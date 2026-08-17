@@ -777,31 +777,10 @@ export default function App() {
            </div>
         </div>
 
-        {/* --- LE COMPTE DE RÉSULTAT --- */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        {/* COMPTE DE RÉSULTAT */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mt-8">
           <div className="bg-slate-800 text-white p-4">
             <h3 className="text-lg font-bold text-center">COMPTE DE RÉSULTAT - EXERCICE {localYear}</h3>
-          </div>
-          <div className="flex items-center gap-4">
-            <label className="text-sm font-medium text-gray-600">Exercice Comptable :</label>
-            <select 
-              value={localYear} 
-              onChange={(e) => setLocalYear(e.target.value)}
-              className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold"
-            >
-              {availableYears.length > 0 ? (
-                availableYears.map(year => <option key={year} value={year}>{year}</option>)
-              ) : (
-                <option value="2025/2026">2025/2026</option>
-              )}
-            </select>
-          </div>
-        </div>
-
-        {/* COMPTE DE RÉSULTAT */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="bg-slate-800 text-white p-4">
-            <h3 className="text-lg font-bold text-center">COMPTE DE RÉSULTAT - {localYear}</h3>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-gray-200">
