@@ -523,9 +523,175 @@ export default function App() {
   const PeriscolaireModule = () => (
     <div className="space-y-6"><h2 className="text-2xl font-bold text-gray-800">Suivi Périscolaire</h2></div>
   );
-  const FinancialStatementsModule = () => (
-    <div className="space-y-6"><h2 className="text-2xl font-bold text-gray-800">États Financiers</h2></div>
-  );
+
+  // Fonction pour calculer l'année scolaire/fiscale (du 01/09 au 31/08)
+  const getFiscalYear = (dateStr) => {
+    if (!dateStr) return 'Non défini';
+    const parts = dateStr.split('/');
+    if (parts.length !== 3) return 'Non défini';
+    const month = parseInt(parts[1], 10);
+    const year = parseInt(parts[2], 10);
+    
+    // Si le mois est Septembre (9) ou plus, on est dans le début de l'année scolaire
+    if (month >= 9) {
+      return `${year}/${year + 1}`;
+    } else {
+      // Sinon (Janvier à Août), on est dans la fin de l'année scolaire commencée l'année d'avant
+      return `${year - 1}/${year}`;
+    }
+  };
+
+  const FinancialStatementsModule = () => {
+    // Déduire toutes les années scolaires existantes à partir des écritures
+    const availableYears = [...new Set(transactions.map(t => getFiscalYear(t.date)).filter(y => y !== 'Non défini'))].sort().reverse();
+    const [localYear, setLocalYear] = useState(availableYears.length > 0 ? availableYears[0] : '2025/2026');
+
+    // Filtrer les écritures uniquement pour l'année sélectionnée
+    const periodTransactions = transactions.filter(t => getFiscalYear(t.date) === localYear);
+
+    // Calculs pour le Compte de Résultat
+    const chargesList = [];
+    const produitsList = [];
+    let totalCharges = 0;
+    let totalProduits = 0;
+
+    // Regrouper par numéro de compte
+    const accountsSummary = {};
+    periodTransactions.forEach(t => {
+      const acc = String(t.account);
+      if (acc.startsWith('6') || acc.startsWith('7')) {
+        if (!accountsSummary[acc]) {
+          accountsSummary[acc] = { label: t.accountLabel || 'À définir', amount: 0, type: acc.startsWith('6') ? 'charge' : 'produit' };
+        }
+        // Pour les charges, le solde normal est débiteur (Débit - Crédit)
+        // Pour les produits, le solde normal est créditeur (Crédit - Débit)
+        if (acc.startsWith('6')) {
+          accountsSummary[acc].amount += (t.debit || 0) - (t.credit || 0);
+        } else {
+          accountsSummary[acc].amount += (t.credit || 0) - (t.debit || 0);
+        }
+      }
+    });
+
+    // Séparer et trier pour l'affichage
+    Object.entries(accountsSummary).forEach(([acc, data]) => {
+      if (data.type === 'charge' && data.amount !== 0) {
+        chargesList.push({ account: acc, ...data });
+        totalCharges += data.amount;
+      } else if (data.type === 'produit' && data.amount !== 0) {
+        produitsList.push({ account: acc, ...data });
+        totalProduits += data.amount;
+      }
+    });
+
+    chargesList.sort((a, b) => a.account.localeCompare(b.account));
+    produitsList.sort((a, b) => a.account.localeCompare(b.account));
+    
+    const resultat = totalProduits - totalCharges;
+
+    return (
+      <div className="space-y-6 animate-in fade-in duration-500 pb-12">
+        <div className="flex justify-between items-center bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-3">
+              <PieChartIcon className="text-blue-600" /> États Financiers
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">Génération automatique du compte de résultat</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <label className="text-sm font-medium text-gray-600">Exercice Comptable :</label>
+            <select 
+              value={localYear} 
+              onChange={(e) => setLocalYear(e.target.value)}
+              className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold"
+            >
+              {availableYears.length > 0 ? (
+                availableYears.map(year => <option key={year} value={year}>{year}</option>)
+              ) : (
+                <option value="2025/2026">2025/2026</option>
+              )}
+            </select>
+          </div>
+        </div>
+
+        {/* COMPTE DE RÉSULTAT */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="bg-slate-800 text-white p-4">
+            <h3 className="text-lg font-bold text-center">COMPTE DE RÉSULTAT - {localYear}</h3>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-gray-200">
+            {/* CHARGES */}
+            <div>
+              <div className="bg-red-50 p-3 border-b border-red-100">
+                <h4 className="font-bold text-red-800">CHARGES (Dépenses)</h4>
+              </div>
+              <table className="w-full text-left text-sm">
+                <tbody>
+                  {chargesList.map(c => (
+                    <tr key={c.account} className="border-b border-gray-50 hover:bg-gray-50">
+                      <td className="p-3 font-mono text-gray-500 w-20">{c.account}</td>
+                      <td className="p-3">{c.label}</td>
+                      <td className="p-3 text-right font-medium">{formatCurrency(c.amount)}</td>
+                    </tr>
+                  ))}
+                  {chargesList.length === 0 && (
+                    <tr><td colSpan="3" className="p-6 text-center text-gray-400 italic">Aucune charge sur cet exercice.</td></tr>
+                  )}
+                </tbody>
+                <tfoot className="bg-gray-50 font-bold border-t border-gray-200">
+                  <tr>
+                    <td colSpan="2" className="p-4 text-right">TOTAL DES CHARGES</td>
+                    <td className="p-4 text-right text-red-600">{formatCurrency(totalCharges)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            {/* PRODUITS */}
+            <div>
+              <div className="bg-green-50 p-3 border-b border-green-100">
+                <h4 className="font-bold text-green-800">PRODUITS (Recettes)</h4>
+              </div>
+              <table className="w-full text-left text-sm">
+                <tbody>
+                  {produitsList.map(p => (
+                    <tr key={p.account} className="border-b border-gray-50 hover:bg-gray-50">
+                      <td className="p-3 font-mono text-gray-500 w-20">{p.account}</td>
+                      <td className="p-3">{p.label}</td>
+                      <td className="p-3 text-right font-medium">{formatCurrency(p.amount)}</td>
+                    </tr>
+                  ))}
+                  {produitsList.length === 0 && (
+                    <tr><td colSpan="3" className="p-6 text-center text-gray-400 italic">Aucun produit sur cet exercice.</td></tr>
+                  )}
+                </tbody>
+                <tfoot className="bg-gray-50 font-bold border-t border-gray-200">
+                  <tr>
+                    <td colSpan="2" className="p-4 text-right">TOTAL DES PRODUITS</td>
+                    <td className="p-4 text-right text-green-600">{formatCurrency(totalProduits)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          {/* RÉSULTAT */}
+          <div className={`p-6 flex justify-between items-center border-t-4 ${resultat >= 0 ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50'}`}>
+            <h3 className="text-xl font-bold uppercase">Résultat de l'exercice</h3>
+            <div className="text-right">
+              <span className={`text-2xl font-bold ${resultat >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                {formatCurrency(resultat)}
+              </span>
+              <p className={`text-sm font-medium mt-1 ${resultat >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {resultat >= 0 ? '(Bénéfice)' : '(Déficit)'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="flex h-screen bg-gray-50 font-sans overflow-hidden">
