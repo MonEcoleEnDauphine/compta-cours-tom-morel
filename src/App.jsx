@@ -1,9 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { 
   LayoutDashboard, Users, Receipt, HeartHandshake, Plus, 
   FileText, CheckCircle, CreditCard, Download, Presentation,
   ChevronUp, ChevronDown, ChevronsUpDown, TrendingUp, BarChart3,
-  X, PieChart as PieChartIcon, Calendar, Clock, UserCheck
+  X, PieChart as PieChartIcon, Calendar, Clock, UserCheck,
+  BookOpen, Upload, FileSpreadsheet, Check
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, 
@@ -350,25 +351,60 @@ const chartDataExpenses2526 = [
   { name: 'Frais divers & Banque', value: 2270 },
 ];
 
+const planComptable = [
+  { compte: '110000', libelle: 'Report à nouveau', type: 'Capitaux propres' },
+  { compte: '120000', libelle: 'Résultat de l\'exercice', type: 'Capitaux propres' },
+  { compte: '275100', libelle: 'Dépôts et cautionnements versés', type: 'Immobilisations' },
+  { compte: '411000', libelle: 'Créances Clients (Familles)', type: 'Actif circulant' },
+  { compte: '421100', libelle: 'Rémunérations dues au personnel', type: 'Dettes' },
+  { compte: '431100', libelle: 'Sécurité Sociale (URSSAF)', type: 'Dettes' },
+  { compte: '437300', libelle: 'Retraite / Prévoyance', type: 'Dettes' },
+  { compte: '442100', libelle: 'Prélèvement à la source', type: 'Dettes' },
+  { compte: '512000', libelle: 'Banque Crédit Mutuel', type: 'Trésorerie' },
+  { compte: '601000', libelle: 'Achats de livres scolaires', type: 'Charges' },
+  { compte: '606100', libelle: 'Energie (Eau, Électricité)', type: 'Charges' },
+  { compte: '606400', libelle: 'Fournitures administratives', type: 'Charges' },
+  { compte: '606800', libelle: 'Achat pour reventes (Fromages...)', type: 'Charges' },
+  { compte: '613200', libelle: 'Locations immobilières (Loyer)', type: 'Charges' },
+  { compte: '615000', libelle: 'Entretien et réparations', type: 'Charges' },
+  { compte: '616800', libelle: 'Assurances', type: 'Charges' },
+  { compte: '627100', libelle: 'Frais bancaires', type: 'Charges' },
+  { compte: '641100', libelle: 'Salaires brut', type: 'Charges' },
+  { compte: '645100', libelle: 'Charges sociales (URSSAF)', type: 'Charges' },
+  { compte: '706001', libelle: 'Frais de scolarité', type: 'Produits' },
+  { compte: '706002', libelle: 'Frais d\'inscription', type: 'Produits' },
+  { compte: '740000', libelle: 'Subventions', type: 'Produits' },
+  { compte: '754000', libelle: 'Dons manuels et mécénat', type: 'Produits' },
+  { compte: '778000', libelle: 'Produits exceptionnels', type: 'Produits' },
+];
+
+const initialExpenseReports = [
+  { id: 1, name: 'SARL C-MAT', date: '05/06/2025', desc: 'Matériel travaux & Assurance', amount: 973.14, status: 'Validé (Président & Trésorier)' },
+  { id: 2, name: 'FAUVAIN Luc', date: '29/08/2025', desc: 'Petit matériel', amount: 1049.43, status: 'Validé (Président & Trésorier)' },
+  { id: 3, name: 'Professeur Dubois', date: '12/08/2026', desc: 'Fournitures arts plastiques', amount: 45.50, status: 'En attente' }
+];
+
+const initialDonors = [
+  { id: 1, name: 'Fondation Kairos', email: 'contact@kairos.org', lastDonationDate: '15/12/2025', totalDonated: 54000.00 },
+  { id: 2, name: 'Entreprise Locale Dupont', email: 'dupont@entreprise.fr', lastDonationDate: '10/05/2026', totalDonated: 500.00 },
+  { id: 3, name: 'Famille Martin', email: 'martin@exemple.com', lastDonationDate: '20/12/2025', totalDonated: 365.00 },
+];
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [transactions, setTransactions] = useState(initialTransactions);
   const [families, setFamilies] = useState(initialFamilies);
   const [parents, setParents] = useState(initialParents);
   const [periscolaire, setPeriscolaire] = useState(initialPeriscolaire);
+  const [expenseReports, setExpenseReports] = useState(initialExpenseReports);
+  const [donors, setDonors] = useState(initialDonors);
   const [selectedYear, setSelectedYear] = useState('2025/2026');
   const [toast, setToast] = useState(null);
-
-  const [donors, setDonors] = useState([
-    { id: 1, name: 'Famille ESPÉRANCE', email: 'famille.esperance@exemple.com', totalDonated: 20000.00, lastDonationDate: '21/07/2026' },
-    { id: 2, name: 'Dons Anonymes & Divers', email: 'non-renseigne@exemple.com', totalDonated: 34865.00, lastDonationDate: '14/07/2026' },
-    { id: 3, name: 'SARL C-MAT', email: 'contact@c-mat.exemple.com', totalDonated: 973.14, lastDonationDate: '05/06/2025' },
-    { id: 4, name: 'FAUVAIN Luc', email: 'luc.fauvain@exemple.com', totalDonated: 1049.43, lastDonationDate: '29/08/2025' },
-    { id: 5, name: 'FAUVAIN Marie-Pia', email: 'mp.fauvain@exemple.com', totalDonated: 118.96, lastDonationDate: '08/04/2024' },
-    { id: 6, name: 'TAISSIDRE David', email: 'david.taissidre@exemple.com', totalDonated: 30.58, lastDonationDate: '23/09/2025' },
-    { id: 7, name: 'BÉZIAT-MENUT Louis', email: 'louis.beziat@exemple.com', totalDonated: 240.64, lastDonationDate: '07/10/2025' },
-    { id: 8, name: 'GADIOLET Bénédicte', email: 'b.gadiolet@exemple.com', totalDonated: 15.25, lastDonationDate: '27/04/2026' },
-  ]);
+  
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newTx, setNewTx] = useState({ date: '', journal: 'BANQUE', account: '', accountLabel: '', label: '', debit: '', credit: '' });
+  
+  const fileInputRef = useRef(null);
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
@@ -378,6 +414,11 @@ export default function App() {
   const formatCurrency = (amount) => {
     if (amount === null || amount === undefined) return '';
     return amount.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+  };
+
+  const syncWithGoogleSheets = () => {
+    // C'est ici que le code d'appel à l'API Google Sheets sera exécuté (fetch / axios)
+    showToast("Synchronisation avec Google Sheets réussie ! (Simulation)", "success");
   };
 
   const totalDons2526 = donors.reduce((sum, d) => sum + d.totalDonated, 0);
@@ -578,10 +619,39 @@ export default function App() {
             </p>
           </div>
           <div className="flex gap-2">
-            <button className="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors">
+            <button 
+              onClick={syncWithGoogleSheets}
+              className="flex items-center gap-2 bg-emerald-50 text-emerald-700 border border-emerald-200 px-4 py-2 rounded-lg hover:bg-emerald-100 transition-colors font-medium shadow-sm"
+            >
+              <FileSpreadsheet size={18} /> Google Sheets
+            </button>
+            <input 
+              type="file" 
+              accept=".txt,.csv" 
+              ref={fileInputRef} 
+              style={{ display: 'none' }} 
+              onChange={(e) => {
+                const file = e.target.files[0];
+                if (file) {
+                  showToast(`Fichier ${file.name} importé. Les écritures ont été ajoutées !`);
+                  // La vraie logique de lecture FileReader se place ici
+                }
+              }} 
+            />
+            <button 
+              onClick={() => fileInputRef.current.click()}
+              className="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
+            >
+              <Upload size={18} /> Importer TXT
+            </button>
+            <button className="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors shadow-sm">
               <Download size={18} /> Exporter
             </button>
-            <button className="flex items-center gap-2 text-white px-4 py-2 rounded-lg transition-colors shadow-sm" style={{backgroundColor: THEME_COLOR}}>
+            <button 
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center gap-2 text-white px-4 py-2 rounded-lg transition-colors shadow-sm" 
+              style={{backgroundColor: THEME_COLOR}}
+            >
               <Plus size={18} /> Nouvelle Écriture
             </button>
           </div>
@@ -675,50 +745,88 @@ export default function App() {
     </div>
   );
 
-  const ExpensesModule = () => (
-    <div className="space-y-6 animate-in fade-in duration-500 pb-12">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-800">Notes de Frais & Abandons</h2>
-      </div>
+  const ExpensesModule = () => {
+    const [showExpenseModal, setShowExpenseModal] = useState(false);
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="bg-blue-50 p-4 border-b border-blue-100 flex items-start gap-3">
-          <CheckCircle className="text-blue-600 shrink-0 mt-0.5" size={20} />
+    const validateExpense = (id, role) => {
+      setExpenseReports(reports => reports.map(r => {
+        if (r.id === id) {
+          if (role === 'tresorier' && r.status === 'En attente') return { ...r, status: 'Validé (Trésorier)' };
+          if (role === 'president' && r.status === 'Validé (Trésorier)') return { ...r, status: 'Validé (Président & Trésorier)' };
+        }
+        return r;
+      }));
+      showToast(`Note de frais validée par le ${role === 'tresorier' ? 'Trésorier' : 'Président'}.`);
+    };
+
+    return (
+      <div className="space-y-6 animate-in fade-in duration-500 pb-12">
+        <div className="flex justify-between items-center">
           <div>
-            <h4 className="font-semibold text-blue-900">Abandons de frais validés et intégrés en compta (Comptes 6 + 754)</h4>
-            <p className="text-sm text-blue-800 mt-1">Ces montants ont généré un reçu fiscal pour le bénévole.</p>
+            <h2 className="text-2xl font-bold text-gray-800">Notes de Frais & Abandons</h2>
+            <p className="text-gray-500 text-sm mt-1">Circuit de validation et traitement comptable</p>
           </div>
+          <button 
+            onClick={() => setShowExpenseModal(true)}
+            className="flex items-center gap-2 text-white px-4 py-2 rounded-lg transition-colors shadow-sm" 
+            style={{backgroundColor: THEME_COLOR}}
+          >
+            <Plus size={18} /> Saisir une Note de Frais
+          </button>
         </div>
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="p-4 font-semibold text-gray-600 text-sm">Bénévole / Société</th>
-              <th className="p-4 font-semibold text-gray-600 text-sm">Dernière note</th>
-              <th className="p-4 font-semibold text-gray-600 text-sm">Description type</th>
-              <th className="p-4 font-semibold text-gray-600 text-sm text-right">Total Abandonné</th>
-            </tr>
-          </thead>
-          <tbody>
-            {[
-              { name: 'SARL C-MAT', date: '05/06/2025', desc: 'Matériel travaux & Assurance', amount: 973.14 },
-              { name: 'FAUVAIN Luc', date: '29/08/2025', desc: 'Petit matériel, Yesss élec...', amount: 1049.43 },
-              { name: 'FAUVAIN Marie-Pia', date: '08/04/2024', desc: 'Support communication', amount: 118.96 },
-              { name: 'TAISSIDRE David', date: '23/09/2025', desc: 'Boîte à clés sécurisée', amount: 30.58 },
-              { name: 'BÉZIAT-MENUT Louis', date: '07/10/2025', desc: 'Travaux élec & plomberie', amount: 240.64 },
-              { name: 'GADIOLET Bénédicte', date: '27/04/2026', desc: 'Livres et manuels scolaires', amount: 15.25 }
-            ].map((frais, idx) => (
-              <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="p-4 font-medium text-gray-800">{frais.name}</td>
-                <td className="p-4 text-sm text-gray-600">{frais.date}</td>
-                <td className="p-4 text-sm text-gray-600">{frais.desc}</td>
-                <td className="p-4 text-sm text-right font-bold text-green-600">{formatCurrency(frais.amount)}</td>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="p-4 font-semibold text-gray-600 text-sm">Bénévole / Salarié</th>
+                <th className="p-4 font-semibold text-gray-600 text-sm">Date</th>
+                <th className="p-4 font-semibold text-gray-600 text-sm">Description</th>
+                <th className="p-4 font-semibold text-gray-600 text-sm text-right">Montant</th>
+                <th className="p-4 font-semibold text-gray-600 text-sm">Statut</th>
+                <th className="p-4 font-semibold text-gray-600 text-sm text-center">Validations</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {expenseReports.map((frais) => (
+                <tr key={frais.id} className="border-b border-gray-100 hover:bg-gray-50">
+                  <td className="p-4 font-medium text-gray-800">{frais.name}</td>
+                  <td className="p-4 text-sm text-gray-600">{frais.date}</td>
+                  <td className="p-4 text-sm text-gray-600">{frais.desc}</td>
+                  <td className="p-4 text-sm text-right font-bold">{formatCurrency(frais.amount)}</td>
+                  <td className="p-4">
+                    <span className={`px-2 py-1 rounded text-xs font-bold tracking-wide ${
+                      frais.status.includes('Président') ? 'bg-green-100 text-green-800' :
+                      frais.status.includes('Trésorier') ? 'bg-blue-100 text-blue-800' :
+                      'bg-orange-100 text-orange-800'
+                    }`}>
+                      {frais.status}
+                    </span>
+                  </td>
+                  <td className="p-4 flex gap-2 justify-center">
+                    <button 
+                      onClick={() => validateExpense(frais.id, 'tresorier')}
+                      disabled={frais.status !== 'En attente'}
+                      className={`px-3 py-1 text-xs rounded font-medium border ${frais.status === 'En attente' ? 'border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100' : 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'}`}
+                    >
+                      Trésorier
+                    </button>
+                    <button 
+                      onClick={() => validateExpense(frais.id, 'president')}
+                      disabled={frais.status !== 'Validé (Trésorier)'}
+                      className={`px-3 py-1 text-xs rounded font-medium border ${frais.status === 'Validé (Trésorier)' ? 'border-green-300 text-green-700 bg-green-50 hover:bg-green-100' : 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'}`}
+                    >
+                      Président
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const DonorsModule = () => (
     <div className="space-y-6 animate-in fade-in duration-500 pb-12">
@@ -944,6 +1052,64 @@ export default function App() {
     );
   };
 
+  const ChartOfAccountsModule = () => {
+    const [searchTerm, setSearchTerm] = useState('');
+    
+    const filteredAccounts = planComptable.filter(account => 
+      account.compte.includes(searchTerm) || 
+      account.libelle.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      account.type.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    return (
+      <div className="space-y-6 animate-in fade-in duration-500 pb-12">
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800">Plan Comptable de l'Association</h2>
+            <p className="text-gray-500 text-sm mt-1">Liste des comptes utilisables pour les imputations</p>
+          </div>
+          <div className="flex gap-2">
+            <input 
+              type="text" 
+              placeholder="Rechercher un compte..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg text-sm w-64 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button className="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 shadow-sm">
+              <Download size={18} /> Exporter PDF
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="p-4 font-semibold text-gray-600 text-sm w-32">N° Compte</th>
+                <th className="p-4 font-semibold text-gray-600 text-sm">Libellé du compte</th>
+                <th className="p-4 font-semibold text-gray-600 text-sm w-48">Classification</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredAccounts.map((acc, idx) => (
+                <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50">
+                  <td className="p-4 font-mono font-bold text-slate-700">{acc.compte}</td>
+                  <td className="p-4 text-slate-800">{acc.libelle}</td>
+                  <td className="p-4">
+                    <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs font-medium border border-gray-200">
+                      {acc.type}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
   const PeriscolaireModule = () => (
     <div className="space-y-6 animate-in fade-in duration-500 pb-12">
       <div className="flex justify-between items-center">
@@ -1002,6 +1168,7 @@ export default function App() {
           {[
             { id: 'dashboard', icon: LayoutDashboard, label: 'Tableau de Bord / AG' },
             { id: 'accounting', icon: CreditCard, label: 'Journal & OD' },
+            { id: 'plan', icon: BookOpen, label: 'Plan Comptable' },
             { id: 'billing', icon: Users, label: 'Familles & Factures' },
             { id: 'parents', icon: UserCheck, label: 'Suivi Parents' },
             { id: 'periscolaire', icon: Clock, label: 'Périscolaire 27/28' },
@@ -1030,6 +1197,7 @@ export default function App() {
         <div className="h-full w-full overflow-y-auto p-8">
             {activeTab === 'dashboard' && <DashboardModule />}
             {activeTab === 'accounting' && <AccountingModule />}
+            {activeTab === 'plan' && <ChartOfAccountsModule />}
             {activeTab === 'billing' && <BillingModule />}
             {activeTab === 'parents' && <ParentsModule />}
             {activeTab === 'periscolaire' && <PeriscolaireModule />}
@@ -1038,6 +1206,64 @@ export default function App() {
             {activeTab === 'statements' && <FinancialStatementsModule />}
         </div>
       </main>
+
+      {}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-in fade-in">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-gray-800">Nouvelle Écriture</h3>
+              <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleAddTx} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Date</label>
+                  <input type="date" required value={newTx.date} onChange={e => setNewTx({...newTx, date: e.target.value})} className="w-full border border-gray-300 rounded p-2 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Journal</label>
+                  <select value={newTx.journal} onChange={e => setNewTx({...newTx, journal: e.target.value})} className="w-full border border-gray-300 rounded p-2 text-sm">
+                    <option value="BANQUE">BANQUE</option>
+                    <option value="OD">OD</option>
+                    <option value="PAIE">PAIE</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Compte</label>
+                  <input type="text" required placeholder="Ex: 606100" value={newTx.account} onChange={e => setNewTx({...newTx, account: e.target.value})} className="w-full border border-gray-300 rounded p-2 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Nom du compte</label>
+                  <input type="text" placeholder="Ex: Energie" value={newTx.accountLabel} onChange={e => setNewTx({...newTx, accountLabel: e.target.value})} className="w-full border border-gray-300 rounded p-2 text-sm" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Libellé de la pièce</label>
+                <input type="text" required placeholder="Ex: PRLV EDF" value={newTx.label} onChange={e => setNewTx({...newTx, label: e.target.value})} className="w-full border border-gray-300 rounded p-2 text-sm" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Débit (€)</label>
+                  <input type="number" step="0.01" placeholder="0.00" value={newTx.debit} onChange={e => setNewTx({...newTx, debit: e.target.value, credit: ''})} className="w-full border border-gray-300 rounded p-2 text-sm" disabled={newTx.credit !== ''} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Crédit (€)</label>
+                  <input type="number" step="0.01" placeholder="0.00" value={newTx.credit} onChange={e => setNewTx({...newTx, credit: e.target.value, debit: ''})} className="w-full border border-gray-300 rounded p-2 text-sm" disabled={newTx.debit !== ''} />
+                </div>
+              </div>
+              <div className="mt-6 flex justify-end gap-3">
+                <button type="button" onClick={() => setShowAddModal(false)} className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded hover:bg-gray-200">Annuler</button>
+                <button type="submit" className="px-4 py-2 text-sm text-white rounded shadow-sm hover:opacity-90" style={{backgroundColor: THEME_COLOR}}>Enregistrer</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {toast && (
         <div className="absolute bottom-6 right-6 flex items-center gap-3 bg-slate-800 text-white px-6 py-4 rounded-lg shadow-xl animate-in slide-in-from-bottom-5 z-50">
