@@ -244,11 +244,81 @@ export default function App() {
 
   // Calcul de la trésorerie totale (Compte 512 Banque)
   const tresorerieTotal = transactions.reduce((sum, t) => {
-    if (t.account && String(t.account).startsWith('512')) {
-        return sum + (t.debit || 0) - (t.credit || 0); // Débit augmente la banque, Crédit diminue
-    }
-    return sum;
+    // Si c'est un relevé bancaire, le débit (de la banque) augmente notre compte, le crédit le diminue.
+    // Attention : souvent sur les relevés, un "crédit" (+ sur le relevé) est une rentrée d'argent (Débit 512 en compta).
+    // Sur ton image du 26/01/2022, 250,00 est en Crédit. Si c'est un Don (rentrée d'argent), c'est +250 pour la banque.
+    // On va supposer que Crédit = Rentrée (+) et Débit = Dépense (-) d'après ton format.
+    return sum + (t.credit || 0) - (t.debit || 0);
   }, 0);
+
+  // --- DYNAMISATION DE L'ANNÉE DU TABLEAU DE BORD ---
+  const getFiscalYear = (dateStr) => {
+    if (!dateStr) return 'Non défini';
+    const parts = dateStr.split('/');
+    if (parts.length !== 3) return 'Non défini';
+    
+    // Essayer de parser la date. Format attendu : JJ/MM/AAAA
+    const day = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10);
+    let year = parseInt(parts[2], 10);
+    
+    // Gérer les années sur 2 chiffres (ex: '22' -> 2022)
+    if (year < 100) {
+      year += 2000;
+    }
+
+    if (isNaN(month) || isNaN(year)) return 'Non défini';
+    
+    // Exercice comptable : du 01/09 au 31/08
+    if (month >= 9) {
+      return `${year}/${year + 1}`;
+    } else {
+      return `${year - 1}/${year}`;
+    }
+  };
+
+  // Trouver toutes les années disponibles et prendre la plus récente
+  const availableYears = [...new Set(transactions.map(t => getFiscalYear(t.date)).filter(y => y !== 'Non défini'))].sort().reverse();
+  const currentDashboardYear = availableYears.length > 0 ? availableYears[0] : 'Année en cours';
+  const shortDashboardYear = currentDashboardYear.replace('20', '').replace('/20', '/'); // ex: "2021/2022" -> "21/22"
+
+  // Recalculer les totaux de Dons pour l'année en cours affichée sur le dashboard
+  const currentYearTransactions = transactions.filter(t => getFiscalYear(t.date) === currentDashboardYear);
+  
+  const totalDonsCurrentYear = currentYearTransactions.reduce((sum, t) => {
+      // On cherche les comptes 754 (Dons)
+      if (t.account && String(t.account).startsWith('754')) {
+          return sum + (t.credit || 0) - (t.debit || 0); // Les dons sont au crédit
+      }
+      return sum;
+  }, 0);
+
+  // Calcul automatique des revenus et dépenses pour les graphiques de l'année en cours
+  const chartDataIncomeCurrent = useMemo(() => {
+    const incomes = {};
+    currentYearTransactions.forEach(t => {
+      if (t.account && String(t.account).startsWith('7') && t.credit) {
+        const label = t.accountLabel || `Compte ${t.account}`;
+        incomes[label] = (incomes[label] || 0) + t.credit;
+      }
+    });
+    return Object.entries(incomes).map(([name, value]) => ({ name, value }));
+  }, [currentYearTransactions]);
+
+  const chartDataExpensesCurrent = useMemo(() => {
+    const expenses = {};
+    currentYearTransactions.forEach(t => {
+      if (t.account && String(t.account).startsWith('6') && t.debit) {
+         const label = t.accountLabel || `Compte ${t.account}`;
+        expenses[label] = (expenses[label] || 0) + t.debit;
+      }
+    });
+    return Object.entries(expenses).map(([name, value]) => ({ name, value }));
+  }, [currentYearTransactions]);
+
+  const totalIncomeCurrent = chartDataIncomeCurrent.reduce((sum, item) => sum + item.value, 0);
+  const totalExpensesCurrent = chartDataExpensesCurrent.reduce((sum, item) => sum + item.value, 0);
+
 
   // Filtrer les onglets selon le rôle de l'utilisateur
   const visibleTabs = ALL_TABS.filter(tab => tab.roles.includes(userRole));
@@ -277,32 +347,32 @@ export default function App() {
           <p className="text-2xl font-bold text-gray-800 mt-1">{formatCurrency(tresorerieTotal)}</p>
         </div>
         <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 border-l-4 border-l-green-500 flex flex-col justify-center">
-          <h3 className="text-gray-500 text-sm font-medium">Dons Récoltés <span className="text-xs font-normal">(25/26)</span></h3>
-          <p className="text-2xl font-bold text-gray-800 mt-1">{formatCurrency(totalDons2526)}</p>
+          <h3 className="text-gray-500 text-sm font-medium">Dons Récoltés <span className="text-xs font-normal">({shortDashboardYear})</span></h3>
+          <p className="text-2xl font-bold text-gray-800 mt-1">{formatCurrency(totalDonsCurrentYear)}</p>
         </div>
         <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 border-l-4 border-l-orange-500 flex flex-col justify-center">
           <h3 className="text-gray-500 text-sm font-medium">Créances Familles</h3>
           <p className="text-2xl font-bold text-gray-800 mt-1">0,00 €</p>
         </div>
         <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 border-l-4 border-l-purple-500 flex flex-col justify-center">
-          <h3 className="text-gray-500 text-sm font-medium">Résultat 25/26</h3>
-          <p className="text-2xl font-bold text-gray-600 mt-1">{formatCurrency(totalIncome2526 - totalExpenses2526)}</p>
+          <h3 className="text-gray-500 text-sm font-medium">Résultat {shortDashboardYear}</h3>
+          <p className="text-2xl font-bold text-gray-600 mt-1">{formatCurrency(totalIncomeCurrent - totalExpensesCurrent)}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-center min-h-[300px]">
           <h3 className="text-lg font-semibold mb-2 flex items-center gap-2 justify-center" style={{color: THEME_COLOR}}>
-            <HeartHandshake size={20} /> Répartition des Recettes
+            <HeartHandshake size={20} /> Répartition des Recettes ({currentDashboardYear})
           </h3>
-          {chartDataIncome2526.length > 0 ? (
+          {chartDataIncomeCurrent.length > 0 ? (
             <>
-              <p className="text-2xl font-bold text-slate-800 mb-6">{formatCurrency(totalIncome2526)}</p>
+              <p className="text-2xl font-bold text-slate-800 mb-6">{formatCurrency(totalIncomeCurrent)}</p>
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={chartDataIncome2526} cx="50%" cy="50%" innerRadius={50} outerRadius={100} paddingAngle={3} dataKey="value" label={renderCustomizedLabel} labelLine={false}>
-                      {chartDataIncome2526.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                    <Pie data={chartDataIncomeCurrent} cx="50%" cy="50%" innerRadius={50} outerRadius={100} paddingAngle={3} dataKey="value" label={renderCustomizedLabel} labelLine={false}>
+                      {chartDataIncomeCurrent.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                     </Pie>
                     <RechartsTooltip formatter={(value) => formatCurrency(value)} />
                     <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: '12px' }} />
@@ -320,16 +390,16 @@ export default function App() {
 
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-center min-h-[300px]">
           <h3 className="text-lg font-semibold text-red-500 mb-2 flex items-center gap-2 justify-center">
-            <PieChartIcon size={20} /> Répartition des Dépenses
+            <PieChartIcon size={20} /> Répartition des Dépenses ({currentDashboardYear})
           </h3>
-          {chartDataExpenses2526.length > 0 ? (
+          {chartDataExpensesCurrent.length > 0 ? (
             <>
-              <p className="text-2xl font-bold text-slate-800 mb-6">{formatCurrency(totalExpenses2526)}</p>
+              <p className="text-2xl font-bold text-slate-800 mb-6">{formatCurrency(totalExpensesCurrent)}</p>
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={chartDataExpenses2526} cx="50%" cy="50%" innerRadius={50} outerRadius={100} paddingAngle={3} dataKey="value" label={renderCustomizedLabel} labelLine={false}>
-                      {chartDataExpenses2526.map((entry, index) => <Cell key={`cell-${index}`} fill={EXPENSE_COLORS[index % EXPENSE_COLORS.length]} />)}
+                    <Pie data={chartDataExpensesCurrent} cx="50%" cy="50%" innerRadius={50} outerRadius={100} paddingAngle={3} dataKey="value" label={renderCustomizedLabel} labelLine={false}>
+                      {chartDataExpensesCurrent.map((entry, index) => <Cell key={`cell-${index}`} fill={EXPENSE_COLORS[index % EXPENSE_COLORS.length]} />)}
                     </Pie>
                     <RechartsTooltip formatter={(value) => formatCurrency(value)} />
                     <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: '12px' }} />
@@ -524,38 +594,19 @@ export default function App() {
     <div className="space-y-6"><h2 className="text-2xl font-bold text-gray-800">Suivi Périscolaire</h2></div>
   );
 
-  // Fonction pour calculer l'année scolaire/fiscale (du 01/09 au 31/08)
-  const getFiscalYear = (dateStr) => {
-    if (!dateStr) return 'Non défini';
-    const parts = dateStr.split('/');
-    if (parts.length !== 3) return 'Non défini';
-    const month = parseInt(parts[1], 10);
-    const year = parseInt(parts[2], 10);
-    
-    // Si le mois est Septembre (9) ou plus, on est dans le début de l'année scolaire
-    if (month >= 9) {
-      return `${year}/${year + 1}`;
-    } else {
-      // Sinon (Janvier à Août), on est dans la fin de l'année scolaire commencée l'année d'avant
-      return `${year - 1}/${year}`;
-    }
-  };
-
   const FinancialStatementsModule = () => {
-    // Déduire toutes les années scolaires existantes à partir des écritures
-    const availableYears = [...new Set(transactions.map(t => getFiscalYear(t.date)).filter(y => y !== 'Non défini'))].sort().reverse();
-    const [localYear, setLocalYear] = useState(availableYears.length > 0 ? availableYears[0] : '2025/2026');
+    // Déduire toutes les années scolaires existantes
+    const [localYear, setLocalYear] = useState(currentDashboardYear);
 
-    // Filtrer les écritures uniquement pour l'année sélectionnée
+    // Filtrer les écritures
     const periodTransactions = transactions.filter(t => getFiscalYear(t.date) === localYear);
-
-    // Calculs pour le Compte de Résultat
+    
+    // --- CALCUL DU COMPTE DE RÉSULTAT (Comptes 6 et 7 de l'année sélectionnée) ---
     const chargesList = [];
     const produitsList = [];
     let totalCharges = 0;
     let totalProduits = 0;
 
-    // Regrouper par numéro de compte
     const accountsSummary = {};
     periodTransactions.forEach(t => {
       const acc = String(t.account);
@@ -563,8 +614,6 @@ export default function App() {
         if (!accountsSummary[acc]) {
           accountsSummary[acc] = { label: t.accountLabel || 'À définir', amount: 0, type: acc.startsWith('6') ? 'charge' : 'produit' };
         }
-        // Pour les charges, le solde normal est débiteur (Débit - Crédit)
-        // Pour les produits, le solde normal est créditeur (Crédit - Débit)
         if (acc.startsWith('6')) {
           accountsSummary[acc].amount += (t.debit || 0) - (t.credit || 0);
         } else {
@@ -573,7 +622,6 @@ export default function App() {
       }
     });
 
-    // Séparer et trier pour l'affichage
     Object.entries(accountsSummary).forEach(([acc, data]) => {
       if (data.type === 'charge' && data.amount !== 0) {
         chargesList.push({ account: acc, ...data });
@@ -589,6 +637,53 @@ export default function App() {
     
     const resultat = totalProduits - totalCharges;
 
+    // --- CALCUL DU BILAN (Comptes 1 à 5 + reconstitution de la Trésorerie) ---
+    // Pour simplifier à partir d'un relevé bancaire, le Bilan est :
+    // Actif = Trésorerie à la fin de l'exercice
+    // Passif = Résultat de l'exercice + Report à nouveau (historique)
+    
+    // 1. Calcul de la trésorerie à la fin de l'année sélectionnée (et avant)
+    const transactionsUpToYear = transactions.filter(t => {
+       const txYear = getFiscalYear(t.date);
+       // On garde si l'année de transaction est inférieure ou égale à l'année locale
+       return txYear <= localYear; 
+    });
+
+    const tresorerieBilan = transactionsUpToYear.reduce((sum, t) => {
+        return sum + (t.credit || 0) - (t.debit || 0);
+    }, 0);
+
+    // 2. Calcul du résultat historique (Report à nouveau) : tout ce qui s'est passé AVANT l'année sélectionnée
+    const transactionsBeforeYear = transactions.filter(t => getFiscalYear(t.date) < localYear);
+    
+    let historiqueProduits = 0;
+    let historiqueCharges = 0;
+    
+    transactionsBeforeYear.forEach(t => {
+        const acc = String(t.account);
+        if (acc.startsWith('7')) historiqueProduits += (t.credit || 0) - (t.debit || 0);
+        if (acc.startsWith('6')) historiqueCharges += (t.debit || 0) - (t.credit || 0);
+    });
+    
+    const reportANouveau = historiqueProduits - historiqueCharges;
+
+    // 3. Construction des tableaux pour l'affichage
+    const actifList = [];
+    if (tresorerieBilan !== 0) {
+        actifList.push({ account: '512000', label: 'Banque', amount: tresorerieBilan });
+    }
+    const totalActif = tresorerieBilan;
+
+    const passifList = [];
+    if (reportANouveau !== 0) {
+        passifList.push({ account: '110000', label: 'Report à nouveau', amount: reportANouveau });
+    }
+    if (resultat !== 0) {
+        passifList.push({ account: '120000', label: 'Résultat de l\'exercice', amount: resultat });
+    }
+    const totalPassif = reportANouveau + resultat;
+
+
     return (
       <div className="space-y-6 animate-in fade-in duration-500 pb-12">
         <div className="flex justify-between items-center bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
@@ -596,7 +691,96 @@ export default function App() {
             <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-3">
               <PieChartIcon className="text-blue-600" /> États Financiers
             </h2>
-            <p className="text-sm text-gray-500 mt-1">Génération automatique du compte de résultat</p>
+            <p className="text-sm text-gray-500 mt-1">Génération automatique du Bilan et Compte de Résultat</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <label className="text-sm font-medium text-gray-600">Exercice Comptable :</label>
+            <select 
+              value={localYear} 
+              onChange={(e) => setLocalYear(e.target.value)}
+              className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold"
+            >
+              {availableYears.length > 0 ? (
+                availableYears.map(year => <option key={year} value={year}>{year}</option>)
+              ) : (
+                <option value="Année en cours">Année en cours</option>
+              )}
+            </select>
+          </div>
+        </div>
+
+        {/* --- LE BILAN COMPTABLE --- */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-8">
+          <div className="bg-slate-700 text-white p-4">
+            <h3 className="text-lg font-bold text-center">BILAN AU 31/08 - EXERCICE {localYear}</h3>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-gray-200">
+            {/* ACTIF */}
+            <div>
+              <div className="bg-blue-50 p-3 border-b border-blue-100">
+                <h4 className="font-bold text-blue-800">ACTIF (Emplois)</h4>
+              </div>
+              <table className="w-full text-left text-sm">
+                <tbody>
+                  {actifList.map(a => (
+                    <tr key={a.account} className="border-b border-gray-50 hover:bg-gray-50">
+                      <td className="p-3 font-mono text-gray-500 w-20">{a.account}</td>
+                      <td className="p-3">{a.label}</td>
+                      <td className="p-3 text-right font-medium">{formatCurrency(a.amount)}</td>
+                    </tr>
+                  ))}
+                  {actifList.length === 0 && (
+                    <tr><td colSpan="3" className="p-6 text-center text-gray-400 italic">Aucun actif enregistré.</td></tr>
+                  )}
+                </tbody>
+                <tfoot className="bg-gray-50 font-bold border-t border-gray-200">
+                  <tr>
+                    <td colSpan="2" className="p-4 text-right">TOTAL ACTIF</td>
+                    <td className="p-4 text-right text-blue-700">{formatCurrency(totalActif)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            {/* PASSIF */}
+            <div>
+              <div className="bg-purple-50 p-3 border-b border-purple-100">
+                <h4 className="font-bold text-purple-800">PASSIF (Ressources)</h4>
+              </div>
+              <table className="w-full text-left text-sm">
+                <tbody>
+                  {passifList.map(p => (
+                    <tr key={p.account} className="border-b border-gray-50 hover:bg-gray-50">
+                      <td className="p-3 font-mono text-gray-500 w-20">{p.account}</td>
+                      <td className="p-3">{p.label}</td>
+                      <td className="p-3 text-right font-medium">{formatCurrency(p.amount)}</td>
+                    </tr>
+                  ))}
+                  {passifList.length === 0 && (
+                    <tr><td colSpan="3" className="p-6 text-center text-gray-400 italic">Aucun passif enregistré.</td></tr>
+                  )}
+                </tbody>
+                <tfoot className="bg-gray-50 font-bold border-t border-gray-200">
+                  <tr>
+                    <td colSpan="2" className="p-4 text-right">TOTAL PASSIF</td>
+                    <td className="p-4 text-right text-purple-700">{formatCurrency(totalPassif)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+          
+           {/* Contrôle de l'équilibre du Bilan */}
+           <div className={`p-3 text-center text-xs font-bold ${Math.abs(totalActif - totalPassif) < 0.01 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+              {Math.abs(totalActif - totalPassif) < 0.01 ? '✓ Le bilan est équilibré' : `⚠ Déséquilibre de ${formatCurrency(totalActif - totalPassif)}`}
+           </div>
+        </div>
+
+        {/* --- LE COMPTE DE RÉSULTAT --- */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="bg-slate-800 text-white p-4">
+            <h3 className="text-lg font-bold text-center">COMPTE DE RÉSULTAT - EXERCICE {localYear}</h3>
           </div>
           <div className="flex items-center gap-4">
             <label className="text-sm font-medium text-gray-600">Exercice Comptable :</label>
