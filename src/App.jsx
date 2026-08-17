@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { 
   LayoutDashboard, Users, Receipt, HeartHandshake, Plus, 
   FileText, CheckCircle, CreditCard, Download, Presentation,
@@ -58,8 +58,10 @@ const financialStatements = {
 
 const chartDataYearly = [];
 const chartDataTreasury = [];
-const chartDataIncome2526 = [];
-const chartDataExpenses2526 = [];
+
+// Les données des graphiques seront maintenant calculées automatiquement
+// const chartDataIncome2526 = [];
+// const chartDataExpenses2526 = [];
 
 const planComptable = [
   { compte: '110000', libelle: 'Report à nouveau', type: 'Capitaux propres' },
@@ -102,6 +104,7 @@ export default function App() {
   
   const [showAddModal, setShowAddModal] = useState(false);
   const [newTx, setNewTx] = useState({ date: '', journal: 'BANQUE', account: '', accountLabel: '', label: '', debit: '', credit: '' });
+  const [isLoading, setIsLoading] = useState(true);
   
   const fileInputRef = useRef(null);
 
@@ -109,6 +112,65 @@ export default function App() {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
+
+  const fetchGoogleSheetsData = useCallback(async () => {
+    setIsLoading(true);
+    const SHEET_ID = '1jy4IPjSoIBHnu3OHnmXfu2YhV2tNv6gf6WlaxbTjtLU';
+    const API_KEY = 'AIzaSyDg92oZrigWKq6RcKloQfHn0476880dT-Y';
+    // On lit les colonnes A à K (pour inclure tes colonnes Libellé et Compte) à partir de la ligne 2
+    const RANGE = 'A2:K'; 
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${RANGE}?key=${API_KEY}`;
+
+    try {
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.error) {
+         console.error("Erreur API:", data.error);
+         showToast("Erreur API : " + data.error.message, "error");
+         return;
+      }
+
+      if (data.values) {
+        const formattedData = data.values.map((row, index) => {
+          // Fonction pour nettoyer les montants (ex: "-7,00" devient 7.00 ou "250,00" devient 250.00)
+          const parseAmount = (val) => {
+            if (!val) return null;
+            // On enlève le signe moins éventuel, les espaces, on remplace la virgule par un point
+            const cleanVal = val.toString().replace('-', '').replace('€', '').trim().replace(',', '.');
+            const parsed = parseFloat(cleanVal);
+            return isNaN(parsed) ? null : parsed;
+          };
+
+          return {
+            id: index, // On utilise la position dans le tableau comme ID
+            date: row[0] || '', // Colonne A: Date comptable
+            journal: 'BANQUE', // On force BANQUE vu que c'est un relevé
+            account: row[10] || 'À CLASSER', // Colonne K: Compte (ou 'À CLASSER' si vide)
+            accountLabel: row[9] || '', // Colonne J: Libellé du compte
+            label: row[3] || row[1] || '', // Colonne D (Infos comp) ou Colonne B (Libellé simplifié)
+            debit: parseAmount(row[5]), // Colonne F: Débit
+            credit: parseAmount(row[6]), // Colonne G: Crédit
+          };
+        });
+        
+        // On inverse pour avoir les opérations les plus récentes en haut du tableau
+        setTransactions(formattedData.reverse());
+        showToast("Données synchronisées avec succès !");
+      } else {
+        setTransactions([]);
+      }
+    } catch (error) {
+      console.error("Erreur de connexion à Google Sheets:", error);
+      showToast("Erreur de connexion réseau au document", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchGoogleSheetsData();
+  }, [fetchGoogleSheetsData]);
 
   const handleRoleChange = (e) => {
     const newRole = e.target.value;
@@ -143,17 +205,50 @@ export default function App() {
   };
 
   const formatCurrency = (amount) => {
-    if (amount === null || amount === undefined) return '';
-    return amount.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+    if (amount === null || amount === undefined || isNaN(amount)) return '';
+    return parseFloat(amount).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
   };
 
   const syncWithGoogleSheets = () => {
-    showToast("Simulation : En attente de votre lien API Google Sheets...", "success");
+    fetchGoogleSheetsData();
   };
 
   const totalDons2526 = donors.reduce((sum, d) => sum + d.totalDonated, 0);
+  
+  // Calcul automatique des revenus depuis les comptes commençant par '7'
+  const chartDataIncome2526 = useMemo(() => {
+    const incomes = {};
+    transactions.forEach(t => {
+      if (t.account && String(t.account).startsWith('7') && t.credit) {
+        const label = t.accountLabel || `Compte ${t.account}`;
+        incomes[label] = (incomes[label] || 0) + t.credit;
+      }
+    });
+    return Object.entries(incomes).map(([name, value]) => ({ name, value }));
+  }, [transactions]);
+
+  // Calcul automatique des dépenses depuis les comptes commençant par '6'
+  const chartDataExpenses2526 = useMemo(() => {
+    const expenses = {};
+    transactions.forEach(t => {
+      if (t.account && String(t.account).startsWith('6') && t.debit) {
+         const label = t.accountLabel || `Compte ${t.account}`;
+        expenses[label] = (expenses[label] || 0) + t.debit;
+      }
+    });
+    return Object.entries(expenses).map(([name, value]) => ({ name, value }));
+  }, [transactions]);
+
   const totalIncome2526 = chartDataIncome2526.reduce((sum, item) => sum + item.value, 0);
   const totalExpenses2526 = chartDataExpenses2526.reduce((sum, item) => sum + item.value, 0);
+
+  // Calcul de la trésorerie totale (Compte 512 Banque)
+  const tresorerieTotal = transactions.reduce((sum, t) => {
+    if (t.account && String(t.account).startsWith('512')) {
+        return sum + (t.debit || 0) - (t.credit || 0); // Débit augmente la banque, Crédit diminue
+    }
+    return sum;
+  }, 0);
 
   // Filtrer les onglets selon le rôle de l'utilisateur
   const visibleTabs = ALL_TABS.filter(tab => tab.roles.includes(userRole));
@@ -179,7 +274,7 @@ export default function App() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 border-l-4 flex flex-col justify-center" style={{borderLeftColor: THEME_COLOR}}>
           <h3 className="text-gray-500 text-sm font-medium">Trésorerie Actuelle</h3>
-          <p className="text-2xl font-bold text-gray-800 mt-1">0,00 €</p>
+          <p className="text-2xl font-bold text-gray-800 mt-1">{formatCurrency(tresorerieTotal)}</p>
         </div>
         <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 border-l-4 border-l-green-500 flex flex-col justify-center">
           <h3 className="text-gray-500 text-sm font-medium">Dons Récoltés <span className="text-xs font-normal">(25/26)</span></h3>
@@ -191,7 +286,7 @@ export default function App() {
         </div>
         <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 border-l-4 border-l-purple-500 flex flex-col justify-center">
           <h3 className="text-gray-500 text-sm font-medium">Résultat 25/26</h3>
-          <p className="text-2xl font-bold text-gray-600 mt-1">0,00 €</p>
+          <p className="text-2xl font-bold text-gray-600 mt-1">{formatCurrency(totalIncome2526 - totalExpenses2526)}</p>
         </div>
       </div>
 
@@ -434,6 +529,15 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-gray-50 font-sans overflow-hidden">
+      
+      {/* Écran de chargement lors de la synchro avec Google Sheets */}
+      {isLoading && (
+        <div className="absolute inset-0 bg-white/70 z-[100] flex flex-col items-center justify-center backdrop-blur-sm">
+           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+           <p className="text-blue-800 font-bold text-xl drop-shadow-md">Synchronisation avec Google Sheets...</p>
+        </div>
+      )}
+
       <aside className="w-64 bg-white text-slate-800 flex flex-col shrink-0 border-r border-gray-200">
         <div className="p-6 border-b border-gray-100 flex flex-col items-center">
           <img src="bleu fond blanc-2_2.png" alt="Logo" className="w-40 h-auto mb-6 object-contain" onError={(e) => { e.target.src = 'https://via.placeholder.com/150x80?text=Logo'; }}/>
