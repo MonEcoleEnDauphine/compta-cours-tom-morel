@@ -1,9 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { 
   LayoutDashboard, Users, BookOpen, GraduationCap, FileSignature, AlertTriangle, CheckCircle,
   Building, Calendar, CreditCard, PieChart, Shield, Lock, FileText, Upload, 
   Trash2, XCircle, RotateCcw, Search, ChevronRight, CheckCircle2, AlertCircle, Paperclip,
-  Plus, Save, Sparkles, Receipt, Heart, FileSpreadsheet
+  Plus, Save, Sparkles, Receipt, Heart, FileSpreadsheet, Download, Filter
 } from 'lucide-react';
 
 const firebaseConfig = {
@@ -17,6 +17,211 @@ const firebaseConfig = {
 };
 
 const LOGO_URL = "https://lh3.googleusercontent.com/sitesv/AG8ngQV-LUFlrtg_DNGIEJuJlg8hL-15Ho9x_gUhT4VHh9raUCwwvKpykeuSr41H06U8AJpts-x4aI6LsqQ-JpWIkDZNjppIGTTOrcWJOwBBgLrBmhjzJ5Fp0_HZ9Blj54z7PfJ9gZhWIe3JI5rKc8MN_9PLh0uvn1qSZEx-fcovZvT4iLqqJMLhDYGXI-Bt=w16383";
+
+// ==========================================
+// MOCK DATA : TRANSACTIONS GLOBALES (Pour l'état financier)
+// Dans une vraie application, ces données viendraient de Firebase (Journal Banque + OD)
+// ==========================================
+const mockTransactionsGlobales = [
+  { id: 1, date: '2026-09-05', libelle: 'Scolarité Septembre Famille Dupont', montant: 450.00, type: 'recette', compte: '706000' },
+  { id: 2, date: '2026-09-12', libelle: 'Loyer Bâtiment Septembre', montant: -1200.00, type: 'depense', compte: '613200' },
+  { id: 3, date: '2026-10-02', libelle: 'Donateur Anonyme', montant: 1000.00, type: 'recette', compte: '754000' },
+  { id: 4, date: '2026-10-15', libelle: 'Fournitures scolaires', montant: -350.50, type: 'depense', compte: '606200' },
+  { id: 5, date: '2027-01-10', libelle: 'Facture Chauffage Hiver', montant: -600.00, type: 'depense', compte: '606100' },
+  { id: 6, date: '2026-08-25', libelle: 'Achat Livres (Année N-1)', montant: -200.00, type: 'depense', compte: '606200' }, // Hors période par défaut 26-27
+];
+
+const categoriesComptables = {
+  '706000': 'Scolarités & Garderie',
+  '754000': 'Dons & Mécénat',
+  '740000': 'Subventions',
+  '613200': 'Loyers & Charges',
+  '606200': 'Fournitures & Pédagogie',
+  '606100': 'Électricité & Eau',
+  '641000': 'Salaires & Charges Soc.',
+  '626000': 'Frais Postaux & Télécom',
+};
+
+// ==========================================
+// MODULE : ETAT FINANCIER (Budget / Bilan)
+// ==========================================
+const EtatFinancier = ({ planComptable }) => {
+  // Par défaut, l'année scolaire en cours (1er Sept -> 31 Août)
+  const [anneeDebut, setAnneeDebut] = useState(2026);
+  
+  const periode = useMemo(() => {
+    return {
+      debut: `${anneeDebut}-09-01`,
+      fin: `${anneeDebut + 1}-08-31`,
+      label: `Année Scolaire ${anneeDebut}-${anneeDebut + 1}`
+    };
+  }, [anneeDebut]);
+
+  // Filtrer les transactions selon la période scolaire sélectionnée
+  const transactionsFiltrees = useMemo(() => {
+    return mockTransactionsGlobales.filter(t => {
+      return t.date >= periode.debut && t.date <= periode.fin;
+    });
+  }, [periode]);
+
+  // Calculer les totaux
+  const totaux = useMemo(() => {
+    let recettes = 0;
+    let depenses = 0;
+    const parCompte = {};
+
+    transactionsFiltrees.forEach(t => {
+      // Déterminer la nature du compte basé sur le 1er chiffre (6 = Charge, 7 = Produit)
+      let typeOperation = 'autre';
+      if (t.compte && t.compte.startsWith('6')) typeOperation = 'depense';
+      else if (t.compte && t.compte.startsWith('7')) typeOperation = 'recette';
+      // Si la banque a donné un montant positif/négatif sans compte, on se fie au montant
+      else typeOperation = t.montant > 0 ? 'recette' : 'depense';
+
+      if (t.montant > 0) recettes += t.montant;
+      if (t.montant < 0) depenses += Math.abs(t.montant);
+
+      if (!parCompte[t.compte]) {
+        parCompte[t.compte] = { montant: 0, type: typeOperation };
+      }
+      parCompte[t.compte].montant += t.montant;
+    });
+
+    return { 
+      recettes, 
+      depenses, 
+      resultat: recettes - depenses,
+      parCompte: Object.entries(parCompte).map(([compte, data]) => {
+        // Chercher le vrai libellé dans le plan comptable de l'association
+        const compteInfo = planComptable.find(c => c.id === compte);
+        return {
+          compte,
+          label: compteInfo ? compteInfo.label : 'Compte Inconnu / À classer',
+          montant: Math.abs(data.montant),
+          type: data.type
+        };
+      }).sort((a, b) => b.montant - a.montant)
+    };
+  }, [transactionsFiltrees, planComptable]);
+
+  return (
+    <div className="space-y-6 animate-in fade-in">
+      {/* En-tête et Filtres */}
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+            <PieChart className="text-blue-600" /> État Financier
+          </h2>
+          <p className="text-slate-500 mt-1">Bilan comptable basé sur l'année scolaire de l'association.</p>
+        </div>
+        
+        <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-lg border border-slate-200">
+          <Filter size={18} className="text-slate-400 ml-2" />
+          <span className="text-sm font-medium text-slate-600">Période :</span>
+          <select 
+            value={anneeDebut}
+            onChange={(e) => setAnneeDebut(Number(e.target.value))}
+            className="p-2 border rounded-md text-sm bg-white font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+          >
+            <option value={2025}>01/09/25 au 31/08/26</option>
+            <option value={2026}>01/09/26 au 31/08/27</option>
+            <option value={2027}>01/09/27 au 31/08/28</option>
+          </select>
+          <button className="p-2 bg-white border border-slate-200 rounded-md hover:bg-slate-100 text-slate-600 transition-colors" title="Exporter en PDF">
+            <Download size={18} />
+          </button>
+        </div>
+      </div>
+
+      {/* Cartes Résumé (KPIs) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex items-center gap-4 border-l-4 border-l-emerald-500">
+          <div className="p-4 bg-emerald-50 rounded-full text-emerald-600">
+            <Plus size={24} />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-slate-500">Total Recettes</p>
+            <h3 className="text-2xl font-bold text-slate-800">{totaux.recettes.toFixed(2)} €</h3>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex items-center gap-4 border-l-4 border-l-rose-500">
+          <div className="p-4 bg-rose-50 rounded-full text-rose-600">
+            <Trash2 size={24} /> {/* Placeholder icon for expenses */}
+          </div>
+          <div>
+            <p className="text-sm font-medium text-slate-500">Total Dépenses</p>
+            <h3 className="text-2xl font-bold text-slate-800">{totaux.depenses.toFixed(2)} €</h3>
+          </div>
+        </div>
+
+        <div className={`bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex items-center gap-4 border-l-4 ${totaux.resultat >= 0 ? 'border-l-blue-500' : 'border-l-amber-500'}`}>
+          <div className={`p-4 rounded-full ${totaux.resultat >= 0 ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'}`}>
+            <Building size={24} />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-slate-500">Résultat Période</p>
+            <h3 className={`text-2xl font-bold ${totaux.resultat >= 0 ? 'text-blue-700' : 'text-amber-700'}`}>
+              {totaux.resultat > 0 ? '+' : ''}{totaux.resultat.toFixed(2)} €
+            </h3>
+          </div>
+        </div>
+      </div>
+
+      {/* Détail par Catégories */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Colonne Dépenses */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="bg-rose-50 p-4 border-b border-rose-100 flex justify-between items-center">
+            <h3 className="font-bold text-rose-800">Dépenses par poste</h3>
+            <span className="text-sm font-semibold text-rose-600">{totaux.depenses.toFixed(2)} €</span>
+          </div>
+          <div className="p-0">
+            <ul className="divide-y divide-slate-100">
+              {totaux.parCompte.filter(c => c.type === 'depense').map((item, idx) => (
+                <li key={idx} className="p-4 flex justify-between items-center hover:bg-slate-50">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-1 rounded">{item.compte}</span>
+                    <span className="font-medium text-slate-700">{item.label}</span>
+                  </div>
+                  <span className="font-semibold text-rose-600">-{item.montant.toFixed(2)} €</span>
+                </li>
+              ))}
+              {totaux.parCompte.filter(c => c.type === 'depense').length === 0 && (
+                <li className="p-8 text-center text-slate-400 text-sm">Aucune dépense enregistrée sur cette période.</li>
+              )}
+            </ul>
+          </div>
+        </div>
+
+        {/* Colonne Recettes */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="bg-emerald-50 p-4 border-b border-emerald-100 flex justify-between items-center">
+            <h3 className="font-bold text-emerald-800">Recettes par poste</h3>
+            <span className="text-sm font-semibold text-emerald-600">{totaux.recettes.toFixed(2)} €</span>
+          </div>
+          <div className="p-0">
+            <ul className="divide-y divide-slate-100">
+              {totaux.parCompte.filter(c => c.type === 'recette').map((item, idx) => (
+                <li key={idx} className="p-4 flex justify-between items-center hover:bg-slate-50">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-1 rounded">{item.compte}</span>
+                    <span className="font-medium text-slate-700">{item.label}</span>
+                  </div>
+                  <span className="font-semibold text-emerald-600">+{item.montant.toFixed(2)} €</span>
+                </li>
+              ))}
+              {totaux.parCompte.filter(c => c.type === 'recette').length === 0 && (
+                <li className="p-8 text-center text-slate-400 text-sm">Aucune recette enregistrée sur cette période.</li>
+              )}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 // ==========================================
 // MODULE : JOURNAL DE BANQUE (Import CSV uniquement)
@@ -139,11 +344,29 @@ const JournalBanque = ({ planComptable }) => {
                   </select>
                 </td>
                 <td className="py-3 px-4 text-center">
-                      <button onClick={() => setTransactions(transactions.filter(tr => tr.id !== t.id))} className="text-red-500 hover:bg-red-50 p-2 rounded"><Trash2 size={16}/></button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
+                  <div className="flex items-center justify-center gap-1">
+                    {t.status === 'validated' ? (
+                      <span className="text-green-600 bg-green-100 p-1.5 rounded flex items-center gap-1 text-xs font-bold">
+                        <CheckCircle2 size={16} /> Validé
+                      </span>
+                    ) : (
+                      <>
+                        <button title="Joindre un justificatif (PDF)" className="text-slate-400 hover:text-blue-600 hover:bg-blue-50 p-1.5 rounded transition-colors">
+                          <Paperclip size={18}/>
+                        </button>
+                        <button onClick={() => setTransactions(transactions.map(tr => tr.id === t.id ? {...tr, status: 'validated'} : tr))} title="Valider l'écriture" className="text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 p-1.5 rounded transition-colors">
+                          <CheckCircle size={18}/>
+                        </button>
+                        <button onClick={() => setTransactions(transactions.filter(tr => tr.id !== t.id))} title="Supprimer la ligne" className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded transition-colors">
+                          <Trash2 size={18}/>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
           </table>
         </div>
       )}
@@ -239,160 +462,138 @@ const OperationsDiverses = ({ planComptable }) => {
 // MODULE : PLAN COMPTABLE
 // ==========================================
 const PlanComptableManager = ({ planComptable, setPlanComptable }) => {
-const [newId, setNewId] = useState('');
-const [newLabel, setNewLabel] = useState('');
+  const [newId, setNewId] = useState('');
+  const [newLabel, setNewLabel] = useState('');
+  const fileInputRef = useRef(null);
+  const [toast, setToast] = useState(null);
 
-const handleAdd = (e) => {
-e.preventDefault();
-if (!newId || !newLabel) return;
-if (planComptable.find(c => c.id === newId)) return;
-setPlanComptable([...planComptable, { id: newId, label: newLabel }].sort((a, b) => a.id.localeCompare(b.id)));
-setNewId('');
-setNewLabel('');
-};
-
-const removeCompte = (id) => {
-setPlanComptable(planComptable.filter(c => c.id !== id));
-};
-
-return (
-<div className="space-y-6 animate-in fade-in max-w-4xl mx-auto">
-  <div className="flex items-center gap-3 mb-2">
-    <BookOpen className="text-purple-600" size={28} />
-    <h2 className="text-2xl font-bold text-slate-800">Plan Comptable de l'Association</h2>
-  </div>
-  
-  <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-    <h3 className="text-sm font-semibold text-slate-700 mb-4">Ajouter un nouveau compte</h3>
-    <form onSubmit={handleAdd} className="flex flex-wrap gap-4 items-end">
-      <div className="flex-1 min-w-[150px]">
-        <label className="block text-xs font-medium text-slate-500 mb-1">Numéro (ex: 606300)</label>
-        <input type="text" required value={newId} onChange={e=>setNewId(e.target.value)} className="w-full p-2 border rounded-md text-sm" />
-      </div>
-      <div className="flex-[2] min-w-[200px]">
-        <label className="block text-xs font-medium text-slate-500 mb-1">Libellé (ex: Fournitures scolaires)</label>
-        <input type="text" required value={newLabel} onChange={e=>setNewLabel(e.target.value)} className="w-full p-2 border rounded-md text-sm" />
-      </div>
-      <button type="submit" className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md font-medium text-sm flex items-center gap-2 h-[38px] transition-colors">
-        <Plus size={16}/> Ajouter
-      </button>
-    </form>
-  </div>
-
-  <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-    <table className="w-full text-left text-sm whitespace-nowrap">
-      <thead className="bg-slate-50 text-slate-600 font-medium border-b border-slate-200">
-        <tr>
-          <th className="py-3 px-4 w-32">Compte</th>
-          <th className="py-3 px-4">Libellé</th>
-          <th className="py-3 px-4 text-center">Action</th>
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-slate-100">
-        {planComptable.length === 0 ? (
-          <tr>
-            <td colSpan="3" className="p-12 text-center text-slate-500">
-              Aucun compte dans le plan comptable. Utilisez le formulaire pour en créer.
-            </td>
-          </tr>
-        ) : (
-          planComptable.map((compte) => (
-            <tr key={compte.id} className="hover:bg-slate-50">
-              <td className="py-3 px-4 font-bold text-slate-700">{compte.id}</td>
-              <td className="py-3 px-4">{compte.label}</td>
-              <td className="py-3 px-4 text-center">
-                <button onClick={() => removeCompte(compte.id)} className="text-red-400 hover:text-red-600 p-2 rounded">
-                  <Trash2 size={16}/>
-                </button>
-              </td>
-            </tr>
-          ))
-        )}
-      </tbody>
-    </table>
-  </div>
-</div>
-);
-};
-
-// ==========================================
-// MODULE : PLANNINGS D'ENGAGEMENT (Ménage / Garde)
-// ==========================================
-const PlanningEngagement = ({ type }) => {
-  const isMenage = type === 'menage';
-  const title = isMenage ? "Ménage du Week-end" : "Garde Cantine / Cour";
-  const MainIcon = isMenage ? Sparkles : CheckCircle;
-
-  const [slots, setSlots] = useState([]);
-  const [newDate, setNewDate] = useState('');
-  const [newAssignee, setNewAssignee] = useState('');
-
-  const handleAddSlot = (e) => {
-    e.preventDefault();
-    if (!newDate) return;
-    const status = newAssignee.trim() === '' ? 'À pourvoir' : 'Confirmé';
-    setSlots([...slots, { id: Date.now(), date: newDate, assignee: newAssignee, status }]);
-    setNewDate('');
-    setNewAssignee('');
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
   };
 
-  const removeSlot = (id) => setSlots(slots.filter(s => s.id !== id));
+  const handleAdd = (e) => {
+    e.preventDefault();
+    if (!newId || !newLabel) return;
+    if (planComptable.find(c => c.id === newId)) {
+       showToast("Ce numéro de compte existe déjà.", "error");
+       return;
+    }
+    setPlanComptable([...planComptable, { id: newId, label: newLabel }].sort((a, b) => a.id.localeCompare(b.id)));
+    setNewId('');
+    setNewLabel('');
+    showToast("Compte ajouté avec succès !");
+  };
+
+  const removeCompte = (id) => {
+    setPlanComptable(planComptable.filter(c => c.id !== id));
+  };
+
+  const handleImportCSV = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target.result;
+        const lines = text.split(/\r?\n/);
+        const newComptes = [];
+
+        for (let i = 0; i < lines.length; i++) {
+          if (!lines[i].trim()) continue;
+          
+          const cols = lines[i].split(/[;,]/);
+          
+          if (cols.length >= 2) {
+            const numeroStr = cols[0].trim().replace(/['"]/g, '');
+            const libelleStr = cols[1].trim().replace(/['"]/g, '');
+
+            if (numeroStr.match(/^[0-9]+$/) && numeroStr.length >= 2) {
+               newComptes.push({ id: numeroStr, label: libelleStr });
+            }
+          }
+        }
+
+        if (newComptes.length > 0) {
+           const existingIds = new Set(planComptable.map(c => c.id));
+           const comptesToAdd = newComptes.filter(c => !existingIds.has(c.id));
+           
+           setPlanComptable([...planComptable, ...comptesToAdd].sort((a, b) => a.id.localeCompare(b.id)));
+           showToast(`${comptesToAdd.length} comptes importés avec succès !`);
+        } else {
+           showToast("Aucun compte valide trouvé dans le fichier.", "error");
+        }
+      } catch (err) {
+        showToast("Erreur lors de la lecture du fichier CSV.", "error");
+      }
+    };
+    reader.readAsText(file, 'ISO-8859-1');
+    e.target.value = null; 
+  };
 
   return (
-    <div className="space-y-6 animate-in fade-in max-w-3xl mx-auto">
-      <div className="flex items-center gap-3 mb-2">
-        <Users className="text-blue-600" size={28} />
-        <h2 className="text-2xl font-bold text-slate-800">Plannings d'Engagement</h2>
-      </div>
+    <div className="space-y-6 animate-in fade-in max-w-4xl mx-auto relative">
+      
+      {toast && (
+        <div className={`absolute top-0 right-0 mt-4 mr-4 p-4 rounded-lg shadow-lg text-sm font-medium z-50 flex items-center gap-2 ${toast.type === 'error' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-green-100 text-green-700 border border-green-200'}`}>
+          {toast.type === 'error' ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
+          {toast.message}
+        </div>
+      )}
 
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-end">
-        <div className="flex-1 min-w-[200px]">
-          <label className="block text-xs font-medium text-slate-500 mb-1">Dates du créneau</label>
-          <input type="text" placeholder="Ex: 12-13 Sept 2026" value={newDate} onChange={e=>setNewDate(e.target.value)} className="w-full p-2 border rounded-md text-sm" />
+      <div className="flex justify-between items-center mb-2">
+        <div className="flex items-center gap-3">
+          <BookOpen className="text-purple-600" size={28} />
+          <h2 className="text-2xl font-bold text-slate-800">Plan Comptable de l'Association</h2>
         </div>
-        <div className="flex-1 min-w-[200px]">
-          <label className="block text-xs font-medium text-slate-500 mb-1">Famille assignée (Optionnel)</label>
-          <input type="text" placeholder="Laisser vide = À pourvoir" value={newAssignee} onChange={e=>setNewAssignee(e.target.value)} className="w-full p-2 border rounded-md text-sm" />
+        
+        <div>
+          <input type="file" accept=".csv" className="hidden" ref={fileInputRef} onChange={handleImportCSV} />
+          <button onClick={() => fileInputRef.current.click()} className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium shadow-sm hover:bg-purple-700 transition-colors">
+            <Upload size={18} /> Importer un Plan (.csv)
+          </button>
         </div>
-        <button onClick={handleAddSlot} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-medium text-sm transition-colors flex items-center gap-2 h-[38px]">
-          <Plus size={16}/> Ajouter
-        </button>
+      </div>
+      
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+        <h3 className="text-sm font-semibold text-slate-700 mb-4">Ajouter un compte manuellement</h3>
+        <form onSubmit={handleAdd} className="flex flex-wrap gap-4 items-end">
+          <div className="flex-1 min-w-[150px]">
+            <label className="block text-xs font-medium text-slate-500 mb-1">N° de Compte</label>
+            <input type="text" required placeholder="Ex: 606100" value={newId} onChange={e=>setNewId(e.target.value)} className="w-full p-2 border rounded-md text-sm" />
+          </div>
+          <div className="flex-[2] min-w-[200px]">
+            <label className="block text-xs font-medium text-slate-500 mb-1">Libellé du compte</label>
+            <input type="text" required placeholder="Ex: Eau et électricité" value={newLabel} onChange={e=>setNewLabel(e.target.value)} className="w-full p-2 border rounded-md text-sm" />
+          </div>
+          <button type="submit" className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md font-medium text-sm transition-colors flex items-center gap-2 h-[38px]">
+            <Plus size={16}/> Ajouter
+          </button>
+        </form>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="bg-[#1E293B] p-4 flex items-center gap-2">
-          <MainIcon className="text-yellow-400" size={20} />
-          <h3 className="text-white font-semibold text-lg">{title}</h3>
+        <div className="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
+          <h3 className="font-semibold text-slate-700">Liste des comptes actifs</h3>
+          <span className="text-xs font-medium bg-slate-200 text-slate-600 px-2 py-1 rounded-full">{planComptable.length} comptes</span>
         </div>
         
-        <div className="divide-y divide-slate-100">
-          {slots.length === 0 ? (
+        <div className="divide-y divide-slate-100 max-h-[500px] overflow-y-auto">
+          {planComptable.length === 0 ? (
             <div className="p-8 text-center text-slate-500 text-sm">
-              Aucun créneau planifié. Utilisez le formulaire ci-dessus pour ajouter des dates.
+              Le plan comptable est vide. Importez un fichier CSV ou ajoutez un compte manuellement.
             </div>
           ) : (
-            slots.map((slot) => (
-              <div key={slot.id} className="p-5 flex justify-between items-center hover:bg-slate-50 transition-colors group">
-                <div>
-                  <div className="font-bold text-slate-800 text-base">{slot.date}</div>
-                  <div className="text-slate-500 text-sm mt-0.5">
-                    {slot.assignee ? slot.assignee : 'À pourvoir'}
-                  </div>
-                </div>
+            planComptable.map((compte) => (
+              <div key={compte.id} className="p-4 flex justify-between items-center hover:bg-slate-50 transition-colors group">
                 <div className="flex items-center gap-4">
-                  {slot.status === 'Confirmé' ? (
-                    <span className="px-4 py-1.5 bg-slate-100 text-slate-600 font-medium rounded-full text-sm border border-slate-200">
-                      Confirmé
-                    </span>
-                  ) : (
-                    <span className="px-4 py-1.5 bg-yellow-100 text-yellow-800 font-medium rounded-full text-sm border border-yellow-200">
-                      S'inscrire
-                    </span>
-                  )}
-                  <button onClick={() => removeSlot(slot.id)} className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Trash2 size={16}/>
-                  </button>
+                  <span className="font-mono font-bold text-purple-700 bg-purple-50 px-2 py-1 rounded text-sm">{compte.id}</span>
+                  <span className="font-medium text-slate-700">{compte.label}</span>
                 </div>
+                <button onClick={() => removeCompte(compte.id)} className="text-slate-300 hover:text-red-500 hover:bg-red-50 p-2 rounded transition-all" title="Supprimer ce compte">
+                  <Trash2 size={18}/>
+                </button>
               </div>
             ))
           )}
@@ -623,7 +824,13 @@ const LoginScreen = ({ onLogin }) => {
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState('infos');
-  const [planComptable, setPlanComptable] = useState([]);
+  const [planComptable, setPlanComptable] = useState([
+    { id: '606100', label: 'Fournitures non stockables (Eau, Énergie)' },
+    { id: '606200', label: 'Fournitures scolaires' },
+    { id: '613200', label: 'Locations immobilières' },
+    { id: '706000', label: 'Prestations de services (Scolarités)' },
+    { id: '754000', label: 'Collectes et Dons' },
+  ]);
 
   if (!currentUser) {
     return <LoginScreen onLogin={(user) => {
@@ -672,6 +879,7 @@ export default function App() {
                 <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 px-3">Pilotage</h3>
                 <ul className="space-y-1">
                   <li><button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-slate-800 hover:text-white'}`}><LayoutDashboard size={18} /> Tableau de Bord</button></li>
+                  <li><button onClick={() => setActiveTab('etat_financier')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'etat_financier' ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-slate-800 hover:text-white'}`}><PieChart size={18} /> État Financier (Bilan)</button></li>
                 </ul>
               </div>
 
@@ -683,7 +891,6 @@ export default function App() {
                 <li><button onClick={() => setActiveTab('plan_comptable')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'plan_comptable' ? 'bg-purple-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><BookOpen size={18} /> Plan Comptable</button></li>
                 <li><button onClick={() => setActiveTab('ndf')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'ndf' ? 'bg-emerald-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><Receipt size={18} /> Notes de Frais</button></li>
                 <li><button onClick={() => setActiveTab('dons')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'dons' ? 'bg-rose-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><Heart size={18} /> Dons & Mécénat</button></li>
-                <li><button onClick={() => setActiveTab('budget')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'budget' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><PieChart size={18} /> Budget Prévisionnel</button></li>
               </ul>
             </div>
 
@@ -711,17 +918,17 @@ export default function App() {
         <header className="bg-white px-8 py-5 border-b border-slate-200 flex justify-between items-center sticky top-0 z-10 shadow-sm">
           <div>
             <h2 className="text-xl font-bold text-slate-800">
-          {activeTab === 'dashboard' && "Tableau de Bord"}
-          {activeTab === 'infos' && "Informations & Contact"}
-          {activeTab === 'mes_factures' && "Mes Factures & Paiements"}
-          {activeTab === 'journal_banque' && "Rapprochement Bancaire"}
-          {activeTab === 'od' && "Opérations Diverses"}
-          {activeTab === 'plan_comptable' && "Gestion du Plan Comptable"}
-          {activeTab === 'ndf' && "Gestion des Notes de Frais"}
-          {activeTab === 'dons' && "Dons & Reçus Fiscaux"}
-          {activeTab === 'menage' && "Planning du Ménage"}
+              {activeTab === 'dashboard' && "Tableau de Bord"}
+              {activeTab === 'etat_financier' && "État Financier de l'Association"}
+              {activeTab === 'infos' && "Informations & Contact"}
+              {activeTab === 'mes_factures' && "Mes Factures & Paiements"}
+              {activeTab === 'journal_banque' && "Rapprochement Bancaire"}
+              {activeTab === 'od' && "Opérations Diverses"}
+              {activeTab === 'plan_comptable' && "Gestion du Plan Comptable"}
+              {activeTab === 'ndf' && "Gestion des Notes de Frais"}
+              {activeTab === 'dons' && "Dons & Reçus Fiscaux"}
+              {activeTab === 'menage' && "Planning du Ménage"}
               {activeTab === 'surveillance' && "Tour de garde"}
-              {activeTab === 'budget' && "Budget Prévisionnel"}
               {activeTab === 'factures_familles' && "Facturation des Familles"}
               {activeTab === 'uniformes' && "Gestion des Uniformes"}
               {activeTab === 'contrats' && "Contrats & Équipe"}
@@ -756,21 +963,22 @@ export default function App() {
              </div>
           )}
 
-      {activeTab === 'dashboard' && <TableauDeBord />}
-      {activeTab === 'journal_banque' && <JournalBanque planComptable={planComptable} />}
-      {activeTab === 'od' && <OperationsDiverses planComptable={planComptable} />}
-      {activeTab === 'plan_comptable' && <PlanComptableManager planComptable={planComptable} setPlanComptable={setPlanComptable} />}
-      
-      {activeTab === 'menage' && <PlanningEngagement type="menage" />}
-      {activeTab === 'surveillance' && <PlanningEngagement type="surveillance" />}
+          {activeTab === 'dashboard' && <TableauDeBord />}
+          {activeTab === 'etat_financier' && <EtatFinancier planComptable={planComptable} />}
+          
+          {activeTab === 'journal_banque' && <JournalBanque planComptable={planComptable} />}
+          {activeTab === 'od' && <OperationsDiverses planComptable={planComptable} />}
+          {activeTab === 'plan_comptable' && <PlanComptableManager planComptable={planComptable} setPlanComptable={setPlanComptable} />}
+          
+          {activeTab === 'menage' && <PlanningEngagement type="menage" />}
+          {activeTab === 'surveillance' && <PlanningEngagement type="surveillance" />}
 
-          {/* Modules dynamiques réintégrés */}
+          {/* Modules dynamiques */}
           {activeTab === 'ndf' && <ModuleListDynamique title="Notes de Frais (NDF)" color="emerald" icon={<Receipt size={24}/>} />}
           {activeTab === 'dons' && <ModuleListDynamique title="Dons & Mécénat" color="rose" icon={<Heart size={24}/>} />}
           {activeTab === 'mes_factures' && <ModuleListDynamique title="Mes Factures (Famille)" color="blue" icon={<Receipt size={24}/>} />}
           {activeTab === 'factures_familles' && <ModuleListDynamique title="Suivi Facturation (Admin)" color="amber" icon={<FileSpreadsheet size={24}/>} />}
           
-          {activeTab === 'budget' && <ModuleListDynamique title="Lignes Budgétaires" color="blue" icon={<PieChart size={24}/>} />}
           {activeTab === 'contrats' && <ModuleListDynamique title="Contrats Équipe" color="blue" icon={<Users size={24}/>} />}
           {activeTab === 'uniformes' && <ModuleListDynamique title="Stock d'Uniformes" color="amber" icon={<Shield size={24}/>} />}
           {activeTab === 'dossiers' && <ModuleListDynamique title="Dossiers d'Inscriptions" color="blue" icon={<GraduationCap size={24}/>} />}
