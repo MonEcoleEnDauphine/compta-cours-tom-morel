@@ -7,7 +7,7 @@ import {
   CalendarHeart, CheckCircle, PieChart, PackageSearch, 
   Tent, UsersRound, Settings, Shirt, Sparkles, Clock, 
   CalendarRange, Euro, Plus, Shield, Briefcase, Receipt, 
-  Gift, Info, LogOut, Lock
+  Gift, Info, LogOut, Lock, Trash2, X
 } from 'lucide-react';
 
 import { 
@@ -27,12 +27,6 @@ const firebaseConfig = {
   appId: "1:605446922070:web:7d81aca59101d76c5a00f7",
   measurementId: "G-XL0L5MG9LK"
 };
-
-// --- FAUSSES DONNÉES DE DÉMONSTRATION ---
-const mockTransactions = [
-  { id: 1, date: '10/09/2026', journal: 'BANQUE', account: '706000', label: 'Scolarité Septembre', debit: 0, credit: 450.00, attachment: true },
-  { id: 2, date: '15/09/2026', journal: 'BANQUE', account: '606300', label: 'Fournitures scolaires', debit: 135.00, credit: 0, attachment: true },
-];
 
 // --- LE PLAN COMPTABLE DE L'ÉCOLE ---
 const PLAN_COMPTABLE = [
@@ -76,6 +70,7 @@ const App = () => {
   // --- ÉTATS DE CONNEXION ---
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState(null); // contiendra { email, role }
+  const [notification, setNotification] = useState(null); // Gestion des notifications
   
   // États de l'interface
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -89,7 +84,13 @@ const App = () => {
   const [isEngagementOpen, setIsEngagementOpen] = useState(false);
 
   // --- ÉTATS DES DONNÉES COMPTABLES ---
-  const [transactions, setTransactions] = useState(mockTransactions);
+  const [transactions, setTransactions] = useState([]); // Tableau vide : adieu les données de test !
+
+  // --- FONCTIONS GLOBALES ---
+  const showNotification = (message, type = 'info') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 4000); // Fait disparaître la notif après 4s
+  };
 
   // --- FONCTION DE CONNEXION (SIMULÉE AVANT FIREBASE) ---
   const handleLogin = (e) => {
@@ -106,7 +107,7 @@ const App = () => {
       setIsAuthenticated(true);
       setActiveTab('contact'); // Les parents arrivent sur l'écran contact par défaut
     } else {
-      alert("Identifiants incorrects. Essayez admin@courstommorel.fr (mdp: admin123) ou parent@courstommorel.fr (mdp: parent123)");
+      showNotification("Identifiants incorrects. Vérifiez l'adresse ou le mot de passe.", "error");
     }
   };
 
@@ -217,8 +218,8 @@ const App = () => {
   );
 
   const FinancialStatementsModule = () => {
-    const totalCharges = mockTransactions.filter(t => t.account && t.account.startsWith('6')).reduce((sum, t) => sum + (t.debit || 0), 0);
-    const totalProduits = mockTransactions.filter(t => t.account && t.account.startsWith('7')).reduce((sum, t) => sum + (t.credit || 0), 0);
+    const totalCharges = transactions.filter(t => t.account && t.account.startsWith('6')).reduce((sum, t) => sum + (t.debit || 0), 0);
+    const totalProduits = transactions.filter(t => t.account && t.account.startsWith('7')).reduce((sum, t) => sum + (t.credit || 0), 0);
     const resultat = totalProduits - totalCharges;
     const isBenefice = resultat >= 0;
 
@@ -328,9 +329,9 @@ const App = () => {
         if (newTransactions.length > 0) {
           setTransactions([...newTransactions, ...transactions]);
           setShowUndo(true); // Afficher le bouton Annuler
-          alert(`Succès : ${newTransactions.length} opérations bancaires ont été importées depuis votre fichier !`);
+          showNotification(`${newTransactions.length} opérations importées avec succès !`, "success");
         } else {
-          alert("Erreur : Aucune ligne exploitable n'a été trouvée dans ce fichier CSV. Vérifiez que les colonnes sont bien séparées par des points-virgules (;).");
+          showNotification("Aucune ligne exploitable trouvée dans ce fichier CSV.", "error");
         }
       };
       
@@ -344,7 +345,13 @@ const App = () => {
     const handleUndoImport = () => {
       setTransactions(previousTransactions);
       setShowUndo(false);
-      alert("L'importation a été annulée. Le journal est revenu à son état précédent.");
+      showNotification("L'importation a été annulée.", "info");
+    };
+
+    // Fonction pour supprimer une ligne manuellement
+    const handleDeleteLine = (id) => {
+      setTransactions(transactions.filter(t => t.id !== id));
+      showNotification("Ligne supprimée du journal.", "info");
     };
 
     // Fonction pour imputer (choisir le compte)
@@ -391,39 +398,56 @@ const App = () => {
                   <th className="p-4 text-right">Débit (-)</th>
                   <th className="p-4 text-right">Crédit (+)</th>
                   <th className="p-4 w-64">Plan Comptable</th>
-                  <th className="p-4 text-center rounded-tr-xl">PDF (Firebase)</th>
+                  <th className="p-4 text-center rounded-tr-xl">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {transactions.map(t => (
-                  <tr key={t.id} className="hover:bg-indigo-50 transition-colors">
-                    <td className="p-4 text-slate-500 whitespace-nowrap">{t.date}</td>
-                    <td className="p-4 font-medium text-slate-800">{t.label}</td>
-                    <td className="p-4 text-right text-rose-600 font-bold">{t.debit > 0 ? formatCurrency(t.debit) : '-'}</td>
-                    <td className="p-4 text-right text-emerald-600 font-bold">{t.credit > 0 ? formatCurrency(t.credit) : '-'}</td>
-                    <td className="p-4">
-                      {/* Le menu déroulant du Plan Comptable */}
-                      <select 
-                        value={t.account} 
-                        onChange={(e) => updateAccount(t.id, e.target.value)}
-                        className={`w-full p-2.5 rounded-lg border text-xs outline-none focus:border-indigo-500 font-medium ${!t.account ? 'bg-amber-50 border-amber-300 text-amber-700 animate-pulse' : 'bg-white border-slate-300 text-slate-700'}`}
-                      >
-                        <option value="">⚠️ À imputer...</option>
-                        {PLAN_COMPTABLE.map(compte => (
-                          <option key={compte.code} value={compte.code}>{compte.code} - {compte.label}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="p-4 text-center">
-                      <button 
-                        className={`p-2.5 rounded-full transition-all ${t.attachment ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200' : 'bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-indigo-500'}`} 
-                        title="Joindre la facture en PDF"
-                      >
-                        <Receipt size={18} />
-                      </button>
+                {transactions.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="p-12 text-center text-slate-500 bg-slate-50 border-dashed border-2 border-slate-200">
+                      <Landmark className="mx-auto mb-3 text-slate-300" size={48} />
+                      <p className="font-bold text-slate-600 mb-1">Votre journal est vide</p>
+                      <p className="text-sm">Importez un relevé bancaire pour commencer votre comptabilité.</p>
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  transactions.map(t => (
+                    <tr key={t.id} className="hover:bg-indigo-50 transition-colors">
+                      <td className="p-4 text-slate-500 whitespace-nowrap">{t.date}</td>
+                      <td className="p-4 font-medium text-slate-800">{t.label}</td>
+                      <td className="p-4 text-right text-rose-600 font-bold">{t.debit > 0 ? formatCurrency(t.debit) : '-'}</td>
+                      <td className="p-4 text-right text-emerald-600 font-bold">{t.credit > 0 ? formatCurrency(t.credit) : '-'}</td>
+                      <td className="p-4">
+                        {/* Le menu déroulant du Plan Comptable */}
+                        <select 
+                          value={t.account} 
+                          onChange={(e) => updateAccount(t.id, e.target.value)}
+                          className={`w-full p-2.5 rounded-lg border text-xs outline-none focus:border-indigo-500 font-medium ${!t.account ? 'bg-amber-50 border-amber-300 text-amber-700 animate-pulse' : 'bg-white border-slate-300 text-slate-700'}`}
+                        >
+                          <option value="">⚠️ À imputer...</option>
+                          {PLAN_COMPTABLE.map(compte => (
+                            <option key={compte.code} value={compte.code}>{compte.code} - {compte.label}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="p-4 flex items-center justify-center gap-1">
+                        <button 
+                          className={`p-2 rounded-full transition-all ${t.attachment ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200' : 'bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-indigo-500'}`} 
+                          title="Joindre la facture en PDF"
+                        >
+                          <Receipt size={18} />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteLine(t.id)}
+                          className="p-2 rounded-full transition-all bg-slate-100 text-slate-400 hover:bg-rose-100 hover:text-rose-600" 
+                          title="Supprimer la ligne"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -443,6 +467,16 @@ const App = () => {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans">
       
+      {/* NOTIFICATION FLOTTANTE */}
+      {notification && (
+        <div className={`fixed top-4 right-4 z-50 p-4 rounded-xl shadow-lg flex items-center gap-3 text-white transition-all transform translate-y-0 opacity-100 ${notification.type === 'error' ? 'bg-rose-600' : notification.type === 'success' ? 'bg-emerald-600' : 'bg-slate-800'}`}>
+          <span className="text-sm font-medium">{notification.message}</span>
+          <button onClick={() => setNotification(null)} className="opacity-70 hover:opacity-100 transition-opacity">
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
       {/* SIDEBAR */}
       <div className="w-full md:w-64 bg-slate-900 text-slate-300 flex flex-col shadow-xl z-20 overflow-y-auto">
         <div className="p-5 bg-slate-950/50 border-b border-slate-800 flex items-center gap-3">
