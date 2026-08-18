@@ -18,21 +18,10 @@ const firebaseConfig = {
 
 const LOGO_URL = "https://lh3.googleusercontent.com/sitesv/AG8ngQV-LUFlrtg_DNGIEJuJlg8hL-15Ho9x_gUhT4VHh9raUCwwvKpykeuSr41H06U8AJpts-x4aI6LsqQ-JpWIkDZNjppIGTTOrcWJOwBBgLrBmhjzJ5Fp0_HZ9Blj54z7PfJ9gZhWIe3JI5rKc8MN_9PLh0uvn1qSZEx-fcovZvT4iLqqJMLhDYGXI-Bt=w16383";
 
-const PLAN_COMPTABLE = [
-  { id: '613200', label: '613200 - Locations immobilières' },
-  { id: '627000', label: '627000 - Services bancaires (Frais)' },
-  { id: '606300', label: '606300 - Fournitures scolaires' },
-  { id: '471000', label: '471000 - Attente encaissement (Stripe/HelloAsso)' },
-  { id: '706000', label: '706000 - Prestations de services (Cantine/Périscolaire)' },
-  { id: '421000', label: '421000 - Rémunérations dues (Salaires)' },
-  { id: '431000', label: '431000 - Sécurité sociale et prévoyance' },
-  { id: 'ATTENTE', label: '⚠️ À classer manuellement...' }
-];
-
 // ==========================================
 // MODULE : JOURNAL DE BANQUE (Import CSV uniquement)
 // ==========================================
-const JournalBanque = () => {
+const JournalBanque = ({ planComptable }) => {
   const [transactions, setTransactions] = useState([]);
   const [lastImportIds, setLastImportIds] = useState([]);
   const [toast, setToast] = useState(null);
@@ -44,13 +33,6 @@ const JournalBanque = () => {
   };
 
   const autoImpute = (libelle, infos, type) => {
-    const textToAnalyze = `${libelle} ${infos} ${type}`.toLowerCase();
-    if (textToAnalyze.includes('loyer')) return '613200';
-    if (textToAnalyze.includes('frais') || textToAnalyze.includes('extourne')) return '627000';
-    if (textToAnalyze.includes('helloasso') || textToAnalyze.includes('stripe')) return '471000';
-    if (textToAnalyze.includes('salaire')) return '421000';
-    if (textToAnalyze.includes('cotisation') || textToAnalyze.includes('urssaf')) return '431000';
-    if (textToAnalyze.includes('fourniture') || textToAnalyze.includes('manuel')) return '606300';
     return 'ATTENTE';
   };
 
@@ -150,12 +132,13 @@ const JournalBanque = () => {
                     <td className="py-3 px-4">{t.date}</td>
                     <td className="py-3 px-4 truncate max-w-[250px]">{t.libelle}</td>
                     <td className="py-3 px-4 text-right font-bold">{t.montant} €</td>
-                    <td className="py-3 px-4">
-                      <select value={t.compte} onChange={(e) => setTransactions(transactions.map(tr => tr.id === t.id ? {...tr, compte: e.target.value} : tr))} className="p-2 border rounded-md">
-                        {PLAN_COMPTABLE.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
-                      </select>
-                    </td>
-                    <td className="py-3 px-4 text-center">
+                <td className="py-3 px-4">
+                  <select value={t.compte} onChange={(e) => setTransactions(transactions.map(tr => tr.id === t.id ? {...tr, compte: e.target.value} : tr))} className="p-2 border rounded-md">
+                    <option value="ATTENTE">⚠️ À classer manuellement...</option>
+                    {planComptable.map(c => <option key={c.id} value={c.id}>{c.id} - {c.label}</option>)}
+                  </select>
+                </td>
+                <td className="py-3 px-4 text-center">
                       <button onClick={() => setTransactions(transactions.filter(tr => tr.id !== t.id))} className="text-red-500 hover:bg-red-50 p-2 rounded"><Trash2 size={16}/></button>
                     </td>
                   </tr>
@@ -171,15 +154,15 @@ const JournalBanque = () => {
 // ==========================================
 // MODULE : OPERATIONS DIVERSES (Saisie Manuelle)
 // ==========================================
-const OperationsDiverses = () => {
+const OperationsDiverses = ({ planComptable }) => {
   const [ods, setOds] = useState([]);
-  const [formData, setFormData] = useState({ date: '', libelle: '', debit: '613200', credit: '421000', montant: '' });
+  const [formData, setFormData] = useState({ date: '', libelle: '', debit: '', credit: '421000', montant: '' });
 
   const handleAdd = (e) => {
     e.preventDefault();
     if (!formData.date || !formData.libelle || !formData.montant) return;
     setOds([{ ...formData, id: Date.now() }, ...ods]);
-    setFormData({ date: '', libelle: '', debit: '613200', credit: '421000', montant: '' });
+    setFormData({ date: '', libelle: '', debit: '', credit: '421000', montant: '' });
   };
 
   return (
@@ -200,7 +183,8 @@ const OperationsDiverses = () => {
           <div className="md:col-span-1">
             <label className="block text-xs font-medium text-slate-500 mb-1">Compte Débit</label>
             <select value={formData.debit} onChange={e=>setFormData({...formData, debit: e.target.value})} className="w-full p-2 border rounded-md text-sm">
-              {PLAN_COMPTABLE.map(c => <option key={c.id} value={c.id}>{c.id}</option>)}
+              <option value="">Sélectionner...</option>
+              {planComptable.map(c => <option key={c.id} value={c.id}>{c.id} - {c.label}</option>)}
             </select>
           </div>
           <div className="md:col-span-1">
@@ -245,10 +229,90 @@ const OperationsDiverses = () => {
               ))}
             </tbody>
           </table>
-        )}
+    )}
+  </div>
+</div>
+);
+};
+
+// ==========================================
+// MODULE : PLAN COMPTABLE
+// ==========================================
+const PlanComptableManager = ({ planComptable, setPlanComptable }) => {
+const [newId, setNewId] = useState('');
+const [newLabel, setNewLabel] = useState('');
+
+const handleAdd = (e) => {
+e.preventDefault();
+if (!newId || !newLabel) return;
+if (planComptable.find(c => c.id === newId)) return;
+setPlanComptable([...planComptable, { id: newId, label: newLabel }].sort((a, b) => a.id.localeCompare(b.id)));
+setNewId('');
+setNewLabel('');
+};
+
+const removeCompte = (id) => {
+setPlanComptable(planComptable.filter(c => c.id !== id));
+};
+
+return (
+<div className="space-y-6 animate-in fade-in max-w-4xl mx-auto">
+  <div className="flex items-center gap-3 mb-2">
+    <BookOpen className="text-purple-600" size={28} />
+    <h2 className="text-2xl font-bold text-slate-800">Plan Comptable de l'Association</h2>
+  </div>
+  
+  <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+    <h3 className="text-sm font-semibold text-slate-700 mb-4">Ajouter un nouveau compte</h3>
+    <form onSubmit={handleAdd} className="flex flex-wrap gap-4 items-end">
+      <div className="flex-1 min-w-[150px]">
+        <label className="block text-xs font-medium text-slate-500 mb-1">Numéro (ex: 606300)</label>
+        <input type="text" required value={newId} onChange={e=>setNewId(e.target.value)} className="w-full p-2 border rounded-md text-sm" />
       </div>
-    </div>
-  );
+      <div className="flex-[2] min-w-[200px]">
+        <label className="block text-xs font-medium text-slate-500 mb-1">Libellé (ex: Fournitures scolaires)</label>
+        <input type="text" required value={newLabel} onChange={e=>setNewLabel(e.target.value)} className="w-full p-2 border rounded-md text-sm" />
+      </div>
+      <button type="submit" className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md font-medium text-sm flex items-center gap-2 h-[38px] transition-colors">
+        <Plus size={16}/> Ajouter
+      </button>
+    </form>
+  </div>
+
+  <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+    <table className="w-full text-left text-sm whitespace-nowrap">
+      <thead className="bg-slate-50 text-slate-600 font-medium border-b border-slate-200">
+        <tr>
+          <th className="py-3 px-4 w-32">Compte</th>
+          <th className="py-3 px-4">Libellé</th>
+          <th className="py-3 px-4 text-center">Action</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-slate-100">
+        {planComptable.length === 0 ? (
+          <tr>
+            <td colSpan="3" className="p-12 text-center text-slate-500">
+              Aucun compte dans le plan comptable. Utilisez le formulaire pour en créer.
+            </td>
+          </tr>
+        ) : (
+          planComptable.map((compte) => (
+            <tr key={compte.id} className="hover:bg-slate-50">
+              <td className="py-3 px-4 font-bold text-slate-700">{compte.id}</td>
+              <td className="py-3 px-4">{compte.label}</td>
+              <td className="py-3 px-4 text-center">
+                <button onClick={() => removeCompte(compte.id)} className="text-red-400 hover:text-red-600 p-2 rounded">
+                  <Trash2 size={16}/>
+                </button>
+              </td>
+            </tr>
+          ))
+        )}
+      </tbody>
+    </table>
+  </div>
+</div>
+);
 };
 
 // ==========================================
@@ -479,6 +543,7 @@ const LoginScreen = ({ onLogin }) => {
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState('infos');
+  const [planComptable, setPlanComptable] = useState([]);
 
   if (!currentUser) {
     return <LoginScreen onLogin={(user) => {
@@ -525,14 +590,15 @@ export default function App() {
             <>
               <div>
                 <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 px-3">Comptabilité & Finances</h3>
-                <ul className="space-y-1">
-                  <li><button onClick={() => setActiveTab('journal_banque')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'journal_banque' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><CreditCard size={18} /> Journal de Banque</button></li>
-                  <li><button onClick={() => setActiveTab('od')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'od' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><FileSignature size={18} /> Opérations Diverses (OD)</button></li>
-                  <li><button onClick={() => setActiveTab('ndf')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'ndf' ? 'bg-emerald-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><Receipt size={18} /> Notes de Frais</button></li>
-                  <li><button onClick={() => setActiveTab('dons')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'dons' ? 'bg-rose-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><Heart size={18} /> Dons & Mécénat</button></li>
-                  <li><button onClick={() => setActiveTab('budget')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'budget' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><PieChart size={18} /> Budget Prévisionnel</button></li>
-                </ul>
-              </div>
+              <ul className="space-y-1">
+                <li><button onClick={() => setActiveTab('journal_banque')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'journal_banque' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><CreditCard size={18} /> Journal de Banque</button></li>
+                <li><button onClick={() => setActiveTab('od')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'od' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><FileSignature size={18} /> Opérations Diverses (OD)</button></li>
+                <li><button onClick={() => setActiveTab('plan_comptable')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'plan_comptable' ? 'bg-purple-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><BookOpen size={18} /> Plan Comptable</button></li>
+                <li><button onClick={() => setActiveTab('ndf')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'ndf' ? 'bg-emerald-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><Receipt size={18} /> Notes de Frais</button></li>
+                <li><button onClick={() => setActiveTab('dons')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'dons' ? 'bg-rose-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><Heart size={18} /> Dons & Mécénat</button></li>
+                <li><button onClick={() => setActiveTab('budget')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'budget' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><PieChart size={18} /> Budget Prévisionnel</button></li>
+              </ul>
+            </div>
 
               <div>
                 <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 px-3">Administration</h3>
@@ -558,13 +624,14 @@ export default function App() {
         <header className="bg-white px-8 py-5 border-b border-slate-200 flex justify-between items-center sticky top-0 z-10 shadow-sm">
           <div>
             <h2 className="text-xl font-bold text-slate-800">
-              {activeTab === 'infos' && "Informations & Contact"}
-              {activeTab === 'mes_factures' && "Mes Factures & Paiements"}
-              {activeTab === 'journal_banque' && "Rapprochement Bancaire"}
-              {activeTab === 'od' && "Opérations Diverses"}
-              {activeTab === 'ndf' && "Gestion des Notes de Frais"}
-              {activeTab === 'dons' && "Dons & Reçus Fiscaux"}
-              {activeTab === 'menage' && "Planning du Ménage"}
+          {activeTab === 'infos' && "Informations & Contact"}
+          {activeTab === 'mes_factures' && "Mes Factures & Paiements"}
+          {activeTab === 'journal_banque' && "Rapprochement Bancaire"}
+          {activeTab === 'od' && "Opérations Diverses"}
+          {activeTab === 'plan_comptable' && "Gestion du Plan Comptable"}
+          {activeTab === 'ndf' && "Gestion des Notes de Frais"}
+          {activeTab === 'dons' && "Dons & Reçus Fiscaux"}
+          {activeTab === 'menage' && "Planning du Ménage"}
               {activeTab === 'surveillance' && "Tour de garde"}
               {activeTab === 'budget' && "Budget Prévisionnel"}
               {activeTab === 'factures_familles' && "Facturation des Familles"}
@@ -601,11 +668,12 @@ export default function App() {
              </div>
           )}
 
-          {activeTab === 'journal_banque' && <JournalBanque />}
-          {activeTab === 'od' && <OperationsDiverses />}
-          
-          {activeTab === 'menage' && <PlanningEngagement type="menage" />}
-          {activeTab === 'surveillance' && <PlanningEngagement type="surveillance" />}
+      {activeTab === 'journal_banque' && <JournalBanque planComptable={planComptable} />}
+      {activeTab === 'od' && <OperationsDiverses planComptable={planComptable} />}
+      {activeTab === 'plan_comptable' && <PlanComptableManager planComptable={planComptable} setPlanComptable={setPlanComptable} />}
+      
+      {activeTab === 'menage' && <PlanningEngagement type="menage" />}
+      {activeTab === 'surveillance' && <PlanningEngagement type="surveillance" />}
 
           {/* Modules dynamiques réintégrés */}
           {activeTab === 'ndf' && <ModuleListDynamique title="Notes de Frais (NDF)" color="emerald" icon={<Receipt size={24}/>} />}
