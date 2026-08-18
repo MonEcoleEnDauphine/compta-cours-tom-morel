@@ -475,6 +475,86 @@ const ModuleListDynamique = ({ title, icon, color }) => {
 };
 
 // ==========================================
+// MODULE : TABLEAU DE BORD (DASHBOARD)
+// ==========================================
+const TableauDeBord = () => {
+  return (
+    <div className="space-y-6 animate-in fade-in">
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h2 className="text-3xl font-bold text-slate-800">Vue d'ensemble</h2>
+          <p className="text-slate-500 mt-1">Bienvenue sur le centre de pilotage de l'association.</p>
+        </div>
+        <div className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg font-medium border border-indigo-100 flex items-center gap-2">
+          <Calendar size={18} /> Année Scolaire 2026-2027
+        </div>
+      </div>
+
+      {/* Cartes d'indicateurs colorées */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Carte Banque */}
+        <div className="bg-gradient-to-br from-blue-500 to-blue-700 rounded-2xl p-6 text-white shadow-lg shadow-blue-200">
+          <div className="flex justify-between items-start mb-4">
+            <div className="p-3 bg-white/20 rounded-xl"><Building size={24} className="text-white" /></div>
+            <span className="flex items-center gap-1 text-sm font-medium bg-white/20 px-2 py-1 rounded-full"><Plus size={14}/> 2.4%</span>
+          </div>
+          <p className="text-blue-100 text-sm font-medium mb-1">Trésorerie Actuelle</p>
+          <h3 className="text-3xl font-bold">24 500 €</h3>
+        </div>
+
+        {/* Carte Familles */}
+        <div className="bg-gradient-to-br from-emerald-500 to-emerald-700 rounded-2xl p-6 text-white shadow-lg shadow-emerald-200">
+          <div className="flex justify-between items-start mb-4">
+            <div className="p-3 bg-white/20 rounded-xl"><Users size={24} className="text-white" /></div>
+            <span className="flex items-center gap-1 text-sm font-medium bg-white/20 px-2 py-1 rounded-full"><CheckCircle2 size={14}/> À jour</span>
+          </div>
+          <p className="text-emerald-100 text-sm font-medium mb-1">Familles Inscrites</p>
+          <h3 className="text-3xl font-bold">42</h3>
+        </div>
+
+        {/* Carte Factures */}
+        <div className="bg-gradient-to-br from-amber-500 to-amber-700 rounded-2xl p-6 text-white shadow-lg shadow-amber-200">
+          <div className="flex justify-between items-start mb-4">
+            <div className="p-3 bg-white/20 rounded-xl"><Receipt size={24} className="text-white" /></div>
+            <span className="flex items-center gap-1 text-sm font-medium bg-white/20 px-2 py-1 rounded-full"><AlertCircle size={14}/> 3 retards</span>
+          </div>
+          <p className="text-amber-100 text-sm font-medium mb-1">Factures en attente</p>
+          <h3 className="text-3xl font-bold">1 250 €</h3>
+        </div>
+
+        {/* Carte Engagements */}
+        <div className="bg-gradient-to-br from-purple-500 to-purple-700 rounded-2xl p-6 text-white shadow-lg shadow-purple-200">
+          <div className="flex justify-between items-start mb-4">
+            <div className="p-3 bg-white/20 rounded-xl"><Sparkles size={24} className="text-white" /></div>
+          </div>
+          <p className="text-purple-100 text-sm font-medium mb-1">Créneaux de garde vides</p>
+          <h3 className="text-3xl font-bold">4</h3>
+        </div>
+      </div>
+
+      {/* Section Raccourcis */}
+      <div className="mt-8 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+        <h3 className="text-lg font-bold text-slate-800 mb-4">Raccourcis rapides</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <button className="p-4 border border-slate-200 rounded-xl hover:bg-slate-50 hover:border-blue-300 transition-colors flex flex-col items-center justify-center gap-2 text-slate-600">
+            <CreditCard className="text-blue-500" /> Saisir la banque
+          </button>
+          <button className="p-4 border border-slate-200 rounded-xl hover:bg-slate-50 hover:border-emerald-300 transition-colors flex flex-col items-center justify-center gap-2 text-slate-600">
+            <FileSignature className="text-emerald-500" /> Nouvelle NDF
+          </button>
+          <button className="p-4 border border-slate-200 rounded-xl hover:bg-slate-50 hover:border-rose-300 transition-colors flex flex-col items-center justify-center gap-2 text-slate-600">
+            <Heart className="text-rose-500" /> Saisir un don
+          </button>
+          <button className="p-4 border border-slate-200 rounded-xl hover:bg-slate-50 hover:border-amber-300 transition-colors flex flex-col items-center justify-center gap-2 text-slate-600">
+            <FileSpreadsheet className="text-amber-500" /> Facturer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ==========================================
 // ECRAN DE CONNEXION 
 // ==========================================
 const LoginScreen = ({ onLogin }) => {
@@ -548,7 +628,7 @@ export default function App() {
   if (!currentUser) {
     return <LoginScreen onLogin={(user) => {
       setCurrentUser(user);
-      setActiveTab(user.role === 'admin' ? 'journal_banque' : 'infos');
+      setActiveTab(user.role === 'admin' ? 'dashboard' : 'infos');
     }} />;
   }
 
@@ -589,6 +669,13 @@ export default function App() {
           {isAdmin && (
             <>
               <div>
+                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 px-3">Pilotage</h3>
+                <ul className="space-y-1">
+                  <li><button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-slate-800 hover:text-white'}`}><LayoutDashboard size={18} /> Tableau de Bord</button></li>
+                </ul>
+              </div>
+
+              <div>
                 <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 px-3">Comptabilité & Finances</h3>
               <ul className="space-y-1">
                 <li><button onClick={() => setActiveTab('journal_banque')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'journal_banque' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><CreditCard size={18} /> Journal de Banque</button></li>
@@ -624,6 +711,7 @@ export default function App() {
         <header className="bg-white px-8 py-5 border-b border-slate-200 flex justify-between items-center sticky top-0 z-10 shadow-sm">
           <div>
             <h2 className="text-xl font-bold text-slate-800">
+          {activeTab === 'dashboard' && "Tableau de Bord"}
           {activeTab === 'infos' && "Informations & Contact"}
           {activeTab === 'mes_factures' && "Mes Factures & Paiements"}
           {activeTab === 'journal_banque' && "Rapprochement Bancaire"}
@@ -668,6 +756,7 @@ export default function App() {
              </div>
           )}
 
+      {activeTab === 'dashboard' && <TableauDeBord />}
       {activeTab === 'journal_banque' && <JournalBanque planComptable={planComptable} />}
       {activeTab === 'od' && <OperationsDiverses planComptable={planComptable} />}
       {activeTab === 'plan_comptable' && <PlanComptableManager planComptable={planComptable} setPlanComptable={setPlanComptable} />}
