@@ -394,6 +394,9 @@ const App = () => {
                   <button onClick={() => setActiveTab('etatsFinanciers')} className={`w-full flex items-center gap-3 pl-10 pr-6 py-2 text-sm ${activeTab === 'etatsFinanciers' ? 'text-blue-400' : 'hover:text-white'}`}>
                     📊 États Financiers
                   </button>
+                  <button onClick={() => setActiveTab('budget')} className={`w-full flex items-center gap-3 pl-10 pr-6 py-2 text-sm ${activeTab === 'budget' ? 'text-blue-400' : 'hover:text-white'}`}>
+                    📈 Budget Prévisionnel
+                  </button>
                 </>
               )}
             </div>
@@ -430,9 +433,6 @@ const App = () => {
               </button>
               {isPeriscolaireOpen && (
                 <>
-                  <button onClick={() => setActiveTab('cantine')} className={`w-full flex items-center gap-3 pl-10 pr-6 py-2 text-sm ${activeTab === 'cantine' ? 'text-blue-400' : 'hover:text-white'}`}>
-                    🍽️ Inscriptions Cantine
-                  </button>
                   <button onClick={() => setActiveTab('garderie')} className={`w-full flex items-center gap-3 pl-10 pr-6 py-2 text-sm ${activeTab === 'garderie' ? 'text-blue-400' : 'hover:text-white'}`}>
                     🧩 Garderie
                   </button>
@@ -512,6 +512,7 @@ const App = () => {
           {activeTab === 'dashboard' && <DashboardModule />}
           {activeTab === 'etatsFinanciers' && <FinancialStatementsModule />}
           {activeTab === 'journal' && <GenericPlaceholder icon={<Landmark size={48} className="text-slate-500"/>} title="Journal Comptable" desc="Saisie des écritures avec Firebase" color="slate"/>}
+          {activeTab === 'budget' && <GenericPlaceholder icon={<Euro size={48} className="text-indigo-500"/>} title="Budget Prévisionnel" desc="Préparation et suivi du budget de l'association" color="indigo"/>}
           {activeTab === 'dossiers' && <GenericPlaceholder icon={<BookOpen size={48} className="text-blue-500"/>} title="Dossiers Scolaires" desc="Gestion GS au CM2" color="blue"/>}
           {activeTab === 'familles' && <GenericPlaceholder icon={<Users size={48} className="text-purple-500"/>} title="Familles" desc="Base de données" color="purple"/>}
           
@@ -520,8 +521,7 @@ const App = () => {
           {activeTab === 'plannings' && <PlanningFamillesModule />}
           {activeTab === 'evenements' && <EvenementsModule />}
           
-          {/* Garderie et Cantine (Utilisent le composant temporaire pour le moment) */}
-          {activeTab === 'cantine' && <GenericPlaceholder icon={<Utensils size={48} className="text-orange-500"/>} title="Inscriptions Cantine" desc="Pointage quotidien des repas" color="orange"/>}
+          {/* Garderie (Utilise le composant temporaire pour le moment) */}
           {activeTab === 'garderie' && <GenericPlaceholder icon={<Tent size={48} className="text-emerald-500"/>} title="Garderie Périscolaire" desc="Suivi des présences" color="emerald"/>}
         </main>
       </div>
