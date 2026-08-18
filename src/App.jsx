@@ -1,23 +1,11 @@
-import React, { useState } from 'react';
-// Importation des icônes
+import React, { useState, useRef } from 'react';
 import { 
-  LayoutDashboard, BookOpen, Utensils, Landmark, FolderOpen, 
-  Users, FileSignature, ShieldAlert, GraduationCap, 
-  MapPin, ChevronDown, ChevronRight, AlertTriangle, 
-  CalendarHeart, CheckCircle, PieChart, PackageSearch, 
-  Tent, UsersRound, Settings, Shirt, Sparkles, Clock, 
-  CalendarRange, Euro, Plus, Shield, Briefcase, Receipt, 
-  Gift, Info, LogOut, Lock, Trash2, X
+  LayoutDashboard, Users, BookOpen, GraduationCap, FileSignature, AlertTriangle, CheckCircle,
+  Building, Calendar, CreditCard, PieChart, Shield, Lock, FileText, Upload, 
+  Trash2, XCircle, RotateCcw, Search, ChevronRight, CheckCircle2, AlertCircle, Paperclip,
+  Plus, Save, Sparkles
 } from 'lucide-react';
 
-import { 
-  ResponsiveContainer, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Bar 
-} from 'recharts';
-
-// TON LOGO OFFICIEL
-const LOGO_URL = "https://lh3.googleusercontent.com/sitesv/AG8ngQV-LUFlrtg_DNGIEJuJlg8hL-15Ho9x_gUhT4VHh9raUCwwvKpykeuSr41H06U8AJpts-x4aI6LsqQ-JpWIkDZNjppIGTTOrcWJOwBBgLrBmhjzJ5Fp0_HZ9Blj54z7PfJ9gZhWIe3JI5rKc8MN_9PLh0uvn1qSZEx-fcovZvT4iLqqJMLhDYGXI-Bt=w16383"; 
-
-// TA CONFIGURATION FIREBASE OFFICIELLE !
 const firebaseConfig = {
   apiKey: "AIzaSyDhKe4Nl3mUHagW1LKG5GT-tI1bB2-wtnE",
   authDomain: "cours-tom-morel.firebaseapp.com",
@@ -28,603 +16,592 @@ const firebaseConfig = {
   measurementId: "G-XL0L5MG9LK"
 };
 
-// --- LE PLAN COMPTABLE DE L'ÉCOLE ---
+const LOGO_URL = "https://lh3.googleusercontent.com/sitesv/AG8ngQV-LUFlrtg_DNGIEJuJlg8hL-15Ho9x_gUhT4VHh9raUCwwvKpykeuSr41H06U8AJpts-x4aI6LsqQ-JpWIkDZNjppIGTTOrcWJOwBBgLrBmhjzJ5Fp0_HZ9Blj54z7PfJ9gZhWIe3JI5rKc8MN_9PLh0uvn1qSZEx-fcovZvT4iLqqJMLhDYGXI-Bt=w16383";
+
 const PLAN_COMPTABLE = [
-  { code: '706000', label: 'Prestations de scolarité' },
-  { code: '708000', label: 'Garderie & Périscolaire' },
-  { code: '754000', label: 'Dons manuels & Mécénat' },
-  { code: '756000', label: 'Cotisations (Familles)' },
-  { code: '606100', label: 'Eau, Électricité, Chauffage' },
-  { code: '606300', label: 'Fournitures scolaires / Entretien' },
-  { code: '616000', label: 'Primes d\'assurances' },
-  { code: '627000', label: 'Frais bancaires' },
-  { code: '641000', label: 'Rémunérations du personnel' },
-  { code: '512000', label: 'Banque (Trésorerie)' }
+  { id: '613200', label: '613200 - Locations immobilières' },
+  { id: '627000', label: '627000 - Services bancaires (Frais)' },
+  { id: '606300', label: '606300 - Fournitures scolaires' },
+  { id: '471000', label: '471000 - Attente encaissement (Stripe/HelloAsso)' },
+  { id: '706000', label: '706000 - Prestations de services (Cantine/Périscolaire)' },
+  { id: '421000', label: '421000 - Rémunérations dues (Salaires)' },
+  { id: '431000', label: '431000 - Sécurité sociale et prévoyance' },
+  { id: 'ATTENTE', label: '⚠️ À classer manuellement...' }
 ];
 
-const mockBudget = [
-  { category: 'Pédagogie', allocated: 4000, spent: 1200 },
-  { category: 'Locaux', allocated: 12000, spent: 3500 },
-];
+// ==========================================
+// MODULE : JOURNAL DE BANQUE (Import CSV uniquement)
+// ==========================================
+const JournalBanque = () => {
+  const [transactions, setTransactions] = useState([]);
+  const [lastImportIds, setLastImportIds] = useState([]);
+  const [toast, setToast] = useState(null);
+  const fileInputRef = useRef(null);
 
-const mockUniformes = [
-  { id: 1, item: 'Polo Bleu Marine - Taille 6 ans', stock: 15, alert: false },
-  { id: 2, item: 'Sweat à capuche - Taille 8 ans', stock: 2, alert: true },
-];
-
-const mockPlanningMenage = [
-  { id: 1, date: '12-13 Sept 2026', family: 'Famille Dupont', status: 'Confirmé' },
-  { id: 2, date: '19-20 Sept 2026', family: 'À pourvoir', status: 'Urgent' },
-];
-
-const mockPlanningCantine = [
-  { id: 1, date: 'Lun 14 Sept', family: 'Maman L. Gérard', status: 'Confirmé' },
-  { id: 2, date: 'Mar 15 Sept', family: 'À pourvoir', status: 'Urgent' },
-];
-
-const mockEvenements = [
-  { id: 1, name: 'Brocante de Septembre', recettes: 1450, depenses: 230, date: '05/09/2026' },
-];
-
-const App = () => {
-  // --- ÉTATS DE CONNEXION ---
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null); // contiendra { email, role }
-  const [notification, setNotification] = useState(null); // Gestion des notifications
-  
-  // États de l'interface
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [isScolariteOpen, setIsScolariteOpen] = useState(false);
-  const [isPeriscolaireOpen, setIsPeriscolaireOpen] = useState(false);
-  const [isLogistiqueOpen, setIsLogistiqueOpen] = useState(false);
-  const [isEvenementsOpen, setIsEvenementsOpen] = useState(false);
-  const [isRhOpen, setIsRhOpen] = useState(false);
-  const [isComptaOpen, setIsComptaOpen] = useState(false);
-  const [isSuiviOpen, setIsSuiviOpen] = useState(false);
-  const [isEngagementOpen, setIsEngagementOpen] = useState(false);
-
-  // --- ÉTATS DES DONNÉES COMPTABLES ---
-  const [transactions, setTransactions] = useState([]); // Tableau vide : adieu les données de test !
-
-  // --- FONCTIONS GLOBALES ---
-  const showNotification = (message, type = 'info') => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification(null), 4000); // Fait disparaître la notif après 4s
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
   };
 
-  // --- FONCTION DE CONNEXION (SIMULÉE AVANT FIREBASE) ---
-  const handleLogin = (e) => {
-    e.preventDefault();
-    const email = e.target.email.value;
-    const password = e.target.password.value;
-
-    if (email === 'admin@courstommorel.fr' && password === 'admin123') {
-      setCurrentUser({ email: email, role: 'admin', name: 'Le Bureau' });
-      setIsAuthenticated(true);
-      setActiveTab('dashboard');
-    } else if (email === 'parent@courstommorel.fr' && password === 'parent123') {
-      setCurrentUser({ email: email, role: 'parent', name: 'Famille Dupont' });
-      setIsAuthenticated(true);
-      setActiveTab('contact'); // Les parents arrivent sur l'écran contact par défaut
-    } else {
-      showNotification("Identifiants incorrects. Vérifiez l'adresse ou le mot de passe.", "error");
-    }
+  const autoImpute = (libelle, infos, type) => {
+    const textToAnalyze = `${libelle} ${infos} ${type}`.toLowerCase();
+    if (textToAnalyze.includes('loyer')) return '613200';
+    if (textToAnalyze.includes('frais') || textToAnalyze.includes('extourne')) return '627000';
+    if (textToAnalyze.includes('helloasso') || textToAnalyze.includes('stripe')) return '471000';
+    if (textToAnalyze.includes('salaire')) return '421000';
+    if (textToAnalyze.includes('cotisation') || textToAnalyze.includes('urssaf')) return '431000';
+    if (textToAnalyze.includes('fourniture') || textToAnalyze.includes('manuel')) return '606300';
+    return 'ATTENTE';
   };
 
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    setCurrentUser(null);
-  };
+  const handleImportCSV = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount);
-  };
-
-  // ==========================================
-  // ÉCRAN DE CONNEXION (LOGIN)
-  // ==========================================
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-slate-100 flex flex-col justify-center items-center p-4">
-        <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-200">
-          <div className="flex justify-center mb-6">
-            <div className="h-20 w-20 bg-white rounded-full flex items-center justify-center overflow-hidden border-4 border-indigo-500 shadow-md">
-              <img src={LOGO_URL} alt="Logo" className="h-full w-full object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
-              <GraduationCap size={40} className="text-indigo-600 absolute z-[-1]" />
-            </div>
-          </div>
-          <h1 className="text-2xl font-bold text-center text-slate-800 mb-2">Cours Tom Morel</h1>
-          <p className="text-center text-slate-500 mb-8 text-sm">Portail sécurisé de l'établissement</p>
-          
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1">Adresse E-mail</label>
-              <input type="email" name="email" required className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="nom@exemple.com" defaultValue="admin@courstommorel.fr" />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1">Mot de passe</label>
-              <div className="relative">
-                <input type="password" name="password" required className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="••••••••" defaultValue="admin123" />
-                <Lock size={16} className="absolute right-3 top-3 text-slate-400" />
-              </div>
-            </div>
-            <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg transition-colors mt-4">
-              Se connecter
-            </button>
-          </form>
-          
-          <div className="mt-6 bg-blue-50 p-4 rounded-lg text-xs text-blue-800 border border-blue-100">
-            <strong>Pour tester :</strong><br/>
-            Admin : admin@courstommorel.fr / admin123<br/>
-            Parent : parent@courstommorel.fr / parent123
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ==========================================
-  // COMPOSANTS (MODULES) DE L'APPLICATION
-  // ==========================================
-
-  const DashboardModule = () => (
-    <div className="space-y-6">
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-800">Tableau de Bord - Rentrée 2026</h2>
-          <p className="text-slate-500 mt-1">Vision globale de l'Association Mon école en Dauphiné.</p>
-        </div>
-        <div className="flex gap-4">
-          <div className="flex items-center gap-2 text-sm text-slate-600 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">
-            <MapPin size={16} className="text-blue-500" />
-            <span>24 rue de la Chapelle, St-Chef</span>
-          </div>
-        </div>
-      </div>
-      
-      {['admin'].includes(currentUser.role) && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 border-l-4 border-l-blue-500">
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Trésorerie Actuelle</h3>
-            <p className="text-2xl font-bold text-slate-800">18 450,00 €</p>
-          </div>
-          <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 border-l-4 border-l-emerald-500">
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Scolarité (Recouvrement)</h3>
-            <p className="text-2xl font-bold text-emerald-600">92%</p>
-          </div>
-          <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 border-l-4 border-l-purple-500">
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Dons & Mécénat</h3>
-            <p className="text-2xl font-bold text-purple-600">2 150,00 €</p>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
-  const InfosContactModule = () => (
-    <div className="space-y-6">
-      <div className="bg-blue-600 rounded-2xl shadow-md p-8 text-white relative overflow-hidden">
-        <div className="relative z-10">
-          <h2 className="text-3xl font-bold mb-2 flex items-center gap-3">
-            <Info className="text-blue-200" size={32}/> Informations Pratiques
-          </h2>
-          <p className="text-blue-100 max-w-2xl text-lg">Retrouvez ici toutes les coordonnées pour contacter l'équipe pédagogique.</p>
-        </div>
-        <div className="absolute -right-10 -top-10 opacity-10">
-          <GraduationCap size={250} />
-        </div>
-      </div>
-    </div>
-  );
-
-  const FinancialStatementsModule = () => {
-    const totalCharges = transactions.filter(t => t.account && t.account.startsWith('6')).reduce((sum, t) => sum + (t.debit || 0), 0);
-    const totalProduits = transactions.filter(t => t.account && t.account.startsWith('7')).reduce((sum, t) => sum + (t.credit || 0), 0);
-    const resultat = totalProduits - totalCharges;
-    const isBenefice = resultat >= 0;
-
-    return (
-      <div className="space-y-6">
-        <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-          <PieChart className="text-blue-600"/> États Financiers
-        </h2>
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="bg-slate-700 text-white text-center py-2 font-bold text-sm tracking-wider">BILAN (Aperçu)</div>
-          <div className="flex flex-col md:flex-row">
-            <div className="flex-1 border-r border-slate-200 p-4">
-              <div className="bg-blue-50 text-blue-700 font-bold px-4 py-2 text-xs border-b border-blue-100">ACTIF (Banque 512)</div>
-              <div className="p-4"><span className="text-slate-800 font-bold text-xl">18 450,00 €</span></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const PlanningFamillesModule = () => (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-          <UsersRound className="text-emerald-600"/> Plannings d'Engagement
-        </h2>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-          <div className="bg-slate-800 p-4 text-white flex items-center gap-2"><Sparkles size={18} className="text-amber-400" /><h3 className="font-bold">Ménage du Week-end</h3></div>
-          <ul className="divide-y divide-slate-100 flex-1">
-            {mockPlanningMenage.map(plan => (
-              <li key={plan.id} className="p-4 flex items-center justify-between hover:bg-slate-50">
-                <div><p className="font-bold text-slate-800">{plan.date}</p><p className="text-sm text-slate-500">{plan.family}</p></div>
-                {plan.status === 'Urgent' ? <button className="text-xs font-bold bg-amber-100 text-amber-700 px-3 py-1.5 rounded-full">S'inscrire</button> : <span className="text-xs font-bold bg-slate-100 text-slate-500 px-3 py-1.5 rounded-full">{plan.status}</span>}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-    </div>
-  );
-
-  // ==========================================
-  // NOUVEAU MODULE : LE JOURNAL DE BANQUE
-  // ==========================================
-  const JournalComptableModule = () => {
-    const [previousTransactions, setPreviousTransactions] = useState([]);
-    const [showUndo, setShowUndo] = useState(false);
-
-    // Vraie fonction de lecture du fichier CSV
-    const handleImportCSV = (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      
-      reader.onload = (event) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
         const text = event.target.result;
-        
-        // 1. Sauvegarder l'état actuel au cas où on veut annuler
-        setPreviousTransactions([...transactions]);
-        
-        // 2. Analyser le CSV (séparé par des points-virgules, format classique des banques françaises)
-        const lines = text.split('\n');
+        const lines = text.split(/\r?\n/);
         const newTransactions = [];
-        
-        // On commence à i=1 pour ignorer la ligne d'en-tête (Date;Libellé;Débit;Crédit)
+        const newIds = [];
+
         for (let i = 1; i < lines.length; i++) {
-          if (lines[i].trim() === '') continue; // Ignorer les lignes vides
-          
-          const columns = lines[i].split(';');
-          // On s'assure d'avoir au moins les colonnes de base
-          if (columns.length >= 3) {
-            const date = columns[0].trim();
-            const label = columns[1].trim();
+          if (!lines[i].trim()) continue;
+          const cols = lines[i].split(';');
+          if (cols.length >= 7) {
+            const dateStr = cols[0].trim();
+            const libelle = cols[1].trim();
+            const infos = cols[3].trim();
+            const typeOp = cols[4].trim();
             
-            // Nettoyage des montants (enlever les guillemets et remplacer la virgule par un point)
-            let debitStr = columns[2] ? columns[2].replace(/"/g, '').replace(',', '.').trim() : '0';
-            let creditStr = columns[3] ? columns[3].replace(/"/g, '').replace(',', '.').trim() : '0';
+            const debitStr = cols[5].replace(',', '.').replace(/[^-0-9.]/g, '');
+            const creditStr = cols[6].replace(',', '.').replace(/[^-0-9.]/g, '');
             
-            let debit = parseFloat(debitStr);
-            let credit = parseFloat(creditStr);
-            
-            // Sécurité : si parseFloat échoue, mettre à 0
-            if (isNaN(debit)) debit = 0;
-            if (isNaN(credit)) credit = 0;
-            
-            // Si le débit est négatif dans le fichier (ex: -120), on le passe en positif pour l'affichage comptable
-            if (debit < 0) debit = Math.abs(debit);
+            let montant = 0;
+            if (debitStr && debitStr !== '') montant = parseFloat(debitStr);
+            else if (creditStr && creditStr !== '') montant = parseFloat(creditStr);
+
+            const newId = Date.now() + i;
+            newIds.push(newId);
 
             newTransactions.push({
-              id: Date.now() + i, // Générer un ID unique temporaire
-              date: date,
-              journal: 'BANQUE',
-              account: '', // Compte vide, à imputer par l'utilisateur
-              label: label,
-              debit: debit,
-              credit: credit,
-              attachment: false
+              id: newId, date: dateStr, type: typeOp, 
+              libelle: `${libelle} ${infos ? '(' + infos + ')' : ''}`,
+              montant: montant, compte: autoImpute(libelle, infos, typeOp),
+              status: 'pending'
             });
           }
         }
-        
-        // 3. Ajouter les nouvelles lignes au tableau existant
-        if (newTransactions.length > 0) {
-          setTransactions([...newTransactions, ...transactions]);
-          setShowUndo(true); // Afficher le bouton Annuler
-          showNotification(`${newTransactions.length} opérations importées avec succès !`, "success");
-        } else {
-          showNotification("Aucune ligne exploitable trouvée dans ce fichier CSV.", "error");
-        }
-      };
-      
-      reader.readAsText(file, 'ISO-8859-1'); // Encodage pour bien lire les accents français
-      
-      // Réinitialiser l'input file pour pouvoir réimporter le même fichier si besoin
-      e.target.value = null; 
+        setTransactions([...newTransactions, ...transactions]);
+        setLastImportIds(newIds);
+        showToast(`${newTransactions.length} opérations importées avec succès !`);
+      } catch (err) {
+        showToast("Erreur lors de la lecture du fichier CSV.", "error");
+      }
     };
+    reader.readAsText(file, 'ISO-8859-1');
+    e.target.value = null;
+  };
 
-    // Fonction pour annuler la dernière importation
-    const handleUndoImport = () => {
-      setTransactions(previousTransactions);
-      setShowUndo(false);
-      showNotification("L'importation a été annulée.", "info");
-    };
-
-    // Fonction pour supprimer une ligne manuellement
-    const handleDeleteLine = (id) => {
-      setTransactions(transactions.filter(t => t.id !== id));
-      showNotification("Ligne supprimée du journal.", "info");
-    };
-
-    // Fonction pour imputer (choisir le compte)
-    const updateAccount = (id, newAccount) => {
-      setTransactions(transactions.map(t => t.id === id ? { ...t, account: newAccount } : t));
-    };
-
-    return (
-      <div className="space-y-6">
-        <div className="flex flex-col md:flex-row justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-100 gap-4">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-              <Landmark className="text-indigo-600"/> Journal de Banque
-            </h2>
-            <p className="text-slate-500 mt-1 text-sm">Rapprochement bancaire, affectation au plan comptable et stockage des factures.</p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3">
-            {showUndo && (
-              <button 
-                onClick={handleUndoImport}
-                className="bg-rose-100 hover:bg-rose-200 text-rose-700 px-5 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2"
-              >
-                <AlertTriangle size={18} />
-                Annuler l'import
-              </button>
-            )}
-            
-            <label className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm cursor-pointer transition-all shadow-sm flex items-center gap-2">
-              <Plus size={18} />
-              Importer un Relevé (.csv)
-              {/* Le bouton lit maintenant vraiment le fichier de la banque */}
-              <input type="file" accept=".csv" className="hidden" onChange={handleImportCSV} />
-            </label>
-          </div>
+  return (
+    <div className="space-y-6 animate-in fade-in">
+      <div className="flex justify-between items-center bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+            <CreditCard className="text-blue-600" /> Journal de Banque
+          </h2>
+          <p className="text-slate-500 mt-1">Importez vos relevés pour générer les écritures bancaires.</p>
         </div>
-
+        <div className="flex gap-3">
+          {lastImportIds.length > 0 && (
+            <button onClick={() => setTransactions(transactions.filter(t => !lastImportIds.includes(t.id)))} className="px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium">
+              Annuler le dernier import
+            </button>
+          )}
+          <input type="file" accept=".csv" className="hidden" ref={fileInputRef} onChange={handleImportCSV} />
+          <button onClick={() => fileInputRef.current.click()} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium shadow-sm">
+            <Upload size={18} /> Importer un relevé (.csv)
+          </button>
+        </div>
+      </div>
+      
+      {/* Table des transactions... (Raccourci pour lisibilité, similaire à avant mais vide par défaut) */}
+      {transactions.length === 0 ? (
+        <div className="bg-white border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
+          <FileText className="text-blue-500 mx-auto mb-4" size={32} />
+          <h3 className="text-xl font-bold text-slate-700 mb-2">Aucune transaction bancaire</h3>
+          <p className="text-slate-500 mb-6">La liste est vide. Importez un fichier pour commencer.</p>
+        </div>
+      ) : (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-800 text-white font-semibold border-b border-slate-700">
+          <table className="w-full text-left text-sm whitespace-nowrap">
+              <thead className="bg-slate-50 text-slate-600 font-medium border-b border-slate-200">
                 <tr>
-                  <th className="p-4 rounded-tl-xl">Date</th>
-                  <th className="p-4">Libellé Bancaire</th>
-                  <th className="p-4 text-right">Débit (-)</th>
-                  <th className="p-4 text-right">Crédit (+)</th>
-                  <th className="p-4 w-64">Plan Comptable</th>
-                  <th className="p-4 text-center rounded-tr-xl">Actions</th>
+                  <th className="py-3 px-4">Date</th>
+                  <th className="py-3 px-4">Libellé</th>
+                  <th className="py-3 px-4 text-right">Montant</th>
+                  <th className="py-3 px-4">Compte</th>
+                  <th className="py-3 px-4 text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {transactions.length === 0 ? (
-                  <tr>
-                    <td colSpan="6" className="p-12 text-center text-slate-500 bg-slate-50 border-dashed border-2 border-slate-200">
-                      <Landmark className="mx-auto mb-3 text-slate-300" size={48} />
-                      <p className="font-bold text-slate-600 mb-1">Votre journal est vide</p>
-                      <p className="text-sm">Importez un relevé bancaire pour commencer votre comptabilité.</p>
+                {transactions.map(t => (
+                  <tr key={t.id} className={t.status === 'validated' ? 'bg-green-50' : ''}>
+                    <td className="py-3 px-4">{t.date}</td>
+                    <td className="py-3 px-4 truncate max-w-[250px]">{t.libelle}</td>
+                    <td className="py-3 px-4 text-right font-bold">{t.montant} €</td>
+                    <td className="py-3 px-4">
+                      <select value={t.compte} onChange={(e) => setTransactions(transactions.map(tr => tr.id === t.id ? {...tr, compte: e.target.value} : tr))} className="p-2 border rounded-md">
+                        {PLAN_COMPTABLE.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                      </select>
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <button onClick={() => setTransactions(transactions.filter(tr => tr.id !== t.id))} className="text-red-500 hover:bg-red-50 p-2 rounded"><Trash2 size={16}/></button>
                     </td>
                   </tr>
-                ) : (
-                  transactions.map(t => (
-                    <tr key={t.id} className="hover:bg-indigo-50 transition-colors">
-                      <td className="p-4 text-slate-500 whitespace-nowrap">{t.date}</td>
-                      <td className="p-4 font-medium text-slate-800">{t.label}</td>
-                      <td className="p-4 text-right text-rose-600 font-bold">{t.debit > 0 ? formatCurrency(t.debit) : '-'}</td>
-                      <td className="p-4 text-right text-emerald-600 font-bold">{t.credit > 0 ? formatCurrency(t.credit) : '-'}</td>
-                      <td className="p-4">
-                        {/* Le menu déroulant du Plan Comptable */}
-                        <select 
-                          value={t.account} 
-                          onChange={(e) => updateAccount(t.id, e.target.value)}
-                          className={`w-full p-2.5 rounded-lg border text-xs outline-none focus:border-indigo-500 font-medium ${!t.account ? 'bg-amber-50 border-amber-300 text-amber-700 animate-pulse' : 'bg-white border-slate-300 text-slate-700'}`}
-                        >
-                          <option value="">⚠️ À imputer...</option>
-                          {PLAN_COMPTABLE.map(compte => (
-                            <option key={compte.code} value={compte.code}>{compte.code} - {compte.label}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="p-4 flex items-center justify-center gap-1">
-                        <button 
-                          className={`p-2 rounded-full transition-all ${t.attachment ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200' : 'bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-indigo-500'}`} 
-                          title="Joindre la facture en PDF"
-                        >
-                          <Receipt size={18} />
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteLine(t.id)}
-                          className="p-2 rounded-full transition-all bg-slate-100 text-slate-400 hover:bg-rose-100 hover:text-rose-600" 
-                          title="Supprimer la ligne"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
+                ))}
               </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const GenericPlaceholder = ({ icon, title, desc, color }) => (
-    <div className={`flex flex-col items-center justify-center h-[60vh] bg-white rounded-2xl border border-dashed border-${color}-300 p-8 text-center`}>
-      <div className={`bg-${color}-50 p-6 rounded-full mb-6`}>{icon}</div>
-      <h2 className="text-2xl font-bold text-slate-800 mb-3">{title}</h2>
-      <p className="text-slate-500 max-w-lg mb-6">{desc}</p>
-    </div>
-  );
-
-  return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans">
-      
-      {/* NOTIFICATION FLOTTANTE */}
-      {notification && (
-        <div className={`fixed top-4 right-4 z-50 p-4 rounded-xl shadow-lg flex items-center gap-3 text-white transition-all transform translate-y-0 opacity-100 ${notification.type === 'error' ? 'bg-rose-600' : notification.type === 'success' ? 'bg-emerald-600' : 'bg-slate-800'}`}>
-          <span className="text-sm font-medium">{notification.message}</span>
-          <button onClick={() => setNotification(null)} className="opacity-70 hover:opacity-100 transition-opacity">
-            <X size={16} />
-          </button>
+          </table>
         </div>
       )}
+    </div>
+  );
+};
 
-      {/* SIDEBAR */}
-      <div className="w-full md:w-64 bg-slate-900 text-slate-300 flex flex-col shadow-xl z-20 overflow-y-auto">
-        <div className="p-5 bg-slate-950/50 border-b border-slate-800 flex items-center gap-3">
-          <div className="h-10 w-10 flex-shrink-0 bg-white rounded-full flex items-center justify-center overflow-hidden border-2 border-indigo-500">
-            <img src={LOGO_URL} alt="Logo de l'école" className="h-full w-full object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
-            <GraduationCap size={20} className="text-indigo-600 absolute z-[-1]" />
-          </div>
-          <div>
-            <h1 className="text-white font-bold text-sm tracking-wide leading-tight">COURS TOM MOREL</h1>
-            <p className="text-[9px] text-indigo-300 uppercase tracking-widest font-semibold mt-0.5">Assoc. Mon École en Dauphiné</p>
-          </div>
-        </div>
+// ==========================================
+// MODULE : OPERATIONS DIVERSES (Saisie Manuelle)
+// ==========================================
+const OperationsDiverses = () => {
+  const [ods, setOds] = useState([]);
+  const [formData, setFormData] = useState({ date: '', libelle: '', debit: '613200', credit: '421000', montant: '' });
 
-        <nav className="flex-1 py-4 flex flex-col gap-1">
-          {currentUser.role === 'admin' && (
-            <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-6 py-2.5 text-sm font-medium ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>
-              <LayoutDashboard size={18} /> Tableau de bord
+  const handleAdd = (e) => {
+    e.preventDefault();
+    if (!formData.date || !formData.libelle || !formData.montant) return;
+    setOds([{ ...formData, id: Date.now() }, ...ods]);
+    setFormData({ date: '', libelle: '', debit: '613200', credit: '421000', montant: '' });
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in">
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+        <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2 mb-6">
+          <FileSignature className="text-indigo-600" /> Saisie Opérations Diverses (OD)
+        </h2>
+        <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end bg-slate-50 p-4 rounded-lg border border-slate-200">
+          <div className="md:col-span-1">
+            <label className="block text-xs font-medium text-slate-500 mb-1">Date</label>
+            <input type="date" required value={formData.date} onChange={e=>setFormData({...formData, date: e.target.value})} className="w-full p-2 border rounded-md text-sm" />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-xs font-medium text-slate-500 mb-1">Libellé de l'écriture</label>
+            <input type="text" placeholder="Ex: Ajustement salaire..." required value={formData.libelle} onChange={e=>setFormData({...formData, libelle: e.target.value})} className="w-full p-2 border rounded-md text-sm" />
+          </div>
+          <div className="md:col-span-1">
+            <label className="block text-xs font-medium text-slate-500 mb-1">Compte Débit</label>
+            <select value={formData.debit} onChange={e=>setFormData({...formData, debit: e.target.value})} className="w-full p-2 border rounded-md text-sm">
+              {PLAN_COMPTABLE.map(c => <option key={c.id} value={c.id}>{c.id}</option>)}
+            </select>
+          </div>
+          <div className="md:col-span-1">
+            <label className="block text-xs font-medium text-slate-500 mb-1">Montant (€)</label>
+            <input type="number" step="0.01" required value={formData.montant} onChange={e=>setFormData({...formData, montant: e.target.value})} className="w-full p-2 border rounded-md text-sm" />
+          </div>
+          <div className="md:col-span-1">
+            <button type="submit" className="w-full py-2 bg-indigo-600 text-white rounded-md text-sm font-medium flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors">
+              <Plus size={16}/> Ajouter
             </button>
-          )}
-          
-          <button onClick={() => setActiveTab('contact')} className={`w-full flex items-center gap-3 px-6 py-2.5 text-sm font-medium ${activeTab === 'contact' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>
-            <Info size={18} /> Infos & Contact
-          </button>
-
-          {/* SCOLARITÉ (Parents voient leurs dossiers, Admin voit tout) */}
-          <div className="mt-2">
-            <button onClick={() => setIsScolariteOpen(!isScolariteOpen)} className="flex items-center justify-between w-full px-6 py-2 text-xs font-bold text-slate-500 uppercase hover:text-slate-300">
-              <span className="flex items-center gap-2"><BookOpen size={14}/> Scolarité</span>
-              {isScolariteOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-            </button>
-            {isScolariteOpen && (
-              <button onClick={() => setActiveTab('dossiers')} className={`w-full flex items-center gap-3 pl-10 pr-6 py-2 text-sm ${activeTab === 'dossiers' ? 'text-indigo-400' : 'hover:text-white'}`}>
-                📝 {currentUser.role === 'parent' ? 'Mes Dossiers' : 'Dossiers (GS-CM2)'}
-              </button>
-            )}
           </div>
-
-          {/* COMPTABILITÉ (Admin Seulement) */}
-          {currentUser.role === 'admin' && (
-            <div className="mt-2">
-              <button onClick={() => setIsComptaOpen(!isComptaOpen)} className="flex items-center justify-between w-full px-6 py-2 text-xs font-bold text-slate-500 uppercase hover:text-slate-300">
-                <span className="flex items-center gap-2"><Landmark size={14}/> Comptabilité</span>
-                {isComptaOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-              </button>
-              {isComptaOpen && (
-                <>
-                  <button onClick={() => setActiveTab('journal')} className={`w-full flex items-center gap-3 pl-10 pr-6 py-2 text-sm ${activeTab === 'journal' ? 'text-indigo-400' : 'hover:text-white'}`}>🏦 Journal & OD</button>
-                  <button onClick={() => setActiveTab('etatsFinanciers')} className={`w-full flex items-center gap-3 pl-10 pr-6 py-2 text-sm ${activeTab === 'etatsFinanciers' ? 'text-indigo-400' : 'hover:text-white'}`}>📊 États Financiers</button>
-                  <button onClick={() => setActiveTab('budget')} className={`w-full flex items-center gap-3 pl-10 pr-6 py-2 text-sm ${activeTab === 'budget' ? 'text-indigo-400' : 'hover:text-white'}`}>📈 Budget Prévisionnel</button>
-                  <button onClick={() => setActiveTab('notesDeFrais')} className={`w-full flex items-center gap-3 pl-10 pr-6 py-2 text-sm ${activeTab === 'notesDeFrais' ? 'text-indigo-400' : 'hover:text-white'}`}><Receipt size={14} /> Notes de Frais</button>
-                  <button onClick={() => setActiveTab('dons')} className={`w-full flex items-center gap-3 pl-10 pr-6 py-2 text-sm ${activeTab === 'dons' ? 'text-indigo-400' : 'hover:text-white'}`}><Gift size={14} /> Dons & Mécénat</button>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* PÉRISCOLAIRE (Garderie) */}
-          <div className="mt-2">
-            <button onClick={() => setIsPeriscolaireOpen(!isPeriscolaireOpen)} className="flex items-center justify-between w-full px-6 py-2 text-xs font-bold text-slate-500 uppercase hover:text-slate-300">
-              <span className="flex items-center gap-2"><Tent size={14}/> Périscolaire</span>
-              {isPeriscolaireOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-            </button>
-            {isPeriscolaireOpen && (
-              <button onClick={() => setActiveTab('garderie')} className={`w-full flex items-center gap-3 pl-10 pr-6 py-2 text-sm ${activeTab === 'garderie' ? 'text-indigo-400' : 'hover:text-white'}`}>🧩 Garderie</button>
-            )}
-          </div>
-
-          {/* ENGAGEMENT FAMILLES (Tout le monde) */}
-          <div className="mt-2">
-            <button onClick={() => setIsEngagementOpen(!isEngagementOpen)} className="flex items-center justify-between w-full px-6 py-2 text-xs font-bold text-slate-500 uppercase hover:text-slate-300">
-              <span className="flex items-center gap-2"><UsersRound size={14}/> Plannings Parents</span>
-              {isEngagementOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-            </button>
-            {isEngagementOpen && (
-              <button onClick={() => setActiveTab('plannings')} className={`w-full flex items-center gap-3 pl-10 pr-6 py-2 text-sm ${activeTab === 'plannings' ? 'text-indigo-400' : 'hover:text-white'}`}>📅 Ménage & Cantine</button>
-            )}
-          </div>
-
-          {/* LOGISTIQUE (Admin) */}
-          {currentUser.role === 'admin' && (
-            <div className="mt-2">
-              <button onClick={() => setIsLogistiqueOpen(!isLogistiqueOpen)} className="flex items-center justify-between w-full px-6 py-2 text-xs font-bold text-slate-500 uppercase hover:text-slate-300">
-                <span className="flex items-center gap-2"><PackageSearch size={14}/> Logistique</span>
-                {isLogistiqueOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-              </button>
-              {isLogistiqueOpen && (
-                <button onClick={() => setActiveTab('uniformes')} className={`w-full flex items-center gap-3 pl-10 pr-6 py-2 text-sm ${activeTab === 'uniformes' ? 'text-indigo-400' : 'hover:text-white'}`}>👕 Stock Uniformes</button>
-              )}
-            </div>
-          )}
-
-           {/* RH & ASSURANCES (Admin Seulement) */}
-           {currentUser.role === 'admin' && (
-            <div className="mt-2">
-              <button onClick={() => setIsRhOpen(!isRhOpen)} className="flex items-center justify-between w-full px-6 py-2 text-xs font-bold text-slate-500 uppercase hover:text-slate-300">
-                <span className="flex items-center gap-2"><Briefcase size={14}/> Équipe & Sécurité</span>
-                {isRhOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-              </button>
-              {isRhOpen && (
-                <>
-                  <button onClick={() => setActiveTab('contrats')} className={`w-full flex items-center gap-3 pl-10 pr-6 py-2 text-sm ${activeTab === 'contrats' ? 'text-indigo-400' : 'hover:text-white'}`}><FileSignature size={14} /> Contrats</button>
-                  <button onClick={() => setActiveTab('formations')} className={`w-full flex items-center gap-3 pl-10 pr-6 py-2 text-sm ${activeTab === 'formations' ? 'text-indigo-400' : 'hover:text-white'}`}><GraduationCap size={14} /> Formations</button>
-                  <button onClick={() => setActiveTab('assurances')} className={`w-full flex items-center gap-3 pl-10 pr-6 py-2 text-sm ${activeTab === 'assurances' ? 'text-indigo-400' : 'hover:text-white'}`}><Shield size={14} /> Assurances</button>
-                </>
-              )}
-            </div>
-          )}
-        </nav>
-        
-        {/* BOUTON DÉCONNEXION */}
-        <div className="p-4 border-t border-slate-800">
-           <button onClick={handleLogout} className="flex items-center gap-2 w-full px-4 py-2 bg-slate-800 hover:bg-rose-900/50 hover:text-rose-400 text-slate-400 rounded-lg text-sm transition-colors">
-              <LogOut size={16} /> Déconnexion
-           </button>
-        </div>
+        </form>
       </div>
 
-      {/* CONTENU PRINCIPAL */}
-      <div className="flex-1 flex flex-col bg-slate-50 overflow-hidden">
-        <header className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shadow-sm z-10 relative">
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-8 bg-indigo-100 text-indigo-700 rounded-full flex items-center justify-center font-bold text-sm">
-              {currentUser.name.charAt(0)}
-            </div>
-            <div>
-              <p className="text-sm font-bold text-slate-800">{currentUser.name}</p>
-              <p className="text-xs text-slate-500 capitalize">Profil : {currentUser.role}</p>
-            </div>
-          </div>
-        </header>
-
-        <main className="flex-1 p-6 lg:p-8 overflow-y-auto w-full">
-          <div className="max-w-7xl mx-auto">
-            {activeTab === 'dashboard' && <DashboardModule />}
-            {activeTab === 'contact' && <InfosContactModule />}
-            {activeTab === 'etatsFinanciers' && <FinancialStatementsModule />}
-            {activeTab === 'plannings' && <PlanningFamillesModule />}
-            
-            {activeTab === 'journal' && <JournalComptableModule />}
-            {activeTab === 'budget' && <GenericPlaceholder icon={<Euro size={48} className="text-indigo-500"/>} title="Budget Prévisionnel" desc="Suivi des dépenses allouées vs réalisées." color="indigo"/>}
-            {activeTab === 'dons' && <GenericPlaceholder icon={<Gift size={48} className="text-pink-500"/>} title="Dons & Mécénat" desc="Génération des reçus fiscaux." color="pink"/>}
-            {activeTab === 'dossiers' && <GenericPlaceholder icon={<BookOpen size={48} className="text-blue-500"/>} title="Dossiers Scolaires" desc="Informations médicales et contacts d'urgence." color="blue"/>}
-            {activeTab === 'assurances' && <GenericPlaceholder icon={<Shield size={48} className="text-red-500"/>} title="Assurances" desc="Attestations RC et locaux." color="red"/>}
-          </div>
-        </main>
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden min-h-[300px]">
+        {ods.length === 0 ? (
+          <div className="p-12 text-center text-slate-500">Aucune Opération Diverse saisie. Remplissez le formulaire ci-dessus.</div>
+        ) : (
+          <table className="w-full text-left text-sm whitespace-nowrap">
+            <thead className="bg-slate-50 text-slate-600 font-medium border-b border-slate-200">
+              <tr>
+                <th className="py-3 px-4">Date</th>
+                <th className="py-3 px-4">Libellé</th>
+                <th className="py-3 px-4 text-center">Débit</th>
+                <th className="py-3 px-4 text-center">Crédit</th>
+                <th className="py-3 px-4 text-right">Montant</th>
+                <th className="py-3 px-4 text-center">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {ods.map(od => (
+                <tr key={od.id} className="hover:bg-slate-50">
+                  <td className="py-3 px-4">{od.date}</td>
+                  <td className="py-3 px-4">{od.libelle}</td>
+                  <td className="py-3 px-4 text-center"><span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">{od.debit}</span></td>
+                  <td className="py-3 px-4 text-center"><span className="bg-rose-100 text-rose-800 px-2 py-1 rounded text-xs">421000</span></td>
+                  <td className="py-3 px-4 text-right font-bold">{parseFloat(od.montant).toFixed(2)} €</td>
+                  <td className="py-3 px-4 text-center">
+                    <button onClick={() => setOds(ods.filter(o => o.id !== od.id))} className="text-red-500 hover:bg-red-50 p-2 rounded"><Trash2 size={16}/></button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
 };
 
-export default App;
+// ==========================================
+// MODULE : PLANNINGS D'ENGAGEMENT (Ménage / Garde)
+// ==========================================
+const PlanningEngagement = ({ type }) => {
+  const isMenage = type === 'menage';
+  const title = isMenage ? "Ménage du Week-end" : "Garde Cantine / Cour";
+  const MainIcon = isMenage ? Sparkles : CheckCircle;
+
+  // Démarre à vide pour te permettre de saisir tes propres données
+  const [slots, setSlots] = useState([]);
+  
+  // Champs du formulaire d'ajout
+  const [newDate, setNewDate] = useState('');
+  const [newAssignee, setNewAssignee] = useState('');
+
+  const handleAddSlot = (e) => {
+    e.preventDefault();
+    if (!newDate) return;
+    const status = newAssignee.trim() === '' ? 'À pourvoir' : 'Confirmé';
+    setSlots([...slots, { id: Date.now(), date: newDate, assignee: newAssignee, status }]);
+    setNewDate('');
+    setNewAssignee('');
+  };
+
+  const removeSlot = (id) => setSlots(slots.filter(s => s.id !== id));
+
+  return (
+    <div className="space-y-6 animate-in fade-in max-w-3xl mx-auto">
+      <div className="flex items-center gap-3 mb-2">
+        <Users className="text-blue-600" size={28} />
+        <h2 className="text-2xl font-bold text-slate-800">Plannings d'Engagement</h2>
+      </div>
+
+      {/* Formulaire de saisie dynamique */}
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-end">
+        <div className="flex-1 min-w-[200px]">
+          <label className="block text-xs font-medium text-slate-500 mb-1">Dates du créneau</label>
+          <input type="text" placeholder="Ex: 12-13 Sept 2026" value={newDate} onChange={e=>setNewDate(e.target.value)} className="w-full p-2 border rounded-md text-sm" />
+        </div>
+        <div className="flex-1 min-w-[200px]">
+          <label className="block text-xs font-medium text-slate-500 mb-1">Famille assignée (Optionnel)</label>
+          <input type="text" placeholder="Laisser vide = À pourvoir" value={newAssignee} onChange={e=>setNewAssignee(e.target.value)} className="w-full p-2 border rounded-md text-sm" />
+        </div>
+        <button onClick={handleAddSlot} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-medium text-sm transition-colors flex items-center gap-2 h-[38px]">
+          <Plus size={16}/> Ajouter
+        </button>
+      </div>
+
+      {/* Rendu visuel fidèle à la maquette de l'utilisateur */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        {/* En-tête sombre */}
+        <div className="bg-[#1E293B] p-4 flex items-center gap-2">
+          <MainIcon className="text-yellow-400" size={20} />
+          <h3 className="text-white font-semibold text-lg">{title}</h3>
+        </div>
+        
+        {/* Liste des créneaux */}
+        <div className="divide-y divide-slate-100">
+          {slots.length === 0 ? (
+            <div className="p-8 text-center text-slate-500 text-sm">
+              Aucun créneau planifié. Utilisez le formulaire ci-dessus pour ajouter des dates.
+            </div>
+          ) : (
+            slots.map((slot) => (
+              <div key={slot.id} className="p-5 flex justify-between items-center hover:bg-slate-50 transition-colors group">
+                <div>
+                  <div className="font-bold text-slate-800 text-base">{slot.date}</div>
+                  <div className="text-slate-500 text-sm mt-0.5">
+                    {slot.assignee ? slot.assignee : 'À pourvoir'}
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  {slot.status === 'Confirmé' ? (
+                    <span className="px-4 py-1.5 bg-slate-100 text-slate-600 font-medium rounded-full text-sm border border-slate-200">
+                      Confirmé
+                    </span>
+                  ) : (
+                    <span className="px-4 py-1.5 bg-yellow-100 text-yellow-800 font-medium rounded-full text-sm border border-yellow-200">
+                      S'inscrire
+                    </span>
+                  )}
+                  {/* Bouton de suppression caché qui apparait au survol pour nettoyer */}
+                  <button onClick={() => removeSlot(slot.id)} className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Trash2 size={16}/>
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ==========================================
+// MODULE : LISTE GENERIQUE (Pour Budget, Contrats, etc.)
+// ==========================================
+const ModuleListDynamique = ({ title, icon, color }) => {
+  const [items, setItems] = useState([]);
+  const [newItem, setNewItem] = useState({ nom: '', detail: '' });
+
+  const handleAdd = (e) => {
+    e.preventDefault();
+    if(!newItem.nom) return;
+    setItems([...items, { ...newItem, id: Date.now() }]);
+    setNewItem({ nom: '', detail: '' });
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in max-w-4xl">
+      <div className={`bg-${color}-50 p-6 rounded-xl border border-${color}-100 flex items-center gap-4`}>
+        <div className={`p-3 bg-white rounded-full text-${color}-600 shadow-sm`}>{icon}</div>
+        <div>
+          <h2 className={`text-2xl font-bold text-${color}-900`}>{title}</h2>
+          <p className={`text-${color}-700 mt-1 text-sm`}>Saisissez de nouvelles données dynamiquement ci-dessous.</p>
+        </div>
+      </div>
+
+      <form onSubmit={handleAdd} className="flex gap-4 items-end bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+        <div className="flex-1">
+          <label className="block text-xs font-medium text-slate-500 mb-1">Nom / Libellé</label>
+          <input type="text" required value={newItem.nom} onChange={e=>setNewItem({...newItem, nom: e.target.value})} className="w-full p-2 border rounded-md text-sm" />
+        </div>
+        <div className="flex-1">
+          <label className="block text-xs font-medium text-slate-500 mb-1">Détails (Montant, Rôle, etc.)</label>
+          <input type="text" value={newItem.detail} onChange={e=>setNewItem({...newItem, detail: e.target.value})} className="w-full p-2 border rounded-md text-sm" />
+        </div>
+        <button type="submit" className={`px-4 py-2 bg-${color}-600 text-white rounded-md font-medium text-sm h-[38px]`}>Ajouter</button>
+      </form>
+
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 min-h-[200px]">
+        {items.length === 0 ? (
+          <div className="p-10 text-center text-slate-400">Aucune donnée pour le moment.</div>
+        ) : (
+          <ul className="divide-y divide-slate-100">
+            {items.map((item) => (
+              <li key={item.id} className="p-4 flex justify-between items-center hover:bg-slate-50">
+                <div>
+                  <span className="font-semibold text-slate-800">{item.nom}</span>
+                  {item.detail && <span className="ml-3 text-sm text-slate-500 bg-slate-100 px-2 py-1 rounded">{item.detail}</span>}
+                </div>
+                <button onClick={() => setItems(items.filter(i => i.id !== item.id))} className="text-red-400 hover:text-red-600"><Trash2 size={16}/></button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ==========================================
+// ECRAN DE CONNEXION 
+// ==========================================
+const LoginScreen = ({ onLogin }) => {
+  // Identifiants codés "en dur" par défaut comme demandé
+  const [email, setEmail] = useState('admin@courstommorel.fr');
+  const [password, setPassword] = useState('admin123');
+  const [error, setError] = useState('');
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (email === 'admin@courstommorel.fr' && password === 'admin123') {
+      onLogin({ email, role: 'admin', name: 'Direction' });
+    } else if (email === 'parent@courstommorel.fr' && password === 'parent123') {
+      onLogin({ email, role: 'parent', name: 'Famille Dupont' });
+    } else {
+      setError('Identifiants incorrects.');
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans relative overflow-hidden">
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-100 rounded-full blur-3xl opacity-50"></div>
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-100 rounded-full blur-3xl opacity-50"></div>
+      
+      <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-8 w-full max-w-md relative z-10">
+        <div className="text-center mb-8">
+          <img src={LOGO_URL} alt="Logo Cours Tom Morel" className="h-24 mx-auto mb-4 object-contain rounded-lg shadow-sm bg-white" onError={(e)=>{e.target.style.display='none'}}/>
+          <h1 className="text-2xl font-bold text-slate-800">Portail Sécurisé</h1>
+          <p className="text-slate-500 mt-2">Cours Tom Morel - Saint-Chef</p>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg flex items-center gap-2">
+            <XCircle size={18} /> {error}
+          </div>
+        )}
+
+        <form onSubmit={handleLogin} className="space-y-5">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Adresse E-mail</label>
+            <div className="relative">
+              <Users className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <input type="email" value={email} onChange={e=>setEmail(e.target.value)} required
+                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Mot de passe</label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <input type="password" value={password} onChange={e=>setPassword(e.target.value)} required
+                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+          </div>
+          <button type="submit" className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-md transition-colors flex justify-center items-center gap-2">
+            Se connecter <ChevronRight size={18} />
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// ==========================================
+// COMPOSANT PRINCIPAL
+// ==========================================
+export default function App() {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [activeTab, setActiveTab] = useState('infos');
+
+  if (!currentUser) {
+    return <LoginScreen onLogin={(user) => {
+      setCurrentUser(user);
+      setActiveTab(user.role === 'admin' ? 'journal_banque' : 'infos');
+    }} />;
+  }
+
+  const isAdmin = currentUser.role === 'admin';
+
+  return (
+    <div className="flex h-screen bg-slate-100 font-sans text-slate-800">
+      
+      {/* SIDEBAR NAVIGATION */}
+      <div className="w-72 bg-slate-900 text-slate-300 flex flex-col shadow-2xl z-20 overflow-y-auto">
+        <div className="p-6 bg-slate-950/50 flex flex-col items-center border-b border-slate-800">
+          <div className="h-16 w-16 bg-white rounded-xl flex items-center justify-center p-2 mb-3 shadow-lg">
+            <img src={LOGO_URL} alt="Logo" className="max-h-full max-w-full object-contain" onError={(e)=>{e.target.style.display='none'}}/>
+          </div>
+          <h1 className="text-lg font-bold text-white tracking-wide">Cours Tom Morel</h1>
+          <p className="text-xs text-slate-400 uppercase tracking-widest mt-1">ERP - Version {isAdmin ? 'Admin' : 'Famille'}</p>
+        </div>
+
+        <nav className="flex-1 px-4 py-6 space-y-8">
+          
+          <div>
+             <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 px-3">Espace Famille</h3>
+             <ul className="space-y-1">
+                <li><button onClick={() => setActiveTab('infos')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'infos' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><AlertCircle size={18} /> Infos & Contact</button></li>
+                <li><button onClick={() => setActiveTab('dossiers')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'dossiers' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><GraduationCap size={18} /> Scolarité (Dossiers)</button></li>
+             </ul>
+          </div>
+
+          <div>
+            <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 px-3">Plannings Parents</h3>
+             <ul className="space-y-1">
+                <li><button onClick={() => setActiveTab('menage')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'menage' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><AlertTriangle size={18} /> Ménage Week-end</button></li>
+                <li><button onClick={() => setActiveTab('surveillance')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'surveillance' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><CheckCircle size={18} /> Garde Cantine / Cour</button></li>
+             </ul>
+          </div>
+
+          {isAdmin && (
+            <>
+              <div>
+                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 px-3">Comptabilité & Finances</h3>
+                <ul className="space-y-1">
+                  <li><button onClick={() => setActiveTab('journal_banque')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'journal_banque' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><CreditCard size={18} /> Journal de Banque</button></li>
+                  <li><button onClick={() => setActiveTab('od')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'od' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><FileSignature size={18} /> Opérations Diverses (OD)</button></li>
+                  <li><button onClick={() => setActiveTab('budget')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'budget' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><PieChart size={18} /> Budget Prévisionnel</button></li>
+                </ul>
+              </div>
+
+              <div>
+                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 px-3">Administration</h3>
+                <ul className="space-y-1">
+                  <li><button onClick={() => setActiveTab('contrats')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'contrats' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><Users size={18} /> Équipe (Contrats)</button></li>
+                  <li><button onClick={() => setActiveTab('uniformes')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'uniformes' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><Shield size={18} /> Uniformes & Stock</button></li>
+                </ul>
+              </div>
+            </>
+          )}
+        </nav>
+        
+        <div className="p-4 bg-slate-950 border-t border-slate-800">
+           <button onClick={() => setCurrentUser(null)} className="w-full py-2 bg-slate-800 hover:bg-red-900/50 hover:text-red-400 text-slate-300 rounded transition-colors text-sm font-medium flex justify-center items-center gap-2">
+             <XCircle size={16}/> Déconnexion
+           </button>
+        </div>
+      </div>
+
+      {/* ZONE DE CONTENU PRINCIPALE */}
+      <div className="flex-1 overflow-auto">
+        <header className="bg-white px-8 py-5 border-b border-slate-200 flex justify-between items-center sticky top-0 z-10 shadow-sm">
+          <div>
+            <h2 className="text-xl font-bold text-slate-800">
+              {activeTab === 'infos' && "Informations & Contact"}
+              {activeTab === 'journal_banque' && "Rapprochement Bancaire"}
+              {activeTab === 'od' && "Opérations Diverses"}
+              {activeTab === 'menage' && "Planning du Ménage"}
+              {activeTab === 'surveillance' && "Tour de garde"}
+              {activeTab === 'budget' && "Budget Prévisionnel"}
+              {activeTab === 'uniformes' && "Gestion des Uniformes"}
+              {activeTab === 'contrats' && "Contrats & Équipe"}
+              {activeTab === 'dossiers' && "Dossiers de Scolarité"}
+            </h2>
+          </div>
+          <div className="flex items-center gap-4">
+             <div className="text-right">
+               <div className="text-sm font-bold text-slate-700">{currentUser.name}</div>
+               <div className="text-xs text-emerald-600 bg-emerald-50 inline-block px-2 py-0.5 rounded-full mt-1 border border-emerald-100">Connecté</div>
+             </div>
+             <div className="h-10 w-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold border border-indigo-200">
+               {currentUser.name.charAt(0)}
+             </div>
+          </div>
+        </header>
+
+        <main className="p-8 max-w-7xl mx-auto">
+          {activeTab === 'infos' && (
+             <div className="space-y-6">
+                <div className="bg-blue-600 rounded-xl p-8 text-white shadow-md">
+                   <h2 className="text-3xl font-bold mb-2">Bienvenue sur le portail du Cours Tom Morel</h2>
+                   <p className="text-blue-100 text-lg">Retrouvez ici toutes les informations de scolarité et les plannings.</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                      <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><AlertCircle className="text-blue-600"/> Contactez l'école</h3>
+                      <p className="text-slate-600 mb-2"><strong>Email :</strong> monecoleendauphine@gmail.com</p>
+                      <p className="text-slate-600 mb-2"><strong>Adresse :</strong> 24 rue de la Chapelle, 38890 Saint Chef</p>
+                   </div>
+                </div>
+             </div>
+          )}
+
+          {activeTab === 'journal_banque' && <JournalBanque />}
+          {activeTab === 'od' && <OperationsDiverses />}
+          
+          {activeTab === 'menage' && <PlanningEngagement type="menage" />}
+          {activeTab === 'surveillance' && <PlanningEngagement type="surveillance" />}
+
+          {/* Modules dynamiques pour remplacer les anciens "en travaux" */}
+          {activeTab === 'budget' && <ModuleListDynamique title="Lignes Budgétaires" color="blue" icon={<PieChart size={24}/>} />}
+          {activeTab === 'contrats' && <ModuleListDynamique title="Contrats Équipe" color="rose" icon={<Users size={24}/>} />}
+          {activeTab === 'uniformes' && <ModuleListDynamique title="Stock d'Uniformes" color="amber" icon={<Shield size={24}/>} />}
+          {activeTab === 'dossiers' && <ModuleListDynamique title="Dossiers d'Inscriptions" color="blue" icon={<GraduationCap size={24}/>} />}
+          
+        </main>
+      </div>
+    </div>
+  );
+}
