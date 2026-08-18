@@ -5,7 +5,8 @@ import {
   Users, FileSignature, Bell, ShieldAlert, GraduationCap, 
   MapPin, Mail, ChevronDown, ChevronRight, AlertTriangle, 
   CalendarHeart, CheckCircle, PieChart, ClipboardCheck,
-  PackageSearch, Tent, UsersRound, Settings
+  PackageSearch, Tent, UsersRound, Settings,
+  Shirt, Sparkles, Clock, CalendarRange, Euro, Plus
 } from 'lucide-react';
 
 // Importation des graphiques
@@ -29,6 +30,31 @@ const mockBudget = [
   { category: 'Admin/Banque', allocated: 1500, spent: 300 }
 ];
 
+const mockUniformes = [
+  { id: 1, item: 'Polo Bleu Marine - Taille 6 ans', stock: 15, alert: false },
+  { id: 2, item: 'Polo Bleu Marine - Taille 8 ans', stock: 2, alert: true },
+  { id: 3, item: 'Sweat à capuche Logo - Taille 10 ans', stock: 8, alert: false },
+  { id: 4, item: 'Blouse de peinture - Taille Unique', stock: 0, alert: true },
+];
+
+const mockPlanningMenage = [
+  { id: 1, date: '12-13 Sept 2026', family: 'Famille Dupont', status: 'Confirmé' },
+  { id: 2, date: '19-20 Sept 2026', family: 'Famille Martin', status: 'Confirmé' },
+  { id: 3, date: '26-27 Sept 2026', family: 'À pourvoir', status: 'Urgent' },
+];
+
+const mockPlanningCantine = [
+  { id: 1, date: 'Lun 14 Sept', family: 'Maman L. Gérard', status: 'Confirmé' },
+  { id: 2, date: 'Mar 15 Sept', family: 'Papa J. Rousseau', status: 'Confirmé' },
+  { id: 3, date: 'Jeu 17 Sept', family: 'À pourvoir', status: 'Urgent' },
+  { id: 4, date: 'Ven 18 Sept', family: 'Famille Blanc', status: 'Confirmé' },
+];
+
+const mockEvenements = [
+  { id: 1, name: 'Brocante de Septembre', recettes: 1450, depenses: 230, date: '05/09/2026' },
+  { id: 2, name: 'Marché de Noël (Prévision)', recettes: 3000, depenses: 800, date: '12/12/2026' },
+];
+
 const App = () => {
   const [currentRole, setCurrentRole] = useState('admin');
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -41,6 +67,7 @@ const App = () => {
   const [isRhOpen, setIsRhOpen] = useState(false);
   const [isComptaOpen, setIsComptaOpen] = useState(false);
   const [isSuiviOpen, setIsSuiviOpen] = useState(false);
+  const [isEngagementOpen, setIsEngagementOpen] = useState(false);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount);
@@ -156,6 +183,161 @@ const App = () => {
     );
   };
 
+  const StockUniformesModule = () => (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+          <Shirt className="text-indigo-600"/> Stock des Uniformes
+        </h2>
+        <button className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm">
+          <Plus size={16} /> Ajouter un article
+        </button>
+      </div>
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <table className="w-full text-left text-sm text-slate-600">
+          <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs">
+            <tr>
+              <th className="px-6 py-4 border-b border-slate-200">Article</th>
+              <th className="px-6 py-4 border-b border-slate-200">Quantité en stock</th>
+              <th className="px-6 py-4 border-b border-slate-200">Statut</th>
+            </tr>
+          </thead>
+          <tbody>
+            {mockUniformes.map(item => (
+              <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50">
+                <td className="px-6 py-4 font-medium text-slate-800">{item.item}</td>
+                <td className="px-6 py-4">
+                  <span className="bg-slate-100 px-3 py-1 rounded-md font-bold text-slate-700">{item.stock}</span>
+                </td>
+                <td className="px-6 py-4">
+                  {item.alert ? (
+                    <span className="bg-red-50 text-red-600 border border-red-200 px-3 py-1 rounded-full text-xs font-bold flex items-center w-max gap-1">
+                      <AlertTriangle size={14}/> Rupture
+                    </span>
+                  ) : (
+                    <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 px-3 py-1 rounded-full text-xs font-bold flex items-center w-max gap-1">
+                      <CheckCircle size={14}/> OK
+                    </span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
+  const PlanningFamillesModule = () => (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+            <UsersRound className="text-emerald-600"/> Engagement des Familles
+          </h2>
+          <p className="text-slate-500 mt-1">Gestion collaborative des tours de garde et du ménage.</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+          <div className="bg-slate-800 p-4 text-white flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Sparkles size={18} className="text-amber-400" />
+              <h3 className="font-bold">Ménage du Week-end</h3>
+            </div>
+          </div>
+          <ul className="divide-y divide-slate-100 flex-1">
+            {mockPlanningMenage.map(plan => (
+              <li key={plan.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                <div>
+                  <p className="font-bold text-slate-800 flex items-center gap-2">
+                    <CalendarRange size={14} className="text-slate-400"/> {plan.date}
+                  </p>
+                  <p className="text-sm text-slate-500 mt-1">{plan.family}</p>
+                </div>
+                {plan.status === 'Urgent' ? (
+                  <button className="text-xs font-bold bg-amber-100 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-full hover:bg-amber-200 transition-colors">S'inscrire</button>
+                ) : (
+                  <span className="text-xs font-bold bg-slate-100 text-slate-500 border border-slate-200 px-3 py-1.5 rounded-full">{plan.status}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+          <div className="bg-slate-800 p-4 text-white flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Clock size={18} className="text-blue-400" />
+              <h3 className="font-bold">Garde Cantine (Midi)</h3>
+            </div>
+          </div>
+          <ul className="divide-y divide-slate-100 flex-1">
+            {mockPlanningCantine.map(plan => (
+              <li key={plan.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                <div>
+                  <p className="font-bold text-slate-800 flex items-center gap-2">
+                     <CalendarRange size={14} className="text-slate-400"/> {plan.date}
+                  </p>
+                  <p className="text-sm text-slate-500 mt-1">{plan.family}</p>
+                </div>
+                {plan.status === 'Urgent' ? (
+                  <button className="text-xs font-bold bg-amber-100 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-full hover:bg-amber-200 transition-colors">S'inscrire</button>
+                ) : (
+                  <span className="text-xs font-bold bg-slate-100 text-slate-500 border border-slate-200 px-3 py-1.5 rounded-full">{plan.status}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+
+  const EvenementsModule = () => (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+          <CalendarHeart className="text-rose-500"/> Suivi des Événements
+        </h2>
+        <button className="bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm">
+          <Plus size={16} /> Nouvel Événement
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {mockEvenements.map(evt => {
+          const benefice = evt.recettes - evt.depenses;
+          return (
+            <div key={evt.id} className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-rose-400 relative overflow-hidden">
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h3 className="font-bold text-xl text-slate-800">{evt.name}</h3>
+                  <p className="text-sm text-slate-500 flex items-center gap-1 mt-1"><CalendarRange size={14}/> Prévu le {evt.date}</p>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs uppercase font-bold text-slate-400 tracking-wider">Bénéfice Net</span>
+                  <p className="text-2xl font-bold text-emerald-600">+{formatCurrency(benefice)}</p>
+                </div>
+              </div>
+              <div className="flex gap-4">
+                <div className="bg-slate-50 border border-slate-100 p-3 rounded-lg flex-1 flex flex-col justify-center">
+                  <p className="text-slate-400 text-xs uppercase font-bold mb-1">Recettes</p>
+                  <p className="font-bold text-slate-700">{formatCurrency(evt.recettes)}</p>
+                </div>
+                <div className="bg-slate-50 border border-slate-100 p-3 rounded-lg flex-1 flex flex-col justify-center">
+                  <p className="text-slate-400 text-xs uppercase font-bold mb-1">Dépenses</p>
+                  <p className="font-bold text-slate-700">{formatCurrency(evt.depenses)}</p>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  );
+
   const GenericPlaceholder = ({ icon, title, desc, color }) => (
     <div className={`flex flex-col items-center justify-center h-[60vh] bg-white rounded-2xl border border-dashed border-${color}-300 p-8 text-center`}>
       <div className={`bg-${color}-50 p-6 rounded-full mb-6`}>{icon}</div>
@@ -236,6 +418,73 @@ const App = () => {
               )}
             </div>
           )}
+
+          {}
+          
+          {/* PÉRISCOLAIRE */}
+          {['admin', 'direction', 'parent'].includes(currentRole) && (
+            <div className="mt-2">
+              <button onClick={() => setIsPeriscolaireOpen(!isPeriscolaireOpen)} className="flex items-center justify-between w-full px-6 py-2 text-xs font-bold text-slate-500 uppercase hover:text-slate-300 transition-colors">
+                <span className="flex items-center gap-2"><Tent size={14}/> Périscolaire</span>
+                {isPeriscolaireOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              </button>
+              {isPeriscolaireOpen && (
+                <>
+                  <button onClick={() => setActiveTab('cantine')} className={`w-full flex items-center gap-3 pl-10 pr-6 py-2 text-sm ${activeTab === 'cantine' ? 'text-blue-400' : 'hover:text-white'}`}>
+                    🍽️ Inscriptions Cantine
+                  </button>
+                  <button onClick={() => setActiveTab('garderie')} className={`w-full flex items-center gap-3 pl-10 pr-6 py-2 text-sm ${activeTab === 'garderie' ? 'text-blue-400' : 'hover:text-white'}`}>
+                    🧩 Garderie
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* ENGAGEMENT FAMILLES (Nouveau) */}
+          {['admin', 'direction', 'parent'].includes(currentRole) && (
+            <div className="mt-2">
+              <button onClick={() => setIsEngagementOpen(!isEngagementOpen)} className="flex items-center justify-between w-full px-6 py-2 text-xs font-bold text-slate-500 uppercase hover:text-slate-300 transition-colors">
+                <span className="flex items-center gap-2"><UsersRound size={14}/> Plannings Parents</span>
+                {isEngagementOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              </button>
+              {isEngagementOpen && (
+                <button onClick={() => setActiveTab('plannings')} className={`w-full flex items-center gap-3 pl-10 pr-6 py-2 text-sm ${activeTab === 'plannings' ? 'text-blue-400' : 'hover:text-white'}`}>
+                  📅 Ménage & Cantine
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* LOGISTIQUE */}
+          {['admin', 'direction'].includes(currentRole) && (
+            <div className="mt-2">
+              <button onClick={() => setIsLogistiqueOpen(!isLogistiqueOpen)} className="flex items-center justify-between w-full px-6 py-2 text-xs font-bold text-slate-500 uppercase hover:text-slate-300 transition-colors">
+                <span className="flex items-center gap-2"><PackageSearch size={14}/> Logistique</span>
+                {isLogistiqueOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              </button>
+              {isLogistiqueOpen && (
+                <button onClick={() => setActiveTab('uniformes')} className={`w-full flex items-center gap-3 pl-10 pr-6 py-2 text-sm ${activeTab === 'uniformes' ? 'text-blue-400' : 'hover:text-white'}`}>
+                  👕 Stock Uniformes
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* ÉVÉNEMENTS */}
+          {['admin', 'president'].includes(currentRole) && (
+            <div className="mt-2">
+              <button onClick={() => setIsEvenementsOpen(!isEvenementsOpen)} className="flex items-center justify-between w-full px-6 py-2 text-xs font-bold text-slate-500 uppercase hover:text-slate-300 transition-colors">
+                <span className="flex items-center gap-2"><CalendarHeart size={14}/> Événements</span>
+                {isEvenementsOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              </button>
+              {isEvenementsOpen && (
+                <button onClick={() => setActiveTab('evenements')} className={`w-full flex items-center gap-3 pl-10 pr-6 py-2 text-sm ${activeTab === 'evenements' ? 'text-blue-400' : 'hover:text-white'}`}>
+                  🎪 Rentabilité Événements
+                </button>
+              )}
+            </div>
+          )}
         </nav>
       </div>
 
@@ -265,6 +514,15 @@ const App = () => {
           {activeTab === 'journal' && <GenericPlaceholder icon={<Landmark size={48} className="text-slate-500"/>} title="Journal Comptable" desc="Saisie des écritures avec Firebase" color="slate"/>}
           {activeTab === 'dossiers' && <GenericPlaceholder icon={<BookOpen size={48} className="text-blue-500"/>} title="Dossiers Scolaires" desc="Gestion GS au CM2" color="blue"/>}
           {activeTab === 'familles' && <GenericPlaceholder icon={<Users size={48} className="text-purple-500"/>} title="Familles" desc="Base de données" color="purple"/>}
+          
+          {}
+          {activeTab === 'uniformes' && <StockUniformesModule />}
+          {activeTab === 'plannings' && <PlanningFamillesModule />}
+          {activeTab === 'evenements' && <EvenementsModule />}
+          
+          {/* Garderie et Cantine (Utilisent le composant temporaire pour le moment) */}
+          {activeTab === 'cantine' && <GenericPlaceholder icon={<Utensils size={48} className="text-orange-500"/>} title="Inscriptions Cantine" desc="Pointage quotidien des repas" color="orange"/>}
+          {activeTab === 'garderie' && <GenericPlaceholder icon={<Tent size={48} className="text-emerald-500"/>} title="Garderie Périscolaire" desc="Suivi des présences" color="emerald"/>}
         </main>
       </div>
     </div>
