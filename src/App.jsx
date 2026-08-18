@@ -34,6 +34,20 @@ const mockTransactions = [
   { id: 2, date: '15/09/2026', journal: 'BANQUE', account: '606300', label: 'Fournitures scolaires', debit: 135.00, credit: 0, attachment: true },
 ];
 
+// --- LE PLAN COMPTABLE DE L'ÉCOLE ---
+const PLAN_COMPTABLE = [
+  { code: '706000', label: 'Prestations de scolarité' },
+  { code: '708000', label: 'Garderie & Périscolaire' },
+  { code: '754000', label: 'Dons manuels & Mécénat' },
+  { code: '756000', label: 'Cotisations (Familles)' },
+  { code: '606100', label: 'Eau, Électricité, Chauffage' },
+  { code: '606300', label: 'Fournitures scolaires / Entretien' },
+  { code: '616000', label: 'Primes d\'assurances' },
+  { code: '627000', label: 'Frais bancaires' },
+  { code: '641000', label: 'Rémunérations du personnel' },
+  { code: '512000', label: 'Banque (Trésorerie)' }
+];
+
 const mockBudget = [
   { category: 'Pédagogie', allocated: 4000, spent: 1200 },
   { category: 'Locaux', allocated: 12000, spent: 3500 },
@@ -73,6 +87,9 @@ const App = () => {
   const [isComptaOpen, setIsComptaOpen] = useState(false);
   const [isSuiviOpen, setIsSuiviOpen] = useState(false);
   const [isEngagementOpen, setIsEngagementOpen] = useState(false);
+
+  // --- ÉTATS DES DONNÉES COMPTABLES ---
+  const [transactions, setTransactions] = useState(mockTransactions);
 
   // --- FONCTION DE CONNEXION (SIMULÉE AVANT FIREBASE) ---
   const handleLogin = (e) => {
@@ -246,6 +263,96 @@ const App = () => {
     </div>
   );
 
+  // ==========================================
+  // NOUVEAU MODULE : LE JOURNAL DE BANQUE
+  // ==========================================
+  const JournalComptableModule = () => {
+    // Fonction qui simule l'importation de ton fichier CSV de cet été
+    const handleImportCSV = (e) => {
+      const newTransactions = [
+        { id: 3, date: '26/07/2026', journal: 'BANQUE', account: '', label: 'Virement Famille Dupont', debit: 0, credit: 450.00, attachment: false },
+        { id: 4, date: '02/08/2026', journal: 'BANQUE', account: '', label: 'Prélèvement EDF - Aoste', debit: 120.50, credit: 0, attachment: false },
+        { id: 5, date: '17/08/2026', journal: 'BANQUE', account: '', label: 'Paiement Librairie (Manuels CP)', debit: 340.00, credit: 0, attachment: false },
+      ];
+      setTransactions([...transactions, ...newTransactions]);
+      alert("Succès : Le fichier 'operations_26072026_17082026.csv' a bien été analysé ! 3 nouvelles opérations bancaires ont été détectées.");
+    };
+
+    // Fonction pour imputer (choisir le compte)
+    const updateAccount = (id, newAccount) => {
+      setTransactions(transactions.map(t => t.id === id ? { ...t, account: newAccount } : t));
+    };
+
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col md:flex-row justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-100 gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+              <Landmark className="text-indigo-600"/> Journal de Banque
+            </h2>
+            <p className="text-slate-500 mt-1 text-sm">Rapprochement bancaire, affectation au plan comptable et stockage des factures.</p>
+          </div>
+          <div className="flex gap-3">
+            <label className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm cursor-pointer transition-all shadow-sm flex items-center gap-2">
+              <Plus size={18} />
+              Importer un Relevé (.csv)
+              {/* C'est ce bouton qui va "lire" le fichier de ta banque */}
+              <input type="file" accept=".csv" className="hidden" onChange={handleImportCSV} />
+            </label>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-800 text-white font-semibold border-b border-slate-700">
+                <tr>
+                  <th className="p-4 rounded-tl-xl">Date</th>
+                  <th className="p-4">Libellé Bancaire</th>
+                  <th className="p-4 text-right">Débit (-)</th>
+                  <th className="p-4 text-right">Crédit (+)</th>
+                  <th className="p-4 w-64">Plan Comptable</th>
+                  <th className="p-4 text-center rounded-tr-xl">PDF (Firebase)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {transactions.map(t => (
+                  <tr key={t.id} className="hover:bg-indigo-50 transition-colors">
+                    <td className="p-4 text-slate-500 whitespace-nowrap">{t.date}</td>
+                    <td className="p-4 font-medium text-slate-800">{t.label}</td>
+                    <td className="p-4 text-right text-rose-600 font-bold">{t.debit > 0 ? formatCurrency(t.debit) : '-'}</td>
+                    <td className="p-4 text-right text-emerald-600 font-bold">{t.credit > 0 ? formatCurrency(t.credit) : '-'}</td>
+                    <td className="p-4">
+                      {/* Le menu déroulant du Plan Comptable */}
+                      <select 
+                        value={t.account} 
+                        onChange={(e) => updateAccount(t.id, e.target.value)}
+                        className={`w-full p-2.5 rounded-lg border text-xs outline-none focus:border-indigo-500 font-medium ${!t.account ? 'bg-amber-50 border-amber-300 text-amber-700 animate-pulse' : 'bg-white border-slate-300 text-slate-700'}`}
+                      >
+                        <option value="">⚠️ À imputer...</option>
+                        {PLAN_COMPTABLE.map(compte => (
+                          <option key={compte.code} value={compte.code}>{compte.code} - {compte.label}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="p-4 text-center">
+                      <button 
+                        className={`p-2.5 rounded-full transition-all ${t.attachment ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200' : 'bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-indigo-500'}`} 
+                        title="Joindre la facture en PDF"
+                      >
+                        <Receipt size={18} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const GenericPlaceholder = ({ icon, title, desc, color }) => (
     <div className={`flex flex-col items-center justify-center h-[60vh] bg-white rounded-2xl border border-dashed border-${color}-300 p-8 text-center`}>
       <div className={`bg-${color}-50 p-6 rounded-full mb-6`}>{icon}</div>
@@ -395,7 +502,7 @@ const App = () => {
             {activeTab === 'etatsFinanciers' && <FinancialStatementsModule />}
             {activeTab === 'plannings' && <PlanningFamillesModule />}
             
-            {activeTab === 'journal' && <GenericPlaceholder icon={<Landmark size={48} className="text-slate-500"/>} title="Journal Comptable" desc="Ici, tes relevés bancaires .csv seront bientôt importés." color="slate"/>}
+            {activeTab === 'journal' && <JournalComptableModule />}
             {activeTab === 'budget' && <GenericPlaceholder icon={<Euro size={48} className="text-indigo-500"/>} title="Budget Prévisionnel" desc="Suivi des dépenses allouées vs réalisées." color="indigo"/>}
             {activeTab === 'dons' && <GenericPlaceholder icon={<Gift size={48} className="text-pink-500"/>} title="Dons & Mécénat" desc="Génération des reçus fiscaux." color="pink"/>}
             {activeTab === 'dossiers' && <GenericPlaceholder icon={<BookOpen size={48} className="text-blue-500"/>} title="Dossiers Scolaires" desc="Informations médicales et contacts d'urgence." color="blue"/>}
