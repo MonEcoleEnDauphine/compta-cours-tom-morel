@@ -267,15 +267,84 @@ const App = () => {
   // NOUVEAU MODULE : LE JOURNAL DE BANQUE
   // ==========================================
   const JournalComptableModule = () => {
-    // Fonction qui simule l'importation de ton fichier CSV de cet été
+    const [previousTransactions, setPreviousTransactions] = useState([]);
+    const [showUndo, setShowUndo] = useState(false);
+
+    // Vraie fonction de lecture du fichier CSV
     const handleImportCSV = (e) => {
-      const newTransactions = [
-        { id: 3, date: '26/07/2026', journal: 'BANQUE', account: '', label: 'Virement Famille Dupont', debit: 0, credit: 450.00, attachment: false },
-        { id: 4, date: '02/08/2026', journal: 'BANQUE', account: '', label: 'Prélèvement EDF - Aoste', debit: 120.50, credit: 0, attachment: false },
-        { id: 5, date: '17/08/2026', journal: 'BANQUE', account: '', label: 'Paiement Librairie (Manuels CP)', debit: 340.00, credit: 0, attachment: false },
-      ];
-      setTransactions([...transactions, ...newTransactions]);
-      alert("Succès : Le fichier 'operations_26072026_17082026.csv' a bien été analysé ! 3 nouvelles opérations bancaires ont été détectées.");
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      
+      reader.onload = (event) => {
+        const text = event.target.result;
+        
+        // 1. Sauvegarder l'état actuel au cas où on veut annuler
+        setPreviousTransactions([...transactions]);
+        
+        // 2. Analyser le CSV (séparé par des points-virgules, format classique des banques françaises)
+        const lines = text.split('\n');
+        const newTransactions = [];
+        
+        // On commence à i=1 pour ignorer la ligne d'en-tête (Date;Libellé;Débit;Crédit)
+        for (let i = 1; i < lines.length; i++) {
+          if (lines[i].trim() === '') continue; // Ignorer les lignes vides
+          
+          const columns = lines[i].split(';');
+          // On s'assure d'avoir au moins les colonnes de base
+          if (columns.length >= 3) {
+            const date = columns[0].trim();
+            const label = columns[1].trim();
+            
+            // Nettoyage des montants (enlever les guillemets et remplacer la virgule par un point)
+            let debitStr = columns[2] ? columns[2].replace(/"/g, '').replace(',', '.').trim() : '0';
+            let creditStr = columns[3] ? columns[3].replace(/"/g, '').replace(',', '.').trim() : '0';
+            
+            let debit = parseFloat(debitStr);
+            let credit = parseFloat(creditStr);
+            
+            // Sécurité : si parseFloat échoue, mettre à 0
+            if (isNaN(debit)) debit = 0;
+            if (isNaN(credit)) credit = 0;
+            
+            // Si le débit est négatif dans le fichier (ex: -120), on le passe en positif pour l'affichage comptable
+            if (debit < 0) debit = Math.abs(debit);
+
+            newTransactions.push({
+              id: Date.now() + i, // Générer un ID unique temporaire
+              date: date,
+              journal: 'BANQUE',
+              account: '', // Compte vide, à imputer par l'utilisateur
+              label: label,
+              debit: debit,
+              credit: credit,
+              attachment: false
+            });
+          }
+        }
+        
+        // 3. Ajouter les nouvelles lignes au tableau existant
+        if (newTransactions.length > 0) {
+          setTransactions([...newTransactions, ...transactions]);
+          setShowUndo(true); // Afficher le bouton Annuler
+          alert(`Succès : ${newTransactions.length} opérations bancaires ont été importées depuis votre fichier !`);
+        } else {
+          alert("Erreur : Aucune ligne exploitable n'a été trouvée dans ce fichier CSV. Vérifiez que les colonnes sont bien séparées par des points-virgules (;).");
+        }
+      };
+      
+      reader.readAsText(file, 'ISO-8859-1'); // Encodage pour bien lire les accents français
+      
+      // Réinitialiser l'input file pour pouvoir réimporter le même fichier si besoin
+      e.target.value = null; 
+    };
+
+    // Fonction pour annuler la dernière importation
+    const handleUndoImport = () => {
+      setTransactions(previousTransactions);
+      setShowUndo(false);
+      alert("L'importation a été annulée. Le journal est revenu à son état précédent.");
     };
 
     // Fonction pour imputer (choisir le compte)
@@ -292,11 +361,21 @@ const App = () => {
             </h2>
             <p className="text-slate-500 mt-1 text-sm">Rapprochement bancaire, affectation au plan comptable et stockage des factures.</p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
+            {showUndo && (
+              <button 
+                onClick={handleUndoImport}
+                className="bg-rose-100 hover:bg-rose-200 text-rose-700 px-5 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2"
+              >
+                <AlertTriangle size={18} />
+                Annuler l'import
+              </button>
+            )}
+            
             <label className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm cursor-pointer transition-all shadow-sm flex items-center gap-2">
               <Plus size={18} />
               Importer un Relevé (.csv)
-              {/* C'est ce bouton qui va "lire" le fichier de ta banque */}
+              {/* Le bouton lit maintenant vraiment le fichier de la banque */}
               <input type="file" accept=".csv" className="hidden" onChange={handleImportCSV} />
             </label>
           </div>
