@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, BookOpen, GraduationCap, FileSignature, AlertTriangle, CheckCircle,
   Building, Calendar, CreditCard, PieChart, Shield, Lock, FileText, Upload, 
   Trash2, XCircle, RotateCcw, Search, ChevronRight, CheckCircle2, AlertCircle, Paperclip,
-  Plus, Save, Sparkles
+  Plus, Save, Sparkles, Receipt, Heart, FileSpreadsheet
 } from 'lucide-react';
 
 const firebaseConfig = {
@@ -126,7 +126,6 @@ const JournalBanque = () => {
         </div>
       </div>
       
-      {/* Table des transactions... (Raccourci pour lisibilité, similaire à avant mais vide par défaut) */}
       {transactions.length === 0 ? (
         <div className="bg-white border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
           <FileText className="text-blue-500 mx-auto mb-4" size={32} />
@@ -260,10 +259,7 @@ const PlanningEngagement = ({ type }) => {
   const title = isMenage ? "Ménage du Week-end" : "Garde Cantine / Cour";
   const MainIcon = isMenage ? Sparkles : CheckCircle;
 
-  // Démarre à vide pour te permettre de saisir tes propres données
   const [slots, setSlots] = useState([]);
-  
-  // Champs du formulaire d'ajout
   const [newDate, setNewDate] = useState('');
   const [newAssignee, setNewAssignee] = useState('');
 
@@ -285,7 +281,6 @@ const PlanningEngagement = ({ type }) => {
         <h2 className="text-2xl font-bold text-slate-800">Plannings d'Engagement</h2>
       </div>
 
-      {/* Formulaire de saisie dynamique */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-end">
         <div className="flex-1 min-w-[200px]">
           <label className="block text-xs font-medium text-slate-500 mb-1">Dates du créneau</label>
@@ -300,15 +295,12 @@ const PlanningEngagement = ({ type }) => {
         </button>
       </div>
 
-      {/* Rendu visuel fidèle à la maquette de l'utilisateur */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        {/* En-tête sombre */}
         <div className="bg-[#1E293B] p-4 flex items-center gap-2">
           <MainIcon className="text-yellow-400" size={20} />
           <h3 className="text-white font-semibold text-lg">{title}</h3>
         </div>
         
-        {/* Liste des créneaux */}
         <div className="divide-y divide-slate-100">
           {slots.length === 0 ? (
             <div className="p-8 text-center text-slate-500 text-sm">
@@ -333,7 +325,6 @@ const PlanningEngagement = ({ type }) => {
                       S'inscrire
                     </span>
                   )}
-                  {/* Bouton de suppression caché qui apparait au survol pour nettoyer */}
                   <button onClick={() => removeSlot(slot.id)} className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Trash2 size={16}/>
                   </button>
@@ -348,11 +339,26 @@ const PlanningEngagement = ({ type }) => {
 };
 
 // ==========================================
-// MODULE : LISTE GENERIQUE (Pour Budget, Contrats, etc.)
+// MODULE : LISTE GENERIQUE (Pour NDF, Dons, Contrats, etc.)
 // ==========================================
 const ModuleListDynamique = ({ title, icon, color }) => {
   const [items, setItems] = useState([]);
   const [newItem, setNewItem] = useState({ nom: '', detail: '' });
+
+  // Map des couleurs Tailwind pour forcer le rendu même si non-purgé
+  const bgColors = {
+    blue: 'bg-blue-50 border-blue-100', textBlue: 'text-blue-900', btnBlue: 'bg-blue-600 hover:bg-blue-700', iconBlue: 'text-blue-600',
+    rose: 'bg-rose-50 border-rose-100', textRose: 'text-rose-900', btnRose: 'bg-rose-600 hover:bg-rose-700', iconRose: 'text-rose-600',
+    emerald: 'bg-emerald-50 border-emerald-100', textEmerald: 'text-emerald-900', btnEmerald: 'bg-emerald-600 hover:bg-emerald-700', iconEmerald: 'text-emerald-600',
+    amber: 'bg-amber-50 border-amber-100', textAmber: 'text-amber-900', btnAmber: 'bg-amber-600 hover:bg-amber-700', iconAmber: 'text-amber-600',
+  };
+
+  const getStyle = (type) => {
+    if (color === 'rose') return type === 'bg' ? bgColors.rose : type === 'text' ? bgColors.textRose : type === 'btn' ? bgColors.btnRose : bgColors.iconRose;
+    if (color === 'emerald') return type === 'bg' ? bgColors.emerald : type === 'text' ? bgColors.textEmerald : type === 'btn' ? bgColors.btnEmerald : bgColors.iconEmerald;
+    if (color === 'amber') return type === 'bg' ? bgColors.amber : type === 'text' ? bgColors.textAmber : type === 'btn' ? bgColors.btnAmber : bgColors.iconAmber;
+    return type === 'bg' ? bgColors.blue : type === 'text' ? bgColors.textBlue : type === 'btn' ? bgColors.btnBlue : bgColors.iconBlue;
+  };
 
   const handleAdd = (e) => {
     e.preventDefault();
@@ -363,11 +369,11 @@ const ModuleListDynamique = ({ title, icon, color }) => {
 
   return (
     <div className="space-y-6 animate-in fade-in max-w-4xl">
-      <div className={`bg-${color}-50 p-6 rounded-xl border border-${color}-100 flex items-center gap-4`}>
-        <div className={`p-3 bg-white rounded-full text-${color}-600 shadow-sm`}>{icon}</div>
+      <div className={`${getStyle('bg')} p-6 rounded-xl border flex items-center gap-4`}>
+        <div className={`p-3 bg-white rounded-full ${getStyle('icon')} shadow-sm`}>{icon}</div>
         <div>
-          <h2 className={`text-2xl font-bold text-${color}-900`}>{title}</h2>
-          <p className={`text-${color}-700 mt-1 text-sm`}>Saisissez de nouvelles données dynamiquement ci-dessous.</p>
+          <h2 className={`text-2xl font-bold ${getStyle('text')}`}>{title}</h2>
+          <p className="text-slate-600 mt-1 text-sm">Saisissez de nouvelles données dynamiquement ci-dessous.</p>
         </div>
       </div>
 
@@ -377,10 +383,10 @@ const ModuleListDynamique = ({ title, icon, color }) => {
           <input type="text" required value={newItem.nom} onChange={e=>setNewItem({...newItem, nom: e.target.value})} className="w-full p-2 border rounded-md text-sm" />
         </div>
         <div className="flex-1">
-          <label className="block text-xs font-medium text-slate-500 mb-1">Détails (Montant, Rôle, etc.)</label>
+          <label className="block text-xs font-medium text-slate-500 mb-1">Détails (Montant, Date, etc.)</label>
           <input type="text" value={newItem.detail} onChange={e=>setNewItem({...newItem, detail: e.target.value})} className="w-full p-2 border rounded-md text-sm" />
         </div>
-        <button type="submit" className={`px-4 py-2 bg-${color}-600 text-white rounded-md font-medium text-sm h-[38px]`}>Ajouter</button>
+        <button type="submit" className={`px-4 py-2 ${getStyle('btn')} text-white rounded-md font-medium text-sm h-[38px] transition-colors`}>Ajouter</button>
       </form>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 min-h-[200px]">
@@ -408,7 +414,6 @@ const ModuleListDynamique = ({ title, icon, color }) => {
 // ECRAN DE CONNEXION 
 // ==========================================
 const LoginScreen = ({ onLogin }) => {
-  // Identifiants codés "en dur" par défaut comme demandé
   const [email, setEmail] = useState('admin@courstommorel.fr');
   const [password, setPassword] = useState('admin123');
   const [error, setError] = useState('');
@@ -489,7 +494,7 @@ export default function App() {
       
       {/* SIDEBAR NAVIGATION */}
       <div className="w-72 bg-slate-900 text-slate-300 flex flex-col shadow-2xl z-20 overflow-y-auto">
-        <div className="p-6 bg-slate-950/50 flex flex-col items-center border-b border-slate-800">
+        <div className="p-6 bg-slate-950/50 flex flex-col items-center border-b border-slate-800 shrink-0">
           <div className="h-16 w-16 bg-white rounded-xl flex items-center justify-center p-2 mb-3 shadow-lg">
             <img src={LOGO_URL} alt="Logo" className="max-h-full max-w-full object-contain" onError={(e)=>{e.target.style.display='none'}}/>
           </div>
@@ -497,13 +502,14 @@ export default function App() {
           <p className="text-xs text-slate-400 uppercase tracking-widest mt-1">ERP - Version {isAdmin ? 'Admin' : 'Famille'}</p>
         </div>
 
-        <nav className="flex-1 px-4 py-6 space-y-8">
+        <nav className="flex-1 px-4 py-6 space-y-8 overflow-y-auto">
           
           <div>
              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 px-3">Espace Famille</h3>
              <ul className="space-y-1">
                 <li><button onClick={() => setActiveTab('infos')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'infos' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><AlertCircle size={18} /> Infos & Contact</button></li>
                 <li><button onClick={() => setActiveTab('dossiers')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'dossiers' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><GraduationCap size={18} /> Scolarité (Dossiers)</button></li>
+                <li><button onClick={() => setActiveTab('mes_factures')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'mes_factures' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><Receipt size={18} /> Mes Factures</button></li>
              </ul>
           </div>
 
@@ -522,6 +528,8 @@ export default function App() {
                 <ul className="space-y-1">
                   <li><button onClick={() => setActiveTab('journal_banque')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'journal_banque' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><CreditCard size={18} /> Journal de Banque</button></li>
                   <li><button onClick={() => setActiveTab('od')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'od' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><FileSignature size={18} /> Opérations Diverses (OD)</button></li>
+                  <li><button onClick={() => setActiveTab('ndf')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'ndf' ? 'bg-emerald-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><Receipt size={18} /> Notes de Frais</button></li>
+                  <li><button onClick={() => setActiveTab('dons')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'dons' ? 'bg-rose-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><Heart size={18} /> Dons & Mécénat</button></li>
                   <li><button onClick={() => setActiveTab('budget')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'budget' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><PieChart size={18} /> Budget Prévisionnel</button></li>
                 </ul>
               </div>
@@ -529,15 +537,16 @@ export default function App() {
               <div>
                 <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 px-3">Administration</h3>
                 <ul className="space-y-1">
+                  <li><button onClick={() => setActiveTab('factures_familles')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'factures_familles' ? 'bg-amber-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><FileSpreadsheet size={18} /> Factures Familles</button></li>
                   <li><button onClick={() => setActiveTab('contrats')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'contrats' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><Users size={18} /> Équipe (Contrats)</button></li>
-                  <li><button onClick={() => setActiveTab('uniformes')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'uniformes' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><Shield size={18} /> Uniformes & Stock</button></li>
+                  <li><button onClick={() => setActiveTab('uniformes')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'uniformes' ? 'bg-amber-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><Shield size={18} /> Uniformes & Stock</button></li>
                 </ul>
               </div>
             </>
           )}
         </nav>
         
-        <div className="p-4 bg-slate-950 border-t border-slate-800">
+        <div className="p-4 bg-slate-950 border-t border-slate-800 shrink-0">
            <button onClick={() => setCurrentUser(null)} className="w-full py-2 bg-slate-800 hover:bg-red-900/50 hover:text-red-400 text-slate-300 rounded transition-colors text-sm font-medium flex justify-center items-center gap-2">
              <XCircle size={16}/> Déconnexion
            </button>
@@ -550,11 +559,15 @@ export default function App() {
           <div>
             <h2 className="text-xl font-bold text-slate-800">
               {activeTab === 'infos' && "Informations & Contact"}
+              {activeTab === 'mes_factures' && "Mes Factures & Paiements"}
               {activeTab === 'journal_banque' && "Rapprochement Bancaire"}
               {activeTab === 'od' && "Opérations Diverses"}
+              {activeTab === 'ndf' && "Gestion des Notes de Frais"}
+              {activeTab === 'dons' && "Dons & Reçus Fiscaux"}
               {activeTab === 'menage' && "Planning du Ménage"}
               {activeTab === 'surveillance' && "Tour de garde"}
               {activeTab === 'budget' && "Budget Prévisionnel"}
+              {activeTab === 'factures_familles' && "Facturation des Familles"}
               {activeTab === 'uniformes' && "Gestion des Uniformes"}
               {activeTab === 'contrats' && "Contrats & Équipe"}
               {activeTab === 'dossiers' && "Dossiers de Scolarité"}
@@ -594,9 +607,14 @@ export default function App() {
           {activeTab === 'menage' && <PlanningEngagement type="menage" />}
           {activeTab === 'surveillance' && <PlanningEngagement type="surveillance" />}
 
-          {/* Modules dynamiques pour remplacer les anciens "en travaux" */}
+          {/* Modules dynamiques réintégrés */}
+          {activeTab === 'ndf' && <ModuleListDynamique title="Notes de Frais (NDF)" color="emerald" icon={<Receipt size={24}/>} />}
+          {activeTab === 'dons' && <ModuleListDynamique title="Dons & Mécénat" color="rose" icon={<Heart size={24}/>} />}
+          {activeTab === 'mes_factures' && <ModuleListDynamique title="Mes Factures (Famille)" color="blue" icon={<Receipt size={24}/>} />}
+          {activeTab === 'factures_familles' && <ModuleListDynamique title="Suivi Facturation (Admin)" color="amber" icon={<FileSpreadsheet size={24}/>} />}
+          
           {activeTab === 'budget' && <ModuleListDynamique title="Lignes Budgétaires" color="blue" icon={<PieChart size={24}/>} />}
-          {activeTab === 'contrats' && <ModuleListDynamique title="Contrats Équipe" color="rose" icon={<Users size={24}/>} />}
+          {activeTab === 'contrats' && <ModuleListDynamique title="Contrats Équipe" color="blue" icon={<Users size={24}/>} />}
           {activeTab === 'uniformes' && <ModuleListDynamique title="Stock d'Uniformes" color="amber" icon={<Shield size={24}/>} />}
           {activeTab === 'dossiers' && <ModuleListDynamique title="Dossiers d'Inscriptions" color="blue" icon={<GraduationCap size={24}/>} />}
           
