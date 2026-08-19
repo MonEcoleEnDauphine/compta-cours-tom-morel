@@ -41,90 +41,108 @@ const EtatFinancier = ({ planComptable, transactionsGlobales }) => {
   }, [anneeDebut]);
 
   const transactionsFiltrees = useMemo(() => {
-    return transactionsGlobales.filter(t => {
-      return t.date >= periode.debut && t.date <= periode.fin;
-    });
+    return transactionsGlobales.filter(t => t.date >= periode.debut && t.date <= periode.fin);
   }, [periode, transactionsGlobales]);
 
   const totaux = useMemo(() => {
-    let recettes = 0;
-    let depenses = 0;
-    let actif = 0;
-    let passif = 0;
     let soldeBanque = 0;
-    
-    const parCompte = {};
+    const parCompteBrut = {};
 
     transactionsFiltrees.forEach(t => {
-      // 1. Calcul de la contrepartie implicite en Banque (512000)
-      // Un montant positif importé de la banque augmente le solde.
+      // Impact sur la trésorerie (512000)
       soldeBanque += t.montant;
-
-      // 2. Ventilation de la ligne selon le compte choisi
-      const comptePrefix = t.compte ? t.compte.charAt(0) : '0';
-      let typeCompte = 'autre';
       
-      if (comptePrefix === '6') {
-          typeCompte = 'charge';
-          depenses += Math.abs(t.montant); // En compta, une charge est positive au CR
-      } else if (comptePrefix === '7') {
-          typeCompte = 'produit';
-          recettes += Math.abs(t.montant); // Un produit est positif au CR
-      } else if (['1', '2', '3', '4', '5'].includes(comptePrefix)) {
-          typeCompte = 'bilan';
-      }
-
-      if (!parCompte[t.compte]) {
-        parCompte[t.compte] = { montant: 0, type: typeCompte };
-      }
-      parCompte[t.compte].montant += t.montant; 
+      if (!parCompteBrut[t.compte]) parCompteBrut[t.compte] = 0;
+      parCompteBrut[t.compte] += t.montant; 
     });
 
-    // 3. Intégration dynamique du compte de Banque (512000)
-    parCompte['512000'] = { montant: soldeBanque, type: 'bilan_banque' };
+    // La contrepartie de tout le journal de banque atterrit dans le 512
+    parCompteBrut['512000'] = soldeBanque;
+
+    const charges = [];
+    const produits = [];
+    const actif = [];
+    const passif = [];
+    let totalCharges = 0;
+    let totalProduits = 0;
+    let totalActif = 0;
+    let totalPassif = 0;
+
+    Object.entries(parCompteBrut).forEach(([compte, solde]) => {
+      if (solde === 0) return; // Ignorer les comptes soldés à zéro
+
+      const compteInfo = planComptable.find(c => c.id === compte);
+      const label = compteInfo ? compteInfo.label : (compte === '512000' ? 'Banque Caisse d\'épargne' : 'Compte Inconnu');
+      const firstDigit = compte.charAt(0);
+      
+      // En comptabilité, une charge est un débit (banque diminue = négatif). On l'affiche en positif dans le tableau.
+      if (['6'].includes(firstDigit)) {
+         const val = Math.abs(solde);
+         charges.push({ compte, label, montant: val });
+         totalCharges += val;
+      } 
+      // Un produit est un crédit (banque augmente = positif).
+      else if (['7'].includes(firstDigit)) {
+         const val = Math.abs(solde);
+         produits.push({ compte, label, montant: val });
+         totalProduits += val;
+      } 
+      // Bilan (Comptes 1 à 5)
+      else if (['1', '2', '3', '4', '5'].includes(firstDigit)) {
+         if (solde > 0) {
+             actif.push({ compte, label, montant: solde });
+             totalActif += solde;
+         } else if (solde < 0) {
+             passif.push({ compte, label, montant: Math.abs(solde) });
+             totalPassif += Math.abs(solde);
+         }
+      }
+    });
+
+    const resultat = totalProduits - totalCharges;
+
+    // Tri pour un affichage propre
+    const sortFn = (a, b) => a.compte.localeCompare(b.compte);
+    charges.sort(sortFn);
+    produits.sort(sortFn);
+    actif.sort(sortFn);
     
-    if (soldeBanque > 0) actif += soldeBanque;
-    else passif += Math.abs(soldeBanque);
-
-    // 4. Calcul de l'Actif et du Passif pour le reste des comptes Bilan
-    Object.entries(parCompte).forEach(([c, data]) => {
-        if (c !== '512000' && data.type === 'bilan') {
-            if (data.montant < 0) passif += Math.abs(data.montant); 
-            else actif += data.montant;
-        }
+    // Ajout du résultat dans le Passif pour équilibrer le Bilan !
+    const bilanPassif = [...passif].sort(sortFn);
+    bilanPassif.push({ 
+        compte: '120000', 
+        label: resultat >= 0 ? 'Résultat de l\'exercice (Bénéfice)' : 'Résultat de l\'exercice (Perte)', 
+        montant: resultat 
     });
+    const grandTotalPassif = totalPassif + resultat;
 
     return { 
-      recettes, 
-      depenses, 
-      resultat: recettes - depenses,
-      actif,
-      passif,
-      soldeBanque,
-      parCompte: Object.entries(parCompte).map(([compte, data]) => {
-        const compteInfo = planComptable.find(c => c.id === compte);
-        let label = compteInfo ? compteInfo.label : 'Compte Inconnu';
-        if (compte === '512000') label = 'Banque (Solde Contrepartie)';
-        
-        return {
-          compte,
-          label: label,
-          montantAbsolu: Math.abs(data.montant),
-          soldeBrut: data.montant,
-          type: data.type
-        };
-      }).sort((a, b) => b.montantAbsolu - a.montantAbsolu)
+        charges, produits, totalCharges, totalProduits, resultat, 
+        actif, passif: bilanPassif, totalActif, grandTotalPassif
     };
   }, [transactionsFiltrees, planComptable]);
 
+  // Construction des lignes des tableaux pour l'affichage en parallèle
+  const maxRowsCR = Math.max(totaux.charges.length, totaux.produits.length);
+  const rowsCR = Array.from({ length: maxRowsCR }).map((_, i) => ({
+      charge: totaux.charges[i] || null,
+      produit: totaux.produits[i] || null
+  }));
+
+  const maxRowsBilan = Math.max(totaux.actif.length, totaux.passif.length);
+  const rowsBilan = Array.from({ length: maxRowsBilan }).map((_, i) => ({
+      actifItem: totaux.actif[i] || null,
+      passifItem: totaux.passif[i] || null
+  }));
+
   return (
-    <div className="space-y-12 animate-in fade-in">
+    <div className="space-y-12 animate-in fade-in pb-12">
       <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <PieChart className="text-blue-600" /> État Financier
           </h2>
-          <p className="text-slate-500 mt-1">Bilan et Compte de Résultat de l'année scolaire.</p>
+          <p className="text-slate-500 mt-1">Édition des documents de synthèse comptable.</p>
         </div>
         
         <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
@@ -144,168 +162,132 @@ const EtatFinancier = ({ planComptable, transactionsGlobales }) => {
         </div>
       </div>
 
-      {/* SECTION COMPTE DE RESULTAT */}
-      <div className="space-y-6">
-          <h3 className="text-xl font-bold text-slate-800 border-b border-slate-200 pb-2">Compte de Résultat</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in zoom-in-95 duration-200">
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex items-center gap-4 border-l-4 border-l-emerald-500">
-              <div className="p-4 bg-emerald-50 rounded-full text-emerald-600">
-                <Plus size={24} />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-slate-500">Total Recettes (Cl. 7)</p>
-                <h3 className="text-2xl font-bold text-slate-800">{totaux.recettes.toFixed(2)} €</h3>
-              </div>
+      {/* --- SECTION COMPTE DE RÉSULTAT --- */}
+      <div className="space-y-4">
+        <div className="flex items-start gap-4">
+            <div className="p-3 bg-blue-100 text-blue-700 rounded-lg"><Info size={24} /></div>
+            <div>
+                <h3 className="text-xl font-bold text-slate-800">Compte de Résultat</h3>
+                <p className="text-sm text-slate-600 font-medium mt-1">Le Compte de Résultat est le <strong>"film"</strong> de l'année scolaire. Il compare l'ensemble de vos Charges (vos dépenses) et de vos Produits (vos recettes) pour déterminer la rentabilité de l'association (Bénéfice ou Perte).</p>
             </div>
+        </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex items-center gap-4 border-l-4 border-l-rose-500">
-              <div className="p-4 bg-rose-50 rounded-full text-rose-600">
-                <Trash2 size={24} />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-slate-500">Total Dépenses (Cl. 6)</p>
-                <h3 className="text-2xl font-bold text-slate-800">{totaux.depenses.toFixed(2)} €</h3>
-              </div>
-            </div>
+        <div className="bg-white shadow-sm border border-slate-300 overflow-x-auto">
+            <table className="w-full text-sm text-left border-collapse min-w-[800px]">
+                <thead>
+                    <tr>
+                        <th colSpan="3" className="border border-slate-300 bg-rose-50 text-rose-800 p-3 text-center font-bold text-base w-1/2">Charges (Dépenses)</th>
+                        <th colSpan="3" className="border border-slate-300 bg-emerald-50 text-emerald-800 p-3 text-center font-bold text-base w-1/2">Produits (Recettes)</th>
+                    </tr>
+                    <tr className="bg-slate-100 text-slate-600 uppercase text-xs tracking-wider">
+                        <th className="border border-slate-300 p-2 w-20">Comptes</th>
+                        <th className="border border-slate-300 p-2">Libellé</th>
+                        <th className="border border-slate-300 p-2 text-right">Montant</th>
+                        <th className="border border-slate-300 p-2 w-20">Comptes</th>
+                        <th className="border border-slate-300 p-2">Libellé</th>
+                        <th className="border border-slate-300 p-2 text-right">Montant</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {rowsCR.map((row, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50">
+                            <td className="border border-slate-200 p-2 font-mono text-xs text-slate-500">{row.charge?.compte || ''}</td>
+                            <td className="border border-slate-200 p-2 font-medium text-slate-700">{row.charge?.label || ''}</td>
+                            <td className="border border-slate-200 p-2 text-right">{row.charge ? row.charge.montant.toFixed(2) + ' €' : ''}</td>
+                            
+                            <td className="border border-slate-200 p-2 font-mono text-xs text-slate-500">{row.produit?.compte || ''}</td>
+                            <td className="border border-slate-200 p-2 font-medium text-slate-700">{row.produit?.label || ''}</td>
+                            <td className="border border-slate-200 p-2 text-right">{row.produit ? row.produit.montant.toFixed(2) + ' €' : ''}</td>
+                        </tr>
+                    ))}
+                    
+                    {/* Lignes d'équilibrage du Résultat */}
+                    {totaux.resultat > 0 && (
+                        <tr className="bg-emerald-50/50 font-bold">
+                            <td className="border border-slate-200 p-2"></td>
+                            <td className="border border-slate-200 p-2 text-emerald-700">Solde créditeur (Bénéfice)</td>
+                            <td className="border border-slate-200 p-2 text-right text-emerald-700">{totaux.resultat.toFixed(2)} €</td>
+                            <td colSpan="3" className="border border-slate-200 p-2 bg-slate-50"></td>
+                        </tr>
+                    )}
+                    {totaux.resultat < 0 && (
+                        <tr className="bg-rose-50/50 font-bold">
+                            <td colSpan="3" className="border border-slate-200 p-2 bg-slate-50"></td>
+                            <td className="border border-slate-200 p-2"></td>
+                            <td className="border border-slate-200 p-2 text-rose-700">Solde débiteur (Perte)</td>
+                            <td className="border border-slate-200 p-2 text-right text-rose-700">{Math.abs(totaux.resultat).toFixed(2)} €</td>
+                        </tr>
+                    )}
 
-            <div className={`bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex items-center gap-4 border-l-4 ${totaux.resultat >= 0 ? 'border-l-blue-500' : 'border-l-amber-500'}`}>
-              <div className={`p-4 rounded-full ${totaux.resultat >= 0 ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'}`}>
-                <Building size={24} />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-slate-500">Résultat Période</p>
-                <h3 className={`text-2xl font-bold ${totaux.resultat >= 0 ? 'text-blue-700' : 'text-amber-700'}`}>
-                  {totaux.resultat > 0 ? '+' : ''}{totaux.resultat.toFixed(2)} €
-                </h3>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="bg-rose-50 p-4 border-b border-rose-100 flex justify-between items-center">
-                <h3 className="font-bold text-rose-800">Dépenses par poste (Cl. 6)</h3>
-                <span className="text-sm font-semibold text-rose-600">{totaux.depenses.toFixed(2)} €</span>
-              </div>
-              <div className="p-0 max-h-[400px] overflow-y-auto custom-scrollbar">
-                <ul className="divide-y divide-slate-100">
-                  {totaux.parCompte.filter(c => c.type === 'charge').map((item, idx) => (
-                    <li key={idx} className="p-4 flex justify-between items-center hover:bg-slate-50">
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs font-mono font-bold bg-slate-100 text-slate-500 border border-slate-200 px-2 py-1 rounded">{item.compte}</span>
-                        <span className="font-medium text-slate-700 truncate max-w-[200px]" title={item.label}>{item.label}</span>
-                      </div>
-                      <span className="font-semibold text-rose-600">-{item.montantAbsolu.toFixed(2)} €</span>
-                    </li>
-                  ))}
-                  {totaux.parCompte.filter(c => c.type === 'charge').length === 0 && (
-                    <li className="p-8 text-center text-slate-400 text-sm">Aucune dépense enregistrée sur cette période.</li>
-                  )}
-                </ul>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="bg-emerald-50 p-4 border-b border-emerald-100 flex justify-between items-center">
-                <h3 className="font-bold text-emerald-800">Recettes par poste (Cl. 7)</h3>
-                <span className="text-sm font-semibold text-emerald-600">{totaux.recettes.toFixed(2)} €</span>
-              </div>
-              <div className="p-0 max-h-[400px] overflow-y-auto custom-scrollbar">
-                <ul className="divide-y divide-slate-100">
-                  {totaux.parCompte.filter(c => c.type === 'produit').map((item, idx) => (
-                    <li key={idx} className="p-4 flex justify-between items-center hover:bg-slate-50">
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs font-mono font-bold bg-slate-100 text-slate-500 border border-slate-200 px-2 py-1 rounded">{item.compte}</span>
-                        <span className="font-medium text-slate-700 truncate max-w-[200px]" title={item.label}>{item.label}</span>
-                      </div>
-                      <span className="font-semibold text-emerald-600">+{item.montantAbsolu.toFixed(2)} €</span>
-                    </li>
-                  ))}
-                  {totaux.parCompte.filter(c => c.type === 'produit').length === 0 && (
-                    <li className="p-8 text-center text-slate-400 text-sm">Aucune recette enregistrée sur cette période.</li>
-                  )}
-                </ul>
-              </div>
-            </div>
-          </div>
+                    {/* Ligne des Totaux Généraux */}
+                    <tr className="bg-slate-800 text-white font-bold text-base">
+                        <td colSpan="2" className="border border-slate-700 p-3 text-right">TOTAL GÉNÉRAL</td>
+                        <td className="border border-slate-700 p-3 text-right">
+                            {totaux.resultat > 0 ? (totaux.totalCharges + totaux.resultat).toFixed(2) : totaux.totalCharges.toFixed(2)} €
+                        </td>
+                        <td colSpan="2" className="border border-slate-700 p-3 text-right">TOTAL GÉNÉRAL</td>
+                        <td className="border border-slate-700 p-3 text-right">
+                            {totaux.resultat < 0 ? (totaux.totalProduits + Math.abs(totaux.resultat)).toFixed(2) : totaux.totalProduits.toFixed(2)} €
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
       </div>
 
-      {}
-      <div className="space-y-6 pt-6">
-          <h3 className="text-xl font-bold text-slate-800 border-b border-slate-200 pb-2">Bilan Comptable</h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex items-center justify-between border-l-4 border-l-purple-500">
-              <div className="flex items-center gap-4">
-                  <div className="p-4 bg-purple-50 rounded-full text-purple-600">
-                    <Building size={24} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-slate-500">Total de l'Actif</p>
-                    <h3 className="text-2xl font-bold text-slate-800">{totaux.actif.toFixed(2)} €</h3>
-                  </div>
-              </div>
-            </div>
-            
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex items-center justify-between border-l-4 border-l-indigo-500">
-              <div className="flex items-center gap-4">
-                  <div className="p-4 bg-indigo-50 rounded-full text-indigo-600">
-                    <BookOpen size={24} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-slate-500">Total du Passif</p>
-                    <h3 className="text-2xl font-bold text-slate-800">{totaux.passif.toFixed(2)} €</h3>
-                  </div>
-              </div>
-            </div>
-          </div>
+      <div className="h-px bg-slate-200 my-8"></div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-             <div className="bg-slate-100 p-4 border-b border-slate-200 flex justify-between items-center">
-                <div>
-                   <h3 className="font-bold text-slate-800">Détail du Bilan (Classes 1 à 5)</h3>
-                   <p className="text-xs text-slate-500">Inclut le solde calculé de la banque en contrepartie (512000).</p>
-                </div>
-             </div>
-             <div className="p-0 max-h-[600px] overflow-y-auto custom-scrollbar">
-                <table className="w-full text-left text-sm whitespace-nowrap">
-                  <thead className="bg-slate-50 text-slate-600 font-medium border-b border-slate-200">
-                     <tr>
-                        <th className="py-3 px-4">N° Compte</th>
-                        <th className="py-3 px-4 w-full">Libellé du compte</th>
-                        <th className="py-3 px-4 text-right">Solde Débiteur (Actif)</th>
-                        <th className="py-3 px-4 text-right">Solde Créditeur (Passif)</th>
-                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                     {totaux.parCompte.filter(c => c.type === 'bilan' || c.type === 'bilan_banque').map((item, idx) => (
-                        <tr key={idx} className={`hover:bg-slate-50 transition-colors ${item.compte === '512000' ? 'bg-blue-50/50' : ''}`}>
-                           <td className="py-3 px-4">
-                              <span className={`font-mono font-bold px-2 py-1 rounded text-sm ${item.compte === '512000' ? 'text-blue-700 bg-blue-100 border-blue-200' : 'text-slate-600 bg-slate-100 border-slate-200'} border`}>
-                                {item.compte}
-                              </span>
-                           </td>
-                           <td className="py-3 px-4 text-slate-700 font-medium flex items-center gap-2">
-                              {item.label}
-                              {item.compte === '512000' && <span className="text-[10px] uppercase bg-blue-600 text-white px-1.5 py-0.5 rounded font-bold">Auto</span>}
-                           </td>
-                           <td className="py-3 px-4 text-right font-bold text-slate-600">
-                              {item.soldeBrut > 0 ? item.soldeBrut.toFixed(2) + ' €' : '-'}
-                           </td>
-                           <td className="py-3 px-4 text-right font-bold text-slate-600">
-                              {item.soldeBrut < 0 ? Math.abs(item.soldeBrut).toFixed(2) + ' €' : '-'}
-                           </td>
+      {/* --- SECTION BILAN --- */}
+      <div className="space-y-4">
+        <div className="flex items-start gap-4">
+            <div className="p-3 bg-purple-100 text-purple-700 rounded-lg"><Building size={24} /></div>
+            <div>
+                <h3 className="text-xl font-bold text-slate-800">Bilan au 31/08/{anneeDebut + 1}</h3>
+                <p className="text-sm text-slate-600 font-medium mt-1">Le Bilan est une <strong>"photographie"</strong> du patrimoine de l'association à un instant donné. L'Actif représente tout ce qu'elle possède (matériel, argent en banque, créances), et le Passif ce qu'elle doit (capitaux, dettes, résultat à affecter).</p>
+            </div>
+        </div>
+
+        <div className="bg-white shadow-sm border border-slate-300 overflow-x-auto">
+            <table className="w-full text-sm text-left border-collapse min-w-[800px]">
+                <thead>
+                    <tr>
+                        <th colSpan="3" className="border border-slate-300 bg-blue-50 text-blue-800 p-3 text-center font-bold text-base w-1/2">Actif (Ce que possède l'association)</th>
+                        <th colSpan="3" className="border border-slate-300 bg-amber-50 text-amber-800 p-3 text-center font-bold text-base w-1/2">Passif (Ce que doit l'association)</th>
+                    </tr>
+                    <tr className="bg-slate-100 text-slate-600 uppercase text-xs tracking-wider">
+                        <th className="border border-slate-300 p-2 w-20">Comptes</th>
+                        <th className="border border-slate-300 p-2">Libellé</th>
+                        <th className="border border-slate-300 p-2 text-right">Montant</th>
+                        <th className="border border-slate-300 p-2 w-20">Comptes</th>
+                        <th className="border border-slate-300 p-2">Libellé</th>
+                        <th className="border border-slate-300 p-2 text-right">Montant</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {rowsBilan.map((row, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50">
+                            <td className="border border-slate-200 p-2 font-mono text-xs text-slate-500">{row.actifItem?.compte || ''}</td>
+                            <td className="border border-slate-200 p-2 font-medium text-slate-700">{row.actifItem?.label || ''}</td>
+                            <td className="border border-slate-200 p-2 text-right font-bold text-blue-700">{row.actifItem ? row.actifItem.montant.toFixed(2) + ' €' : ''}</td>
+                            
+                            <td className="border border-slate-200 p-2 font-mono text-xs text-slate-500">{row.passifItem?.compte || ''}</td>
+                            <td className="border border-slate-200 p-2 font-medium text-slate-700">{row.passifItem?.label || ''}</td>
+                            <td className={`border border-slate-200 p-2 text-right font-bold ${row.passifItem?.compte === '120000' && row.passifItem.montant < 0 ? 'text-rose-600' : 'text-amber-700'}`}>
+                                {row.passifItem ? row.passifItem.montant.toFixed(2) + ' €' : ''}
+                            </td>
                         </tr>
-                     ))}
-                     {totaux.parCompte.filter(c => c.type === 'bilan' || c.type === 'bilan_banque').length === 0 && (
-                        <tr>
-                           <td colSpan="4" className="py-8 text-center text-slate-400">Aucun mouvement de bilan enregistré.</td>
-                        </tr>
-                     )}
-                  </tbody>
-                </table>
-             </div>
-          </div>
+                    ))}
+                    
+                    {/* Ligne des Totaux Généraux */}
+                    <tr className="bg-slate-800 text-white font-bold text-base">
+                        <td colSpan="2" className="border border-slate-700 p-3 text-right">TOTAL ACTIF</td>
+                        <td className="border border-slate-700 p-3 text-right">{totaux.totalActif.toFixed(2)} €</td>
+                        <td colSpan="2" className="border border-slate-700 p-3 text-right">TOTAL PASSIF</td>
+                        <td className="border border-slate-700 p-3 text-right">{totaux.grandTotalPassif.toFixed(2)} €</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
       </div>
     </div>
   );
