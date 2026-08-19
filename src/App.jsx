@@ -10,7 +10,7 @@ import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "firebase/auth";
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, addDoc, getDoc, updateDoc } from "firebase/firestore";
 
-// Configuration Firebase
+// Configuration Firebase Officielle
 const firebaseConfig = {
   apiKey: "AIzaSyDhKe4Nl3mUHagW1LkG5GT-tI1bB2-wtnE",
   authDomain: "cours-tom-morel.firebaseapp.com",
@@ -699,7 +699,7 @@ const LoginScreen = ({ onLogin }) => {
       console.error("Auth Error:", err);
       if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') setError("Identifiant ou mot de passe incorrect.");
       else if (err.code === 'auth/email-already-in-use') setError("Cet identifiant est déjà utilisé.");
-      else if (err.code === 'auth/operation-not-allowed') setError("Connexion par mot de passe désactivée. Allez dans Firebase > Authentication > Méthode de connexion pour l'activer.");
+      else if (err.code === 'auth/operation-not-allowed') setError("La connexion par mot de passe est désactivée dans Firebase.");
       else setError("Erreur de connexion.");
     }
   };
@@ -709,7 +709,6 @@ const LoginScreen = ({ onLogin }) => {
       <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-8 w-full max-w-md relative z-10">
         
         <div className="text-center mb-8">
-          {/* Beau logo remplaçant l'image Googleusercontent cassée */}
           <div className="mx-auto w-24 h-24 bg-gradient-to-br from-blue-600 to-indigo-800 rounded-2xl shadow-xl flex items-center justify-center mb-4 border-4 border-white">
              <GraduationCap size={48} className="text-white" />
           </div>
@@ -832,7 +831,7 @@ export default function App() {
   return (
     <div className="flex h-screen bg-slate-100 font-sans text-slate-800">
       
-      {/* SIDEBAR NAVIGATION - RESTAURÉE AVEC TOUS LES ÉLÉMENTS */}
+      {/* SIDEBAR NAVIGATION - MENU COMPLET RESTAURE */}
       <div className="w-72 bg-slate-900 text-slate-300 flex flex-col shadow-2xl z-20 overflow-y-auto custom-scrollbar">
         <div className="p-6 bg-slate-950/50 flex flex-col items-center border-b border-slate-800 shrink-0">
           <div className="h-16 w-16 bg-gradient-to-br from-blue-600 to-indigo-800 rounded-xl flex items-center justify-center mb-3 shadow-lg border-2 border-white/10">
@@ -945,7 +944,7 @@ export default function App() {
         </header>
 
         <main className="p-8 max-w-7xl mx-auto">
-          {/* VUES SIMPLES / PLACEHOLDERS POUR LES MODULES RESTAURÉS */}
+          {/* VUES SIMPLES / PLACEHOLDERS POUR LES MODULES NON CONNECTES */}
           {activeTab === 'infos' && (
              <div className="space-y-6">
                 <div className="bg-blue-600 rounded-xl p-8 text-white shadow-md">
@@ -963,7 +962,7 @@ export default function App() {
             </div>
           )}
 
-          {/* TABLEAU DE BORD RESTAURÉ */}
+          {/* TABLEAU DE BORD RESTAURÉ COMPLETEMENT */}
           {activeTab === 'dashboard' && (
             <div className="space-y-6 animate-in fade-in">
               <div className="flex justify-between items-end mb-2">
@@ -1013,7 +1012,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Raccourcis Rapides */}
               <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mt-8">
                 <h3 className="text-lg font-bold text-slate-800 mb-4">Raccourcis rapides</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
