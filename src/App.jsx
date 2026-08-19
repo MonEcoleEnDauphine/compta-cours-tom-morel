@@ -300,6 +300,9 @@ const GrandLivre = ({ planComptable, transactions, setTransactions, firebaseUser
   
   // État pour le formulaire d'OD
   const [odForm, setOdForm] = useState({ date: '', libelle: '', debit: '', credit: '512000', montant: '' });
+  
+  // État pour la confirmation de suppression (ID de la transaction)
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
@@ -456,6 +459,21 @@ const GrandLivre = ({ planComptable, transactions, setTransactions, firebaseUser
 
   const handlePdfUploadStub = () => {
       showToast("La fonction d'envoi de PDF vers le Cloud sera activée à la prochaine étape.", "success");
+  };
+
+  const handleDeleteValidated = async (txId) => {
+      if (confirmDeleteId === txId) {
+          try {
+              await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', txId));
+              showToast("Écriture supprimée définitivement du Grand Livre.", "success");
+              setConfirmDeleteId(null);
+          } catch(e) {
+              showToast("Erreur lors de la suppression.", "error");
+          }
+      } else {
+          setConfirmDeleteId(txId);
+          setTimeout(() => setConfirmDeleteId(null), 3000); // Annule la confirmation après 3s
+      }
   };
 
   const validatedTransactions = [...(globalTransactions || [])].sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -621,10 +639,21 @@ const GrandLivre = ({ planComptable, transactions, setTransactions, firebaseUser
                                  {planComptable.map(c => <option key={c.id} value={c.id}>{c.id} - {c.label}</option>)}
                               </select>
                            </td>
-                           <td className="py-3 px-4 text-center">
-                              <button onClick={handlePdfUploadStub} className="text-slate-400 hover:text-blue-600 hover:bg-blue-100 p-2 rounded-full transition-all inline-flex items-center justify-center shadow-sm border border-transparent hover:border-blue-200" title="Joindre une facture PDF">
+                           <td className="py-3 px-4 text-center flex items-center justify-center gap-2">
+                              <button onClick={handlePdfUploadStub} className="text-slate-400 hover:text-blue-600 hover:bg-blue-100 p-1.5 rounded-full transition-all inline-flex items-center justify-center shadow-sm border border-transparent hover:border-blue-200" title="Joindre une facture PDF">
                                  <Paperclip size={16} />
                               </button>
+                              
+                              {/* Bouton de suppression avec sécurité */}
+                              {confirmDeleteId === t.id ? (
+                                  <button onClick={() => handleDeleteValidated(t.id)} className="bg-red-500 text-white hover:bg-red-600 px-2 py-1 rounded text-xs font-bold animate-pulse shadow-sm whitespace-nowrap">
+                                      Confirmer ?
+                                  </button>
+                              ) : (
+                                  <button onClick={() => handleDeleteValidated(t.id)} className="text-slate-300 hover:text-red-500 p-1.5 rounded-full transition-colors" title="Supprimer l'écriture (irréversible)">
+                                      <Trash2 size={16} />
+                                  </button>
+                              )}
                            </td>
                         </tr>
                      ))}
