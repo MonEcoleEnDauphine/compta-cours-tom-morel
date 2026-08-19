@@ -26,8 +26,11 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'cours-tom-morel';
 
+// VARIABLE DU LOGO (A remplacer par votre lien d'image si vous en avez un)
+const LOGO_URL = ""; 
+
 const EtatFinancier = ({ planComptable, transactionsGlobales }) => {
-  const [anneeDebut, setAnneeDebut] = useState(2026);
+  const [anneeDebut, setAnneeDebut] = useState(2022);
   
   const periode = useMemo(() => {
     return {
@@ -97,6 +100,9 @@ const EtatFinancier = ({ planComptable, transactionsGlobales }) => {
             onChange={(e) => setAnneeDebut(Number(e.target.value))}
             className="p-2 border rounded-md text-sm bg-white font-medium focus:ring-2 focus:ring-blue-500 outline-none"
           >
+            <option value={2021}>01/09/21 au 31/08/22</option>
+            <option value={2022}>01/09/22 au 31/08/23</option>
+            <option value={2023}>01/09/23 au 31/08/24</option>
             <option value={2024}>01/09/24 au 31/08/25</option>
             <option value={2025}>01/09/25 au 31/08/26</option>
             <option value={2026}>01/09/26 au 31/08/27</option>
@@ -189,7 +195,7 @@ const EtatFinancier = ({ planComptable, transactionsGlobales }) => {
   );
 };
 
-const JournalBanque = ({ planComptable, transactions, setTransactions, firebaseUser }) => {
+const JournalBanque = ({ planComptable, transactions, setTransactions, firebaseUser, globalTransactions }) => {
   const [lastImportIds, setLastImportIds] = useState([]);
   const [toast, setToast] = useState(null);
   const fileInputRef = useRef(null);
@@ -201,10 +207,57 @@ const JournalBanque = ({ planComptable, transactions, setTransactions, firebaseU
 
   const autoImpute = (libelle, typeOp) => {
     const text = (libelle + " " + typeOp).toLowerCase();
-    if (text.includes('loyer')) return '613200';
-    if (text.includes('helloasso') || text.includes('stripe')) return '471000';
-    if (text.includes('frais') || text.includes('extournes') || text.includes('cotisation')) return '627000';
-    if (text.includes('salaire')) return '641000';
+    
+    // Frais bancaires et cotisations
+    if (text.includes('frais') || text.includes('extournes') || text.includes('cotisation') || 
+        text.includes('forfait') || text.includes('bl association') || text.includes('commission') || text.includes('agios')) {
+        return '627000'; // Services bancaires et assimilés
+    }
+    
+    // Fournitures et petits équipements
+    if (text.includes('bureau') || text.includes('fournitures') || text.includes('papeterie') || text.includes('amazon')) {
+        return '606400'; // Fournitures administratives
+    }
+    if (text.includes('livre') || text.includes('manuel') || text.includes('scolaire') || text.includes('pedagogique')) {
+        return '606800'; // Autres matières et fournitures (ex: pédagogique)
+    }
+
+    // Loyer et charges
+    if (text.includes('loyer') || text.includes('sci ') || text.includes('location')) {
+        return '613200'; // Locations immobilières
+    }
+    if (text.includes('edf') || text.includes('engie') || text.includes('eau ') || text.includes('electricite')) {
+        return '606100'; // Fournitures non stockables (eau, énergie)
+    }
+    if (text.includes('assurance') || text.includes('mutuelle') || text.includes('axa ') || text.includes('macif')) {
+        return '616000'; // Primes d'assurances
+    }
+    
+    // Entretien et nettoyage
+    if (text.includes('menage') || text.includes('nettoyage') || text.includes('entretien')) {
+        return '615000'; // Entretien et réparations
+    }
+
+    // Salaires et cotisations sociales
+    if (text.includes('salaire') || text.includes('virement ') && (text.includes('prof') || text.includes('enseignant'))) {
+        return '641000'; // Rémunérations du personnel
+    }
+    if (text.includes('urssaf') || text.includes('retraite') || text.includes('pole emploi')) {
+        return '645000'; // Charges de sécurité sociale et de prévoyance
+    }
+
+    // Recettes (Dons, Scolarité, Plateformes)
+    if (text.includes('helloasso') || text.includes('stripe')) {
+        // Souvent un compte d'attente avant ventilation précise (dons vs scolarité)
+        return '471000'; // Compte d'attente
+    }
+    if (text.includes('scolarite') || text.includes('cantine') || text.includes('inscription')) {
+        return '706000'; // Prestations de services (Scolarité)
+    }
+    if (text.includes('don ') || text.includes('mecenat') || text.includes('soutien')) {
+        return '754000'; // Collectes (Dons) ou 758000 (Dons manuels) - À adapter selon votre plan
+    }
+
     return 'ATTENTE';
   };
 
@@ -303,6 +356,25 @@ const JournalBanque = ({ planComptable, transactions, setTransactions, firebaseU
     }
   };
 
+  const handleUpdateCompte = async (txId, newCompte) => {
+      if (!firebaseUser) return;
+      try {
+          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', txId), {
+              compte: newCompte
+          });
+          showToast("Compte modifié avec succès.", "success");
+      } catch (e) {
+          showToast("Erreur lors de la modification.", "error");
+      }
+  };
+
+  const handlePdfUploadStub = () => {
+      showToast("La fonction d'envoi de PDF sera activée à la prochaine étape (Firebase Storage).", "error");
+  };
+
+  // Trier les écritures validées de la plus récente à la plus ancienne
+  const validatedTransactions = [...(globalTransactions || [])].sort((a, b) => new Date(b.date) - new Date(a.date));
+
   return (
     <div className="space-y-6 animate-in fade-in relative">
       {toast && (
@@ -312,6 +384,7 @@ const JournalBanque = ({ planComptable, transactions, setTransactions, firebaseU
         </div>
       )}
 
+      {/* ZONE D'IMPORT (EN ATTENTE) */}
       <div className="flex justify-between items-center bg-white p-6 rounded-xl shadow-sm border border-slate-100">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
@@ -335,14 +408,11 @@ const JournalBanque = ({ planComptable, transactions, setTransactions, firebaseU
         </div>
       </div>
       
-      {transactions.length === 0 ? (
-        <div className="bg-white border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
-          <FileText className="text-blue-500 mx-auto mb-4" size={32} />
-          <h3 className="text-xl font-bold text-slate-700 mb-2">Zone de traitement vide</h3>
-          <p className="text-slate-500 mb-6">Importez un fichier CSV de votre banque pour commencer le rapprochement.</p>
-        </div>
-      ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      {transactions.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8">
+          <div className="bg-amber-50 p-3 border-b border-amber-100 flex items-center gap-2 text-amber-800 font-bold">
+            <AlertTriangle size={18} /> Écritures en attente de validation ({transactions.length})
+          </div>
           <table className="w-full text-left text-sm whitespace-nowrap">
               <thead className="bg-slate-50 text-slate-600 font-medium border-b border-slate-200">
                 <tr>
@@ -385,6 +455,60 @@ const JournalBanque = ({ planComptable, transactions, setTransactions, firebaseU
           </table>
         </div>
       )}
+
+      {/* GRAND LIVRE (ÉCRITURES VALIDÉES) */}
+      <div className="bg-white rounded-xl shadow-sm border border-blue-200 overflow-hidden">
+         <div className="bg-blue-50 p-4 border-b border-blue-200 flex justify-between items-center">
+            <h3 className="font-bold text-blue-800 flex items-center gap-2">
+               <BookOpen size={18} /> Grand Livre (Écritures Validées)
+            </h3>
+            <span className="text-sm font-semibold text-blue-600">{validatedTransactions.length} écritures</span>
+         </div>
+         <div className="max-h-[500px] overflow-y-auto">
+            {validatedTransactions.length === 0 ? (
+               <div className="p-8 text-center text-slate-400 text-sm">
+                  Aucune écriture validée dans la base de données.
+               </div>
+            ) : (
+               <table className="w-full text-left text-sm whitespace-nowrap">
+                  <thead className="bg-white sticky top-0 shadow-sm text-slate-600 font-medium border-b border-slate-200 z-10">
+                     <tr>
+                        <th className="py-3 px-4">Date</th>
+                        <th className="py-3 px-4">Libellé</th>
+                        <th className="py-3 px-4 text-right">Montant</th>
+                        <th className="py-3 px-4">Compte Imputé</th>
+                        <th className="py-3 px-4 text-center">Justificatif</th>
+                     </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                     {validatedTransactions.map(t => (
+                        <tr key={t.id} className="hover:bg-slate-50 transition-colors">
+                           <td className="py-3 px-4 text-slate-500">{t.date}</td>
+                           <td className="py-3 px-4 truncate max-w-[300px] text-slate-700" title={t.libelle}>{t.libelle}</td>
+                           <td className={`py-3 px-4 text-right font-bold ${t.montant > 0 ? 'text-emerald-600' : 'text-slate-800'}`}>
+                              {t.montant > 0 ? '+' : ''}{t.montant.toFixed(2)} €
+                           </td>
+                           <td className="py-3 px-4">
+                              <select 
+                                 value={t.compte} 
+                                 onChange={(e) => handleUpdateCompte(t.id, e.target.value)} 
+                                 className="p-1 border border-transparent hover:border-slate-300 rounded max-w-[200px] bg-transparent hover:bg-white focus:bg-white focus:border-blue-500 transition-all cursor-pointer text-xs font-mono"
+                              >
+                                 {planComptable.map(c => <option key={c.id} value={c.id}>{c.id} - {c.label}</option>)}
+                              </select>
+                           </td>
+                           <td className="py-3 px-4 text-center">
+                              <button onClick={handlePdfUploadStub} className="text-slate-400 hover:text-blue-600 hover:bg-blue-50 p-2 rounded-full transition-colors inline-flex items-center justify-center" title="Ajouter un PDF">
+                                 <Paperclip size={16} />
+                              </button>
+                           </td>
+                        </tr>
+                     ))}
+                  </tbody>
+               </table>
+            )}
+         </div>
+      </div>
     </div>
   );
 };
@@ -709,9 +833,13 @@ const LoginScreen = ({ onLogin }) => {
       <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-8 w-full max-w-md relative z-10">
         
         <div className="text-center mb-8">
-          <div className="mx-auto w-24 h-24 bg-gradient-to-br from-blue-600 to-indigo-800 rounded-2xl shadow-xl flex items-center justify-center mb-4 border-4 border-white">
-             <GraduationCap size={48} className="text-white" />
-          </div>
+          {LOGO_URL ? (
+             <img src={LOGO_URL} alt="Logo Cours Tom Morel" className="h-24 mx-auto mb-4 object-contain" />
+          ) : (
+             <div className="mx-auto w-24 h-24 bg-gradient-to-br from-blue-600 to-indigo-800 rounded-2xl shadow-xl flex items-center justify-center mb-4 border-4 border-white">
+                <GraduationCap size={48} className="text-white" />
+             </div>
+          )}
           <h1 className="text-2xl font-bold text-slate-800">Portail Sécurisé</h1>
           <p className="text-slate-500 mt-2">Cours Tom Morel - Saint-Chef</p>
         </div>
@@ -834,9 +962,13 @@ export default function App() {
       {/* SIDEBAR NAVIGATION - MENU COMPLET RESTAURE */}
       <div className="w-72 bg-slate-900 text-slate-300 flex flex-col shadow-2xl z-20 overflow-y-auto custom-scrollbar">
         <div className="p-6 bg-slate-950/50 flex flex-col items-center border-b border-slate-800 shrink-0">
-          <div className="h-16 w-16 bg-gradient-to-br from-blue-600 to-indigo-800 rounded-xl flex items-center justify-center mb-3 shadow-lg border-2 border-white/10">
-            <GraduationCap size={32} className="text-white" />
-          </div>
+          {LOGO_URL ? (
+              <img src={LOGO_URL} alt="Logo" className="h-16 w-16 mb-3 object-contain rounded-xl bg-white p-1" />
+          ) : (
+              <div className="h-16 w-16 bg-gradient-to-br from-blue-600 to-indigo-800 rounded-xl flex items-center justify-center mb-3 shadow-lg border-2 border-white/10">
+                <GraduationCap size={32} className="text-white" />
+              </div>
+          )}
           <h1 className="text-lg font-bold text-white tracking-wide">Cours Tom Morel</h1>
           <p className="text-xs text-slate-400 uppercase tracking-widest mt-1">ERP - Version {isAdmin ? 'Admin' : 'Famille'}</p>
         </div>
@@ -962,7 +1094,7 @@ export default function App() {
             </div>
           )}
 
-          {/* TABLEAU DE BORD RESTAURÉ COMPLETEMENT */}
+          {/* TABLEAU DE BORD */}
           {activeTab === 'dashboard' && (
             <div className="space-y-6 animate-in fade-in">
               <div className="flex justify-between items-end mb-2">
@@ -1038,7 +1170,7 @@ export default function App() {
           
           {/* MODULES CONNECTÉS À FIREBASE */}
           {activeTab === 'etat_financier' && <EtatFinancier planComptable={planComptable} transactionsGlobales={globalTransactions} />}
-          {activeTab === 'journal_banque' && <JournalBanque planComptable={planComptable} transactions={journalTransactions} setTransactions={setJournalTransactions} firebaseUser={firebaseUser} />}
+          {activeTab === 'journal_banque' && <JournalBanque planComptable={planComptable} transactions={journalTransactions} setTransactions={setJournalTransactions} firebaseUser={firebaseUser} globalTransactions={globalTransactions} />}
           {activeTab === 'od' && <OperationsDiverses planComptable={planComptable} firebaseUser={firebaseUser} />}
           {activeTab === 'plan_comptable' && <PlanComptableManager planComptable={planComptable} firebaseUser={firebaseUser} />}
           {activeTab === 'acces' && <GestionAcces firebaseUser={firebaseUser} />}
