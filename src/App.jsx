@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, BookOpen, GraduationCap, FileSignature, AlertTriangle, CheckCircle,
   Building, Calendar, CreditCard, PieChart, Shield, Lock, FileText, Upload, 
   Trash2, XCircle, RotateCcw, Search, ChevronRight, CheckCircle2, AlertCircle, Paperclip,
-  Plus, Save, Sparkles, Receipt, Heart, FileSpreadsheet, Download, Filter, Euro, Info
+  Plus, Save, Sparkles, Receipt, Heart, FileSpreadsheet, Download, Filter, Euro, Info, ChevronDown, ChevronUp
 } from 'lucide-react';
 
 import { initializeApp } from "firebase/app";
@@ -49,14 +49,11 @@ const EtatFinancier = ({ planComptable, transactionsGlobales }) => {
     const parCompteBrut = {};
 
     transactionsFiltrees.forEach(t => {
-      // Impact sur la trésorerie (512000)
       soldeBanque += t.montant;
-      
       if (!parCompteBrut[t.compte]) parCompteBrut[t.compte] = 0;
       parCompteBrut[t.compte] += t.montant; 
     });
 
-    // La contrepartie de tout le journal de banque atterrit dans le 512
     parCompteBrut['512000'] = soldeBanque;
 
     const charges = [];
@@ -69,26 +66,21 @@ const EtatFinancier = ({ planComptable, transactionsGlobales }) => {
     let totalPassif = 0;
 
     Object.entries(parCompteBrut).forEach(([compte, solde]) => {
-      if (solde === 0) return; // Ignorer les comptes soldés à zéro
+      if (solde === 0) return;
 
       const compteInfo = planComptable.find(c => c.id === compte);
       const label = compteInfo ? compteInfo.label : (compte === '512000' ? 'Banque Caisse d\'épargne' : 'Compte Inconnu');
       const firstDigit = compte.charAt(0);
       
-      // En comptabilité, une charge est un débit (banque diminue = négatif). On l'affiche en positif dans le tableau.
       if (['6'].includes(firstDigit)) {
          const val = Math.abs(solde);
          charges.push({ compte, label, montant: val });
          totalCharges += val;
-      } 
-      // Un produit est un crédit (banque augmente = positif).
-      else if (['7'].includes(firstDigit)) {
+      } else if (['7'].includes(firstDigit)) {
          const val = Math.abs(solde);
          produits.push({ compte, label, montant: val });
          totalProduits += val;
-      } 
-      // Bilan (Comptes 1 à 5)
-      else if (['1', '2', '3', '4', '5'].includes(firstDigit)) {
+      } else if (['1', '2', '3', '4', '5'].includes(firstDigit)) {
          if (solde > 0) {
              actif.push({ compte, label, montant: solde });
              totalActif += solde;
@@ -101,39 +93,98 @@ const EtatFinancier = ({ planComptable, transactionsGlobales }) => {
 
     const resultat = totalProduits - totalCharges;
 
-    // Tri pour un affichage propre
-    const sortFn = (a, b) => a.compte.localeCompare(b.compte);
-    charges.sort(sortFn);
-    produits.sort(sortFn);
-    actif.sort(sortFn);
+    // Fonction pour regrouper les comptes par les 2 premiers chiffres (ex: 60, 61, 62)
+    const grouperComptes = (comptesArray) => {
+        const groupes = {};
+        comptesArray.forEach(item => {
+            const prefixe = item.compte.substring(0, 2);
+            if (!groupes[prefixe]) {
+                groupes[prefixe] = {
+                    prefixe: prefixe,
+                    label: getLibelleFamille(prefixe),
+                    montantTotal: 0,
+                    details: []
+                };
+            }
+            groupes[prefixe].details.push(item);
+            groupes[prefixe].montantTotal += item.montant;
+        });
+
+        // Convertir l'objet en tableau, trier les groupes puis trier les détails à l'intérieur
+        return Object.values(groupes)
+            .sort((a, b) => a.prefixe.localeCompare(b.prefixe))
+            .map(groupe => ({
+                ...groupe,
+                details: groupe.details.sort((a, b) => a.compte.localeCompare(b.compte))
+            }));
+    };
+
+    // Titres standards des familles comptables
+    const getLibelleFamille = (prefixe) => {
+        const labels = {
+            '10': 'Capital et réserves', '12': 'Résultat de l\'exercice', '16': 'Emprunts et dettes',
+            '20': 'Immobilisations incorporelles', '21': 'Immobilisations corporelles',
+            '40': 'Fournisseurs', '41': 'Clients et usagers', '42': 'Personnel', '43': 'Organismes sociaux', '47': 'Comptes d\'attente',
+            '51': 'Banques', '53': 'Caisse',
+            '60': 'Achats', '61': 'Services extérieurs', '62': 'Autres services extérieurs', '63': 'Impôts et taxes', '64': 'Charges de personnel', '65': 'Autres charges de gestion courante', '66': 'Charges financières', '68': 'Dotations aux amortissements',
+            '70': 'Ventes et prestations', '74': 'Subventions d\'exploitation', '75': 'Autres produits de gestion', '76': 'Produits financiers'
+        };
+        return labels[prefixe] || `Famille ${prefixe}`;
+    };
+
+    const chargesGroupees = grouperComptes(charges);
+    const produitsGroupes = grouperComptes(produits);
+    const actifGroupe = grouperComptes(actif);
+    const passifGroupe = grouperComptes(passif);
+
+    // Ajout du résultat dans le Passif (Famille 12)
+    let familleResultat = passifGroupe.find(g => g.prefixe === '12');
+    if (!familleResultat) {
+        familleResultat = { prefixe: '12', label: 'Résultat de l\'exercice', montantTotal: 0, details: [] };
+        passifGroupe.push(familleResultat);
+        passifGroupe.sort((a, b) => a.prefixe.localeCompare(b.prefixe));
+    }
     
-    // Ajout du résultat dans le Passif pour équilibrer le Bilan !
-    const bilanPassif = [...passif].sort(sortFn);
-    bilanPassif.push({ 
+    familleResultat.details.push({ 
         compte: '120000', 
-        label: resultat >= 0 ? 'Résultat de l\'exercice (Bénéfice)' : 'Résultat de l\'exercice (Perte)', 
+        label: resultat >= 0 ? 'Bénéfice de l\'exercice' : 'Perte de l\'exercice', 
         montant: resultat 
     });
+    // On n'ajoute pas le résultat au total de la famille pour éviter les soucis d'affichage de sous-totaux négatifs dans les passifs,
+    // On gère l'affichage du résultat à part dans le Bilan.
     const grandTotalPassif = totalPassif + resultat;
 
     return { 
-        charges, produits, totalCharges, totalProduits, resultat, 
-        actif, passif: bilanPassif, totalActif, grandTotalPassif
+        chargesGroupees, produitsGroupes, totalCharges, totalProduits, resultat, 
+        actifGroupe, passifGroupe, totalActif, grandTotalPassif
     };
   }, [transactionsFiltrees, planComptable]);
 
-  // Construction des lignes des tableaux pour l'affichage en parallèle
-  const maxRowsCR = Math.max(totaux.charges.length, totaux.produits.length);
-  const rowsCR = Array.from({ length: maxRowsCR }).map((_, i) => ({
-      charge: totaux.charges[i] || null,
-      produit: totaux.produits[i] || null
-  }));
+  // État pour gérer l'ouverture/fermeture des groupes de comptes
+  const [expandedGroups, setExpandedGroups] = useState({});
 
-  const maxRowsBilan = Math.max(totaux.actif.length, totaux.passif.length);
-  const rowsBilan = Array.from({ length: maxRowsBilan }).map((_, i) => ({
-      actifItem: totaux.actif[i] || null,
-      passifItem: totaux.passif[i] || null
-  }));
+  const toggleGroup = (groupId) => {
+      setExpandedGroups(prev => ({
+          ...prev,
+          [groupId]: !prev[groupId]
+      }));
+  };
+
+  const expandAll = () => {
+      const newExpanded = {};
+      [...totaux.chargesGroupees, ...totaux.produitsGroupes, ...totaux.actifGroupe, ...totaux.passifGroupe].forEach(g => {
+          newExpanded[`CR-C-${g.prefixe}`] = true;
+          newExpanded[`CR-P-${g.prefixe}`] = true;
+          newExpanded[`BIL-A-${g.prefixe}`] = true;
+          newExpanded[`BIL-P-${g.prefixe}`] = true;
+      });
+      setExpandedGroups(newExpanded);
+  };
+
+  const collapseAll = () => {
+      setExpandedGroups({});
+  };
+
 
   return (
     <div className="space-y-12 animate-in fade-in pb-12">
@@ -145,20 +196,27 @@ const EtatFinancier = ({ planComptable, transactionsGlobales }) => {
           <p className="text-slate-500 mt-1">Édition des documents de synthèse comptable.</p>
         </div>
         
-        <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
-          <Filter size={18} className="text-slate-400" />
-          <select 
-            value={anneeDebut}
-            onChange={(e) => setAnneeDebut(Number(e.target.value))}
-            className="p-1.5 border-none bg-transparent text-sm font-bold text-slate-700 focus:ring-0 outline-none cursor-pointer"
-          >
-            <option value={2021}>01/09/21 au 31/08/22</option>
-            <option value={2022}>01/09/22 au 31/08/23</option>
-            <option value={2023}>01/09/23 au 31/08/24</option>
-            <option value={2024}>01/09/24 au 31/08/25</option>
-            <option value={2025}>01/09/25 au 31/08/26</option>
-            <option value={2026}>01/09/26 au 31/08/27</option>
-          </select>
+        <div className="flex flex-col md:flex-row items-center gap-4">
+          <div className="flex items-center gap-2">
+              <button onClick={expandAll} className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded transition-colors font-medium">Tout Déplier</button>
+              <button onClick={collapseAll} className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded transition-colors font-medium">Tout Replier</button>
+          </div>
+          <div className="h-6 w-px bg-slate-300 hidden md:block"></div>
+          <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
+            <Filter size={18} className="text-slate-400" />
+            <select 
+              value={anneeDebut}
+              onChange={(e) => setAnneeDebut(Number(e.target.value))}
+              className="p-1.5 border-none bg-transparent text-sm font-bold text-slate-700 focus:ring-0 outline-none cursor-pointer"
+            >
+              <option value={2021}>01/09/21 au 31/08/22</option>
+              <option value={2022}>01/09/22 au 31/08/23</option>
+              <option value={2023}>01/09/23 au 31/08/24</option>
+              <option value={2024}>01/09/24 au 31/08/25</option>
+              <option value={2025}>01/09/25 au 31/08/26</option>
+              <option value={2026}>01/09/26 au 31/08/27</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -168,70 +226,128 @@ const EtatFinancier = ({ planComptable, transactionsGlobales }) => {
             <div className="p-3 bg-blue-100 text-blue-700 rounded-lg"><Info size={24} /></div>
             <div>
                 <h3 className="text-xl font-bold text-slate-800">Compte de Résultat</h3>
-                <p className="text-sm text-slate-600 font-medium mt-1">Le Compte de Résultat est le <strong>"film"</strong> de l'année scolaire. Il compare l'ensemble de vos Charges (vos dépenses) et de vos Produits (vos recettes) pour déterminer la rentabilité de l'association (Bénéfice ou Perte).</p>
+                <p className="text-sm text-slate-600 font-medium mt-1">Comparaison des Charges (dépenses) et Produits (recettes) pour déterminer le Résultat.</p>
             </div>
         </div>
 
-        <div className="bg-white shadow-sm border border-slate-300 overflow-x-auto">
-            <table className="w-full text-sm text-left border-collapse min-w-[800px]">
-                <thead>
-                    <tr>
-                        <th colSpan="3" className="border border-slate-300 bg-rose-50 text-rose-800 p-3 text-center font-bold text-base w-1/2">Charges (Dépenses)</th>
-                        <th colSpan="3" className="border border-slate-300 bg-emerald-50 text-emerald-800 p-3 text-center font-bold text-base w-1/2">Produits (Recettes)</th>
-                    </tr>
-                    <tr className="bg-slate-100 text-slate-600 uppercase text-xs tracking-wider">
-                        <th className="border border-slate-300 p-2 w-20">Comptes</th>
-                        <th className="border border-slate-300 p-2">Libellé</th>
-                        <th className="border border-slate-300 p-2 text-right">Montant</th>
-                        <th className="border border-slate-300 p-2 w-20">Comptes</th>
-                        <th className="border border-slate-300 p-2">Libellé</th>
-                        <th className="border border-slate-300 p-2 text-right">Montant</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {rowsCR.map((row, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50">
-                            <td className="border border-slate-200 p-2 font-mono text-xs text-slate-500">{row.charge?.compte || ''}</td>
-                            <td className="border border-slate-200 p-2 font-medium text-slate-700">{row.charge?.label || ''}</td>
-                            <td className="border border-slate-200 p-2 text-right">{row.charge ? row.charge.montant.toFixed(2) + ' €' : ''}</td>
-                            
-                            <td className="border border-slate-200 p-2 font-mono text-xs text-slate-500">{row.produit?.compte || ''}</td>
-                            <td className="border border-slate-200 p-2 font-medium text-slate-700">{row.produit?.label || ''}</td>
-                            <td className="border border-slate-200 p-2 text-right">{row.produit ? row.produit.montant.toFixed(2) + ' €' : ''}</td>
-                        </tr>
-                    ))}
-                    
-                    {/* Lignes d'équilibrage du Résultat */}
-                    {totaux.resultat > 0 && (
-                        <tr className="bg-emerald-50/50 font-bold">
-                            <td className="border border-slate-200 p-2"></td>
-                            <td className="border border-slate-200 p-2 text-emerald-700">Solde créditeur (Bénéfice)</td>
-                            <td className="border border-slate-200 p-2 text-right text-emerald-700">{totaux.resultat.toFixed(2)} €</td>
-                            <td colSpan="3" className="border border-slate-200 p-2 bg-slate-50"></td>
-                        </tr>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* CHARGES */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-300 overflow-hidden">
+                <div className="bg-rose-50 text-rose-800 p-4 border-b border-slate-300 font-bold text-lg text-center uppercase tracking-wide">
+                    Charges (Dépenses)
+                </div>
+                <div className="p-0">
+                    {totaux.chargesGroupees.length === 0 ? (
+                        <div className="p-6 text-center text-slate-400 text-sm">Aucune charge enregistrée.</div>
+                    ) : (
+                        <div className="divide-y divide-slate-100">
+                            {totaux.chargesGroupees.map((groupe) => {
+                                const isExpanded = expandedGroups[`CR-C-${groupe.prefixe}`];
+                                return (
+                                    <div key={groupe.prefixe} className="group">
+                                        <div 
+                                            onClick={() => toggleGroup(`CR-C-${groupe.prefixe}`)}
+                                            className="flex justify-between items-center p-3 bg-slate-50/80 hover:bg-slate-100 cursor-pointer transition-colors"
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                {isExpanded ? <ChevronDown size={16} className="text-slate-400"/> : <ChevronRight size={16} className="text-slate-400"/>}
+                                                <span className="font-bold text-slate-700 text-sm">{groupe.prefixe} - {groupe.label}</span>
+                                            </div>
+                                            <span className="font-bold text-slate-800 text-sm">{groupe.montantTotal.toFixed(2)} €</span>
+                                        </div>
+                                        
+                                        {isExpanded && (
+                                            <div className="bg-white border-t border-slate-100">
+                                                <table className="w-full text-sm text-left">
+                                                    <tbody>
+                                                        {groupe.details.map(detail => (
+                                                            <tr key={detail.compte} className="hover:bg-slate-50 border-b border-slate-50 last:border-0">
+                                                                <td className="p-2 pl-8 font-mono text-xs text-slate-500 w-24">{detail.compte}</td>
+                                                                <td className="p-2 text-slate-600">{detail.label}</td>
+                                                                <td className="p-2 text-right text-slate-700">{detail.montant.toFixed(2)} €</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
                     )}
-                    {totaux.resultat < 0 && (
-                        <tr className="bg-rose-50/50 font-bold">
-                            <td colSpan="3" className="border border-slate-200 p-2 bg-slate-50"></td>
-                            <td className="border border-slate-200 p-2"></td>
-                            <td className="border border-slate-200 p-2 text-rose-700">Solde débiteur (Perte)</td>
-                            <td className="border border-slate-200 p-2 text-right text-rose-700">{Math.abs(totaux.resultat).toFixed(2)} €</td>
-                        </tr>
-                    )}
+                </div>
+                {/* Ligne d'équilibrage du Résultat côté Charges (si bénéfice) */}
+                {totaux.resultat > 0 && (
+                    <div className="flex justify-between items-center p-3 bg-emerald-50/50 border-t border-emerald-100 font-bold text-emerald-800">
+                        <span>Solde créditeur (Bénéfice)</span>
+                        <span>{totaux.resultat.toFixed(2)} €</span>
+                    </div>
+                )}
+                <div className="bg-slate-800 text-white p-4 flex justify-between items-center font-bold text-lg">
+                    <span>TOTAL CHARGES</span>
+                    <span>{totaux.resultat > 0 ? (totaux.totalCharges + totaux.resultat).toFixed(2) : totaux.totalCharges.toFixed(2)} €</span>
+                </div>
+            </div>
 
-                    {/* Ligne des Totaux Généraux */}
-                    <tr className="bg-slate-800 text-white font-bold text-base">
-                        <td colSpan="2" className="border border-slate-700 p-3 text-right">TOTAL GÉNÉRAL</td>
-                        <td className="border border-slate-700 p-3 text-right">
-                            {totaux.resultat > 0 ? (totaux.totalCharges + totaux.resultat).toFixed(2) : totaux.totalCharges.toFixed(2)} €
-                        </td>
-                        <td colSpan="2" className="border border-slate-700 p-3 text-right">TOTAL GÉNÉRAL</td>
-                        <td className="border border-slate-700 p-3 text-right">
-                            {totaux.resultat < 0 ? (totaux.totalProduits + Math.abs(totaux.resultat)).toFixed(2) : totaux.totalProduits.toFixed(2)} €
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+            {/* PRODUITS */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-300 overflow-hidden">
+                <div className="bg-emerald-50 text-emerald-800 p-4 border-b border-slate-300 font-bold text-lg text-center uppercase tracking-wide">
+                    Produits (Recettes)
+                </div>
+                <div className="p-0">
+                    {totaux.produitsGroupes.length === 0 ? (
+                        <div className="p-6 text-center text-slate-400 text-sm">Aucun produit enregistré.</div>
+                    ) : (
+                        <div className="divide-y divide-slate-100">
+                            {totaux.produitsGroupes.map((groupe) => {
+                                const isExpanded = expandedGroups[`CR-P-${groupe.prefixe}`];
+                                return (
+                                    <div key={groupe.prefixe} className="group">
+                                        <div 
+                                            onClick={() => toggleGroup(`CR-P-${groupe.prefixe}`)}
+                                            className="flex justify-between items-center p-3 bg-slate-50/80 hover:bg-slate-100 cursor-pointer transition-colors"
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                {isExpanded ? <ChevronDown size={16} className="text-slate-400"/> : <ChevronRight size={16} className="text-slate-400"/>}
+                                                <span className="font-bold text-slate-700 text-sm">{groupe.prefixe} - {groupe.label}</span>
+                                            </div>
+                                            <span className="font-bold text-slate-800 text-sm">{groupe.montantTotal.toFixed(2)} €</span>
+                                        </div>
+                                        
+                                        {isExpanded && (
+                                            <div className="bg-white border-t border-slate-100">
+                                                <table className="w-full text-sm text-left">
+                                                    <tbody>
+                                                        {groupe.details.map(detail => (
+                                                            <tr key={detail.compte} className="hover:bg-slate-50 border-b border-slate-50 last:border-0">
+                                                                <td className="p-2 pl-8 font-mono text-xs text-slate-500 w-24">{detail.compte}</td>
+                                                                <td className="p-2 text-slate-600">{detail.label}</td>
+                                                                <td className="p-2 text-right text-slate-700">{detail.montant.toFixed(2)} €</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+                {/* Ligne d'équilibrage du Résultat côté Produits (si perte) */}
+                {totaux.resultat < 0 && (
+                    <div className="flex justify-between items-center p-3 bg-rose-50/50 border-t border-rose-100 font-bold text-rose-800">
+                        <span>Solde débiteur (Perte)</span>
+                        <span>{Math.abs(totaux.resultat).toFixed(2)} €</span>
+                    </div>
+                )}
+                <div className="bg-slate-800 text-white p-4 flex justify-between items-center font-bold text-lg">
+                    <span>TOTAL PRODUITS</span>
+                    <span>{totaux.resultat < 0 ? (totaux.totalProduits + Math.abs(totaux.resultat)).toFixed(2) : totaux.totalProduits.toFixed(2)} €</span>
+                </div>
+            </div>
         </div>
       </div>
 
@@ -243,50 +359,121 @@ const EtatFinancier = ({ planComptable, transactionsGlobales }) => {
             <div className="p-3 bg-purple-100 text-purple-700 rounded-lg"><Building size={24} /></div>
             <div>
                 <h3 className="text-xl font-bold text-slate-800">Bilan au 31/08/{anneeDebut + 1}</h3>
-                <p className="text-sm text-slate-600 font-medium mt-1">Le Bilan est une <strong>"photographie"</strong> du patrimoine de l'association à un instant donné. L'Actif représente tout ce qu'elle possède (matériel, argent en banque, créances), et le Passif ce qu'elle doit (capitaux, dettes, résultat à affecter).</p>
+                <p className="text-sm text-slate-600 font-medium mt-1">Patrimoine de l'association : ce qu'elle possède (Actif) et ce qu'elle doit (Passif).</p>
             </div>
         </div>
 
-        <div className="bg-white shadow-sm border border-slate-300 overflow-x-auto">
-            <table className="w-full text-sm text-left border-collapse min-w-[800px]">
-                <thead>
-                    <tr>
-                        <th colSpan="3" className="border border-slate-300 bg-blue-50 text-blue-800 p-3 text-center font-bold text-base w-1/2">Actif (Ce que possède l'association)</th>
-                        <th colSpan="3" className="border border-slate-300 bg-amber-50 text-amber-800 p-3 text-center font-bold text-base w-1/2">Passif (Ce que doit l'association)</th>
-                    </tr>
-                    <tr className="bg-slate-100 text-slate-600 uppercase text-xs tracking-wider">
-                        <th className="border border-slate-300 p-2 w-20">Comptes</th>
-                        <th className="border border-slate-300 p-2">Libellé</th>
-                        <th className="border border-slate-300 p-2 text-right">Montant</th>
-                        <th className="border border-slate-300 p-2 w-20">Comptes</th>
-                        <th className="border border-slate-300 p-2">Libellé</th>
-                        <th className="border border-slate-300 p-2 text-right">Montant</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {rowsBilan.map((row, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50">
-                            <td className="border border-slate-200 p-2 font-mono text-xs text-slate-500">{row.actifItem?.compte || ''}</td>
-                            <td className="border border-slate-200 p-2 font-medium text-slate-700">{row.actifItem?.label || ''}</td>
-                            <td className="border border-slate-200 p-2 text-right font-bold text-blue-700">{row.actifItem ? row.actifItem.montant.toFixed(2) + ' €' : ''}</td>
-                            
-                            <td className="border border-slate-200 p-2 font-mono text-xs text-slate-500">{row.passifItem?.compte || ''}</td>
-                            <td className="border border-slate-200 p-2 font-medium text-slate-700">{row.passifItem?.label || ''}</td>
-                            <td className={`border border-slate-200 p-2 text-right font-bold ${row.passifItem?.compte === '120000' && row.passifItem.montant < 0 ? 'text-rose-600' : 'text-amber-700'}`}>
-                                {row.passifItem ? row.passifItem.montant.toFixed(2) + ' €' : ''}
-                            </td>
-                        </tr>
-                    ))}
-                    
-                    {/* Ligne des Totaux Généraux */}
-                    <tr className="bg-slate-800 text-white font-bold text-base">
-                        <td colSpan="2" className="border border-slate-700 p-3 text-right">TOTAL ACTIF</td>
-                        <td className="border border-slate-700 p-3 text-right">{totaux.totalActif.toFixed(2)} €</td>
-                        <td colSpan="2" className="border border-slate-700 p-3 text-right">TOTAL PASSIF</td>
-                        <td className="border border-slate-700 p-3 text-right">{totaux.grandTotalPassif.toFixed(2)} €</td>
-                    </tr>
-                </tbody>
-            </table>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* ACTIF */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-300 overflow-hidden">
+                <div className="bg-blue-50 text-blue-800 p-4 border-b border-slate-300 font-bold text-lg text-center uppercase tracking-wide">
+                    Actif
+                </div>
+                <div className="p-0">
+                    {totaux.actifGroupe.length === 0 ? (
+                        <div className="p-6 text-center text-slate-400 text-sm">Aucun actif enregistré.</div>
+                    ) : (
+                        <div className="divide-y divide-slate-100">
+                            {totaux.actifGroupe.map((groupe) => {
+                                const isExpanded = expandedGroups[`BIL-A-${groupe.prefixe}`];
+                                return (
+                                    <div key={groupe.prefixe} className="group">
+                                        <div 
+                                            onClick={() => toggleGroup(`BIL-A-${groupe.prefixe}`)}
+                                            className="flex justify-between items-center p-3 bg-slate-50/80 hover:bg-slate-100 cursor-pointer transition-colors"
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                {isExpanded ? <ChevronDown size={16} className="text-slate-400"/> : <ChevronRight size={16} className="text-slate-400"/>}
+                                                <span className="font-bold text-slate-700 text-sm">{groupe.prefixe} - {groupe.label}</span>
+                                            </div>
+                                            <span className="font-bold text-blue-700 text-sm">{groupe.montantTotal.toFixed(2)} €</span>
+                                        </div>
+                                        
+                                        {isExpanded && (
+                                            <div className="bg-white border-t border-slate-100">
+                                                <table className="w-full text-sm text-left">
+                                                    <tbody>
+                                                        {groupe.details.map(detail => (
+                                                            <tr key={detail.compte} className="hover:bg-slate-50 border-b border-slate-50 last:border-0">
+                                                                <td className="p-2 pl-8 font-mono text-xs text-slate-500 w-24">{detail.compte}</td>
+                                                                <td className="p-2 text-slate-600">{detail.label}</td>
+                                                                <td className="p-2 text-right font-medium text-blue-700">{detail.montant.toFixed(2)} €</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+                <div className="bg-slate-800 text-white p-4 flex justify-between items-center font-bold text-lg mt-auto">
+                    <span>TOTAL ACTIF</span>
+                    <span>{totaux.totalActif.toFixed(2)} €</span>
+                </div>
+            </div>
+
+            {/* PASSIF */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-300 overflow-hidden flex flex-col">
+                <div className="bg-amber-50 text-amber-800 p-4 border-b border-slate-300 font-bold text-lg text-center uppercase tracking-wide">
+                    Passif
+                </div>
+                <div className="p-0 flex-1">
+                    {totaux.passifGroupe.length === 0 ? (
+                        <div className="p-6 text-center text-slate-400 text-sm">Aucun passif enregistré.</div>
+                    ) : (
+                        <div className="divide-y divide-slate-100">
+                            {totaux.passifGroupe.map((groupe) => {
+                                const isExpanded = expandedGroups[`BIL-P-${groupe.prefixe}`];
+                                // Ne pas afficher de total pour le groupe du Résultat car on affiche les lignes en brut
+                                const afficherTotalGroupe = groupe.prefixe !== '12';
+
+                                return (
+                                    <div key={groupe.prefixe} className="group">
+                                        <div 
+                                            onClick={() => toggleGroup(`BIL-P-${groupe.prefixe}`)}
+                                            className="flex justify-between items-center p-3 bg-slate-50/80 hover:bg-slate-100 cursor-pointer transition-colors"
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                {isExpanded ? <ChevronDown size={16} className="text-slate-400"/> : <ChevronRight size={16} className="text-slate-400"/>}
+                                                <span className="font-bold text-slate-700 text-sm">{groupe.prefixe} - {groupe.label}</span>
+                                            </div>
+                                            {afficherTotalGroupe && (
+                                                <span className="font-bold text-amber-700 text-sm">{groupe.montantTotal.toFixed(2)} €</span>
+                                            )}
+                                        </div>
+                                        
+                                        {isExpanded && (
+                                            <div className="bg-white border-t border-slate-100">
+                                                <table className="w-full text-sm text-left">
+                                                    <tbody>
+                                                        {groupe.details.map(detail => (
+                                                            <tr key={detail.compte} className="hover:bg-slate-50 border-b border-slate-50 last:border-0">
+                                                                <td className="p-2 pl-8 font-mono text-xs text-slate-500 w-24">{detail.compte}</td>
+                                                                <td className="p-2 text-slate-600">{detail.label}</td>
+                                                                <td className={`p-2 text-right font-medium ${detail.compte === '120000' && detail.montant < 0 ? 'text-rose-600' : 'text-amber-700'}`}>
+                                                                    {detail.montant.toFixed(2)} €
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+                <div className="bg-slate-800 text-white p-4 flex justify-between items-center font-bold text-lg mt-auto">
+                    <span>TOTAL PASSIF</span>
+                    <span>{totaux.grandTotalPassif.toFixed(2)} €</span>
+                </div>
+            </div>
         </div>
       </div>
     </div>
@@ -424,14 +611,12 @@ const GrandLivre = ({ planComptable, transactions, setTransactions, firebaseUser
     if (!firebaseUser) return;
     if (!odForm.date || !odForm.libelle || !odForm.montant || !odForm.debit) return;
     
-    // Le montant saisi par l'utilisateur est considéré comme un débit sur le compte choisi.
-    // L'impact en banque est l'inverse (si dépense, banque diminue = négatif).
     const montantNum = parseFloat(odForm.montant);
     
     const newGlobalTx = {
       date: odForm.date,
       libelle: `(OD) ${odForm.libelle}`,
-      montant: -Math.abs(montantNum), // Impact négatif implicite sur 512000
+      montant: -Math.abs(montantNum),
       type: 'depense',
       compte: odForm.debit,
       date_creation: new Date().toISOString()
@@ -472,7 +657,7 @@ const GrandLivre = ({ planComptable, transactions, setTransactions, firebaseUser
           }
       } else {
           setConfirmDeleteId(txId);
-          setTimeout(() => setConfirmDeleteId(null), 3000); // Annule la confirmation après 3s
+          setTimeout(() => setConfirmDeleteId(null), 3000); 
       }
   };
 
@@ -644,7 +829,6 @@ const GrandLivre = ({ planComptable, transactions, setTransactions, firebaseUser
                                  <Paperclip size={16} />
                               </button>
                               
-                              {/* Bouton de suppression avec sécurité */}
                               {confirmDeleteId === t.id ? (
                                   <button onClick={() => handleDeleteValidated(t.id)} className="bg-red-500 text-white hover:bg-red-600 px-2 py-1 rounded text-xs font-bold animate-pulse shadow-sm whitespace-nowrap">
                                       Confirmer ?
