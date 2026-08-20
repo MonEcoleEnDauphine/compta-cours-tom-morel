@@ -381,7 +381,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
     return '';
   };
 
-  // NOUVEAU : Mise à jour magique du SAS quand une écriture est validée
+  // Mise à jour magique du SAS quand une écriture est validée
   useEffect(() => {
     if (lignesEnAttente.length > 0) {
       setLignesEnAttente(prev => prev.map(ligne => {
@@ -556,7 +556,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
     }
   };
 
-  // NOUVEAU : Fonction pour modifier une écriture directement dans le Grand Livre
   const handleUpdateCompte = async (txId, newCompte, field) => {
     try {
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', txId), {
@@ -671,8 +670,9 @@ const GrandLivre = ({ transactionsGlobales }) => {
                     </td>
                     <td className="py-2 px-4">
                       <div className="relative">
+                        {/* CORRECTION ICI : value au lieu de defaultValue */}
                         <select 
-                          defaultValue={ligne.comptePropose || ''}
+                          value={ligne.comptePropose || ''}
                           onChange={(e) => {
                             if (e.target.value !== "") {
                               validerLigneBank(ligne.id, e.target.value);
@@ -744,7 +744,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
                   
                   {t.type === 'od' ? (
                     <td className="py-3 px-4">
-                      {/* NOUVEAU : Modification des OD validées */}
                       <div className="flex flex-col gap-1 w-full max-w-[250px]">
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] font-bold text-slate-500 w-3">D:</span>
@@ -772,7 +771,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
                     </td>
                   ) : (
                     <td className="py-3 px-4">
-                      {/* NOUVEAU : Modification des lignes bancaires validées */}
                       <select 
                         value={t.compte || ''} 
                         onChange={(e) => handleUpdateCompte(t.id, e.target.value, 'compte')}
