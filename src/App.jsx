@@ -210,7 +210,6 @@ const EtatFinancier = ({ transactionsGlobales }) => {
         produits[categorie].total += valeur;
         totalProduits += valeur;
       } else if (['1', '2', '3', '4', '5'].includes(prefix)) {
-        // Logique simplifiée pour Actif / Passif (Trésorerie/Immobilisation = Actif ; Dettes/Capitaux = Passif)
         if (['2', '3'].includes(prefix) || (prefix === '5' && solde > 0) || (prefix === '4' && solde > 0)) {
           if (!actif[categorie]) actif[categorie] = { total: 0, comptes: [] };
           actif[categorie].comptes.push({ compte, solde: valeur });
@@ -649,37 +648,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
   );
 };
 
-// ==========================================
-// APPLICATION PRINCIPALE
-// ==========================================
-
-export default function App() {
-  const [activeTab, setActiveTab] = useState('tableau_bord');
-  const [transactionsGlobales, setTransactionsGlobales] = useState([]);
-
-  // Fetch transactions from Firebase
-  useEffect(() => {
-    const fetchTx = () => {
-      const q = collection(db, 'artifacts', appId, 'public', 'data', 'transactions');
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const txs = [];
-        snapshot.forEach((doc) => {
-          txs.push({ id: doc.id, ...doc.data() });
-        });
-        setTransactionsGlobales(txs);
-      });
-      return unsubscribe;
-    };
-    const unsub = fetchTx();
-    return () => unsub();
-  }, []);
-
-const renderContent = () => {
-    switch (activeTab) {
-      case 'contact': return <InfosContact />;
-      case 'etat_financier': return <EtatFinancier transactionsGlobales={transactionsGlobales} />;
-      case 'grand_livre': return <GrandLivre transactionsGlobales={transactionsGlobales} />;
-      case 'plan_comptable': return <PlanComptable />;
 // --- 4. PLAN COMPTABLE ---
 const PlanComptable = () => {
   const [comptes, setComptes] = useState([]);
@@ -852,14 +820,46 @@ const PlanComptable = () => {
     </div>
   );
 };
-        
+
+
+// ==========================================
+// APPLICATION PRINCIPALE
+// ==========================================
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState('tableau_bord');
+  const [transactionsGlobales, setTransactionsGlobales] = useState([]);
+
+  // Fetch transactions from Firebase
+  useEffect(() => {
+    const fetchTx = () => {
+      const q = collection(db, 'artifacts', appId, 'public', 'data', 'transactions');
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const txs = [];
+        snapshot.forEach((doc) => {
+          txs.push({ id: doc.id, ...doc.data() });
+        });
+        setTransactionsGlobales(txs);
+      });
+      return unsubscribe;
+    };
+    const unsub = fetchTx();
+    return () => unsub();
+  }, []);
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'contact': return <InfosContact />;
+      case 'etat_financier': return <EtatFinancier transactionsGlobales={transactionsGlobales} />;
+      case 'grand_livre': return <GrandLivre transactionsGlobales={transactionsGlobales} />;
+      case 'plan_comptable': return <PlanComptable />;
+      
       // Placeholders pour les autres pages
       case 'tableau_bord': return <PlaceholderPage title="Tableau de Bord" />;
       case 'scolarite': return <PlaceholderPage title="Scolarité" />;
       case 'factures_parents': return <PlaceholderPage title="Mes Factures (Parents)" />;
       case 'menage_weekend': return <PlaceholderPage title="Planning : Ménage Week-end" />;
       case 'garde_cantine': return <PlaceholderPage title="Planning : Garde Cantine / Cour" />;
-      case 'plan_comptable': return <PlaceholderPage title="Plan Comptable" />;
       case 'budget': return <PlaceholderPage title="Budget Prévisionnel" />;
       case 'notes_frais': return <PlaceholderPage title="Notes de Frais" />;
       case 'dons_recus': return <PlaceholderPage title="Dons et reçus fiscaux" />;
