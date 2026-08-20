@@ -412,16 +412,11 @@ const GrandLivre = ({ transactionsGlobales }) => {
           const val6 = String(cols[6] || '').replace(/\s/g, '').replace(',', '.');
           
           let mt = 0;
-          
-          // CORRECTION DE L'IMPORTATION DES SIGNES :
           if (val6 !== '' && val6 !== 'undefined') {
-            // S'il y a une colonne Crédit (val6) distincte
             const credit = parseFloat(val6) || 0;
             const debit = parseFloat(val5) || 0;
-            // On force mathématiquement le crédit en + et le débit en - (Rouge)
             mt = credit !== 0 ? Math.abs(credit) : -Math.abs(debit);
           } else {
-            // Si la banque utilise une seule colonne avec des + et des -
             mt = parseFloat(val5) || 0;
           }
           
@@ -432,8 +427,8 @@ const GrandLivre = ({ transactionsGlobales }) => {
               id: Math.random().toString(36).substr(2, 9),
               date: cols[0],
               libelle: libelleExtrait,
-              reference: cols[2],
-              typeOp: cols[4],
+              reference: cols[2], // Infos complémentaires (ex: N° de chèque)
+              typeOp: cols[4],    // Type d'opération (ex: Virement, Prélèvement)
               montant: mt,
               comptePropose: devinerCompte(libelleExtrait),
               statut: 'attente'
@@ -639,7 +634,8 @@ const GrandLivre = ({ transactionsGlobales }) => {
         (t.libelle && t.libelle.toLowerCase().includes(lowerTerm)) ||
         (t.compte && t.compte.toLowerCase().includes(lowerTerm)) ||
         (t.compteDebit && t.compteDebit.toLowerCase().includes(lowerTerm)) ||
-        (t.compteCredit && t.compteCredit.toLowerCase().includes(lowerTerm))
+        (t.compteCredit && t.compteCredit.toLowerCase().includes(lowerTerm)) ||
+        (t.reference && t.reference.toLowerCase().includes(lowerTerm))
       );
     }
 
@@ -855,49 +851,79 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
         <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
           <table className="w-full text-sm text-left">
-            <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-semibold sticky top-0 shadow-sm z-10">
+            <thead className="bg-slate-50 text-slate-500 text-[11px] uppercase font-semibold sticky top-0 shadow-sm z-10">
               <tr>
-                <th className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('date')}>
+                <th className="py-3 px-3 cursor-pointer hover:bg-slate-100 transition-colors whitespace-nowrap" onClick={() => handleSort('date')}>
                   <div className="flex items-center gap-1">
-                    Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    Date comptable {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </div>
                 </th>
-                <th className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('libelle')}>
+                <th className="py-3 px-3 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('libelle')}>
                   <div className="flex items-center gap-1">
-                    Libellé {sortConfig.key === 'libelle' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    Libellé simplifié {sortConfig.key === 'libelle' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </div>
                 </th>
-                <th className="py-3 px-4 text-center cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('montant')}>
-                  <div className="flex items-center justify-center gap-1">
-                    Mouvement {sortConfig.key === 'montant' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                <th className="py-3 px-3 text-slate-400">
+                  Informations complémentaires
+                </th>
+                <th className="py-3 px-3 text-slate-400">
+                  Type opération
+                </th>
+                <th className="py-3 px-3 text-right cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('montant')}>
+                  <div className="flex items-center justify-end gap-1">
+                    Débit {sortConfig.key === 'montant' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </div>
                 </th>
-                <th className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('compte')}>
+                <th className="py-3 px-3 text-right cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('montant')}>
+                  <div className="flex items-center justify-end gap-1">
+                    Crédit {sortConfig.key === 'montant' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </div>
+                </th>
+                <th className="py-3 px-3 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('compte')}>
                   <div className="flex items-center gap-1">
                     Détail Compte {sortConfig.key === 'compte' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </div>
                 </th>
-                <th className="py-3 px-4 text-center">Action</th>
+                <th className="py-3 px-3 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredAndSortedTransactions.map(t => (
                 <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="py-3 px-4 text-slate-600 whitespace-nowrap">{t.date}</td>
-                  <td className="py-3 px-4 text-slate-800">{t.libelle}</td>
+                  <td className="py-3 px-3 text-slate-600 whitespace-nowrap">{t.date}</td>
+                  <td className="py-3 px-3 text-slate-800 font-medium truncate max-w-[180px]">{t.libelle}</td>
                   
+                  {/* NOUVEAU : Affichage des informations complémentaires et type d'opération */}
+                  <td className="py-3 px-3 text-slate-500 text-xs truncate max-w-[150px]" title={t.reference}>
+                    {t.reference || <span className="text-slate-300 italic">-</span>}
+                  </td>
+                  <td className="py-3 px-3 text-slate-500 text-xs truncate max-w-[120px]">
+                    {t.typeOp || <span className="text-slate-300 italic">-</span>}
+                  </td>
+                  
+                  {/* NOUVEAU : Ventilation Débit / Crédit */}
                   {t.type === 'od' ? (
-                    <td className="py-3 px-4 text-center font-medium text-purple-600">OD ({t.montant} €)</td>
+                    <>
+                      <td className="py-3 px-3 text-right font-medium text-purple-600">{Number(t.montant).toFixed(2)} €</td>
+                      <td className="py-3 px-3 text-right font-medium text-purple-600">{Number(t.montant).toFixed(2)} €</td>
+                    </>
                   ) : (
-                    <td className={`py-3 px-4 text-center font-bold ${t.montant > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {t.montant > 0 ? '+' : ''}{Number(t.montant).toFixed(2)} €
-                    </td>
+                    <>
+                      {/* Dépense (<0) = Débit (Rouge) */}
+                      <td className="py-3 px-3 text-right font-bold text-red-600">
+                        {t.montant < 0 ? Math.abs(t.montant).toFixed(2) + ' €' : '-'}
+                      </td>
+                      {/* Recette (>0) = Crédit (Vert) */}
+                      <td className="py-3 px-3 text-right font-bold text-emerald-600">
+                        {t.montant > 0 ? Number(t.montant).toFixed(2) + ' €' : '-'}
+                      </td>
+                    </>
                   )}
                   
-                  <td className="py-3 px-4">
+                  <td className="py-3 px-3">
                     {editingRowId === t.id ? (
                       t.type === 'od' ? (
-                        <div className="flex flex-col gap-1 w-full max-w-[250px]">
+                        <div className="flex flex-col gap-1 w-full min-w-[200px]">
                           <div className="flex items-center gap-2">
                             <span className="text-[10px] font-bold text-slate-500 w-3">D:</span>
                             <select 
@@ -928,7 +954,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
                             handleUpdateCompte(t.id, e.target.value, 'compte');
                             setEditingRowId(null);
                           }}
-                          className="border border-indigo-300 rounded p-2 text-xs bg-indigo-50 max-w-[250px] w-full text-indigo-800 font-mono outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner cursor-pointer"
+                          className="border border-indigo-300 rounded p-2 text-xs bg-indigo-50 min-w-[200px] w-full text-indigo-800 font-mono outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner cursor-pointer"
                         >
                           <option value="">Non défini</option>
                           {comptesList.map(c => <option key={c.id} value={c.code}>{c.code} - {c.libelle}</option>)}
@@ -936,17 +962,17 @@ const GrandLivre = ({ transactionsGlobales }) => {
                       )
                     ) : (
                       t.type === 'od' ? (
-                        <div className="flex flex-col gap-0.5">
-                          <div className="text-xs text-slate-500"><span className="font-bold text-slate-700">D:</span> {t.compteDebit} {t.compteDebit && `- ${comptesList.find(c => c.code === t.compteDebit)?.libelle || ''}`}</div>
-                          <div className="text-xs text-slate-500"><span className="font-bold text-slate-700">C:</span> {t.compteCredit} {t.compteCredit && `- ${comptesList.find(c => c.code === t.compteCredit)?.libelle || ''}`}</div>
+                        <div className="flex flex-col gap-0.5 min-w-[200px]">
+                          <div className="text-xs text-slate-500 truncate"><span className="font-bold text-slate-700">D:</span> {t.compteDebit} {t.compteDebit && `- ${comptesList.find(c => c.code === t.compteDebit)?.libelle || ''}`}</div>
+                          <div className="text-xs text-slate-500 truncate"><span className="font-bold text-slate-700">C:</span> {t.compteCredit} {t.compteCredit && `- ${comptesList.find(c => c.code === t.compteCredit)?.libelle || ''}`}</div>
                         </div>
                       ) : (
                         <div 
                           onClick={() => setEditingRowId(t.id)} 
-                          className="group flex items-center gap-2 cursor-pointer w-fit"
+                          className="group flex items-center gap-2 cursor-pointer w-fit min-w-[200px]"
                           title="Cliquez pour modifier le compte"
                         >
-                          <span className="bg-slate-50 group-hover:bg-indigo-50 px-3 py-1.5 rounded-md text-xs font-mono text-slate-700 group-hover:text-indigo-700 border border-slate-200 group-hover:border-indigo-300 transition-all max-w-[250px] truncate shadow-sm">
+                          <span className="bg-slate-50 group-hover:bg-indigo-50 px-2 py-1.5 rounded-md text-xs font-mono text-slate-700 group-hover:text-indigo-700 border border-slate-200 group-hover:border-indigo-300 transition-all max-w-[220px] truncate shadow-sm">
                             {t.compte ? `${t.compte} - ${comptesList.find(c => c.code === t.compte)?.libelle || ''}` : 'Non défini'}
                           </span>
                           <span className="text-slate-300 group-hover:text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity font-bold text-sm">
@@ -957,7 +983,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
                     )}
                   </td>
                   
-                  <td className="py-3 px-4 text-center flex items-center justify-center gap-2">
+                  <td className="py-3 px-3 text-center flex items-center justify-center gap-2">
                     {editingRowId === t.id ? (
                       <button onClick={() => setEditingRowId(null)} className="text-white bg-emerald-500 hover:bg-emerald-600 px-3 py-1 rounded text-xs font-bold transition-colors shadow-sm mt-1.5" title="Terminer l'édition">
                         OK
@@ -980,7 +1006,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
               ))}
               {filteredAndSortedTransactions.length === 0 && (
                 <tr>
-                  <td colSpan="5" className="py-8 text-center text-slate-400">Aucune écriture trouvée.</td>
+                  <td colSpan="8" className="py-8 text-center text-slate-400">Aucune écriture trouvée.</td>
                 </tr>
               )}
             </tbody>
