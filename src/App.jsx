@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, BookOpen, GraduationCap, FileSignature, AlertTriangle, CheckCircle,
   Building, Calendar, CreditCard, PieChart, Shield, Lock, FileText, Upload, 
   Trash2, XCircle, RotateCcw, Search, ChevronRight, CheckCircle2, AlertCircle, Paperclip,
-  Plus, Save, Sparkles, Receipt, Heart, FileSpreadsheet, Download, Filter, Euro, Info, ChevronDown, ChevronUp
+  Plus, Save, Sparkles, Receipt, Heart, FileSpreadsheet, Download, Filter, Euro, Info, ChevronDown, ChevronUp, Globe, Mail, Phone, Target
 } from 'lucide-react';
 
 import { initializeApp } from "firebase/app";
@@ -804,7 +804,7 @@ const GrandLivre = ({ planComptable, transactions, setTransactions, firebaseUser
                         <th className="py-3 px-4">Libellé</th>
                         <th className="py-3 px-4 text-right">Mouvement Banque</th>
                         <th className="py-3 px-4">Compte Imputé</th>
-                        <th className="py-3 px-4 text-center">Justif. PDF</th>
+                        <th className="py-3 px-4 text-center">Action</th>
                      </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -1119,6 +1119,7 @@ export default function App() {
                 <ul className="space-y-1">
                   <li><button onClick={() => setActiveTab('grand_livre')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'grand_livre' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><BookOpen size={18} /> Grand Livre</button></li>
                   <li><button onClick={() => setActiveTab('plan_comptable')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'plan_comptable' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><FileSignature size={18} /> Plan Comptable</button></li>
+                  <li><button onClick={() => setActiveTab('budget')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'budget' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><Target size={18} /> Budget Prévisionnel</button></li>
                   <li><button onClick={() => setActiveTab('notes_frais')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'notes_frais' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><FileText size={18} /> Notes de Frais</button></li>
                   <li><button onClick={() => setActiveTab('dons')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'dons' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}><Heart size={18} /> Dons & Mécénat</button></li>
                 </ul>
@@ -1152,6 +1153,7 @@ export default function App() {
               {activeTab === 'garde' && "Planning Garde Cantine/Cour"}
               {activeTab === 'grand_livre' && "Grand Livre Comptable"}
               {activeTab === 'plan_comptable' && "Gestion du Plan Comptable"}
+              {activeTab === 'budget' && "Budget Prévisionnel"}
               {activeTab === 'notes_frais' && "Notes de Frais"}
               {activeTab === 'dons' && "Dons & Mécénat"}
               {activeTab === 'factures_familles' && "Facturation des Familles"}
@@ -1171,15 +1173,69 @@ export default function App() {
 
         <main className="p-8 max-w-7xl mx-auto">
           {activeTab === 'infos' && (
-             <div className="space-y-6">
+             <div className="space-y-6 animate-in fade-in">
+                {}
                 <div className="bg-blue-600 rounded-xl p-8 text-white shadow-md">
                    <h2 className="text-3xl font-bold mb-2">Bienvenue sur le portail du Cours Tom Morel</h2>
                    <p className="text-blue-100 text-lg">Retrouvez ici toutes les informations de scolarité et les plannings.</p>
                 </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+                  {/* Carte Site Web */}
+                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center text-center hover:shadow-md transition-shadow">
+                    <div className="h-12 w-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-4">
+                      <Globe size={24} />
+                    </div>
+                    <h3 className="font-bold text-slate-800 mb-1">Le Cours Tom Morel</h3>
+                    <p className="text-xs font-semibold text-blue-600 mb-3">24 rue de la Chapelle, Saint-Chef</p>
+                    <p className="text-sm text-slate-500 mb-4 flex-1">Retrouvez les actualités, la présentation de l'école et de ses valeurs.</p>
+                    <div className="w-full mt-auto">
+                      <a href="https://www.courstommorel.fr" target="_blank" rel="noopener noreferrer" className="w-full py-2 flex justify-center items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium rounded-lg transition-colors text-sm">
+                        <Globe size={16} /> Visiter le site web
+                      </a>
+                    </div>
+                  </div>
+
+                  {/* Carte Contact Direction */}
+                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center text-center hover:shadow-md transition-shadow">
+                    <div className="h-12 w-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-4">
+                      <Mail size={24} />
+                    </div>
+                    <h3 className="font-bold text-slate-800 mb-1">Direction de l'École</h3>
+                    <p className="text-xs font-semibold text-emerald-600 mb-3">Mme Laurence Gérard & les maîtresses</p>
+                    <p className="text-sm text-slate-500 mb-4 flex-1">Pour toute question pédagogique ou concernant la scolarité de votre enfant.</p>
+                    <div className="w-full space-y-2">
+                      <a href="tel:0667909576" className="w-full py-2 flex justify-center items-center gap-2 border border-slate-200 hover:bg-slate-50 text-slate-600 font-medium rounded-lg transition-colors text-sm">
+                        <Phone size={16} /> 06 67 90 95 76
+                      </a>
+                      <a href="mailto:direction@courstommorel.fr" className="w-full py-2 flex justify-center items-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-medium rounded-lg transition-colors text-sm">
+                        <Mail size={16} /> Écrire à la direction
+                      </a>
+                    </div>
+                  </div>
+
+                  {/* Carte Contact Association */}
+                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center text-center hover:shadow-md transition-shadow">
+                    <div className="h-12 w-12 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mb-4">
+                      <Building size={24} />
+                    </div>
+                    <h3 className="font-bold text-slate-800 mb-1">Association (Bureau)</h3>
+                    <p className="text-xs font-semibold text-purple-600 mb-3">Mon École en Dauphiné</p>
+                    <p className="text-sm text-slate-500 mb-4 flex-1">Pour les questions administratives, la facturation, les dons ou la cantine.</p>
+                    <div className="w-full space-y-2">
+                      <a href="tel:0660202980" className="w-full py-2 flex justify-center items-center gap-2 border border-slate-200 hover:bg-slate-50 text-slate-600 font-medium rounded-lg transition-colors text-sm">
+                        <Phone size={16} /> 06 60 20 29 80
+                      </a>
+                      <a href="mailto:bureau@courstommorel.fr" className="w-full py-2 flex justify-center items-center gap-2 bg-purple-50 hover:bg-purple-100 text-purple-700 font-medium rounded-lg transition-colors text-sm">
+                        <Mail size={16} /> Écrire au bureau
+                      </a>
+                    </div>
+                  </div>
+                </div>
              </div>
           )}
 
-          {['dossiers', 'mes_factures', 'menage', 'garde', 'notes_frais', 'dons', 'factures_familles', 'contrats', 'uniformes'].includes(activeTab) && (
+          {['dossiers', 'mes_factures', 'menage', 'garde', 'notes_frais', 'dons', 'factures_familles', 'contrats', 'uniformes', 'budget'].includes(activeTab) && (
             <div className="bg-white border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center animate-in fade-in">
               <AlertCircle className="text-slate-400 mx-auto mb-4" size={48} />
               <h3 className="text-xl font-bold text-slate-700 mb-2">Module en construction</h3>
