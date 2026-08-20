@@ -333,38 +333,82 @@ const GrandLivre = ({ transactionsGlobales }) => {
   
   const fileInputCsvRef = useRef(null);
   const fileInputXlsxRef = useRef(null);
+  const fileInputPaieRef = useRef(null); // Référence pour le fichier TXT de Paie
 
-  // Gérer l'import CSV / XLSX
+  // --- MOTEUR D'ASSISTANCE (IA LOCALE & MÉMOIRE) ---
+  const devinerCompte = (libelleTxt) => {
+    if (!libelleTxt) return '';
+    const txt = libelleTxt.toLowerCase();
+
+    // 1. Fouiller dans la mémoire (les transactions déjà validées)
+    const memoire = transactionsGlobales.find(tx => 
+      tx.compte && tx.type !== 'od' && tx.libelle && (txt.includes(tx.libelle.toLowerCase()) || tx.libelle.toLowerCase().includes(txt))
+    );
+    if (memoire) return memoire.compte;
+
+    // 2. Fouiller dans le dictionnaire des mots-clés standards
+    const dictionnaire = [
+      { mots: ['edf', 'engie', 'eau', 'electricite', 'saur'], compte: '606100' }, 
+      { mots: ['loyer', 'sci '], compte: '613200' }, 
+      { mots: ['orange', 'sfr', 'bouygues', 'free', 'telephone', 'internet', 'ovh', 'vercel'], compte: '626000' }, 
+      { mots: ['banque', 'agios', 'cotisation', 'commission', 'frais bancaires', 'credit agricole', 'caisse epargne'], compte: '627000' }, 
+      { mots: ['assurance', 'macif', 'axa', 'maaf', 'mgen'], compte: '616000' }, 
+      { mots: ['dgfip', 'impot', 'urssaf', 'tresor public'], compte: '635000' }, 
+      { mots: ['salaire', 'virement salaire', 'paie'], compte: '421000' }, 
+      { mots: ['fourniture', 'bureau vallée', 'fnac', 'amazon', 'papeterie', 'leclerc', 'carrefour'], compte: '606400' }, 
+      { mots: ['nettoyage', 'menage', 'entretien'], compte: '611000' }, 
+      { mots: ['scolarite', 'frais de scolarite', 'ecolage', 'famille', 'inscription'], compte: '706000' }, 
+      { mots: ['don ', 'helloasso', 'mecenat'], compte: '754000' }, 
+    ];
+
+    for (let regle of dictionnaire) {
+      if (regle.mots.some(mot => txt.includes(mot))) {
+        return regle.compte;
+      }
+    }
+    return '';
+  };
+
+  // --- GESTION DE L'IMPORT BANCAIRE ---
   const handleImportFile = async (e, type) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    const preparerLignes = (lignesBrutes) => {
+      const nouvellesLignes = [];
+      for (let i = 0; i < lignesBrutes.length; i++) {
+        const cols = lignesBrutes[i];
+        if (cols.length >= 7) {
+          const debit = parseFloat(String(cols[5]).replace(',', '.')) || 0;
+          const credit = parseFloat(String(cols[6]).replace(',', '.')) || 0;
+          const mt = credit > 0 ? credit : -debit;
+          const libelleExtrait = cols[1] || cols[3];
+          
+          if (mt !== 0) {
+            nouvellesLignes.push({
+              id: Math.random().toString(36).substr(2, 9),
+              date: cols[0],
+              libelle: libelleExtrait,
+              reference: cols[2],
+              typeOp: cols[4],
+              montant: mt,
+              comptePropose: devinerCompte(libelleExtrait),
+              statut: 'attente'
+            });
+          }
+        }
+      }
+      return nouvellesLignes;
+    };
 
     if (type === 'csv') {
       const reader = new FileReader();
       reader.onload = (event) => {
         const lines = event.target.result.split('\n');
-        const nouvellesLignes = lines.slice(1).map(line => {
-          const cols = line.split(';').map(c => c.trim().replace(/"/g, ''));
-          if (cols.length >= 7) {
-            // A=Date(0), B=Libelle(1), C=Ref(2), D=Info(3), E=Type(4), F=Debit(5), G=Credit(6)
-            const debit = parseFloat(cols[5].replace(',', '.')) || 0;
-            const credit = parseFloat(cols[6].replace(',', '.')) || 0;
-            const mt = credit > 0 ? credit : -debit;
-            return {
-              id: Math.random().toString(36).substr(2, 9),
-              date: cols[0],
-              libelle: cols[1] || cols[3],
-              reference: cols[2],
-              typeOp: cols[4],
-              montant: mt,
-              compteImpute: '',
-              statut: 'attente'
-            };
-          }
-          return null;
-        }).filter(l => l && l.montant !== 0);
-        setLignesEnAttente(prev => [...prev, ...nouvellesLignes]);
-        alert(`${nouvellesLignes.length} lignes importées avec succès.`);
+        const lignesBrutes = lines.slice(1).map(line => line.split(';').map(c => c.trim().replace(/"/g, '')));
+        const resultat = preparerLignes(lignesBrutes);
+        setLignesEnAttente(prev => [...prev, ...resultat]);
+        alert(`${resultat.length} lignes importées avec succès.`);
       };
       reader.readAsText(file, 'ISO-8859-1');
     } else if (type === 'xlsx') {
@@ -373,34 +417,71 @@ const GrandLivre = ({ transactionsGlobales }) => {
         const workbook = XLSX.read(data, { type: 'array' });
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false, defval: '' });
+        const resultat = preparerLignes(rows.slice(1));
+        setLignesEnAttente(prev => [...prev, ...resultat]);
+        alert(`${resultat.length} lignes importées depuis Excel.`);
+      } catch (err) {
+        alert("Erreur lors de la lecture du fichier XLSX.");
+      }
+    }
+  };
+
+  // --- NOUVEAU : IMPORT DES FICHES DE PAIE (TXT FEC) ---
+  const handleImportPaie = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const lines = event.target.result.split('\n');
+      let count = 0;
+      
+      // On boucle en ignorant la ligne 0 (En-têtes)
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
         
-        const nouvellesLignes = [];
-        for (let i = 1; i < rows.length; i++) {
-          const cols = rows[i];
-          if (cols.length >= 7) {
-            const debit = parseFloat(String(cols[5]).replace(',', '.')) || 0;
-            const credit = parseFloat(String(cols[6]).replace(',', '.')) || 0;
-            const mt = credit > 0 ? credit : -debit;
-            if (mt !== 0) {
-              nouvellesLignes.push({
-                id: Math.random().toString(36).substr(2, 9),
-                date: cols[0],
-                libelle: cols[1] || cols[3],
-                reference: cols[2],
-                typeOp: cols[4],
-                montant: mt,
-                compteImpute: '',
-                statut: 'attente'
-              });
+        // Séparation par tabulation (format standard FEC txt)
+        const cols = line.split('\t');
+        
+        if (cols.length >= 13) {
+          const rawDate = cols[3].trim(); // Format YYYYMMDD attendu
+          const formattedDate = rawDate.length === 8 ? `${rawDate.slice(0,4)}-${rawDate.slice(4,6)}-${rawDate.slice(6,8)}` : rawDate;
+          
+          const compteNum = cols[4].trim();
+          const compteLib = cols[5].trim();
+          const pieceRef = cols[8].trim();
+          const ecritureLib = cols[10].trim();
+          
+          const debit = parseFloat(cols[11].replace(',', '.')) || 0;
+          const credit = parseFloat(cols[12].replace(',', '.')) || 0;
+          
+          if (debit > 0 || credit > 0) {
+            // Création d'une OD automatisée
+            const newTx = {
+              date: formattedDate,
+              libelle: `(PAIE) ${ecritureLib} - ${compteLib}`,
+              montant: debit > 0 ? debit : credit,
+              type: 'od',
+              compteDebit: debit > 0 ? compteNum : '',
+              compteCredit: credit > 0 ? compteNum : '',
+              reference: pieceRef,
+              date_creation: new Date().toISOString()
+            };
+            
+            try {
+              await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), newTx);
+              count++;
+            } catch(err) {
+              console.error(err);
             }
           }
         }
-        setLignesEnAttente(prev => [...prev, ...nouvellesLignes]);
-        alert(`${nouvellesLignes.length} lignes importées depuis Excel.`);
-      } catch (err) {
-        alert("Erreur lors de la lecture du fichier XLSX. Vérifiez qu'il respecte bien les colonnes A à J.");
       }
-    }
+      alert(`${count} lignes de paie intégrées directement au Grand Livre !`);
+      if (fileInputPaieRef.current) fileInputPaieRef.current.value = '';
+    };
+    reader.readAsText(file, 'UTF-8');
   };
 
   const validerLigneBank = async (ligneId, compteCode) => {
@@ -473,7 +554,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       
-      {/* HEADER: TITRE & IMPORT */}
+      {/* HEADER: TITRE */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
@@ -483,42 +564,52 @@ const GrandLivre = ({ transactionsGlobales }) => {
         </div>
       </div>
 
-      {/* LES DEUX BLOCS: IMPORT BANQUE ET OD MANUELLE */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* LES TROIS BLOCS: IMPORT BANQUE, OD MANUELLE, IMPORT PAIE */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* BLOC 1 : IMPORT BANQUE */}
         <div className="bg-indigo-50 p-6 rounded-xl border border-indigo-100 flex flex-col justify-center items-center text-center space-y-4">
           <h3 className="font-bold text-indigo-900 text-lg">Journal de Banque</h3>
           <p className="text-sm text-indigo-700">Importez vos lignes bancaires pour les imputer.</p>
-          <div className="flex gap-4 w-full justify-center">
+          <div className="flex flex-col gap-2 w-full">
             <input type="file" accept=".csv" className="hidden" ref={fileInputCsvRef} onChange={(e) => handleImportFile(e, 'csv')} />
-            <button onClick={() => fileInputCsvRef.current.click()} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition-colors">
-              <Download size={16} /> Importer un relevé (.csv)
+            <button onClick={() => fileInputCsvRef.current.click()} className="w-full justify-center bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition-colors">
+              <Download size={16} /> Import Relevé (.csv)
             </button>
             
             <input type="file" accept=".xlsx" className="hidden" ref={fileInputXlsxRef} onChange={(e) => handleImportFile(e, 'xlsx')} />
-            <button onClick={() => fileInputXlsxRef.current.click()} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition-colors">
-              <FileSpreadsheet size={16} /> Importer un relevé (.xlsx)
+            <button onClick={() => fileInputXlsxRef.current.click()} className="w-full justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition-colors">
+              <FileSpreadsheet size={16} /> Import Relevé (.xlsx)
             </button>
           </div>
         </div>
 
-        {/* BLOC 2 : SAISIE OD */}
-        <div className="bg-purple-50 p-6 rounded-xl border border-purple-100 space-y-4">
-          <h3 className="font-bold text-purple-900 text-lg flex items-center gap-2">
-            <FileText size={18} /> Saisir une Opération Diverse (OD)
+        {/* BLOC 2 : IMPORT PAIE */}
+        <div className="bg-pink-50 p-6 rounded-xl border border-pink-200 flex flex-col justify-center items-center text-center space-y-4">
+          <h3 className="font-bold text-pink-900 text-lg">Fiches de Paie</h3>
+          <p className="text-sm text-pink-700">Importez le fichier TXT exporté depuis le logiciel de paie.</p>
+          <div className="flex-1"></div>
+          <input type="file" accept=".txt,.tsv" className="hidden" ref={fileInputPaieRef} onChange={handleImportPaie} />
+          <button onClick={() => fileInputPaieRef.current.click()} className="w-full justify-center bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition-colors">
+            <Users size={16} /> Importer Fichier (.txt)
+          </button>
+        </div>
+
+        {/* BLOC 3 : SAISIE OD */}
+        <div className="bg-purple-50 p-6 rounded-xl border border-purple-100 space-y-4 flex flex-col">
+          <h3 className="font-bold text-purple-900 text-lg flex items-center gap-2 justify-center">
+            <FileText size={18} /> Opération Diverse
           </h3>
-          <div className="grid grid-cols-2 gap-3">
-            <input type="date" value={odForm.date} onChange={e => setOdForm({...odForm, date: e.target.value})} className="border border-purple-200 rounded p-2 text-sm" />
-            <input type="text" placeholder="Libellé OD..." value={odForm.libelle} onChange={e => setOdForm({...odForm, libelle: e.target.value})} className="border border-purple-200 rounded p-2 text-sm" />
+          <div className="grid grid-cols-2 gap-2 flex-1">
+            <input type="date" value={odForm.date} onChange={e => setOdForm({...odForm, date: e.target.value})} className="border border-purple-200 rounded p-1.5 text-xs" />
+            <input type="text" placeholder="Libellé OD..." value={odForm.libelle} onChange={e => setOdForm({...odForm, libelle: e.target.value})} className="border border-purple-200 rounded p-1.5 text-xs" />
             
-            {/* Débit et Crédit simples pour la saisie manuelle (vous devriez idéalement mettre un sélecteur de vos comptes) */}
-            <input type="text" placeholder="Code Compte Débit" value={odForm.debit} onChange={e => setOdForm({...odForm, debit: e.target.value})} className="border border-purple-200 rounded p-2 text-sm" />
-            <input type="text" placeholder="Code Compte Crédit" value={odForm.credit} onChange={e => setOdForm({...odForm, credit: e.target.value})} className="border border-purple-200 rounded p-2 text-sm" />
+            <input type="text" placeholder="Compte Débit" value={odForm.debit} onChange={e => setOdForm({...odForm, debit: e.target.value})} className="border border-purple-200 rounded p-1.5 text-xs" />
+            <input type="text" placeholder="Compte Crédit" value={odForm.credit} onChange={e => setOdForm({...odForm, credit: e.target.value})} className="border border-purple-200 rounded p-1.5 text-xs" />
             
-            <input type="number" placeholder="Montant (€)" value={odForm.montant} onChange={e => setOdForm({...odForm, montant: e.target.value})} className="border border-purple-200 rounded p-2 text-sm col-span-2" />
+            <input type="number" placeholder="Montant (€)" value={odForm.montant} onChange={e => setOdForm({...odForm, montant: e.target.value})} className="border border-purple-200 rounded p-1.5 text-xs col-span-2" />
           </div>
-          <button onClick={handleAddOD} className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded font-medium text-sm transition-colors">
+          <button onClick={handleAddOD} className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded font-medium text-sm transition-colors mt-auto">
             Enregistrer l'OD
           </button>
         </div>
@@ -526,7 +617,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
       {/* LIGNES EN ATTENTE (SAS) */}
       {lignesEnAttente.length > 0 && (
-        <div className="bg-orange-50 p-6 rounded-xl border border-orange-200">
+        <div className="bg-orange-50 p-6 rounded-xl border border-orange-200 shadow-sm">
           <h3 className="font-bold text-orange-800 mb-4 flex items-center gap-2">
             <AlertTriangle size={18} /> Lignes bancaires à imputer ({lignesEnAttente.length})
           </h3>
@@ -550,16 +641,22 @@ const GrandLivre = ({ transactionsGlobales }) => {
                       {ligne.montant > 0 ? '+' : ''}{ligne.montant.toFixed(2)} €
                     </td>
                     <td className="py-2 px-4">
-                      <input 
-                        type="text" 
-                        placeholder="Ex: 606100" 
-                        className="border border-slate-300 rounded px-2 py-1 w-full text-sm"
-                        onBlur={(e) => validerLigneBank(ligne.id, e.target.value)}
-                        onKeyDown={(e) => { if(e.key === 'Enter') validerLigneBank(ligne.id, e.target.value) }}
-                      />
+                      <div className="relative">
+                        <input 
+                          type="text" 
+                          placeholder="Ex: 606100" 
+                          defaultValue={ligne.comptePropose || ''}
+                          className={`border rounded-md px-2 py-1 w-full text-sm font-mono pr-8 focus:ring-2 focus:ring-indigo-500 outline-none ${ligne.comptePropose ? 'border-indigo-300 bg-indigo-50 text-indigo-700 font-bold' : 'border-slate-300'}`}
+                          onBlur={(e) => validerLigneBank(ligne.id, e.target.value)}
+                          onKeyDown={(e) => { if(e.key === 'Enter') validerLigneBank(ligne.id, e.target.value) }}
+                        />
+                        {ligne.comptePropose && (
+                          <Sparkles size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-indigo-500" title="Suggéré automatiquement par le logiciel" />
+                        )}
+                      </div>
                     </td>
                     <td className="py-2 px-2 text-center">
-                      <button onClick={() => setLignesEnAttente(prev => prev.filter(l => l.id !== ligne.id))} className="text-slate-400 hover:text-red-500">
+                      <button onClick={() => setLignesEnAttente(prev => prev.filter(l => l.id !== ligne.id))} className="text-slate-400 hover:text-red-500 transition-colors">
                         <Trash2 size={16} />
                       </button>
                     </td>
@@ -583,7 +680,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
         </div>
         <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
           <table className="w-full text-sm text-left">
-            <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-semibold sticky top-0 shadow-sm">
+            <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-semibold sticky top-0 shadow-sm z-10">
               <tr>
                 <th className="py-3 px-4">Date</th>
                 <th className="py-3 px-4">Libellé</th>
@@ -647,7 +744,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
     </div>
   );
 };
-
 // --- 4. PLAN COMPTABLE ---
 const PlanComptable = () => {
   const [comptes, setComptes] = useState([]);
