@@ -43,40 +43,66 @@ const PlaceholderPage = ({ title }) => (
 
 // --- 1. INFOS & CONTACT ---
 const InfosContact = () => (
-  <div className="space-y-6">
-    <div className="bg-indigo-600 p-8 rounded-xl shadow-md text-white">
+  <div className="space-y-6 max-w-6xl mx-auto">
+    <div className="bg-blue-600 p-8 rounded-xl shadow-md text-white">
       <h1 className="text-3xl font-bold mb-2">Bienvenue sur le portail du Cours Tom Morel</h1>
-      <p className="text-indigo-100">Retrouvez ici toutes les informations de scolarité, les plannings et la comptabilité.</p>
+      <p className="text-blue-100">Retrouvez ici toutes les informations de scolarité et les plannings.</p>
     </div>
     
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-        <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-          <Building className="text-indigo-500" /> L'École
-        </h3>
-        <p className="text-slate-600 mb-2"><strong>Direction :</strong> Mme Laurence Gérard</p>
-        <p className="text-slate-600 mb-2 flex items-center gap-2"><Phone size={16} /> 06 67 90 95 76</p>
-        <p className="text-slate-600 mb-4 flex items-center gap-2"><Globe size={16} /> www.courstommorel.fr</p>
-        <a href="http://www.courstommorel.fr" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg transition-colors font-medium text-sm">
-          Visiter le site internet
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      
+      {/* Carte 1 : L'École (Site) */}
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center">
+        <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center mb-4">
+          <Globe size={24} />
+        </div>
+        <h3 className="text-lg font-bold text-slate-800 mb-1">Le Cours Tom Morel</h3>
+        <p className="text-blue-500 text-sm mb-6">24 rue de la Chapelle, Saint-Chef</p>
+        
+        <div className="flex-1"></div>
+        
+        <a href="https://sites.google.com/view/courstommorel/cours-tom-morel" target="_blank" rel="noreferrer" className="w-full inline-flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-600 px-4 py-2.5 rounded-lg transition-colors font-medium text-sm">
+          <Globe size={18} /> Visiter le site
         </a>
       </div>
 
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-        <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-          <Users className="text-indigo-500" /> L'Association (Mon École en Dauphiné)
-        </h3>
-        <p className="text-slate-600 mb-2">Bureau et gestion administrative</p>
-        <p className="text-slate-600 mb-4 flex items-center gap-2"><Phone size={16} /> 06 60 20 29 80</p>
-        <div className="flex flex-col gap-2">
-          <a href="mailto:direction@courstommorel.fr" className="inline-flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-4 py-2 rounded-lg transition-colors font-medium text-sm">
-            <Mail size={16} /> Écrire à la Direction
-          </a>
-          <a href="mailto:association@courstommorel.fr" className="inline-flex items-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-4 py-2 rounded-lg transition-colors font-medium text-sm">
-            <Mail size={16} /> Écrire à l'Association
-          </a>
+      {/* Carte 2 : Direction */}
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center">
+        <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center mb-4">
+          <Mail size={24} />
         </div>
+        <h3 className="text-lg font-bold text-slate-800 mb-1">Direction de l'École</h3>
+        <p className="text-slate-600 text-sm font-medium mb-1">Mme Laurence Gérard</p>
+        <p className="text-slate-400 text-xs mb-5">Équipe enseignante: Mme Meyer,<br/>Mme Dupont, M. Martin</p>
+        
+        <div className="w-full border border-slate-200 rounded-lg py-2 mb-3 flex items-center justify-center gap-2 text-slate-600 text-sm font-medium">
+          <Phone size={16} /> 06 67 90 95 76
+        </div>
+        
+        <a href="mailto:direction@courstommorel.fr" className="w-full inline-flex items-center justify-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 px-4 py-2.5 rounded-lg transition-colors font-medium text-sm">
+          <Mail size={18} /> Écrire
+        </a>
       </div>
+
+      {/* Carte 3 : Association */}
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center">
+        <div className="w-12 h-12 rounded-full bg-purple-50 text-purple-500 flex items-center justify-center mb-4">
+          <Building size={24} />
+        </div>
+        <h3 className="text-lg font-bold text-slate-800 mb-1">Association (Bureau)</h3>
+        <p className="text-purple-500 text-sm mb-6">Mon École en Dauphiné</p>
+        
+        <div className="flex-1"></div>
+        
+        <div className="w-full border border-slate-200 rounded-lg py-2 mb-3 flex items-center justify-center gap-2 text-slate-600 text-sm font-medium">
+          <Phone size={16} /> 06 60 20 29 80
+        </div>
+        
+        <a href="mailto:association@courstommorel.fr" className="w-full inline-flex items-center justify-center gap-2 bg-purple-50 hover:bg-purple-100 text-purple-600 px-4 py-2.5 rounded-lg transition-colors font-medium text-sm">
+          <Mail size={18} /> Écrire
+        </a>
+      </div>
+
     </div>
   </div>
 );
