@@ -330,6 +330,9 @@ const GrandLivre = ({ transactionsGlobales }) => {
   const [odForm, setOdForm] = useState({ date: '', libelle: '', debit: '', credit: '', montant: '' });
   const [comptesList, setComptesList] = useState([]);
   
+  // NOUVEAU : État pour savoir quelle ligne du Grand Livre on est en train de modifier
+  const [editingRowId, setEditingRowId] = useState(null);
+  
   const fileInputCsvRef = useRef(null);
   const fileInputXlsxRef = useRef(null);
   const fileInputPaieRef = useRef(null);
@@ -712,7 +715,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
                           value={ligne.comptePropose || ''}
                           onChange={(e) => {
                             const val = e.target.value;
-                            // IA Instantanée : On met à jour la ligne cliquée ET toutes celles avec le même libellé !
                             setLignesEnAttente(prev => prev.map(l => 
                               (l.id === ligne.id || l.libelle === ligne.libelle) 
                                 ? { ...l, comptePropose: val } 
@@ -793,53 +795,90 @@ const GrandLivre = ({ transactionsGlobales }) => {
                     </td>
                   )}
                   
-                  {t.type === 'od' ? (
-                    <td className="py-3 px-4">
-                      <div className="flex flex-col gap-1 w-full max-w-[250px]">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-bold text-slate-500 w-3">D:</span>
-                          <select 
-                            value={t.compteDebit || ''} 
-                            onChange={(e) => handleUpdateCompte(t.id, e.target.value, 'compteDebit')}
-                            className="border border-slate-200 rounded p-1 text-xs bg-white w-full text-slate-700 outline-none focus:border-indigo-400"
-                          >
-                            <option value="">Non défini</option>
-                            {comptesList.map(c => <option key={`d-${c.id}`} value={c.code}>{c.code} - {c.libelle}</option>)}
-                          </select>
+                  {/* AFFICHAGE DU COMPTE FIGÉ OU EN MODE ÉDITION */}
+                  <td className="py-3 px-4">
+                    {editingRowId === t.id ? (
+                      // MODE ÉDITION (LISTES DÉROULANTES)
+                      t.type === 'od' ? (
+                        <div className="flex flex-col gap-1 w-full max-w-[250px]">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-slate-500 w-3">D:</span>
+                            <select 
+                              value={t.compteDebit || ''} 
+                              onChange={(e) => handleUpdateCompte(t.id, e.target.value, 'compteDebit')}
+                              className="border border-indigo-300 rounded p-1 text-xs bg-indigo-50 w-full text-indigo-800 outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner"
+                            >
+                              <option value="">Non défini</option>
+                              {comptesList.map(c => <option key={`d-${c.id}`} value={c.code}>{c.code} - {c.libelle}</option>)}
+                            </select>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-slate-500 w-3">C:</span>
+                            <select 
+                              value={t.compteCredit || ''} 
+                              onChange={(e) => handleUpdateCompte(t.id, e.target.value, 'compteCredit')}
+                              className="border border-indigo-300 rounded p-1 text-xs bg-indigo-50 w-full text-indigo-800 outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner"
+                            >
+                              <option value="">Non défini</option>
+                              {comptesList.map(c => <option key={`c-${c.id}`} value={c.code}>{c.code} - {c.libelle}</option>)}
+                            </select>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-bold text-slate-500 w-3">C:</span>
-                          <select 
-                            value={t.compteCredit || ''} 
-                            onChange={(e) => handleUpdateCompte(t.id, e.target.value, 'compteCredit')}
-                            className="border border-slate-200 rounded p-1 text-xs bg-white w-full text-slate-700 outline-none focus:border-indigo-400"
-                          >
-                            <option value="">Non défini</option>
-                            {comptesList.map(c => <option key={`c-${c.id}`} value={c.code}>{c.code} - {c.libelle}</option>)}
-                          </select>
+                      ) : (
+                        <select 
+                          value={t.compte || ''} 
+                          onChange={(e) => {
+                            handleUpdateCompte(t.id, e.target.value, 'compte');
+                            setEditingRowId(null); // On ferme automatiquement après modification
+                          }}
+                          className="border border-indigo-300 rounded p-2 text-xs bg-indigo-50 max-w-[250px] w-full text-indigo-800 font-mono outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner cursor-pointer"
+                        >
+                          <option value="">Non défini</option>
+                          {comptesList.map(c => <option key={c.id} value={c.code}>{c.code} - {c.libelle}</option>)}
+                        </select>
+                      )
+                    ) : (
+                      // MODE AFFICHAGE SÉCURISÉ (ÉTIQUETTE TEXTE)
+                      t.type === 'od' ? (
+                        <div className="flex flex-col gap-0.5">
+                          <div className="text-xs text-slate-500"><span className="font-bold text-slate-700">D:</span> {t.compteDebit} {t.compteDebit && `- ${comptesList.find(c => c.code === t.compteDebit)?.libelle || ''}`}</div>
+                          <div className="text-xs text-slate-500"><span className="font-bold text-slate-700">C:</span> {t.compteCredit} {t.compteCredit && `- ${comptesList.find(c => c.code === t.compteCredit)?.libelle || ''}`}</div>
                         </div>
-                      </div>
-                    </td>
-                  ) : (
-                    <td className="py-3 px-4">
-                      <select 
-                        value={t.compte || ''} 
-                        onChange={(e) => handleUpdateCompte(t.id, e.target.value, 'compte')}
-                        className="border border-slate-200 rounded p-1 text-xs bg-white max-w-[250px] w-full text-slate-700 font-mono outline-none focus:border-indigo-400"
-                      >
-                        <option value="">Non défini</option>
-                        {comptesList.map(c => <option key={c.id} value={c.code}>{c.code} - {c.libelle}</option>)}
-                      </select>
-                    </td>
-                  )}
+                      ) : (
+                        <div 
+                          onClick={() => setEditingRowId(t.id)} 
+                          className="group flex items-center gap-2 cursor-pointer w-fit"
+                          title="Cliquez pour modifier le compte"
+                        >
+                          <span className="bg-slate-50 group-hover:bg-indigo-50 px-3 py-1.5 rounded-md text-xs font-mono text-slate-700 group-hover:text-indigo-700 border border-slate-200 group-hover:border-indigo-300 transition-all max-w-[250px] truncate shadow-sm">
+                            {t.compte ? `${t.compte} - ${comptesList.find(c => c.code === t.compte)?.libelle || ''}` : 'Non défini'}
+                          </span>
+                          <span className="text-slate-300 group-hover:text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity font-bold text-sm">
+                            ✎
+                          </span>
+                        </div>
+                      )
+                    )}
+                  </td>
                   
                   <td className="py-3 px-4 text-center flex items-center justify-center gap-2">
-                    <button className="text-slate-300 hover:text-indigo-500 transition-colors mt-2" title="Attacher PDF">
-                      <Paperclip size={16} />
-                    </button>
-                    <button onClick={() => handleDeleteValidated(t.id)} className="text-slate-300 hover:text-red-500 p-1.5 rounded transition-colors mt-1.5" title="Supprimer l'écriture">
-                      <Trash2 size={16}/>
-                    </button>
+                    {editingRowId === t.id ? (
+                      <button onClick={() => setEditingRowId(null)} className="text-white bg-emerald-500 hover:bg-emerald-600 px-3 py-1 rounded text-xs font-bold transition-colors shadow-sm mt-1.5" title="Terminer l'édition">
+                        OK
+                      </button>
+                    ) : (
+                      <>
+                        <button onClick={() => setEditingRowId(t.id)} className="text-slate-300 hover:text-indigo-500 p-1.5 rounded transition-colors mt-1.5" title="Modifier le compte">
+                          <span className="font-bold text-lg leading-none">✎</span>
+                        </button>
+                        <button className="text-slate-300 hover:text-indigo-500 transition-colors mt-1.5" title="Attacher PDF">
+                          <Paperclip size={16} />
+                        </button>
+                        <button onClick={() => handleDeleteValidated(t.id)} className="text-slate-300 hover:text-red-500 p-1.5 rounded transition-colors mt-1.5" title="Supprimer l'écriture">
+                          <Trash2 size={16}/>
+                        </button>
+                      </>
+                    )}
                   </td>
                 </tr>
               ))}
