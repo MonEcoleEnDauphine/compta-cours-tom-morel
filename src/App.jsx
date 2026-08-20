@@ -655,6 +655,9 @@ const PlanComptable = () => {
   const [nouveauCode, setNouveauCode] = useState('');
   const [nouveauLibelle, setNouveauLibelle] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [isImporting, setIsImporting] = useState(false);
+  
+  const fileInputPlanRef = useRef(null);
 
   // Récupération des comptes depuis Firebase
   useEffect(() => {
@@ -706,6 +709,61 @@ const PlanComptable = () => {
     }
   };
 
+  // NOUVEAU : Fonction d'importation CSV/XLSX
+  const handleImportPlan = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setIsImporting(true);
+
+    const processRows = async (rows) => {
+      let count = 0;
+      // On commence à i = 1 pour ignorer la ligne d'en-tête
+      for (let i = 1; i < rows.length; i++) {
+        const cols = rows[i];
+        const code = cols[0] ? String(cols[0]).trim() : '';
+        const libelle = cols[1] ? String(cols[1]).trim() : '';
+
+        if (code && libelle) {
+          try {
+            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'comptes'), {
+              code: code,
+              libelle: libelle,
+              date_creation: new Date().toISOString()
+            });
+            count++;
+          } catch(err) {
+            console.error("Erreur sur la ligne", i, err);
+          }
+        }
+      }
+      setIsImporting(false);
+      alert(`${count} comptes importés avec succès !`);
+      if (fileInputPlanRef.current) fileInputPlanRef.current.value = ''; // Reset l'input
+    };
+
+    const ext = file.name.split('.').pop().toLowerCase();
+    
+    if (ext === 'csv') {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const lines = event.target.result.split('\n');
+        const rows = lines.map(line => line.split(';').map(c => c.trim().replace(/"/g, '')));
+        await processRows(rows);
+      };
+      reader.readAsText(file, 'ISO-8859-1');
+    } else if (ext === 'xlsx') {
+      try {
+        const data = await file.arrayBuffer();
+        const workbook = XLSX.read(data, { type: 'array' });
+        const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, raw: false, defval: '' });
+        await processRows(rows);
+      } catch (err) {
+        setIsImporting(false);
+        alert("Erreur de lecture du fichier XLSX.");
+      }
+    }
+  };
+
   const comptesFiltres = comptes.filter(c => 
     c.code.includes(recherche) || c.libelle.toLowerCase().includes(recherche.toLowerCase())
   );
@@ -723,7 +781,7 @@ const PlanComptable = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Colonne gauche : Ajout d'un compte */}
+        {/* Colonne gauche : Ajout & Importation */}
         <div className="md:col-span-1">
           <div className="bg-indigo-50 p-6 rounded-xl border border-indigo-100 sticky top-6">
             <h3 className="font-bold text-indigo-900 text-lg mb-4 flex items-center gap-2">
@@ -757,6 +815,24 @@ const PlanComptable = () => {
                 Ajouter au plan
               </button>
             </form>
+
+            {/* NOUVEAU : Bloc d'importation */}
+            <div className="mt-6 pt-5 border-t border-indigo-200">
+              <h4 className="text-xs font-semibold text-indigo-700 mb-3 text-center uppercase tracking-wider">Importation en masse</h4>
+              <input type="file" accept=".csv, .xlsx" className="hidden" ref={fileInputPlanRef} onChange={handleImportPlan} />
+              <button 
+                type="button" 
+                onClick={() => fileInputPlanRef.current.click()}
+                disabled={isImporting}
+                className={`w-full bg-white border-2 border-indigo-200 hover:border-indigo-600 text-indigo-700 py-2 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2 ${isImporting ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                <Download size={16} /> {isImporting ? "Importation..." : "Importer (CSV / XLSX)"}
+              </button>
+              <p className="text-[10px] text-indigo-500 mt-2 text-center leading-tight">
+                Fichier avec Colonne A : Code<br/>Colonne B : Libellé<br/>(La ligne 1 d'en-tête sera ignorée)
+              </p>
+            </div>
+
           </div>
         </div>
 
