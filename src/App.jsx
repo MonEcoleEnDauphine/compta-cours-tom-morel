@@ -73,7 +73,7 @@ const InfosContact = () => (
         </div>
         <h3 className="text-lg font-bold text-slate-800 mb-1">Direction de l'École</h3>
         <p className="text-slate-600 text-sm font-medium mb-1">Mme Laurence Gérard</p>
-        <p className="text-slate-400 text-xs mb-5">Équipe enseignante: Mme Meyer,<br/>Mme Dupont, M. Martin</p>
+        <p className="text-slate-400 text-xs mb-5">Équipe enseignante: Mme Cécile Sublet & Mme Florence ...
         
         <div className="w-full border border-slate-200 rounded-lg py-2 mb-3 flex items-center justify-center gap-2 text-slate-600 text-sm font-medium">
           <Phone size={16} /> 06 67 90 95 76
