@@ -12,14 +12,15 @@ import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, on
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, addDoc, getDoc, updateDoc } from "firebase/firestore";
 import * as XLSX from 'xlsx';
 
-// --- CONFIGURATION FIREBASE (À remplacer par vos vraies clés si nécessaire) ---
+// Configuration Firebase Officielle
 const firebaseConfig = {
-  apiKey: "VOTRE_API_KEY",
-  authDomain: "VOTRE_AUTH_DOMAIN",
-  projectId: "VOTRE_PROJECT_ID",
-  storageBucket: "VOTRE_STORAGE_BUCKET",
-  messagingSenderId: "VOTRE_MESSAGING_SENDER_ID",
-  appId: "VOTRE_APP_ID"
+  apiKey: "AIzaSyDhKe4Nl3mUHagW1LkG5GT-tI1bB2-wtnE",
+  authDomain: "cours-tom-morel.firebaseapp.com",
+  projectId: "cours-tom-morel",
+  storageBucket: "cours-tom-morel.firebasestorage.app",
+  messagingSenderId: "605446922070",
+  appId: "1:605446922070:web:7d81aca59101d76c5a00f7",
+  measurementId: "G-XL0L5MG9LK"
 };
 
 // Initialisation conditionnelle
