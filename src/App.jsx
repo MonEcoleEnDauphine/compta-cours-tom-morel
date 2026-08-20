@@ -324,21 +324,16 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     </div>
   );
 };
-
 // --- 3. GRAND LIVRE (Import CSV/XLSX, OD, Validations) ---
 const GrandLivre = ({ transactionsGlobales }) => {
   const [lignesEnAttente, setLignesEnAttente] = useState([]);
   const [odForm, setOdForm] = useState({ date: '', libelle: '', debit: '', credit: '', montant: '' });
-  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
-  
-  // NOUVEAU : État pour stocker le plan comptable
   const [comptesList, setComptesList] = useState([]);
   
   const fileInputCsvRef = useRef(null);
   const fileInputXlsxRef = useRef(null);
   const fileInputPaieRef = useRef(null);
 
-  // NOUVEAU : Récupération des comptes depuis Firebase pour alimenter les listes déroulantes
   useEffect(() => {
     const q = collection(db, 'artifacts', appId, 'public', 'data', 'comptes');
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -357,11 +352,13 @@ const GrandLivre = ({ transactionsGlobales }) => {
     if (!libelleTxt) return '';
     const txt = libelleTxt.toLowerCase();
 
+    // 1. Cherche dans la base validée
     const memoire = transactionsGlobales.find(tx => 
       tx.compte && tx.type !== 'od' && tx.libelle && (txt.includes(tx.libelle.toLowerCase()) || tx.libelle.toLowerCase().includes(txt))
     );
     if (memoire) return memoire.compte;
 
+    // 2. Mots-clés standards
     const dictionnaire = [
       { mots: ['edf', 'engie', 'eau', 'electricite', 'saur'], compte: '606100' }, 
       { mots: ['loyer', 'sci '], compte: '613200' }, 
@@ -383,6 +380,20 @@ const GrandLivre = ({ transactionsGlobales }) => {
     }
     return '';
   };
+
+  // NOUVEAU : Mise à jour magique du SAS quand une écriture est validée
+  useEffect(() => {
+    if (lignesEnAttente.length > 0) {
+      setLignesEnAttente(prev => prev.map(ligne => {
+        if (!ligne.comptePropose) {
+          const guess = devinerCompte(ligne.libelle);
+          if (guess) return { ...ligne, comptePropose: guess };
+        }
+        return ligne;
+      }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transactionsGlobales]);
 
   const handleImportFile = async (e, type) => {
     const file = e.target.files[0];
@@ -422,7 +433,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
         const lignesBrutes = lines.slice(1).map(line => line.split(';').map(c => c.trim().replace(/"/g, '')));
         const resultat = preparerLignes(lignesBrutes);
         setLignesEnAttente(prev => [...prev, ...resultat]);
-        alert(`${resultat.length} lignes importées avec succès.`);
       };
       reader.readAsText(file, 'ISO-8859-1');
     } else if (type === 'xlsx') {
@@ -433,7 +443,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
         const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false, defval: '' });
         const resultat = preparerLignes(rows.slice(1));
         setLignesEnAttente(prev => [...prev, ...resultat]);
-        alert(`${resultat.length} lignes importées depuis Excel.`);
       } catch (err) {
         alert("Erreur lors de la lecture du fichier XLSX.");
       }
@@ -454,16 +463,13 @@ const GrandLivre = ({ transactionsGlobales }) => {
         if (!line) continue;
         
         const cols = line.split('\t');
-        
         if (cols.length >= 13) {
           const rawDate = cols[3].trim();
           const formattedDate = rawDate.length === 8 ? `${rawDate.slice(0,4)}-${rawDate.slice(4,6)}-${rawDate.slice(6,8)}` : rawDate;
-          
           const compteNum = cols[4].trim();
           const compteLib = cols[5].trim();
           const pieceRef = cols[8].trim();
           const ecritureLib = cols[10].trim();
-          
           const debit = parseFloat(cols[11].replace(',', '.')) || 0;
           const credit = parseFloat(cols[12].replace(',', '.')) || 0;
           
@@ -496,10 +502,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
   const validerLigneBank = async (ligneId, compteCode) => {
     const ligne = lignesEnAttente.find(l => l.id === ligneId);
-    if (!ligne || !compteCode) {
-      alert("Veuillez sélectionner un compte avant de valider.");
-      return;
-    }
+    if (!ligne || !compteCode) return;
     
     const newTx = {
       date: ligne.date,
@@ -516,7 +519,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), newTx);
       setLignesEnAttente(prev => prev.filter(l => l.id !== ligneId));
     } catch(e) {
-      console.error(e);
       alert("Erreur de sauvegarde.");
     }
   };
@@ -526,7 +528,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
       alert('Veuillez remplir tous les champs de l\'OD.');
       return;
     }
-    
     const newTx = {
       date: odForm.date,
       libelle: `(OD) ${odForm.libelle}`,
@@ -536,20 +537,17 @@ const GrandLivre = ({ transactionsGlobales }) => {
       compteCredit: odForm.credit,
       date_creation: new Date().toISOString()
     };
-
     try {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), newTx);
       setOdForm({ date: '', libelle: '', debit: '', credit: '', montant: '' });
       alert("OD ajoutée avec succès au Grand Livre.");
     } catch(e) {
-      console.error(e);
       alert("Erreur lors de la création de l'OD.");
     }
   };
 
   const handleDeleteValidated = async (txId) => {
-    const confirm = window.confirm("ATTENTION : Êtes-vous sûr de vouloir supprimer définitivement cette écriture du Grand Livre ?");
-    if (confirm) {
+    if (window.confirm("ATTENTION : Êtes-vous sûr de vouloir supprimer définitivement cette écriture du Grand Livre ?")) {
       try {
         await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', txId));
       } catch(e) { 
@@ -558,10 +556,20 @@ const GrandLivre = ({ transactionsGlobales }) => {
     }
   };
 
+  // NOUVEAU : Fonction pour modifier une écriture directement dans le Grand Livre
+  const handleUpdateCompte = async (txId, newCompte, field) => {
+    try {
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', txId), {
+        [field]: newCompte
+      });
+    } catch(e) {
+      alert("Erreur lors de la mise à jour du compte.");
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       
-      {/* HEADER: TITRE */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
@@ -571,9 +579,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
         </div>
       </div>
 
-      {/* LES TROIS BLOCS: IMPORT BANQUE, OD MANUELLE, IMPORT PAIE */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
         {/* BLOC 1 : IMPORT BANQUE */}
         <div className="bg-indigo-50 p-6 rounded-xl border border-indigo-100 flex flex-col justify-center items-center text-center space-y-4">
           <h3 className="font-bold text-indigo-900 text-lg">Journal de Banque</h3>
@@ -583,7 +589,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
             <button onClick={() => fileInputCsvRef.current.click()} className="w-full justify-center bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition-colors">
               <Download size={16} /> Import Relevé (.csv)
             </button>
-            
             <input type="file" accept=".xlsx" className="hidden" ref={fileInputXlsxRef} onChange={(e) => handleImportFile(e, 'xlsx')} />
             <button onClick={() => fileInputXlsxRef.current.click()} className="w-full justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition-colors">
               <FileSpreadsheet size={16} /> Import Relevé (.xlsx)
@@ -602,7 +607,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
           </button>
         </div>
 
-        {/* BLOC 3 : SAISIE OD (Avec menus déroulants) */}
+        {/* BLOC 3 : SAISIE OD */}
         <div className="bg-purple-50 p-6 rounded-xl border border-purple-100 space-y-4 flex flex-col">
           <h3 className="font-bold text-purple-900 text-lg flex items-center gap-2 justify-center">
             <FileText size={18} /> Opération Diverse
@@ -610,17 +615,14 @@ const GrandLivre = ({ transactionsGlobales }) => {
           <div className="grid grid-cols-2 gap-2 flex-1">
             <input type="date" value={odForm.date} onChange={e => setOdForm({...odForm, date: e.target.value})} className="border border-purple-200 rounded p-1.5 text-xs bg-white" />
             <input type="text" placeholder="Libellé OD..." value={odForm.libelle} onChange={e => setOdForm({...odForm, libelle: e.target.value})} className="border border-purple-200 rounded p-1.5 text-xs bg-white" />
-            
             <select value={odForm.debit} onChange={e => setOdForm({...odForm, debit: e.target.value})} className="border border-purple-200 rounded p-1.5 text-xs bg-white">
               <option value="">Compte Débit...</option>
               {comptesList.map(c => <option key={c.id} value={c.code}>{c.code} - {c.libelle}</option>)}
             </select>
-            
             <select value={odForm.credit} onChange={e => setOdForm({...odForm, credit: e.target.value})} className="border border-purple-200 rounded p-1.5 text-xs bg-white">
               <option value="">Compte Crédit...</option>
               {comptesList.map(c => <option key={c.id} value={c.code}>{c.code} - {c.libelle}</option>)}
             </select>
-            
             <input type="number" placeholder="Montant (€)" value={odForm.montant} onChange={e => setOdForm({...odForm, montant: e.target.value})} className="border border-purple-200 rounded p-1.5 text-xs col-span-2 bg-white" />
           </div>
           <button onClick={handleAddOD} className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded font-medium text-sm transition-colors mt-auto">
@@ -669,7 +671,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
                     </td>
                     <td className="py-2 px-4">
                       <div className="relative">
-                        {/* NOUVEAU : Liste déroulante automatique */}
                         <select 
                           defaultValue={ligne.comptePropose || ''}
                           onChange={(e) => {
@@ -680,13 +681,9 @@ const GrandLivre = ({ transactionsGlobales }) => {
                           className={`border rounded-md px-2 py-1.5 w-full text-sm font-mono pr-8 focus:ring-2 focus:ring-indigo-500 appearance-none outline-none cursor-pointer ${ligne.comptePropose ? 'border-indigo-300 bg-indigo-50 text-indigo-700 font-bold' : 'border-slate-300 bg-white'}`}
                         >
                           <option value="">Sélectionner un compte...</option>
-                          
-                          {/* Option suggérée si elle n'est pas déjà dans la base (sécurité d'affichage) */}
                           {ligne.comptePropose && !comptesList.find(c => c.code === ligne.comptePropose) && (
                             <option value={ligne.comptePropose}>{ligne.comptePropose} (Suggéré)</option>
                           )}
-                          
-                          {/* Affichage du vrai plan comptable */}
                           {comptesList.map(c => (
                             <option key={c.id} value={c.code}>{c.code} - {c.libelle}</option>
                           ))}
@@ -747,22 +744,51 @@ const GrandLivre = ({ transactionsGlobales }) => {
                   
                   {t.type === 'od' ? (
                     <td className="py-3 px-4">
-                      <div className="text-xs text-slate-500"><span className="font-bold text-slate-700">D:</span> {t.compteDebit}</div>
-                      <div className="text-xs text-slate-500"><span className="font-bold text-slate-700">C:</span> {t.compteCredit}</div>
+                      {/* NOUVEAU : Modification des OD validées */}
+                      <div className="flex flex-col gap-1 w-full max-w-[250px]">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold text-slate-500 w-3">D:</span>
+                          <select 
+                            value={t.compteDebit || ''} 
+                            onChange={(e) => handleUpdateCompte(t.id, e.target.value, 'compteDebit')}
+                            className="border border-slate-200 rounded p-1 text-xs bg-white w-full text-slate-700 outline-none focus:border-indigo-400"
+                          >
+                            <option value="">Non défini</option>
+                            {comptesList.map(c => <option key={`d-${c.id}`} value={c.code}>{c.code} - {c.libelle}</option>)}
+                          </select>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold text-slate-500 w-3">C:</span>
+                          <select 
+                            value={t.compteCredit || ''} 
+                            onChange={(e) => handleUpdateCompte(t.id, e.target.value, 'compteCredit')}
+                            className="border border-slate-200 rounded p-1 text-xs bg-white w-full text-slate-700 outline-none focus:border-indigo-400"
+                          >
+                            <option value="">Non défini</option>
+                            {comptesList.map(c => <option key={`c-${c.id}`} value={c.code}>{c.code} - {c.libelle}</option>)}
+                          </select>
+                        </div>
+                      </div>
                     </td>
                   ) : (
                     <td className="py-3 px-4">
-                      <span className="bg-slate-100 px-2 py-1 rounded text-xs font-mono text-slate-700 border border-slate-200">
-                        {t.compte || 'Non défini'}
-                      </span>
+                      {/* NOUVEAU : Modification des lignes bancaires validées */}
+                      <select 
+                        value={t.compte || ''} 
+                        onChange={(e) => handleUpdateCompte(t.id, e.target.value, 'compte')}
+                        className="border border-slate-200 rounded p-1 text-xs bg-white max-w-[250px] w-full text-slate-700 font-mono outline-none focus:border-indigo-400"
+                      >
+                        <option value="">Non défini</option>
+                        {comptesList.map(c => <option key={c.id} value={c.code}>{c.code} - {c.libelle}</option>)}
+                      </select>
                     </td>
                   )}
                   
                   <td className="py-3 px-4 text-center flex items-center justify-center gap-2">
-                    <button className="text-slate-300 hover:text-indigo-500 transition-colors" title="Attacher PDF">
+                    <button className="text-slate-300 hover:text-indigo-500 transition-colors mt-2" title="Attacher PDF">
                       <Paperclip size={16} />
                     </button>
-                    <button onClick={() => handleDeleteValidated(t.id)} className="text-slate-300 hover:text-red-500 p-1.5 rounded transition-colors" title="Supprimer l'écriture">
+                    <button onClick={() => handleDeleteValidated(t.id)} className="text-slate-300 hover:text-red-500 p-1.5 rounded transition-colors mt-1.5" title="Supprimer l'écriture">
                       <Trash2 size={16}/>
                     </button>
                   </td>
@@ -779,7 +805,8 @@ const GrandLivre = ({ transactionsGlobales }) => {
       </div>
     </div>
   );
-};// --- 4. PLAN COMPTABLE ---
+};
+// --- 4. PLAN COMPTABLE ---
 const PlanComptable = () => {
   const [comptes, setComptes] = useState([]);
   const [recherche, setRecherche] = useState('');
