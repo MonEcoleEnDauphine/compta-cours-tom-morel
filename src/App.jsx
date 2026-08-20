@@ -496,7 +496,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
     reader.readAsText(file, 'UTF-8');
   };
 
-  // NOUVEAU : Validation d'une ligne individuelle
   const validerLigneBank = async (ligneId, compteCode) => {
     const ligne = lignesEnAttente.find(l => l.id === ligneId);
     if (!ligne || !compteCode) {
@@ -523,7 +522,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
     }
   };
 
-  // NOUVEAU : Validation groupée (Toutes les lignes prêtes)
   const validerLignesPretes = async () => {
     const lignesAValider = lignesEnAttente.filter(l => l.comptePropose);
     if (lignesAValider.length === 0) return;
@@ -667,7 +665,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
               <AlertTriangle size={18} /> Lignes bancaires à imputer ({lignesEnAttente.length})
             </h3>
             
-            {/* BOUTONS D'ACTION GLOBALE */}
             <div className="flex items-center gap-3">
               {nbLignesPretes > 0 && (
                 <button 
@@ -711,12 +708,16 @@ const GrandLivre = ({ transactionsGlobales }) => {
                     </td>
                     <td className="py-3 px-4">
                       <div className="relative">
-                        {/* Mise à jour uniquement locale (pas d'envoi à Firebase ici) */}
                         <select 
                           value={ligne.comptePropose || ''}
                           onChange={(e) => {
                             const val = e.target.value;
-                            setLignesEnAttente(prev => prev.map(l => l.id === ligne.id ? { ...l, comptePropose: val } : l));
+                            // IA Instantanée : On met à jour la ligne cliquée ET toutes celles avec le même libellé !
+                            setLignesEnAttente(prev => prev.map(l => 
+                              (l.id === ligne.id || l.libelle === ligne.libelle) 
+                                ? { ...l, comptePropose: val } 
+                                : l
+                            ));
                           }}
                           className={`border rounded-lg px-3 py-2 w-full text-sm font-mono pr-8 focus:ring-2 focus:ring-indigo-500 appearance-none outline-none cursor-pointer transition-all ${ligne.comptePropose ? 'border-indigo-400 bg-indigo-50 text-indigo-800 font-bold shadow-inner' : 'border-slate-300 bg-white'}`}
                         >
@@ -736,7 +737,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
                     </td>
                     <td className="py-3 px-2 text-center">
                       <div className="flex justify-center items-center gap-1.5">
-                        {/* NOUVEAU BOUTON DE VALIDATION INDIVIDUELLE */}
                         <button 
                           onClick={() => validerLigneBank(ligne.id, ligne.comptePropose)}
                           disabled={!ligne.comptePropose}
@@ -745,7 +745,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
                         >
                           <CheckCircle2 size={18} />
                         </button>
-                        
                         <button onClick={() => setLignesEnAttente(prev => prev.filter(l => l.id !== ligne.id))} className="p-1.5 rounded-md bg-white border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-300 transition-colors shadow-sm" title="Supprimer cette ligne">
                           <Trash2 size={18} />
                         </button>
