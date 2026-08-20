@@ -679,7 +679,179 @@ export default function App() {
       case 'contact': return <InfosContact />;
       case 'etat_financier': return <EtatFinancier transactionsGlobales={transactionsGlobales} />;
       case 'grand_livre': return <GrandLivre transactionsGlobales={transactionsGlobales} />;
-      
+// --- 4. PLAN COMPTABLE ---
+const PlanComptable = () => {
+  const [comptes, setComptes] = useState([]);
+  const [recherche, setRecherche] = useState('');
+  const [nouveauCode, setNouveauCode] = useState('');
+  const [nouveauLibelle, setNouveauLibelle] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+
+  // Récupération des comptes depuis Firebase
+  useEffect(() => {
+    const q = collection(db, 'artifacts', appId, 'public', 'data', 'comptes');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const liste = [];
+      snapshot.forEach((doc) => {
+        liste.push({ id: doc.id, ...doc.data() });
+      });
+      // Tri par numéro de compte
+      liste.sort((a, b) => a.code.localeCompare(b.code));
+      setComptes(liste);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleAjouter = async (e) => {
+    e.preventDefault();
+    if (!nouveauCode || !nouveauLibelle) {
+      alert("Veuillez remplir le code et le libellé.");
+      return;
+    }
+    
+    try {
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'comptes'), {
+        code: nouveauCode,
+        libelle: nouveauLibelle,
+        date_creation: new Date().toISOString()
+      });
+      setNouveauCode('');
+      setNouveauLibelle('');
+    } catch (error) {
+      console.error(error);
+      alert("Erreur lors de l'ajout du compte.");
+    }
+  };
+
+  const handleSupprimer = async (id) => {
+    if (confirmDeleteId === id) {
+      try {
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'comptes', id));
+        setConfirmDeleteId(null);
+      } catch(e) {
+        alert("Erreur lors de la suppression.");
+      }
+    } else {
+      setConfirmDeleteId(id);
+      setTimeout(() => setConfirmDeleteId(null), 3000);
+    }
+  };
+
+  const comptesFiltres = comptes.filter(c => 
+    c.code.includes(recherche) || c.libelle.toLowerCase().includes(recherche.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-6 max-w-5xl mx-auto">
+      {/* En-tête */}
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+            <FileSignature className="text-indigo-600" /> Plan Comptable
+          </h2>
+          <p className="text-slate-500 text-sm mt-1">Gérez la liste de vos comptes (Classes 1 à 7).</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Colonne gauche : Ajout d'un compte */}
+        <div className="md:col-span-1">
+          <div className="bg-indigo-50 p-6 rounded-xl border border-indigo-100 sticky top-6">
+            <h3 className="font-bold text-indigo-900 text-lg mb-4 flex items-center gap-2">
+              <Plus size={18} /> Nouveau Compte
+            </h3>
+            <form onSubmit={handleAjouter} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-indigo-700 mb-1">Code Comptable</label>
+                <input 
+                  type="text" 
+                  placeholder="Ex: 606100" 
+                  value={nouveauCode}
+                  onChange={(e) => setNouveauCode(e.target.value)}
+                  className="w-full border border-indigo-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-indigo-700 mb-1">Libellé</label>
+                <input 
+                  type="text" 
+                  placeholder="Ex: Fournitures non stockables..." 
+                  value={nouveauLibelle}
+                  onChange={(e) => setNouveauLibelle(e.target.value)}
+                  className="w-full border border-indigo-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                />
+              </div>
+              <button 
+                type="submit" 
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-medium text-sm transition-colors"
+              >
+                Ajouter au plan
+              </button>
+            </form>
+          </div>
+        </div>
+
+        {/* Colonne droite : Liste des comptes */}
+        <div className="md:col-span-2">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full">
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center gap-4">
+              <div className="relative flex-1 max-w-sm">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input 
+                  type="text" 
+                  placeholder="Rechercher un compte..." 
+                  value={recherche}
+                  onChange={(e) => setRecherche(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                />
+              </div>
+              <span className="text-xs font-medium bg-white px-3 py-1 rounded-full border border-slate-200 text-slate-500">
+                {comptesFiltres.length} compte(s)
+              </span>
+            </div>
+
+            <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-semibold sticky top-0 shadow-sm">
+                  <tr>
+                    <th className="py-3 px-4 w-32">Code</th>
+                    <th className="py-3 px-4">Libellé</th>
+                    <th className="py-3 px-4 text-center w-24">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {comptesFiltres.map(c => (
+                    <tr key={c.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="py-3 px-4 font-mono font-bold text-slate-700">{c.code}</td>
+                      <td className="py-3 px-4 text-slate-600">{c.libelle}</td>
+                      <td className="py-3 px-4 text-center">
+                        {confirmDeleteId === c.id ? (
+                          <button onClick={() => handleSupprimer(c.id)} className="text-white bg-red-500 hover:bg-red-600 px-2 py-1 rounded text-xs font-bold animate-pulse">
+                            Confirmer ?
+                          </button>
+                        ) : (
+                          <button onClick={() => handleSupprimer(c.id)} className="text-slate-300 hover:text-red-500 p-1.5 rounded transition-colors" title="Supprimer">
+                            <Trash2 size={16}/>
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {comptesFiltres.length === 0 && (
+                    <tr>
+                      <td colSpan="3" className="py-8 text-center text-slate-400">Aucun compte trouvé.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+        
       // Placeholders pour les autres pages
       case 'tableau_bord': return <PlaceholderPage title="Tableau de Bord" />;
       case 'scolarite': return <PlaceholderPage title="Scolarité" />;
