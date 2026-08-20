@@ -329,10 +329,28 @@ const EtatFinancier = ({ transactionsGlobales }) => {
 const GrandLivre = ({ transactionsGlobales }) => {
   const [lignesEnAttente, setLignesEnAttente] = useState([]);
   const [odForm, setOdForm] = useState({ date: '', libelle: '', debit: '', credit: '', montant: '' });
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  
+  // NOUVEAU : État pour stocker le plan comptable
+  const [comptesList, setComptesList] = useState([]);
   
   const fileInputCsvRef = useRef(null);
   const fileInputXlsxRef = useRef(null);
   const fileInputPaieRef = useRef(null);
+
+  // NOUVEAU : Récupération des comptes depuis Firebase pour alimenter les listes déroulantes
+  useEffect(() => {
+    const q = collection(db, 'artifacts', appId, 'public', 'data', 'comptes');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const liste = [];
+      snapshot.forEach((doc) => {
+        liste.push({ id: doc.id, ...doc.data() });
+      });
+      liste.sort((a, b) => a.code.localeCompare(b.code));
+      setComptesList(liste);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // --- MOTEUR D'ASSISTANCE (IA LOCALE & MÉMOIRE) ---
   const devinerCompte = (libelleTxt) => {
@@ -529,7 +547,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
     }
   };
 
-  // NOUVEAU : Suppression avec popup de sécurité
   const handleDeleteValidated = async (txId) => {
     const confirm = window.confirm("ATTENTION : Êtes-vous sûr de vouloir supprimer définitivement cette écriture du Grand Livre ?");
     if (confirm) {
@@ -585,19 +602,26 @@ const GrandLivre = ({ transactionsGlobales }) => {
           </button>
         </div>
 
-        {/* BLOC 3 : SAISIE OD */}
+        {/* BLOC 3 : SAISIE OD (Avec menus déroulants) */}
         <div className="bg-purple-50 p-6 rounded-xl border border-purple-100 space-y-4 flex flex-col">
           <h3 className="font-bold text-purple-900 text-lg flex items-center gap-2 justify-center">
             <FileText size={18} /> Opération Diverse
           </h3>
           <div className="grid grid-cols-2 gap-2 flex-1">
-            <input type="date" value={odForm.date} onChange={e => setOdForm({...odForm, date: e.target.value})} className="border border-purple-200 rounded p-1.5 text-xs" />
-            <input type="text" placeholder="Libellé OD..." value={odForm.libelle} onChange={e => setOdForm({...odForm, libelle: e.target.value})} className="border border-purple-200 rounded p-1.5 text-xs" />
+            <input type="date" value={odForm.date} onChange={e => setOdForm({...odForm, date: e.target.value})} className="border border-purple-200 rounded p-1.5 text-xs bg-white" />
+            <input type="text" placeholder="Libellé OD..." value={odForm.libelle} onChange={e => setOdForm({...odForm, libelle: e.target.value})} className="border border-purple-200 rounded p-1.5 text-xs bg-white" />
             
-            <input type="text" placeholder="Compte Débit" value={odForm.debit} onChange={e => setOdForm({...odForm, debit: e.target.value})} className="border border-purple-200 rounded p-1.5 text-xs" />
-            <input type="text" placeholder="Compte Crédit" value={odForm.credit} onChange={e => setOdForm({...odForm, credit: e.target.value})} className="border border-purple-200 rounded p-1.5 text-xs" />
+            <select value={odForm.debit} onChange={e => setOdForm({...odForm, debit: e.target.value})} className="border border-purple-200 rounded p-1.5 text-xs bg-white">
+              <option value="">Compte Débit...</option>
+              {comptesList.map(c => <option key={c.id} value={c.code}>{c.code} - {c.libelle}</option>)}
+            </select>
             
-            <input type="number" placeholder="Montant (€)" value={odForm.montant} onChange={e => setOdForm({...odForm, montant: e.target.value})} className="border border-purple-200 rounded p-1.5 text-xs col-span-2" />
+            <select value={odForm.credit} onChange={e => setOdForm({...odForm, credit: e.target.value})} className="border border-purple-200 rounded p-1.5 text-xs bg-white">
+              <option value="">Compte Crédit...</option>
+              {comptesList.map(c => <option key={c.id} value={c.code}>{c.code} - {c.libelle}</option>)}
+            </select>
+            
+            <input type="number" placeholder="Montant (€)" value={odForm.montant} onChange={e => setOdForm({...odForm, montant: e.target.value})} className="border border-purple-200 rounded p-1.5 text-xs col-span-2 bg-white" />
           </div>
           <button onClick={handleAddOD} className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded font-medium text-sm transition-colors mt-auto">
             Enregistrer l'OD
@@ -608,7 +632,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
       {/* LIGNES EN ATTENTE (SAS) */}
       {lignesEnAttente.length > 0 && (
         <div className="bg-orange-50 p-6 rounded-xl border border-orange-200 shadow-sm">
-          {/* NOUVEAU : En-tête avec bouton d'annulation */}
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-bold text-orange-800 flex items-center gap-2">
               <AlertTriangle size={18} /> Lignes bancaires à imputer ({lignesEnAttente.length})
@@ -638,7 +661,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
               </thead>
               <tbody>
                 {lignesEnAttente.map((ligne) => (
-                  <tr key={ligne.id} className="border-b border-orange-100 bg-white">
+                  <tr key={ligne.id} className="border-b border-orange-100 bg-white hover:bg-orange-50/50 transition-colors">
                     <td className="py-2 px-2 text-slate-600">{ligne.date}</td>
                     <td className="py-2 px-2 text-slate-800 truncate max-w-xs">{ligne.libelle}</td>
                     <td className={`py-2 px-2 text-right font-medium ${ligne.montant > 0 ? 'text-emerald-600' : 'text-slate-800'}`}>
@@ -646,16 +669,31 @@ const GrandLivre = ({ transactionsGlobales }) => {
                     </td>
                     <td className="py-2 px-4">
                       <div className="relative">
-                        <input 
-                          type="text" 
-                          placeholder="Ex: 606100" 
+                        {/* NOUVEAU : Liste déroulante automatique */}
+                        <select 
                           defaultValue={ligne.comptePropose || ''}
-                          className={`border rounded-md px-2 py-1 w-full text-sm font-mono pr-8 focus:ring-2 focus:ring-indigo-500 outline-none ${ligne.comptePropose ? 'border-indigo-300 bg-indigo-50 text-indigo-700 font-bold' : 'border-slate-300'}`}
-                          onBlur={(e) => validerLigneBank(ligne.id, e.target.value)}
-                          onKeyDown={(e) => { if(e.key === 'Enter') validerLigneBank(ligne.id, e.target.value) }}
-                        />
+                          onChange={(e) => {
+                            if (e.target.value !== "") {
+                              validerLigneBank(ligne.id, e.target.value);
+                            }
+                          }}
+                          className={`border rounded-md px-2 py-1.5 w-full text-sm font-mono pr-8 focus:ring-2 focus:ring-indigo-500 appearance-none outline-none cursor-pointer ${ligne.comptePropose ? 'border-indigo-300 bg-indigo-50 text-indigo-700 font-bold' : 'border-slate-300 bg-white'}`}
+                        >
+                          <option value="">Sélectionner un compte...</option>
+                          
+                          {/* Option suggérée si elle n'est pas déjà dans la base (sécurité d'affichage) */}
+                          {ligne.comptePropose && !comptesList.find(c => c.code === ligne.comptePropose) && (
+                            <option value={ligne.comptePropose}>{ligne.comptePropose} (Suggéré)</option>
+                          )}
+                          
+                          {/* Affichage du vrai plan comptable */}
+                          {comptesList.map(c => (
+                            <option key={c.id} value={c.code}>{c.code} - {c.libelle}</option>
+                          ))}
+                        </select>
+                        <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                         {ligne.comptePropose && (
-                          <Sparkles size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-indigo-500" title="Suggéré automatiquement par le logiciel" />
+                          <Sparkles size={14} className="absolute right-7 top-1/2 -translate-y-1/2 text-indigo-500 pointer-events-none" title="Suggéré automatiquement par l'historique" />
                         )}
                       </div>
                     </td>
@@ -724,7 +762,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
                     <button className="text-slate-300 hover:text-indigo-500 transition-colors" title="Attacher PDF">
                       <Paperclip size={16} />
                     </button>
-                    {/* NOUVEAU : Appel du Pop-up de sécurité */}
                     <button onClick={() => handleDeleteValidated(t.id)} className="text-slate-300 hover:text-red-500 p-1.5 rounded transition-colors" title="Supprimer l'écriture">
                       <Trash2 size={16}/>
                     </button>
@@ -742,8 +779,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
       </div>
     </div>
   );
-};
-// --- 4. PLAN COMPTABLE ---
+};// --- 4. PLAN COMPTABLE ---
 const PlanComptable = () => {
   const [comptes, setComptes] = useState([]);
   const [recherche, setRecherche] = useState('');
