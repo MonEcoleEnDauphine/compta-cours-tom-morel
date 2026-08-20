@@ -407,10 +407,24 @@ const GrandLivre = ({ transactionsGlobales }) => {
       const nouvellesLignes = [];
       for (let i = 0; i < lignesBrutes.length; i++) {
         const cols = lignesBrutes[i];
-        if (cols.length >= 7) {
-          const debit = parseFloat(String(cols[5]).replace(',', '.')) || 0;
-          const credit = parseFloat(String(cols[6]).replace(',', '.')) || 0;
-          const mt = credit > 0 ? credit : -debit;
+        if (cols.length >= 6) {
+          const val5 = String(cols[5] || '').replace(/\s/g, '').replace(',', '.');
+          const val6 = String(cols[6] || '').replace(/\s/g, '').replace(',', '.');
+          
+          let mt = 0;
+          
+          // CORRECTION DE L'IMPORTATION DES SIGNES :
+          if (val6 !== '' && val6 !== 'undefined') {
+            // S'il y a une colonne Crédit (val6) distincte
+            const credit = parseFloat(val6) || 0;
+            const debit = parseFloat(val5) || 0;
+            // On force mathématiquement le crédit en + et le débit en - (Rouge)
+            mt = credit !== 0 ? Math.abs(credit) : -Math.abs(debit);
+          } else {
+            // Si la banque utilise une seule colonne avec des + et des -
+            mt = parseFloat(val5) || 0;
+          }
+          
           const libelleExtrait = cols[1] || cols[3];
           
           if (mt !== 0) {
@@ -761,7 +775,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
                   <tr key={ligne.id} className="border-b border-orange-100 bg-white hover:bg-orange-50/50 transition-colors">
                     <td className="py-3 px-2 text-slate-600">{ligne.date}</td>
                     <td className="py-3 px-2 text-slate-800 truncate max-w-xs">{ligne.libelle}</td>
-                    {/* CORRECTION : ROUGE POUR LES DEPENSES (< 0), VERT POUR LES RECETTES (> 0) */}
                     <td className={`py-3 px-2 text-right font-bold ${ligne.montant > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                       {ligne.montant > 0 ? '+' : ''}{ligne.montant.toFixed(2)} €
                     </td>
@@ -873,7 +886,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
                   <td className="py-3 px-4 text-slate-600 whitespace-nowrap">{t.date}</td>
                   <td className="py-3 px-4 text-slate-800">{t.libelle}</td>
                   
-                  {/* CORRECTION : ROUGE POUR LES DEPENSES (< 0), VERT POUR LES RECETTES (> 0) */}
                   {t.type === 'od' ? (
                     <td className="py-3 px-4 text-center font-medium text-purple-600">OD ({t.montant} €)</td>
                   ) : (
