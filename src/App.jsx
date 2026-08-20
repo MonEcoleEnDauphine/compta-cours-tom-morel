@@ -403,6 +403,8 @@ const GrandLivre = ({ transactionsGlobales }) => {
     const file = e.target.files[0];
     if (!file) return;
 
+    let doublonsCount = 0;
+
     const preparerLignes = (lignesBrutes) => {
       const nouvellesLignes = [];
       for (let i = 0; i < lignesBrutes.length; i++) {
@@ -420,15 +422,26 @@ const GrandLivre = ({ transactionsGlobales }) => {
             mt = parseFloat(val5) || 0;
           }
           
+          const dateExtrait = cols[0];
           const libelleExtrait = cols[1] || cols[3];
           
           if (mt !== 0) {
+            // NOUVEAU : Vérification stricte des doublons (Date + Libellé + Montant)
+            const isDuplicate = transactionsGlobales.some(t => t.date === dateExtrait && t.libelle === libelleExtrait && Math.abs(t.montant) === Math.abs(mt)) ||
+                                lignesEnAttente.some(t => t.date === dateExtrait && t.libelle === libelleExtrait && Math.abs(t.montant) === Math.abs(mt)) ||
+                                nouvellesLignes.some(t => t.date === dateExtrait && t.libelle === libelleExtrait && Math.abs(t.montant) === Math.abs(mt));
+
+            if (isDuplicate) {
+              doublonsCount++;
+              continue; // On passe à la ligne suivante sans l'ajouter
+            }
+
             nouvellesLignes.push({
               id: Math.random().toString(36).substr(2, 9),
-              date: cols[0],
+              date: dateExtrait,
               libelle: libelleExtrait,
-              reference: cols[2], // Infos complémentaires (ex: N° de chèque)
-              typeOp: cols[4],    // Type d'opération (ex: Virement, Prélèvement)
+              reference: cols[2], 
+              typeOp: cols[4],    
               montant: mt,
               comptePropose: devinerCompte(libelleExtrait),
               statut: 'attente'
@@ -446,6 +459,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
         const lignesBrutes = lines.slice(1).map(line => line.split(';').map(c => c.trim().replace(/"/g, '')));
         const resultat = preparerLignes(lignesBrutes);
         setLignesEnAttente(prev => [...prev, ...resultat]);
+        alert(`${resultat.length} ligne(s) importée(s) avec succès.${doublonsCount > 0 ? `\n(Sécurité : ${doublonsCount} doublon(s) ignoré(s))` : ''}`);
       };
       reader.readAsText(file, 'ISO-8859-1');
     } else if (type === 'xlsx') {
@@ -456,6 +470,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
         const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false, defval: '' });
         const resultat = preparerLignes(rows.slice(1));
         setLignesEnAttente(prev => [...prev, ...resultat]);
+        alert(`${resultat.length} ligne(s) importée(s) avec succès.${doublonsCount > 0 ? `\n(Sécurité : ${doublonsCount} doublon(s) ignoré(s))` : ''}`);
       } catch (err) {
         alert("Erreur lors de la lecture du fichier XLSX.");
       }
@@ -470,6 +485,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
     reader.onload = async (event) => {
       const lines = event.target.result.split('\n');
       let count = 0;
+      let doublonsCount = 0;
       
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim();
@@ -487,10 +503,21 @@ const GrandLivre = ({ transactionsGlobales }) => {
           const credit = parseFloat(cols[12].replace(',', '.')) || 0;
           
           if (debit > 0 || credit > 0) {
+            const libelleFinal = `(PAIE) ${ecritureLib} - ${compteLib}`;
+            const mt = debit > 0 ? debit : credit;
+
+            // NOUVEAU : Vérification des doublons de Paie
+            const isDuplicate = transactionsGlobales.some(t => t.date === formattedDate && t.libelle === libelleFinal && Math.abs(t.montant) === Math.abs(mt));
+
+            if (isDuplicate) {
+              doublonsCount++;
+              continue;
+            }
+
             const newTx = {
               date: formattedDate,
-              libelle: `(PAIE) ${ecritureLib} - ${compteLib}`,
-              montant: debit > 0 ? debit : credit,
+              libelle: libelleFinal,
+              montant: mt,
               type: 'od',
               compteDebit: debit > 0 ? compteNum : '',
               compteCredit: credit > 0 ? compteNum : '',
@@ -507,7 +534,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
           }
         }
       }
-      alert(`${count} lignes de paie intégrées directement au Grand Livre !`);
+      alert(`${count} ligne(s) de paie intégrée(s) !${doublonsCount > 0 ? `\n(Sécurité : ${doublonsCount} doublon(s) ignoré(s))` : ''}`);
       if (fileInputPaieRef.current) fileInputPaieRef.current.value = '';
     };
     reader.readAsText(file, 'UTF-8');
@@ -864,10 +891,10 @@ const GrandLivre = ({ transactionsGlobales }) => {
                   </div>
                 </th>
                 <th className="py-3 px-3 text-slate-400">
-                  Informations complémentaires
+                  Infos
                 </th>
                 <th className="py-3 px-3 text-slate-400">
-                  Type opération
+                  Type Op.
                 </th>
                 <th className="py-3 px-3 text-right cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('montant')}>
                   <div className="flex items-center justify-end gap-1">
@@ -893,15 +920,13 @@ const GrandLivre = ({ transactionsGlobales }) => {
                   <td className="py-3 px-3 text-slate-600 whitespace-nowrap">{t.date}</td>
                   <td className="py-3 px-3 text-slate-800 font-medium truncate max-w-[180px]">{t.libelle}</td>
                   
-                  {/* NOUVEAU : Affichage des informations complémentaires et type d'opération */}
-                  <td className="py-3 px-3 text-slate-500 text-xs truncate max-w-[150px]" title={t.reference}>
+                  <td className="py-3 px-3 text-slate-500 text-xs truncate max-w-[120px]" title={t.reference}>
                     {t.reference || <span className="text-slate-300 italic">-</span>}
                   </td>
-                  <td className="py-3 px-3 text-slate-500 text-xs truncate max-w-[120px]">
+                  <td className="py-3 px-3 text-slate-500 text-xs truncate max-w-[100px]">
                     {t.typeOp || <span className="text-slate-300 italic">-</span>}
                   </td>
                   
-                  {/* NOUVEAU : Ventilation Débit / Crédit */}
                   {t.type === 'od' ? (
                     <>
                       <td className="py-3 px-3 text-right font-medium text-purple-600">{Number(t.montant).toFixed(2)} €</td>
@@ -909,11 +934,9 @@ const GrandLivre = ({ transactionsGlobales }) => {
                     </>
                   ) : (
                     <>
-                      {/* Dépense (<0) = Débit (Rouge) */}
                       <td className="py-3 px-3 text-right font-bold text-red-600">
                         {t.montant < 0 ? Math.abs(t.montant).toFixed(2) + ' €' : '-'}
                       </td>
-                      {/* Recette (>0) = Crédit (Vert) */}
                       <td className="py-3 px-3 text-right font-bold text-emerald-600">
                         {t.montant > 0 ? Number(t.montant).toFixed(2) + ' €' : '-'}
                       </td>
@@ -967,16 +990,9 @@ const GrandLivre = ({ transactionsGlobales }) => {
                           <div className="text-xs text-slate-500 truncate"><span className="font-bold text-slate-700">C:</span> {t.compteCredit} {t.compteCredit && `- ${comptesList.find(c => c.code === t.compteCredit)?.libelle || ''}`}</div>
                         </div>
                       ) : (
-                        <div 
-                          onClick={() => setEditingRowId(t.id)} 
-                          className="group flex items-center gap-2 cursor-pointer w-fit min-w-[200px]"
-                          title="Cliquez pour modifier le compte"
-                        >
-                          <span className="bg-slate-50 group-hover:bg-indigo-50 px-2 py-1.5 rounded-md text-xs font-mono text-slate-700 group-hover:text-indigo-700 border border-slate-200 group-hover:border-indigo-300 transition-all max-w-[220px] truncate shadow-sm">
+                        <div className="flex items-center w-fit min-w-[200px]">
+                          <span className="bg-slate-50 px-2 py-1.5 rounded-md text-xs font-mono text-slate-700 border border-slate-200 max-w-[220px] truncate shadow-sm">
                             {t.compte ? `${t.compte} - ${comptesList.find(c => c.code === t.compte)?.libelle || ''}` : 'Non défini'}
-                          </span>
-                          <span className="text-slate-300 group-hover:text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity font-bold text-sm">
-                            ✎
                           </span>
                         </div>
                       )
@@ -990,6 +1006,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
                       </button>
                     ) : (
                       <>
+                        {/* UN SEUL BOUTON CRAYON CONSERVÉ ICI */}
                         <button onClick={() => setEditingRowId(t.id)} className="text-slate-300 hover:text-indigo-500 p-1.5 rounded transition-colors mt-1.5" title="Modifier le compte">
                           <span className="font-bold text-lg leading-none">✎</span>
                         </button>
