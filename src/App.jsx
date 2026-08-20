@@ -347,18 +347,15 @@ const GrandLivre = ({ transactionsGlobales }) => {
     return () => unsubscribe();
   }, []);
 
-  // --- MOTEUR D'ASSISTANCE (IA LOCALE & MÉMOIRE) ---
   const devinerCompte = (libelleTxt) => {
     if (!libelleTxt) return '';
     const txt = libelleTxt.toLowerCase();
 
-    // 1. Cherche dans la base validée
     const memoire = transactionsGlobales.find(tx => 
       tx.compte && tx.type !== 'od' && tx.libelle && (txt.includes(tx.libelle.toLowerCase()) || tx.libelle.toLowerCase().includes(txt))
     );
     if (memoire) return memoire.compte;
 
-    // 2. Mots-clés standards
     const dictionnaire = [
       { mots: ['edf', 'engie', 'eau', 'electricite', 'saur'], compte: '606100' }, 
       { mots: ['loyer', 'sci '], compte: '613200' }, 
@@ -381,7 +378,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
     return '';
   };
 
-  // Mise à jour magique du SAS quand une écriture est validée
   useEffect(() => {
     if (lignesEnAttente.length > 0) {
       setLignesEnAttente(prev => prev.map(ligne => {
@@ -500,9 +496,13 @@ const GrandLivre = ({ transactionsGlobales }) => {
     reader.readAsText(file, 'UTF-8');
   };
 
+  // NOUVEAU : Validation d'une ligne individuelle
   const validerLigneBank = async (ligneId, compteCode) => {
     const ligne = lignesEnAttente.find(l => l.id === ligneId);
-    if (!ligne || !compteCode) return;
+    if (!ligne || !compteCode) {
+      alert("Veuillez sélectionner un compte avant de valider.");
+      return;
+    }
     
     const newTx = {
       date: ligne.date,
@@ -520,6 +520,33 @@ const GrandLivre = ({ transactionsGlobales }) => {
       setLignesEnAttente(prev => prev.filter(l => l.id !== ligneId));
     } catch(e) {
       alert("Erreur de sauvegarde.");
+    }
+  };
+
+  // NOUVEAU : Validation groupée (Toutes les lignes prêtes)
+  const validerLignesPretes = async () => {
+    const lignesAValider = lignesEnAttente.filter(l => l.comptePropose);
+    if (lignesAValider.length === 0) return;
+    
+    if (window.confirm(`Vous êtes sur le point d'envoyer ${lignesAValider.length} écriture(s) d'un seul coup vers le Grand Livre. Confirmer ?`)) {
+      for (const ligne of lignesAValider) {
+        const newTx = {
+          date: ligne.date,
+          libelle: ligne.libelle,
+          montant: ligne.montant,
+          compte: ligne.comptePropose,
+          reference: ligne.reference || '',
+          typeOp: ligne.typeOp || '',
+          type: ligne.montant < 0 ? 'depense' : 'recette',
+          date_creation: new Date().toISOString()
+        };
+        try {
+          await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), newTx);
+        } catch(e) {
+          console.error("Erreur sur l'insertion de masse", e);
+        }
+      }
+      setLignesEnAttente(prev => prev.filter(l => !l.comptePropose));
     }
   };
 
@@ -565,6 +592,8 @@ const GrandLivre = ({ transactionsGlobales }) => {
       alert("Erreur lors de la mise à jour du compte.");
     }
   };
+
+  const nbLignesPretes = lignesEnAttente.filter(l => l.comptePropose).length;
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
@@ -633,20 +662,32 @@ const GrandLivre = ({ transactionsGlobales }) => {
       {/* LIGNES EN ATTENTE (SAS) */}
       {lignesEnAttente.length > 0 && (
         <div className="bg-orange-50 p-6 rounded-xl border border-orange-200 shadow-sm">
-          <div className="flex justify-between items-center mb-4">
+          <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
             <h3 className="font-bold text-orange-800 flex items-center gap-2">
               <AlertTriangle size={18} /> Lignes bancaires à imputer ({lignesEnAttente.length})
             </h3>
-            <button 
-              onClick={() => {
-                if (window.confirm("Êtes-vous sûr de vouloir annuler l'import en cours et vider cette liste ?")) {
-                  setLignesEnAttente([]);
-                }
-              }}
-              className="text-sm bg-orange-200 hover:bg-orange-300 text-orange-900 px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-2"
-            >
-              <XCircle size={16} /> Annuler l'import (Vider)
-            </button>
+            
+            {/* BOUTONS D'ACTION GLOBALE */}
+            <div className="flex items-center gap-3">
+              {nbLignesPretes > 0 && (
+                <button 
+                  onClick={validerLignesPretes}
+                  className="text-sm bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold transition-colors flex items-center gap-2 shadow-md animate-fade-in"
+                >
+                  <CheckCircle2 size={18} /> Tout Valider ({nbLignesPretes})
+                </button>
+              )}
+              <button 
+                onClick={() => {
+                  if (window.confirm("Êtes-vous sûr de vouloir annuler l'import en cours et vider cette liste ?")) {
+                    setLignesEnAttente([]);
+                  }
+                }}
+                className="text-sm bg-white border border-orange-300 hover:bg-orange-100 text-orange-800 px-3 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+              >
+                <XCircle size={16} /> Vider la liste
+              </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -657,28 +698,27 @@ const GrandLivre = ({ transactionsGlobales }) => {
                   <th className="py-2">Libellé</th>
                   <th className="py-2 text-right">Montant</th>
                   <th className="py-2 px-4">Compte (Classe 6 ou 7)</th>
-                  <th className="py-2 text-center">Action</th>
+                  <th className="py-2 text-center w-28">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {lignesEnAttente.map((ligne) => (
                   <tr key={ligne.id} className="border-b border-orange-100 bg-white hover:bg-orange-50/50 transition-colors">
-                    <td className="py-2 px-2 text-slate-600">{ligne.date}</td>
-                    <td className="py-2 px-2 text-slate-800 truncate max-w-xs">{ligne.libelle}</td>
-                    <td className={`py-2 px-2 text-right font-medium ${ligne.montant > 0 ? 'text-emerald-600' : 'text-slate-800'}`}>
+                    <td className="py-3 px-2 text-slate-600">{ligne.date}</td>
+                    <td className="py-3 px-2 text-slate-800 truncate max-w-xs">{ligne.libelle}</td>
+                    <td className={`py-3 px-2 text-right font-bold ${ligne.montant > 0 ? 'text-emerald-600' : 'text-slate-800'}`}>
                       {ligne.montant > 0 ? '+' : ''}{ligne.montant.toFixed(2)} €
                     </td>
-                    <td className="py-2 px-4">
+                    <td className="py-3 px-4">
                       <div className="relative">
-                        {/* CORRECTION ICI : value au lieu de defaultValue */}
+                        {/* Mise à jour uniquement locale (pas d'envoi à Firebase ici) */}
                         <select 
                           value={ligne.comptePropose || ''}
                           onChange={(e) => {
-                            if (e.target.value !== "") {
-                              validerLigneBank(ligne.id, e.target.value);
-                            }
+                            const val = e.target.value;
+                            setLignesEnAttente(prev => prev.map(l => l.id === ligne.id ? { ...l, comptePropose: val } : l));
                           }}
-                          className={`border rounded-md px-2 py-1.5 w-full text-sm font-mono pr-8 focus:ring-2 focus:ring-indigo-500 appearance-none outline-none cursor-pointer ${ligne.comptePropose ? 'border-indigo-300 bg-indigo-50 text-indigo-700 font-bold' : 'border-slate-300 bg-white'}`}
+                          className={`border rounded-lg px-3 py-2 w-full text-sm font-mono pr-8 focus:ring-2 focus:ring-indigo-500 appearance-none outline-none cursor-pointer transition-all ${ligne.comptePropose ? 'border-indigo-400 bg-indigo-50 text-indigo-800 font-bold shadow-inner' : 'border-slate-300 bg-white'}`}
                         >
                           <option value="">Sélectionner un compte...</option>
                           {ligne.comptePropose && !comptesList.find(c => c.code === ligne.comptePropose) && (
@@ -688,16 +728,28 @@ const GrandLivre = ({ transactionsGlobales }) => {
                             <option key={c.id} value={c.code}>{c.code} - {c.libelle}</option>
                           ))}
                         </select>
-                        <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                        <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                         {ligne.comptePropose && (
-                          <Sparkles size={14} className="absolute right-7 top-1/2 -translate-y-1/2 text-indigo-500 pointer-events-none" title="Suggéré automatiquement par l'historique" />
+                          <Sparkles size={14} className="absolute right-8 top-1/2 -translate-y-1/2 text-indigo-500 pointer-events-none" title="Prêt à être validé" />
                         )}
                       </div>
                     </td>
-                    <td className="py-2 px-2 text-center">
-                      <button onClick={() => setLignesEnAttente(prev => prev.filter(l => l.id !== ligne.id))} className="text-slate-400 hover:text-red-500 transition-colors" title="Ignorer cette ligne">
-                        <Trash2 size={16} />
-                      </button>
+                    <td className="py-3 px-2 text-center">
+                      <div className="flex justify-center items-center gap-1.5">
+                        {/* NOUVEAU BOUTON DE VALIDATION INDIVIDUELLE */}
+                        <button 
+                          onClick={() => validerLigneBank(ligne.id, ligne.comptePropose)}
+                          disabled={!ligne.comptePropose}
+                          className={`p-1.5 rounded-md transition-all shadow-sm ${ligne.comptePropose ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-500 hover:text-white' : 'bg-slate-100 text-slate-300 cursor-not-allowed'}`}
+                          title={ligne.comptePropose ? "Valider cette ligne" : "Sélectionnez un compte d'abord"}
+                        >
+                          <CheckCircle2 size={18} />
+                        </button>
+                        
+                        <button onClick={() => setLignesEnAttente(prev => prev.filter(l => l.id !== ligne.id))} className="p-1.5 rounded-md bg-white border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-300 transition-colors shadow-sm" title="Supprimer cette ligne">
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -713,7 +765,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
           <h3 className="font-bold text-slate-800 flex items-center gap-2">
             <CheckCircle2 className="text-emerald-500" /> Écritures Validées au Grand Livre
           </h3>
-          <span className="text-xs font-medium bg-white px-3 py-1 rounded-full border border-slate-200 text-slate-500">
+          <span className="text-xs font-medium bg-white px-3 py-1 rounded-full border border-slate-200 text-slate-500 shadow-sm">
             {transactionsGlobales.length} écritures
           </span>
         </div>
