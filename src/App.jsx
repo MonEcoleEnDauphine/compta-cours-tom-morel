@@ -329,24 +329,21 @@ const EtatFinancier = ({ transactionsGlobales }) => {
 const GrandLivre = ({ transactionsGlobales }) => {
   const [lignesEnAttente, setLignesEnAttente] = useState([]);
   const [odForm, setOdForm] = useState({ date: '', libelle: '', debit: '', credit: '', montant: '' });
-  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   
   const fileInputCsvRef = useRef(null);
   const fileInputXlsxRef = useRef(null);
-  const fileInputPaieRef = useRef(null); // Référence pour le fichier TXT de Paie
+  const fileInputPaieRef = useRef(null);
 
   // --- MOTEUR D'ASSISTANCE (IA LOCALE & MÉMOIRE) ---
   const devinerCompte = (libelleTxt) => {
     if (!libelleTxt) return '';
     const txt = libelleTxt.toLowerCase();
 
-    // 1. Fouiller dans la mémoire (les transactions déjà validées)
     const memoire = transactionsGlobales.find(tx => 
       tx.compte && tx.type !== 'od' && tx.libelle && (txt.includes(tx.libelle.toLowerCase()) || tx.libelle.toLowerCase().includes(txt))
     );
     if (memoire) return memoire.compte;
 
-    // 2. Fouiller dans le dictionnaire des mots-clés standards
     const dictionnaire = [
       { mots: ['edf', 'engie', 'eau', 'electricite', 'saur'], compte: '606100' }, 
       { mots: ['loyer', 'sci '], compte: '613200' }, 
@@ -369,7 +366,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
     return '';
   };
 
-  // --- GESTION DE L'IMPORT BANCAIRE ---
   const handleImportFile = async (e, type) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -426,7 +422,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
     }
   };
 
-  // --- NOUVEAU : IMPORT DES FICHES DE PAIE (TXT FEC) ---
   const handleImportPaie = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -436,16 +431,14 @@ const GrandLivre = ({ transactionsGlobales }) => {
       const lines = event.target.result.split('\n');
       let count = 0;
       
-      // On boucle en ignorant la ligne 0 (En-têtes)
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim();
         if (!line) continue;
         
-        // Séparation par tabulation (format standard FEC txt)
         const cols = line.split('\t');
         
         if (cols.length >= 13) {
-          const rawDate = cols[3].trim(); // Format YYYYMMDD attendu
+          const rawDate = cols[3].trim();
           const formattedDate = rawDate.length === 8 ? `${rawDate.slice(0,4)}-${rawDate.slice(4,6)}-${rawDate.slice(6,8)}` : rawDate;
           
           const compteNum = cols[4].trim();
@@ -457,7 +450,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
           const credit = parseFloat(cols[12].replace(',', '.')) || 0;
           
           if (debit > 0 || credit > 0) {
-            // Création d'une OD automatisée
             const newTx = {
               date: formattedDate,
               libelle: `(PAIE) ${ecritureLib} - ${compteLib}`,
@@ -537,17 +529,15 @@ const GrandLivre = ({ transactionsGlobales }) => {
     }
   };
 
+  // NOUVEAU : Suppression avec popup de sécurité
   const handleDeleteValidated = async (txId) => {
-    if (confirmDeleteId === txId) {
+    const confirm = window.confirm("ATTENTION : Êtes-vous sûr de vouloir supprimer définitivement cette écriture du Grand Livre ?");
+    if (confirm) {
       try {
         await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', txId));
-        setConfirmDeleteId(null);
       } catch(e) { 
         alert('Erreur lors de la suppression.'); 
       }
-    } else {
-      setConfirmDeleteId(txId);
-      setTimeout(() => setConfirmDeleteId(null), 3000);
     }
   };
 
@@ -560,7 +550,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
           <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <BookOpen className="text-indigo-600" /> Grand Livre (Import & Saisie)
           </h2>
-          <p className="text-slate-500 text-sm mt-1">Importez vos relevés bancaires ou saisissez une OD manuelle.</p>
+          <p className="text-slate-500 text-sm mt-1">Importez vos relevés bancaires, fiches de paie ou saisissez une OD.</p>
         </div>
       </div>
 
@@ -618,9 +608,23 @@ const GrandLivre = ({ transactionsGlobales }) => {
       {/* LIGNES EN ATTENTE (SAS) */}
       {lignesEnAttente.length > 0 && (
         <div className="bg-orange-50 p-6 rounded-xl border border-orange-200 shadow-sm">
-          <h3 className="font-bold text-orange-800 mb-4 flex items-center gap-2">
-            <AlertTriangle size={18} /> Lignes bancaires à imputer ({lignesEnAttente.length})
-          </h3>
+          {/* NOUVEAU : En-tête avec bouton d'annulation */}
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-bold text-orange-800 flex items-center gap-2">
+              <AlertTriangle size={18} /> Lignes bancaires à imputer ({lignesEnAttente.length})
+            </h3>
+            <button 
+              onClick={() => {
+                if (window.confirm("Êtes-vous sûr de vouloir annuler l'import en cours et vider cette liste ?")) {
+                  setLignesEnAttente([]);
+                }
+              }}
+              className="text-sm bg-orange-200 hover:bg-orange-300 text-orange-900 px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-2"
+            >
+              <XCircle size={16} /> Annuler l'import (Vider)
+            </button>
+          </div>
+
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
@@ -656,7 +660,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
                       </div>
                     </td>
                     <td className="py-2 px-2 text-center">
-                      <button onClick={() => setLignesEnAttente(prev => prev.filter(l => l.id !== ligne.id))} className="text-slate-400 hover:text-red-500 transition-colors">
+                      <button onClick={() => setLignesEnAttente(prev => prev.filter(l => l.id !== ligne.id))} className="text-slate-400 hover:text-red-500 transition-colors" title="Ignorer cette ligne">
                         <Trash2 size={16} />
                       </button>
                     </td>
@@ -720,15 +724,10 @@ const GrandLivre = ({ transactionsGlobales }) => {
                     <button className="text-slate-300 hover:text-indigo-500 transition-colors" title="Attacher PDF">
                       <Paperclip size={16} />
                     </button>
-                    {confirmDeleteId === t.id ? (
-                      <button onClick={() => handleDeleteValidated(t.id)} className="text-white bg-red-500 hover:bg-red-600 px-2 py-1 rounded text-xs font-bold animate-pulse">
-                        Confirmer ?
-                      </button>
-                    ) : (
-                      <button onClick={() => handleDeleteValidated(t.id)} className="text-slate-300 hover:text-red-500 p-1.5 rounded transition-colors" title="Supprimer l'écriture">
-                        <Trash2 size={16}/>
-                      </button>
-                    )}
+                    {/* NOUVEAU : Appel du Pop-up de sécurité */}
+                    <button onClick={() => handleDeleteValidated(t.id)} className="text-slate-300 hover:text-red-500 p-1.5 rounded transition-colors" title="Supprimer l'écriture">
+                      <Trash2 size={16}/>
+                    </button>
                   </td>
                 </tr>
               ))}
