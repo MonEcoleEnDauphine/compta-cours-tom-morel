@@ -674,11 +674,12 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  const renderContent = () => {
+const renderContent = () => {
     switch (activeTab) {
       case 'contact': return <InfosContact />;
       case 'etat_financier': return <EtatFinancier transactionsGlobales={transactionsGlobales} />;
       case 'grand_livre': return <GrandLivre transactionsGlobales={transactionsGlobales} />;
+      case 'plan_comptable': return <PlanComptable />;
 // --- 4. PLAN COMPTABLE ---
 const PlanComptable = () => {
   const [comptes, setComptes] = useState([]);
