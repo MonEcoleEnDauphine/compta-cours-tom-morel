@@ -107,7 +107,6 @@ const InfosContact = () => (
     </div>
   </div>
 );
-
 // --- 2. ÉTAT FINANCIER (Bilan & Résultat Groupés) ---
 const EtatFinancier = ({ transactionsGlobales }) => {
   const [anneeDebut, setAnneeDebut] = useState(new Date().getFullYear() > 2025 ? 2025 : 2021);
@@ -155,7 +154,15 @@ const EtatFinancier = ({ transactionsGlobales }) => {
   };
 
   const analyse = useMemo(() => {
-    const txFiltrees = transactionsGlobales.filter(t => t.date >= periode.debut && t.date <= periode.fin);
+    // CORRECTION : Traduction des dates (JJ/MM/AAAA -> AAAA-MM-JJ) pour le filtre
+    const txFiltrees = transactionsGlobales.filter(t => {
+      let dateIso = t.date;
+      if (dateIso && dateIso.includes('/')) {
+        const [d, m, y] = dateIso.split('/');
+        dateIso = `${y.length === 2 ? '20'+y : y}-${m}-${d}`;
+      }
+      return dateIso >= periode.debut && dateIso <= periode.fin;
+    });
     
     let parCompte = {};
     let soldeBanque = 0;
@@ -268,7 +275,6 @@ const EtatFinancier = ({ transactionsGlobales }) => {
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto">
-      {/* En-tête */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
@@ -289,7 +295,6 @@ const EtatFinancier = ({ transactionsGlobales }) => {
         </div>
       </div>
 
-      {/* COMPTE DE RÉSULTAT */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="bg-slate-800 text-white p-4">
           <h3 className="font-bold text-lg flex items-center gap-2">Compte de Résultat (Classe 6 & 7)</h3>
@@ -309,7 +314,6 @@ const EtatFinancier = ({ transactionsGlobales }) => {
         </div>
       </div>
 
-      {/* BILAN */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="bg-slate-800 text-white p-4">
           <h3 className="font-bold text-lg flex items-center gap-2"><Building size={20}/> Bilan Comptable (Classe 1 à 5)</h3>
@@ -329,9 +333,10 @@ const GrandLivre = ({ transactionsGlobales }) => {
   const [lignesEnAttente, setLignesEnAttente] = useState([]);
   const [odForm, setOdForm] = useState({ date: '', libelle: '', debit: '', credit: '', montant: '' });
   const [comptesList, setComptesList] = useState([]);
-  
-  // NOUVEAU : État pour savoir quelle ligne du Grand Livre on est en train de modifier
   const [editingRowId, setEditingRowId] = useState(null);
+  
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' });
   
   const fileInputCsvRef = useRef(null);
   const fileInputXlsxRef = useRef(null);
@@ -594,6 +599,61 @@ const GrandLivre = ({ transactionsGlobales }) => {
     }
   };
 
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const parseDateForSort = (dStr) => {
+    if (!dStr) return 0;
+    if (dStr.includes('/')) {
+      const [day, month, year] = dStr.split('/');
+      return new Date(`${year}-${month}-${day}`).getTime();
+    }
+    return new Date(dStr).getTime();
+  };
+
+  const filteredAndSortedTransactions = useMemo(() => {
+    let result = [...transactionsGlobales];
+
+    if (searchTerm) {
+      const lowerTerm = searchTerm.toLowerCase();
+      result = result.filter(t => 
+        (t.libelle && t.libelle.toLowerCase().includes(lowerTerm)) ||
+        (t.compte && t.compte.toLowerCase().includes(lowerTerm)) ||
+        (t.compteDebit && t.compteDebit.toLowerCase().includes(lowerTerm)) ||
+        (t.compteCredit && t.compteCredit.toLowerCase().includes(lowerTerm))
+      );
+    }
+
+    result.sort((a, b) => {
+      let valA, valB;
+      
+      if (sortConfig.key === 'date') {
+        valA = parseDateForSort(a.date);
+        valB = parseDateForSort(b.date);
+      } else if (sortConfig.key === 'montant') {
+        valA = Number(a.montant) || 0;
+        valB = Number(b.montant) || 0;
+      } else if (sortConfig.key === 'compte') {
+        valA = (a.type === 'od' ? a.compteDebit : a.compte) || '';
+        valB = (b.type === 'od' ? b.compteDebit : b.compte) || '';
+      } else {
+        valA = (a[sortConfig.key] || '').toLowerCase();
+        valB = (b[sortConfig.key] || '').toLowerCase();
+      }
+
+      if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [transactionsGlobales, searchTerm, sortConfig]);
+
   const nbLignesPretes = lignesEnAttente.filter(l => l.comptePropose).length;
 
   return (
@@ -609,7 +669,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* BLOC 1 : IMPORT BANQUE */}
         <div className="bg-indigo-50 p-6 rounded-xl border border-indigo-100 flex flex-col justify-center items-center text-center space-y-4">
           <h3 className="font-bold text-indigo-900 text-lg">Journal de Banque</h3>
           <p className="text-sm text-indigo-700">Importez vos lignes bancaires pour les imputer.</p>
@@ -625,7 +684,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
           </div>
         </div>
 
-        {/* BLOC 2 : IMPORT PAIE */}
         <div className="bg-pink-50 p-6 rounded-xl border border-pink-200 flex flex-col justify-center items-center text-center space-y-4">
           <h3 className="font-bold text-pink-900 text-lg">Fiches de Paie</h3>
           <p className="text-sm text-pink-700">Importez le fichier TXT exporté depuis le logiciel de paie.</p>
@@ -636,7 +694,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
           </button>
         </div>
 
-        {/* BLOC 3 : SAISIE OD */}
         <div className="bg-purple-50 p-6 rounded-xl border border-purple-100 space-y-4 flex flex-col">
           <h3 className="font-bold text-purple-900 text-lg flex items-center gap-2 justify-center">
             <FileText size={18} /> Opération Diverse
@@ -660,14 +717,12 @@ const GrandLivre = ({ transactionsGlobales }) => {
         </div>
       </div>
 
-      {/* LIGNES EN ATTENTE (SAS) */}
       {lignesEnAttente.length > 0 && (
         <div className="bg-orange-50 p-6 rounded-xl border border-orange-200 shadow-sm">
           <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
             <h3 className="font-bold text-orange-800 flex items-center gap-2">
               <AlertTriangle size={18} /> Lignes bancaires à imputer ({lignesEnAttente.length})
             </h3>
-            
             <div className="flex items-center gap-3">
               {nbLignesPretes > 0 && (
                 <button 
@@ -706,7 +761,8 @@ const GrandLivre = ({ transactionsGlobales }) => {
                   <tr key={ligne.id} className="border-b border-orange-100 bg-white hover:bg-orange-50/50 transition-colors">
                     <td className="py-3 px-2 text-slate-600">{ligne.date}</td>
                     <td className="py-3 px-2 text-slate-800 truncate max-w-xs">{ligne.libelle}</td>
-                    <td className={`py-3 px-2 text-right font-bold ${ligne.montant > 0 ? 'text-emerald-600' : 'text-slate-800'}`}>
+                    {/* CORRECTION : ROUGE POUR LES DEPENSES (< 0), VERT POUR LES RECETTES (> 0) */}
+                    <td className={`py-3 px-2 text-right font-bold ${ligne.montant > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                       {ligne.montant > 0 ? '+' : ''}{ligne.montant.toFixed(2)} €
                     </td>
                     <td className="py-3 px-4">
@@ -762,43 +818,72 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
       {/* TABLEAU DES ÉCRITURES VALIDÉES (LE GRAND LIVRE) */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+        
+        <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap justify-between items-center gap-4">
           <h3 className="font-bold text-slate-800 flex items-center gap-2">
             <CheckCircle2 className="text-emerald-500" /> Écritures Validées au Grand Livre
           </h3>
-          <span className="text-xs font-medium bg-white px-3 py-1 rounded-full border border-slate-200 text-slate-500 shadow-sm">
-            {transactionsGlobales.length} écritures
-          </span>
+          <div className="flex items-center gap-4 w-full md:w-auto">
+            <div className="relative flex-1 md:w-64">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input 
+                type="text" 
+                placeholder="Rechercher (libellé, compte...)" 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+              />
+            </div>
+            <span className="text-xs font-medium bg-white px-3 py-1.5 rounded-full border border-slate-200 text-slate-500 shadow-sm whitespace-nowrap">
+              {filteredAndSortedTransactions.length} écritures
+            </span>
+          </div>
         </div>
+
         <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
           <table className="w-full text-sm text-left">
             <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-semibold sticky top-0 shadow-sm z-10">
               <tr>
-                <th className="py-3 px-4">Date</th>
-                <th className="py-3 px-4">Libellé</th>
-                <th className="py-3 px-4 text-center">Mouvement</th>
-                <th className="py-3 px-4">Détail Compte</th>
+                <th className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('date')}>
+                  <div className="flex items-center gap-1">
+                    Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </div>
+                </th>
+                <th className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('libelle')}>
+                  <div className="flex items-center gap-1">
+                    Libellé {sortConfig.key === 'libelle' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </div>
+                </th>
+                <th className="py-3 px-4 text-center cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('montant')}>
+                  <div className="flex items-center justify-center gap-1">
+                    Mouvement {sortConfig.key === 'montant' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </div>
+                </th>
+                <th className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('compte')}>
+                  <div className="flex items-center gap-1">
+                    Détail Compte {sortConfig.key === 'compte' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </div>
+                </th>
                 <th className="py-3 px-4 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {transactionsGlobales.slice().sort((a, b) => new Date(b.date) - new Date(a.date)).map(t => (
+              {filteredAndSortedTransactions.map(t => (
                 <tr key={t.id} className="hover:bg-slate-50 transition-colors">
                   <td className="py-3 px-4 text-slate-600 whitespace-nowrap">{t.date}</td>
                   <td className="py-3 px-4 text-slate-800">{t.libelle}</td>
                   
+                  {/* CORRECTION : ROUGE POUR LES DEPENSES (< 0), VERT POUR LES RECETTES (> 0) */}
                   {t.type === 'od' ? (
                     <td className="py-3 px-4 text-center font-medium text-purple-600">OD ({t.montant} €)</td>
                   ) : (
-                    <td className={`py-3 px-4 text-center font-bold ${t.montant > 0 ? 'text-emerald-600' : 'text-slate-800'}`}>
+                    <td className={`py-3 px-4 text-center font-bold ${t.montant > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                       {t.montant > 0 ? '+' : ''}{Number(t.montant).toFixed(2)} €
                     </td>
                   )}
                   
-                  {/* AFFICHAGE DU COMPTE FIGÉ OU EN MODE ÉDITION */}
                   <td className="py-3 px-4">
                     {editingRowId === t.id ? (
-                      // MODE ÉDITION (LISTES DÉROULANTES)
                       t.type === 'od' ? (
                         <div className="flex flex-col gap-1 w-full max-w-[250px]">
                           <div className="flex items-center gap-2">
@@ -829,7 +914,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
                           value={t.compte || ''} 
                           onChange={(e) => {
                             handleUpdateCompte(t.id, e.target.value, 'compte');
-                            setEditingRowId(null); // On ferme automatiquement après modification
+                            setEditingRowId(null);
                           }}
                           className="border border-indigo-300 rounded p-2 text-xs bg-indigo-50 max-w-[250px] w-full text-indigo-800 font-mono outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner cursor-pointer"
                         >
@@ -838,7 +923,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
                         </select>
                       )
                     ) : (
-                      // MODE AFFICHAGE SÉCURISÉ (ÉTIQUETTE TEXTE)
                       t.type === 'od' ? (
                         <div className="flex flex-col gap-0.5">
                           <div className="text-xs text-slate-500"><span className="font-bold text-slate-700">D:</span> {t.compteDebit} {t.compteDebit && `- ${comptesList.find(c => c.code === t.compteDebit)?.libelle || ''}`}</div>
@@ -882,9 +966,9 @@ const GrandLivre = ({ transactionsGlobales }) => {
                   </td>
                 </tr>
               ))}
-              {transactionsGlobales.length === 0 && (
+              {filteredAndSortedTransactions.length === 0 && (
                 <tr>
-                  <td colSpan="5" className="py-8 text-center text-slate-400">Aucune écriture dans le Grand Livre.</td>
+                  <td colSpan="5" className="py-8 text-center text-slate-400">Aucune écriture trouvée.</td>
                 </tr>
               )}
             </tbody>
