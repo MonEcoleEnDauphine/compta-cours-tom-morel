@@ -3,12 +3,17 @@ import {
   LayoutDashboard, Users, BookOpen, GraduationCap, FileSignature, AlertTriangle, CheckCircle,
   Building, Calendar, CreditCard, PieChart, Shield, Lock, FileText, Upload, 
   Trash2, XCircle, Search, ChevronRight, CheckCircle2, AlertCircle, Paperclip,
-  Plus, Sparkles, Receipt, Heart, FileSpreadsheet, Filter, Euro, Info, ChevronDown, Globe, Mail, Phone, Target
+  Plus, Sparkles, Receipt, Heart, FileSpreadsheet, Filter, Euro, Info, ChevronDown, Globe, Mail, Phone, Target, ArrowRightLeft
 } from 'lucide-react';
 
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "firebase/auth";
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, addDoc, getDoc, updateDoc } from "firebase/firestore";
+
+// Ignorer l'erreur de compilation locale si xlsx n'est pas installé dans le bac à sable
+// Sur Vercel, cela fonctionnera car vous l'avez ajouté au package.json
+let XLSX;
+import(/* @vite-ignore */ 'xlsx').then(module => { XLSX = module; }).catch(() => {});
 
 const firebaseConfig = {
   apiKey: "AIzaSyDhKe4Nl3mUHagW1LkG5GT-tI1bB2-wtnE",
@@ -47,27 +52,30 @@ const EtatFinancier = ({ planComptable, transactionsGlobales }) => {
     let soldeBanque = 0;
     const parCompteBrut = {};
 
+    // 1. Calcul des soldes bruts de chaque compte
     transactionsFiltrees.forEach(t => {
       if (t.type === 'od') {
+          // Opération Diverse à double entrée (Ne touche pas le 512000 par défaut)
           if (t.compteDebit) {
               if (!parCompteBrut[t.compteDebit]) parCompteBrut[t.compteDebit] = 0;
-              parCompteBrut[t.compteDebit] += Math.abs(t.montant); // Debit
+              parCompteBrut[t.compteDebit] -= Math.abs(t.montant); // Le moins simule une charge/débit pour s'aligner avec la logique bancaire
           }
           if (t.compteCredit) {
               if (!parCompteBrut[t.compteCredit]) parCompteBrut[t.compteCredit] = 0;
-              parCompteBrut[t.compteCredit] -= Math.abs(t.montant); // Credit
+              parCompteBrut[t.compteCredit] += Math.abs(t.montant); // Le plus simule un produit/crédit
           }
       } else {
+          // Opération Bancaire classique (Contrepartie implicite = 512000)
           soldeBanque += (t.montant || 0);
           if (t.compte) {
               if (!parCompteBrut[t.compte]) parCompteBrut[t.compte] = 0;
-              // Si montant < 0 (dépense bancaire), cela correspond à un Débit pour la charge (+)
-              // Si montant > 0 (recette bancaire), cela correspond à un Crédit pour le produit (-)
+              // Si montant < 0 (dépense banque), cela devient un solde positif pour la charge (- par -)
               parCompteBrut[t.compte] -= (t.montant || 0); 
           }
       }
     });
 
+    // On force l'intégration du solde calculé de la banque dans la balance
     parCompteBrut['512000'] = (parCompteBrut['512000'] || 0) + soldeBanque;
 
     const charges = [];
@@ -79,6 +87,7 @@ const EtatFinancier = ({ planComptable, transactionsGlobales }) => {
     let totalActif = 0;
     let totalPassif = 0;
 
+    // 2. Répartition dans les grandes masses (Bilan / Résultat)
     Object.entries(parCompteBrut).forEach(([compte, solde]) => {
       if (Math.abs(solde) < 0.01) return;
 
@@ -93,6 +102,9 @@ const EtatFinancier = ({ planComptable, transactionsGlobales }) => {
          produits.push({ compte, label, montant: Math.abs(solde) });
          totalProduits += Math.abs(solde);
       } else if (['1', '2', '3', '4', '5'].includes(firstDigit)) {
+         // Actif: Comptes 2, 3, 4 débiteurs, 5 débiteurs
+         // Passif: Comptes 1, 4 créditeurs, 5 créditeurs (découvert)
+         // Dans notre logique de 'soldeBanque' ci-dessus, un solde positif est un Actif.
          if (solde > 0) {
              actif.push({ compte, label, montant: solde });
              totalActif += solde;
@@ -105,6 +117,7 @@ const EtatFinancier = ({ planComptable, transactionsGlobales }) => {
 
     const resultat = totalProduits - totalCharges;
 
+    // 3. Fonction de groupement par Sous-Catégories comptables
     const grouperComptes = (comptesArray, estBilan) => {
         const groupes = {};
         comptesArray.forEach(item => {
@@ -151,6 +164,7 @@ const EtatFinancier = ({ planComptable, transactionsGlobales }) => {
     const actifGroupe = grouperComptes(actif, true);
     const passifGroupe = grouperComptes(passif, true);
 
+    // 4. Intégration du Résultat dans le Passif (Fonds Propres) pour équilibrer le Bilan
     let familleResultat = passifGroupe.find(g => g.id === 'P1');
     if (!familleResultat) {
         familleResultat = { id: 'P1', label: 'Fonds Propres', montantTotal: 0, details: [] };
@@ -192,12 +206,13 @@ const EtatFinancier = ({ planComptable, transactionsGlobales }) => {
       return (
           <div className="divide-y divide-slate-100">
               {groupes.length === 0 ? (
-                  <div className="p-6 text-center text-slate-400 text-sm">Aucune donnée.</div>
+                  <div className="p-6 text-center text-slate-400 text-sm">Aucune donnée sur cette période.</div>
               ) : (
                   groupes.map(groupe => {
                       const isExpanded = expandedGroups[groupe.id];
                       return (
                           <div key={groupe.id} className="group">
+                              {/* En-tête de Sous-catégorie */}
                               <div onClick={() => toggleGroup(groupe.id)} className={`flex justify-between items-center p-3 cursor-pointer transition-colors ${type === 'charge' ? 'bg-rose-50/50 hover:bg-rose-100/50' : type === 'produit' ? 'bg-emerald-50/50 hover:bg-emerald-100/50' : type === 'actif' ? 'bg-blue-50/50 hover:bg-blue-100/50' : 'bg-amber-50/50 hover:bg-amber-100/50'}`}>
                                   <div className="flex items-center gap-2">
                                       {isExpanded ? <ChevronDown size={16} className="text-slate-400"/> : <ChevronRight size={16} className="text-slate-400"/>}
@@ -205,6 +220,7 @@ const EtatFinancier = ({ planComptable, transactionsGlobales }) => {
                                   </div>
                                   <span className={`font-bold text-sm ${type === 'charge' ? 'text-rose-900' : type === 'produit' ? 'text-emerald-900' : type === 'actif' ? 'text-blue-900' : 'text-amber-900'}`}>{groupe.montantTotal.toFixed(2)} €</span>
                               </div>
+                              {/* Lignes détaillées de la sous-catégorie */}
                               {isExpanded && (
                                   <div className="bg-white border-t border-slate-100">
                                       <table className="w-full text-sm text-left">
@@ -233,12 +249,12 @@ const EtatFinancier = ({ planComptable, transactionsGlobales }) => {
 
   return (
     <div className="space-y-12 animate-in fade-in pb-12">
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 sticky top-0 z-10">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <PieChart className="text-blue-600" /> États Financiers
           </h2>
-          <p className="text-slate-500 mt-1">Bilan et Compte de Résultat de l'association.</p>
+          <p className="text-slate-500 mt-1">Bilan et Compte de Résultat détaillés de l'association.</p>
         </div>
         
         <div className="flex items-center gap-4">
@@ -265,7 +281,7 @@ const EtatFinancier = ({ planComptable, transactionsGlobales }) => {
 
       {/* --- SECTION COMPTE DE RÉSULTAT --- */}
       <div className="space-y-4">
-        <div className="flex items-start gap-4">
+        <div className="flex items-start gap-4 bg-blue-50/50 p-4 rounded-xl border border-blue-100">
             <div className="p-3 bg-blue-100 text-blue-700 rounded-lg shrink-0"><Info size={24} /></div>
             <div>
                 <h3 className="text-xl font-bold text-slate-800">Compte de Résultat</h3>
@@ -313,7 +329,7 @@ const EtatFinancier = ({ planComptable, transactionsGlobales }) => {
 
       {/* --- SECTION BILAN --- */}
       <div className="space-y-4">
-        <div className="flex items-start gap-4">
+        <div className="flex items-start gap-4 bg-purple-50/50 p-4 rounded-xl border border-purple-100">
             <div className="p-3 bg-purple-100 text-purple-700 rounded-lg shrink-0"><Building size={24} /></div>
             <div>
                 <h3 className="text-xl font-bold text-slate-800">Bilan au 31/08/{anneeDebut + 1}</h3>
@@ -348,7 +364,8 @@ const EtatFinancier = ({ planComptable, transactionsGlobales }) => {
 const GrandLivre = ({ planComptable, transactions, setTransactions, firebaseUser, globalTransactions }) => {
   const [lastImportIds, setLastImportIds] = useState([]);
   const [toast, setToast] = useState(null);
-  const fileInputRef = useRef(null);
+  const fileInputCsvRef = useRef(null);
+  const fileInputXlsxRef = useRef(null);
   const [odForm, setOdForm] = useState({ date: '', libelle: '', debit: '', credit: '', montant: '' });
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
@@ -375,77 +392,91 @@ const GrandLivre = ({ planComptable, transactions, setTransactions, firebaseUser
     return 'ATTENTE';
   };
 
-  const handleImportCSV = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+  const handleImportFile = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
+      const extension = file.name.split('.').pop().toLowerCase();
+
       try {
-        const text = event.target.result;
-        const lines = text.split(/\r?\n/);
-        const newTransactions = [];
-        const newIds = [];
-
-        // Parsing en respectant strictement l'ordre des 10 colonnes (A à J)
-        for (let i = 1; i < lines.length; i++) {
-          if (!lines[i].trim()) continue;
-          
-          const cols = lines[i].split(';');
-          if (cols.length >= 7) {
-            const dateStr = cols[0] ? cols[0].trim() : ''; // Col A
-            const libelleSimplifie = cols[1] ? cols[1].trim() : ''; // Col B
-            const reference = cols[2] ? cols[2].trim() : ''; // Col C
-            const infoCompl = cols[3] ? cols[3].trim() : ''; // Col D
-            const typeOpBancaire = cols[4] ? cols[4].trim() : ''; // Col E
-            
-            // Construit un libellé visuel pour l'interface
-            const libelleComplet = `${libelleSimplifie} ${infoCompl ? '('+infoCompl+')' : ''}`.trim();
-            
-            const debitStr = cols[5] ? cols[5].replace(',', '.').replace(/[^-0-9.]/g, '') : ''; // Col F
-            const creditStr = cols[6] ? cols[6].replace(',', '.').replace(/[^-0-9.]/g, '') : ''; // Col G
-            
-            const dateOperation = cols[7] ? cols[7].trim() : ''; // Col H
-            const dateValeur = cols[8] ? cols[8].trim() : ''; // Col I
-            const lettrage = cols[9] ? cols[9].trim() : ''; // Col J
-            
-            let montant = 0;
-            if (debitStr && debitStr !== '') montant = parseFloat(debitStr);
-            else if (creditStr && creditStr !== '') montant = parseFloat(creditStr);
-
-            const newId = Date.now() + i;
-            newIds.push(newId);
-
-            newTransactions.push({
-              id: newId, 
-              date: dateStr,
-              date_operation: dateOperation,
-              date_valeur: dateValeur,
-              libelle_simplifie: libelleSimplifie,
-              reference: reference,
-              info_complementaire: infoCompl,
-              type_operation_bancaire: typeOpBancaire,
-              lettrage: lettrage,
-              type: typeOpBancaire, // Utilisé pour l'auto-imputation classique
-              libelle: libelleComplet,
-              montant: montant, 
-              compte: autoImpute(libelleComplet, typeOpBancaire),
-              status: 'pending'
-            });
+          let rows = [];
+          if (extension === 'csv') {
+              const text = await file.text();
+              const lines = text.split(/\r?\n/);
+              rows = lines.map(line => line.split(';'));
+          } else if (extension === 'xlsx') {
+              if (typeof XLSX === 'undefined') {
+                  showToast("Le module XLSX n'est pas encore prêt. Essayez le CSV pour le moment.", "error");
+                  return;
+              }
+              const data = await file.arrayBuffer();
+              const workbook = XLSX.read(data, { type: 'array' });
+              const firstSheetName = workbook.SheetNames[0];
+              const worksheet = workbook.Sheets[firstSheetName];
+              // On utilise raw: false pour lire les dates formatées comme du texte
+              rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false, defval: '' });
           }
-        }
-        setTransactions([...newTransactions, ...transactions]);
-        setLastImportIds(newIds);
-        showToast(`${newTransactions.length} opérations importées. À vous de les valider !`);
-      } catch (err) {
-        showToast("Erreur de lecture du fichier CSV.", "error");
-      }
-    };
-    reader.readAsText(file, 'ISO-8859-1');
-    e.target.value = null;
-  };
 
-  const handleImportXLSX = () => showToast("L'import natif XLSX nécessite une petite mise à jour Vercel. Utilisez le CSV pour l'instant !", "success");
+          const newTransactions = [];
+          const newIds = [];
+          
+          // La ligne 0 est l'en-tête, on commence à 1
+          for (let i = 1; i < rows.length; i++) {
+              const cols = rows[i];
+              if (!cols || cols.length < 7) continue;
+              
+              let dateStr = cols[0] ? String(cols[0]).trim() : '';
+              let libelleSimplifie = cols[1] ? String(cols[1]).trim() : '';
+              let reference = cols[2] ? String(cols[2]).trim() : '';
+              let infoCompl = cols[3] ? String(cols[3]).trim() : '';
+              let typeOpBancaire = cols[4] ? String(cols[4]).trim() : '';
+              
+              let debitStr = cols[5] !== undefined && cols[5] !== '' ? String(cols[5]).replace(',', '.').replace(/[^-0-9.]/g, '') : '';
+              let creditStr = cols[6] !== undefined && cols[6] !== '' ? String(cols[6]).replace(',', '.').replace(/[^-0-9.]/g, '') : '';
+              
+              let dateOperation = cols[7] ? String(cols[7]).trim() : '';
+              let dateValeur = cols[8] ? String(cols[8]).trim() : '';
+              let lettrage = cols[9] ? String(cols[9]).trim() : '';
+
+              const libelleComplet = `${libelleSimplifie} ${infoCompl ? '('+infoCompl+')' : ''}`.trim();
+              
+              let montant = 0;
+              if (debitStr && debitStr !== '') montant = parseFloat(debitStr);
+              else if (creditStr && creditStr !== '') montant = parseFloat(creditStr);
+
+              // Ne pas importer les lignes vides ou titres
+              if (isNaN(montant) || Math.abs(montant) < 0.01) continue;
+
+              const newId = Date.now() + i + Math.floor(Math.random() * 1000);
+              newIds.push(newId);
+
+              newTransactions.push({
+                id: newId, 
+                date: dateStr,
+                date_operation: dateOperation,
+                date_valeur: dateValeur,
+                libelle_simplifie: libelleSimplifie,
+                reference: reference,
+                info_complementaire: infoCompl,
+                type_operation_bancaire: typeOpBancaire,
+                lettrage: lettrage,
+                type: typeOpBancaire, 
+                libelle: libelleComplet,
+                montant: montant, 
+                compte: autoImpute(libelleComplet, typeOpBancaire),
+                status: 'pending'
+              });
+          }
+          setTransactions([...newTransactions, ...transactions]);
+          setLastImportIds(newIds);
+          showToast(`${newTransactions.length} opérations importées. À vous de les valider !`);
+          
+      } catch (err) {
+          console.error(err);
+          showToast(`Erreur de lecture du fichier ${extension.toUpperCase()}.`, "error");
+      }
+      e.target.value = null; // Reset input
+  };
 
   const handleValidate = async (t) => {
     if (!firebaseUser) return showToast("Vous devez être connecté.", "error");
@@ -486,8 +517,13 @@ const GrandLivre = ({ planComptable, transactions, setTransactions, firebaseUser
     
     const montantNum = parseFloat(odForm.montant);
     const newGlobalTx = {
-      date: odForm.date, libelle: `(OD) ${odForm.libelle}`, montant: montantNum,
-      type: 'od', compteDebit: odForm.debit, compteCredit: odForm.credit, date_creation: new Date().toISOString()
+      date: odForm.date, 
+      libelle: `(OD) ${odForm.libelle}`, 
+      montant: montantNum,
+      type: 'od', 
+      compteDebit: odForm.debit, 
+      compteCredit: odForm.credit, 
+      date_creation: new Date().toISOString()
     };
 
     try {
@@ -549,13 +585,15 @@ const GrandLivre = ({ planComptable, transactions, setTransactions, firebaseUser
                     Annuler le dernier import en cours
                 </button>
                 )}
-                <div className="flex gap-3">
-                    <input type="file" accept=".csv" className="hidden" ref={fileInputRef} onChange={handleImportCSV} />
-                    <button onClick={() => fileInputRef.current.click()} className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium shadow-sm hover:bg-blue-700 transition-colors">
+                <div className="flex flex-col gap-3">
+                    <input type="file" accept=".csv" className="hidden" ref={fileInputCsvRef} onChange={handleImportFile} />
+                    <button onClick={() => fileInputCsvRef.current.click()} className="flex-1 w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium shadow-sm hover:bg-blue-700 transition-colors">
                         <Upload size={18} /> Importer un relevé (.csv)
                     </button>
-                    <button onClick={handleImportXLSX} className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium shadow-sm hover:bg-emerald-700 transition-colors">
-                        <Upload size={18} /> Importer un relevé (.xlsx)
+                    
+                    <input type="file" accept=".xlsx" className="hidden" ref={fileInputXlsxRef} onChange={handleImportFile} />
+                    <button onClick={() => fileInputXlsxRef.current.click()} className="flex-1 w-full flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium shadow-sm hover:bg-emerald-700 transition-colors">
+                        <FileSpreadsheet size={18} /> Importer un relevé (.xlsx)
                     </button>
                 </div>
             </div>
@@ -569,40 +607,41 @@ const GrandLivre = ({ planComptable, transactions, setTransactions, firebaseUser
                 <div className="grid grid-cols-2 gap-4">
                     <div>
                         <label className="block text-[10px] uppercase tracking-wider font-bold text-indigo-400 mb-1">Date</label>
-                        <input type="date" required value={odForm.date} onChange={e=>setOdForm({...odForm, date: e.target.value})} className="w-full p-2 border border-indigo-200 rounded-md text-sm outline-none" />
+                        <input type="date" required value={odForm.date} onChange={e=>setOdForm({...odForm, date: e.target.value})} className="w-full p-2 border border-indigo-200 rounded-md text-sm outline-none bg-white" />
                     </div>
                     <div>
                         <label className="block text-[10px] uppercase tracking-wider font-bold text-indigo-400 mb-1">Montant (€)</label>
-                        <input type="number" step="0.01" required value={odForm.montant} onChange={e=>setOdForm({...odForm, montant: e.target.value})} className="w-full p-2 border border-indigo-200 rounded-md text-sm outline-none" />
+                        <input type="number" step="0.01" required value={odForm.montant} onChange={e=>setOdForm({...odForm, montant: e.target.value})} className="w-full p-2 border border-indigo-200 rounded-md text-sm outline-none bg-white" />
                     </div>
                 </div>
                 <div>
                     <label className="block text-[10px] uppercase tracking-wider font-bold text-indigo-400 mb-1">Libellé</label>
-                    <input type="text" placeholder="Ex: Ajustement de caisse..." required value={odForm.libelle} onChange={e=>setOdForm({...odForm, libelle: e.target.value})} className="w-full p-2 border border-indigo-200 rounded-md text-sm outline-none" />
+                    <input type="text" placeholder="Ex: Ajustement de caisse, provisions..." required value={odForm.libelle} onChange={e=>setOdForm({...odForm, libelle: e.target.value})} className="w-full p-2 border border-indigo-200 rounded-md text-sm outline-none bg-white" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                     <div>
                         <label className="block text-[10px] uppercase tracking-wider font-bold text-indigo-400 mb-1">Compte Débit</label>
-                        <select required value={odForm.debit} onChange={e=>setOdForm({...odForm, debit: e.target.value})} className="w-full p-2 border border-indigo-200 rounded-md text-sm outline-none">
+                        <select required value={odForm.debit} onChange={e=>setOdForm({...odForm, debit: e.target.value})} className="w-full p-2 border border-indigo-200 rounded-md text-sm outline-none bg-white">
                         <option value="">Sélectionner...</option>
                         {planComptable.map(c => <option key={`d-${c.id}`} value={c.id}>{c.id}</option>)}
                         </select>
                     </div>
                     <div>
                         <label className="block text-[10px] uppercase tracking-wider font-bold text-indigo-400 mb-1">Compte Crédit</label>
-                        <select required value={odForm.credit} onChange={e=>setOdForm({...odForm, credit: e.target.value})} className="w-full p-2 border border-indigo-200 rounded-md text-sm outline-none">
+                        <select required value={odForm.credit} onChange={e=>setOdForm({...odForm, credit: e.target.value})} className="w-full p-2 border border-indigo-200 rounded-md text-sm outline-none bg-white">
                         <option value="">Sélectionner...</option>
                         {planComptable.map(c => <option key={`c-${c.id}`} value={c.id}>{c.id}</option>)}
                         </select>
                     </div>
                 </div>
-                <button type="submit" className="w-full py-2 bg-indigo-600 text-white rounded-md text-sm font-bold shadow-sm hover:bg-indigo-700 transition-colors mt-2">
-                Ajouter l'OD
+                <button type="submit" className="w-full py-2 bg-indigo-600 text-white rounded-md text-sm font-bold shadow-sm hover:bg-indigo-700 transition-colors mt-2 flex items-center justify-center gap-2">
+                   <ArrowRightLeft size={16} /> Ajouter l'OD
                 </button>
             </form>
           </div>
       </div>
 
+      {}
       {transactions.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="bg-amber-50 p-3 border-b border-amber-100 flex items-center gap-2 text-amber-800 font-bold"><AlertTriangle size={18} /> Lignes en attente de validation ({transactions.length})</div>
@@ -635,6 +674,7 @@ const GrandLivre = ({ planComptable, transactions, setTransactions, firebaseUser
         </div>
       )}
 
+      {}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
          <div className="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
             <div>
@@ -660,10 +700,10 @@ const GrandLivre = ({ planComptable, transactions, setTransactions, firebaseUser
                            
                            {t.type === 'od' ? (
                                <>
-                                 <td className="py-3 px-4 text-right font-bold text-indigo-600">{t.montant.toFixed(2)} €</td>
+                                 <td className="py-3 px-4 text-right font-bold text-indigo-600 text-xs uppercase tracking-wider">OD : {t.montant.toFixed(2)} €</td>
                                  <td className="py-3 px-4 text-xs text-slate-500">
-                                     <div><span className="font-bold">D:</span> {t.compteDebit}</div>
-                                     <div><span className="font-bold">C:</span> {t.compteCredit}</div>
+                                     <div className="flex gap-2"><span className="font-bold text-slate-700 w-4">D:</span> <span className="font-mono text-indigo-600">{t.compteDebit}</span></div>
+                                     <div className="flex gap-2 mt-1"><span className="font-bold text-slate-700 w-4">C:</span> <span className="font-mono text-pink-600">{t.compteCredit}</span></div>
                                  </td>
                                </>
                            ) : (
@@ -680,7 +720,7 @@ const GrandLivre = ({ planComptable, transactions, setTransactions, firebaseUser
                            )}
                            
                            <td className="py-3 px-4 text-center flex items-center justify-center gap-1">
-                              <button onClick={handlePdfUploadStub} className="text-slate-400 hover:text-blue-600 p-1.5 rounded"><Paperclip size={16} /></button>
+                              <button onClick={handlePdfUploadStub} className="text-slate-400 hover:text-blue-600 p-1.5 rounded" title="Joindre un justificatif"><Paperclip size={16} /></button>
                               {confirmDeleteId === t.id ? (
                                   <button onClick={() => handleDeleteValidated(t.id)} className="bg-red-500 text-white px-2 py-1 rounded text-xs font-bold animate-pulse">Confirmer ?</button>
                               ) : (
@@ -770,6 +810,7 @@ const GestionAcces = ({ firebaseUser }) => {
     const unsub = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'users'), snap => setUsers(snap.docs.map(d => ({ uid: d.id, ...d.data() }))));
     return () => unsub();
   }, [firebaseUser]);
+  
   return (
     <div className="space-y-6 animate-in fade-in max-w-4xl relative">
       <div className="bg-slate-900 p-6 rounded-xl text-white shadow-sm flex items-center gap-4">
@@ -872,8 +913,8 @@ export default function App() {
       <div className="w-72 bg-slate-900 text-slate-300 flex flex-col shadow-2xl z-20 overflow-y-auto">
         <div className="p-6 bg-slate-950/50 flex flex-col items-center border-b border-slate-800 shrink-0">
           <img src={LOGO_URL} alt="Logo" className="h-16 w-16 mb-3 object-contain rounded-xl bg-white p-1" />
-          <h1 className="text-lg font-bold text-white tracking-wide">Cours Tom Morel</h1>
-          <p className="text-xs text-slate-400 uppercase tracking-widest mt-1">ERP - {isAdmin ? 'Admin' : 'Famille'}</p>
+          <h1 className="text-lg font-bold text-white tracking-wide text-center leading-tight">Cours<br/>Tom Morel</h1>
+          <p className="text-xs text-slate-400 uppercase tracking-widest mt-2">ERP - {isAdmin ? 'Admin' : 'Famille'}</p>
         </div>
         <nav className="flex-1 px-4 py-6 space-y-8 overflow-y-auto">
           <div>
@@ -932,10 +973,11 @@ export default function App() {
                   <div className="bg-white p-6 rounded-xl shadow-sm text-center flex flex-col">
                     <div className="h-12 w-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-4 mx-auto"><Mail size={24} /></div>
                     <h3 className="font-bold text-slate-800">Direction de l'École</h3>
-                    <p className="text-xs font-semibold text-emerald-600 mb-3">Mme Laurence Gérard</p>
+                    <p className="text-xs font-semibold text-slate-500 mb-1">Mme Laurence Gérard</p>
+                    <p className="text-[10px] text-slate-400 mb-3 leading-tight">Équipe enseignante: Mme Meyer,<br/>Mme Dupont, M. Martin</p>
                     <div className="mt-auto space-y-2">
-                      <a href="tel:0667909576" className="w-full py-2 border border-slate-200 text-slate-600 rounded-lg text-sm flex items-center justify-center gap-2"><Phone size={16} /> 06 67 90 95 76</a>
-                      <a href="mailto:direction@courstommorel.fr" className="w-full py-2 bg-emerald-50 text-emerald-700 rounded-lg text-sm flex items-center justify-center gap-2"><Mail size={16} /> Écrire</a>
+                      <a href="tel:0667909576" className="w-full py-2 border border-slate-200 text-slate-600 rounded-lg text-sm flex items-center justify-center gap-2 hover:bg-slate-50"><Phone size={16} /> 06 67 90 95 76</a>
+                      <a href="mailto:direction@courstommorel.fr" className="w-full py-2 bg-emerald-50 text-emerald-700 rounded-lg text-sm flex items-center justify-center gap-2 hover:bg-emerald-100"><Mail size={16} /> Écrire</a>
                     </div>
                   </div>
                   <div className="bg-white p-6 rounded-xl shadow-sm text-center flex flex-col">
@@ -943,8 +985,8 @@ export default function App() {
                     <h3 className="font-bold text-slate-800">Association (Bureau)</h3>
                     <p className="text-xs font-semibold text-purple-600 mb-3">Mon École en Dauphiné</p>
                     <div className="mt-auto space-y-2">
-                      <a href="tel:0660202980" className="w-full py-2 border border-slate-200 text-slate-600 rounded-lg text-sm flex items-center justify-center gap-2"><Phone size={16} /> 06 60 20 29 80</a>
-                      <a href="mailto:bureau@courstommorel.fr" className="w-full py-2 bg-purple-50 text-purple-700 rounded-lg text-sm flex items-center justify-center gap-2"><Mail size={16} /> Écrire</a>
+                      <a href="tel:0660202980" className="w-full py-2 border border-slate-200 text-slate-600 rounded-lg text-sm flex items-center justify-center gap-2 hover:bg-slate-50"><Phone size={16} /> 06 60 20 29 80</a>
+                      <a href="mailto:bureau@courstommorel.fr" className="w-full py-2 bg-purple-50 text-purple-700 rounded-lg text-sm flex items-center justify-center gap-2 hover:bg-purple-100"><Mail size={16} /> Écrire</a>
                     </div>
                   </div>
                 </div>
