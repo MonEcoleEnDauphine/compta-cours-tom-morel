@@ -470,7 +470,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [lastImportBatch, setLastImportBatch] = useState(null);
   
-  // NOUVEAU : Gestion des pièces jointes PDF
   const [selectedTxForPdf, setSelectedTxForPdf] = useState(null);
   const fileInputPdfRef = useRef(null);
 
@@ -503,7 +502,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
     return () => unsubscribe();
   }, []);
 
-  // Gestionnaires pour pièces jointes
   const handleTriggerPdf = (txId) => {
     setSelectedTxForPdf(txId);
     if (fileInputPdfRef.current) fileInputPdfRef.current.click();
@@ -534,6 +532,28 @@ const GrandLivre = ({ transactionsGlobales }) => {
       if (fileInputPdfRef.current) fileInputPdfRef.current.value = '';
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleResetGrandLivre = async () => {
+    if (transactionsGlobales.length === 0) return alert("Le Grand Livre est déjà vide.");
+    
+    const pwd = window.prompt("⚠️ DANGER : Vous allez supprimer TOUTES les écritures validées du Grand Livre.\n\nVeuillez entrer le mot de passe administrateur pour confirmer :");
+    
+    if (pwd === 'admin123') {
+      const confirm = window.confirm(`Êtes-vous absolument sûr ? ${transactionsGlobales.length} écritures vont être définitivement effacées.`);
+      if (confirm) {
+        try {
+          for (const tx of transactionsGlobales) {
+            await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', tx.id));
+          }
+          alert("✅ Le Grand Livre a été entièrement vidé avec succès.");
+        } catch (e) {
+          alert("Erreur lors de la suppression du Grand Livre.");
+        }
+      }
+    } else if (pwd !== null) {
+      alert("❌ Mot de passe incorrect. Annulation de la suppression.");
+    }
   };
 
   const devinerCompte = (libelleTxt) => {
@@ -897,9 +917,66 @@ const GrandLivre = ({ transactionsGlobales }) => {
     }
   };
 
+  const validerLignesPretes = async () => {
+    const lignesAValider = lignesEnAttente.filter(l => l.comptePropose);
+    if (lignesAValider.length === 0) return;
+    
+    if (window.confirm(`Vous êtes sur le point d'envoyer ${lignesAValider.length} écriture(s) d'un seul coup vers le Grand Livre. Confirmer ?`)) {
+      for (const ligne of lignesAValider) {
+        const newTx = {
+          date: ligne.date,
+          libelle: ligne.libelle,
+          montant: ligne.montant,
+          compte: ligne.comptePropose,
+          reference: ligne.reference || '',
+          typeOp: ligne.typeOp || '',
+          commentaire: ligne.commentaire || '',
+          type: ligne.montant < 0 ? 'depense' : 'recette',
+          date_creation: new Date().toISOString()
+        };
+        try {
+          await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), newTx);
+        } catch(e) {
+          console.error("Erreur sur l'insertion de masse", e);
+        }
+      }
+      setLignesEnAttente(prev => prev.filter(l => !l.comptePropose));
+    }
+  };
+
   const addOdLine = () => setOdLines([...odLines, { id: Date.now(), compte: '', debit: '', credit: '' }]);
   const removeOdLine = (id) => setOdLines(odLines.filter(l => l.id !== id));
   
+  // NOUVEAU : Création de compte à la volée depuis la saisie d'OD
+  const handleCompteOdChange = async (id, value) => {
+    // Si l'utilisateur a tapé un numéro et validé
+    if (value && value.length >= 2 && !comptesList.find(c => c.code === value)) {
+      const libelle = window.prompt(`Le compte ${value} n'existe pas dans le Plan Comptable.\n\nQuel libellé voulez-vous lui donner pour le créer immédiatement ?`);
+      if (libelle) {
+        try {
+          await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'comptes'), {
+            code: value,
+            libelle: libelle
+          });
+          alert(`Le compte ${value} a été créé !`);
+        } catch(e) {
+          alert("Erreur lors de la création du compte.");
+          return;
+        }
+      } else {
+        // L'utilisateur a annulé, on ne garde pas le numéro invalide
+        return; 
+      }
+    }
+    
+    setOdLines(odLines.map(l => {
+      if (l.id === id) {
+        return { ...l, compte: value };
+      }
+      return l;
+    }));
+  };
+
   const updateOdLine = (id, field, value) => {
     setOdLines(odLines.map(l => {
       if (l.id === id) {
@@ -1072,7 +1149,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
   return (
     <div className="space-y-6 w-full max-w-[1600px] mx-auto px-2">
       
-      {/* INPUT MASQUÉ POUR L'UPLOAD PDF */}
       <input 
         type="file" 
         accept="application/pdf,image/*" 
@@ -1150,10 +1226,19 @@ const GrandLivre = ({ transactionsGlobales }) => {
           <div className="overflow-y-auto flex-1 space-y-1.5 pr-1 min-h-[80px]">
             {odLines.map((l) => (
               <div key={l.id} className="flex gap-1 items-center">
-                <select value={l.compte} onChange={e => updateOdLine(l.id, 'compte', e.target.value)} className="border border-purple-200 rounded p-1 text-xs bg-white w-1/2 outline-none focus:ring-1 focus:ring-purple-500">
-                  <option value="">Compte...</option>
-                  {comptesList.map(c => <option key={c.id} value={c.code}>{c.code} - {c.libelle}</option>)}
-                </select>
+                {/* NOUVEAU: Input libre + DataList pour permettre la création à la volée */}
+                <input 
+                  type="text" 
+                  list="comptes-datalist"
+                  placeholder="Compte..." 
+                  value={l.compte} 
+                  onChange={e => handleCompteOdChange(l.id, e.target.value)} 
+                  className="border border-purple-200 rounded p-1 text-xs bg-white w-1/2 outline-none focus:ring-1 focus:ring-purple-500 font-mono"
+                />
+                <datalist id="comptes-datalist">
+                  {comptesList.map(c => <option key={c.id} value={c.code}>{c.libelle}</option>)}
+                </datalist>
+
                 <input type="number" placeholder="Débit" value={l.debit} onChange={e => updateOdLine(l.id, 'debit', e.target.value)} className="border border-purple-200 rounded p-1 text-xs bg-white w-1/4 outline-none focus:ring-1 focus:ring-purple-500" />
                 <input type="number" placeholder="Crédit" value={l.credit} onChange={e => updateOdLine(l.id, 'credit', e.target.value)} className="border border-purple-200 rounded p-1 text-xs bg-white w-1/4 outline-none focus:ring-1 focus:ring-purple-500" />
                 <button onClick={() => removeOdLine(l.id)} className="text-slate-300 hover:text-red-500"><XCircle size={14} /></button>
@@ -1292,6 +1377,15 @@ const GrandLivre = ({ transactionsGlobales }) => {
             <CheckCircle2 className="text-emerald-500" /> Écritures Validées au Grand Livre
           </h3>
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+            
+            <button 
+              onClick={handleResetGrandLivre}
+              className="text-xs bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg font-bold transition-colors flex items-center gap-2"
+              title="Vider entièrement le Grand Livre"
+            >
+              <Trash2 size={14} /> Vider le Grand Livre
+            </button>
+
             <select 
               value={selectedCompteFilter}
               onChange={(e) => setSelectedCompteFilter(e.target.value)}
@@ -1511,7 +1605,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
                             <span className="font-bold text-lg leading-none">✎</span>
                           </button>
                           
-                          {/* NOUVELLE GESTION DES PIÈCES JOINTES PDF */}
                           {t.pdfData ? (
                             <div className="relative group/pdf inline-block">
                               <button 
@@ -1522,9 +1615,9 @@ const GrandLivre = ({ transactionsGlobales }) => {
                                   }
                                 }}
                                 className="text-indigo-600 hover:text-indigo-800 p-1.5 rounded bg-indigo-50 border border-indigo-200 transition-colors mt-1.5"
-                                title={`Voir le document : ${t.pdfName || 'Pièce jointe'}`}
+                                title={`Voir la facture/justificatif : ${t.pdfName || 'Pièce jointe'}`}
                               >
-                                <Paperclip size={16} className="text-indigo-600" />
+                                <Receipt size={16} className="text-indigo-600" />
                               </button>
                               <button 
                                 onClick={async (e) => {
