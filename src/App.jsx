@@ -462,6 +462,133 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     </div>
   );
 };
+// --- FONCTION DE NORMALISATION STRICTE DES DATES EN JJ/MM/AAAA ---
+const normaliserDateFR = (rawVal) => {
+  if (!rawVal) return '';
+
+  // 1. Si SheetJS renvoie un objet Date JS (avec cellDates: true)
+  if (rawVal instanceof Date && !isNaN(rawVal)) {
+    const d = String(rawVal.getDate()).padStart(2, '0');
+    const m = String(rawVal.getMonth() + 1).padStart(2, '0');
+    const y = rawVal.getFullYear();
+    return `${d}/${m}/${y}`;
+  }
+
+  const str = String(rawVal).trim();
+  if (!str) return '';
+
+  // 2. Format ISO YYYY-MM-DD
+  if (str.includes('-')) {
+    const parts = str.split('T')[0].split('-');
+    if (parts.length === 3 && parts[0].length === 4) {
+      const [y, m, d] = parts;
+      return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+    }
+  }
+
+  // 3. Format avec slashes (DD/MM/YYYY ou D/M/YY ou YYYY/MM/DD)
+  if (str.includes('/')) {
+    const parts = str.split('/');
+    if (parts.length === 3) {
+      if (parts[0].length === 4) { // YYYY/MM/DD
+        const [y, m, d] = parts;
+        return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+      } else { // DD/MM/YYYY ou D/M/YY
+        let [d, m, y] = parts;
+        if (y.length === 2) y = '20' + y;
+        return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+      }
+    }
+  }
+
+  return str;
+};
+
+// --- SÉLECTEUR DE COMPTE AVEC RECHERCHE PAR CODE ET LIBELLÉ ---
+const SearchableCompteSelect = ({ value, onChange, comptesList, placeholder = "Sélectionner un compte..." }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const normalizeStr = (str) => (str || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+  const filteredComptes = useMemo(() => {
+    if (!search.trim()) return comptesList;
+    const term = normalizeStr(search);
+    return comptesList.filter(c => 
+      normalizeStr(c.code).includes(term) || 
+      normalizeStr(c.libelle).includes(term)
+    );
+  }, [comptesList, search]);
+
+  const selectedCompte = comptesList.find(c => c.code === value);
+
+  return (
+    <div className="relative w-full" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full text-left border rounded-xl px-3 py-2 text-xs font-mono font-bold flex justify-between items-center transition-all bg-white shadow-2xs ${
+          value ? 'border-indigo-300 bg-indigo-50/80 text-indigo-900' : 'border-slate-200 text-slate-400'
+        }`}
+      >
+        <span className="truncate">
+          {selectedCompte ? `${selectedCompte.code} - ${selectedCompte.libelle}` : (value ? `${value} (Suggéré)` : placeholder)}
+        </span>
+        <ChevronDown size={14} className="text-slate-400 shrink-0 ml-1" />
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-2xl shadow-2xl p-2 max-h-60 overflow-y-auto">
+          <div className="relative mb-2">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input 
+              type="text" 
+              placeholder="Code ou libellé (ex : AS, 616)..." 
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-9 pr-3 py-1.5 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-600 font-sans"
+              autoFocus
+            />
+          </div>
+          <div className="space-y-0.5">
+            {filteredComptes.length > 0 ? (
+              filteredComptes.map(c => (
+                <div 
+                  key={c.id}
+                  onClick={() => {
+                    onChange(c.code);
+                    setIsOpen(false);
+                    setSearch('');
+                  }}
+                  className={`px-3 py-2 rounded-xl text-xs cursor-pointer flex justify-between items-center transition-colors ${
+                    c.code === value ? 'bg-indigo-100 text-indigo-950 font-extrabold' : 'hover:bg-slate-100/80 text-slate-700 font-medium'
+                  }`}
+                >
+                  <span className="font-mono font-extrabold text-indigo-700 shrink-0">{c.code}</span>
+                  <span className="truncate text-slate-600 ml-2 text-right flex-1">{c.libelle}</span>
+                </div>
+              ))
+            ) : (
+              <div className="text-xs text-slate-400 text-center py-3">Aucun compte correspondant</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // --- 3. GRAND LIVRE (Import CSV/XLSX, OD, Validations) ---
 const GrandLivre = ({ transactionsGlobales }) => {
   const [lignesEnAttente, setLignesEnAttente] = useState([]);
@@ -662,24 +789,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transactionsGlobales]);
 
-  const formatDateAffichage = (dStr) => {
-    if (!dStr) return '';
-    if (dStr.includes('-')) {
-      const parts = dStr.split('-');
-      if (parts.length === 3 && parts[0].length === 4) {
-        let y = parts[0];
-        let p1 = parts[1]; 
-        let p2 = parts[2]; 
-        if (parseInt(p1) > 12) {
-          return `${p1}/${p2}/${y}`;
-        } else {
-          return `${p2}/${p1}/${y}`;
-        }
-      }
-    }
-    return dStr; 
-  };
-
   const parseMontant = (rawVal) => {
     if (rawVal === undefined || rawVal === null || rawVal === '') return 0;
     if (typeof rawVal === 'number') return rawVal;
@@ -732,7 +841,9 @@ const GrandLivre = ({ transactionsGlobales }) => {
           } else {
             mt = debit;
           }
-          const dateExtrait = cols[0];
+
+          // CONVERSION STRICTE DE LA DATE EN JJ/MM/AAAA
+          const dateExtrait = normaliserDateFR(cols[0]);
           const libelleExtrait = cols[1] || cols[3];
           
           if (mt !== 0) {
@@ -778,9 +889,10 @@ const GrandLivre = ({ transactionsGlobales }) => {
     } else if (ext === 'xlsx') {
       try {
         const data = await file.arrayBuffer();
-        const workbook = XLSX.read(data, { type: 'array' });
+        // cellDates: true empêche SheetJS de formater les dates en MM/DD/YY us
+        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false, defval: '' });
+        const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: true, defval: '' });
         const resultat = processRows(rows.slice(1));
         setLignesEnAttente(prev => [...prev, ...resultat]);
         if (resultat.length > 0) setLastImportBatch({ batchId, target: 'sas', source: 'Journal de Banque', count: resultat.length });
@@ -810,7 +922,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
         const cols = line.split('\t');
         if (cols.length >= 13) {
           const rawDate = cols[3].trim();
-          const formattedDate = rawDate.length === 8 ? `${rawDate.slice(0,4)}-${rawDate.slice(4,6)}-${rawDate.slice(6,8)}` : rawDate;
+          const formattedDate = normaliserDateFR(rawDate);
           const compteNum = cols[4].trim();
           const compteLib = cols[5].trim();
           const pieceRef = cols[8].trim();
@@ -888,12 +1000,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
           }
 
           if (rawDate && libelle && (debitVal !== 0 || creditVal !== 0)) {
-            let formattedDate = rawDate;
-            if (rawDate.includes('/')) {
-              const [d, m, y] = rawDate.split('/');
-              formattedDate = `${y.length === 2 ? '20'+y : y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-            }
-
+            const formattedDate = normaliserDateFR(rawDate);
             const isDebit = debitVal > 0;
             const montantFinal = isDebit ? debitVal : creditVal;
             const prefix = journal === 'PAIE' ? '(PAIE)' : '(OD)';
@@ -938,8 +1045,8 @@ const GrandLivre = ({ transactionsGlobales }) => {
     } else if (ext === 'xlsx') {
       try {
         const data = await file.arrayBuffer();
-        const workbook = XLSX.read(data, { type: 'array' });
-        const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, raw: false, defval: '' });
+        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+        const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, raw: true, defval: '' });
         await processRows(rows);
       } catch (err) {
         alert("Erreur de lecture du fichier XLSX.");
@@ -955,7 +1062,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
     }
     
     const newTx = {
-      date: ligne.date,
+      date: normaliserDateFR(ligne.date),
       libelle: ligne.libelle,
       montant: ligne.montant,
       compte: compteCode,
@@ -1006,12 +1113,13 @@ const GrandLivre = ({ transactionsGlobales }) => {
     }
 
     try {
+      const dateFormatted = normaliserDateFR(odFormDate);
       for (const line of odLines) {
         const debit = parseFloat(line.debit) || 0;
         const credit = parseFloat(line.credit) || 0;
         if (debit > 0 || credit > 0) {
           const newTx = {
-            date: odFormDate,
+            date: dateFormatted,
             libelle: `(OD) ${odFormLibelle}`,
             montant: debit > 0 ? debit : credit,
             type: 'od',
@@ -1066,24 +1174,23 @@ const GrandLivre = ({ transactionsGlobales }) => {
     setSortConfig({ key, direction });
   };
 
+  // PARSER DE TRI CHRONOLOGIQUE
   const parseDateForSort = (dStr) => {
     if (!dStr) return 0;
     const str = String(dStr).trim();
     if (str.includes('/')) {
       const parts = str.split('/');
       if (parts.length === 3) {
+        let day = parseInt(parts[0], 10);
+        let month = parseInt(parts[1], 10) - 1;
         let year = parseInt(parts[2], 10);
         if (year < 100) year += 2000;
-        return new Date(year, parseInt(parts[1], 10) - 1, parseInt(parts[0], 10)).getTime();
+        return new Date(year, month, day).getTime();
       }
     } else if (str.includes('-')) {
       const parts = str.split('-');
-      if (parts.length === 3) {
-        if (parts[0].length === 4) {
-          return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)).getTime();
-        } else {
-          return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10)).getTime();
-        }
+      if (parts.length === 3 && parts[0].length === 4) {
+        return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)).getTime();
       }
     }
     return new Date(str).getTime() || 0;
@@ -1146,7 +1253,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
   const nbLignesPretes = lignesEnAttente.filter(l => l.comptePropose).length;
 
-  // Calculs synthétiques pour l'en-tête dynamique
   const totalGeneralDebit = transactionsGlobales.reduce((acc, t) => {
     if (t.type === 'od') return acc + (t.compteDebit ? Number(t.montant) || 0 : 0);
     return acc + (Number(t.montant) < 0 ? Math.abs(Number(t.montant)) : 0);
@@ -1267,7 +1373,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
           </div>
         </div>
 
-        {/* METRICS RAPIDES */}
         <div className="relative z-10 flex flex-wrap items-center gap-3 w-full md:w-auto">
           <div className="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/10 flex flex-col">
             <span className="text-[10px] uppercase font-bold text-indigo-200/80 tracking-wider">Écritures enregistrées</span>
@@ -1363,11 +1468,10 @@ const GrandLivre = ({ transactionsGlobales }) => {
           </button>
         </div>
 
-        {/* CARTE 3 : OPÉRATION DIVERSE (SAISIE + IMPORT MASSE) */}
+        {/* CARTE 3 : OPÉRATION DIVERSE */}
         <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all flex flex-col h-[390px] relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-purple-500 to-indigo-600"></div>
 
-          {/* Top Bar OD */}
           <div className="flex justify-between items-center shrink-0 mb-3">
             <div className="flex items-center gap-2">
               <span className="p-2 bg-purple-50 text-purple-600 rounded-xl">
@@ -1385,7 +1489,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
             </button>
           </div>
 
-          {/* Form En-tête */}
           <div className="grid grid-cols-3 gap-2 shrink-0 mb-2">
             <input 
               type="date" 
@@ -1412,11 +1515,9 @@ const GrandLivre = ({ transactionsGlobales }) => {
             />
           </div>
 
-          {/* Ventilation OD Lignes */}
           <div className="overflow-y-auto flex-1 space-y-2 pr-1 min-h-[90px]">
             {odLines.map((l) => (
               <div key={l.id} className="flex gap-1.5 items-center bg-slate-50/80 p-1.5 rounded-xl border border-slate-200/60">
-                
                 <div className="w-1/2 relative">
                   <input 
                     type="text" 
@@ -1456,7 +1557,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
             </button>
           </div>
 
-          {/* Footer OD / Jauge d'équilibre */}
           <div className="shrink-0 flex flex-col gap-2 pt-2 border-t border-slate-100 mt-2">
             <div className={`flex justify-between items-center text-xs font-bold p-2.5 rounded-xl border transition-colors ${
               isOdBalanced 
@@ -1487,7 +1587,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
       </div>
 
-      {/* TAMPON / SAS D'IMPUTATION BANCAIRE */}
+      {/* TAMPON / SAS D'IMPUTATION BANCAIRE AVEC SÉLECTEUR RECHERCHABLE */}
       {lignesEnAttente.length > 0 && (
         <div className="bg-orange-50/80 p-6 rounded-3xl border border-orange-200/80 shadow-sm animate-fade-in">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
@@ -1497,7 +1597,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
               </span>
               <div>
                 <h3 className="font-extrabold text-orange-950 text-base">Lignes bancaires à imputer ({lignesEnAttente.length})</h3>
-                <p className="text-xs text-orange-800/80">Affectez un compte comptable avant transfert définitif vers le Grand Livre.</p>
+                <p className="text-xs text-orange-800/80">Recherche par numéro de compte ou par mot-clé (ex : AS, loyer, banque).</p>
               </div>
             </div>
 
@@ -1526,14 +1626,14 @@ const GrandLivre = ({ transactionsGlobales }) => {
                   <th className="py-3 px-4">Libellé</th>
                   <th className="py-3 px-4 text-right">Montant</th>
                   <th className="py-3 px-4">Commentaire</th>
-                  <th className="py-3 px-4">Compte comptable</th>
+                  <th className="py-3 px-4 min-w-[280px]">Compte comptable (Recherchable)</th>
                   <th className="py-3 px-4 text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-orange-100">
                 {lignesEnAttente.map((ligne) => (
                   <tr key={ligne.id} className="hover:bg-orange-50/40 transition-colors">
-                    <td className="py-3 px-4 font-mono font-semibold text-slate-600 whitespace-nowrap">{formatDateAffichage(ligne.date)}</td>
+                    <td className="py-3 px-4 font-mono font-semibold text-slate-600 whitespace-nowrap">{normaliserDateFR(ligne.date)}</td>
                     <td className="py-3 px-4 font-medium text-slate-800 truncate max-w-xs">{ligne.libelle}</td>
                     <td className={`py-3 px-4 text-right font-extrabold font-mono whitespace-nowrap ${ligne.montant > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                       {ligne.montant > 0 ? '+' : ''}{ligne.montant.toFixed(2)} €
@@ -1547,35 +1647,24 @@ const GrandLivre = ({ transactionsGlobales }) => {
                           const val = e.target.value;
                           setLignesEnAttente(prev => prev.map(l => l.id === ligne.id ? { ...l, commentaire: val } : l));
                         }}
-                        className="border border-slate-200 rounded-lg px-2.5 py-1 text-xs w-full outline-none focus:border-indigo-500 bg-slate-50/50"
+                        className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs w-full outline-none focus:border-indigo-500 bg-slate-50/50"
                       />
                     </td>
-                    <td className="py-3 px-4">
-                      <select 
+                    
+                    <td className="py-3 px-4 min-w-[280px]">
+                      <SearchableCompteSelect 
                         value={ligne.comptePropose || ''}
-                        onChange={(e) => {
-                          const val = e.target.value;
+                        comptesList={comptesList}
+                        onChange={(val) => {
                           setLignesEnAttente(prev => prev.map(l => 
                             (l.id === ligne.id || l.libelle === ligne.libelle) 
                               ? { ...l, comptePropose: val } 
                               : l
                           ));
                         }}
-                        className={`border rounded-xl px-3 py-1.5 w-full text-xs font-mono font-bold outline-none cursor-pointer transition-all ${
-                          ligne.comptePropose 
-                            ? 'border-indigo-300 bg-indigo-50/80 text-indigo-900' 
-                            : 'border-slate-200 bg-white'
-                        }`}
-                      >
-                        <option value="">Sélectionner un compte...</option>
-                        {ligne.comptePropose && !comptesList.find(c => c.code === ligne.comptePropose) && (
-                          <option value={ligne.comptePropose}>{ligne.comptePropose} (Suggéré)</option>
-                        )}
-                        {comptesList.map(c => (
-                          <option key={c.id} value={c.code}>{c.code} - {c.libelle}</option>
-                        ))}
-                      </select>
+                      />
                     </td>
+
                     <td className="py-3 px-4 text-center">
                       <div className="flex justify-center items-center gap-2">
                         <button 
@@ -1605,7 +1694,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
       {/* GRAND LIVRE DÉFINITIF TABLEAU */}
       <div className="bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden">
         
-        {/* Barre de Filtres & Commandes */}
         <div className="p-5 bg-slate-50/80 border-b border-slate-200/80 flex flex-wrap justify-between items-center gap-4">
           <div className="flex items-center gap-3">
             <span className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl">
@@ -1615,7 +1703,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
           </div>
 
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-            
             <button 
               onClick={handleResetGrandLivre}
               className="text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-2 active:scale-95"
@@ -1658,7 +1745,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
           </div>
         </div>
 
-        {/* Table de données */}
         <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
           <table className="w-full text-xs text-left min-w-max">
             <thead className="bg-slate-100/70 text-slate-500 uppercase font-extrabold text-[10px] tracking-wider sticky top-0 backdrop-blur-md shadow-sm z-10">
@@ -1706,7 +1792,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
                 return (
                   <tr key={t.id} className="hover:bg-slate-50/80 transition-colors group">
-                    <td className="py-3.5 px-4 font-mono font-semibold text-slate-600 whitespace-nowrap">{formatDateAffichage(t.date)}</td>
+                    <td className="py-3.5 px-4 font-mono font-semibold text-slate-600 whitespace-nowrap">{normaliserDateFR(t.date)}</td>
                     
                     <td className="py-3.5 px-3 text-slate-400 font-mono text-[10px]" title={t.id}>
                       {t.id.substring(0, 6)}...
@@ -1745,7 +1831,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
                       )}
                     </td>
 
-                    {/* Débit & Crédit */}
                     {t.type === 'od' ? (
                       <>
                         <td className="py-3.5 px-4 text-right font-mono font-bold text-purple-700 whitespace-nowrap">
@@ -1766,53 +1851,20 @@ const GrandLivre = ({ transactionsGlobales }) => {
                       </>
                     )}
                     
-                    {/* Détail Compte */}
-                    <td className="py-3.5 px-4">
+                    <td className="py-3.5 px-4 min-w-[220px]">
                       {editingRowId === t.id ? (
-                        t.type === 'od' ? (
-                          (t.compteDebit && t.compteCredit) ? (
-                            <div className="flex flex-col gap-1 w-full min-w-[200px]">
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-bold text-slate-500 w-3">D:</span>
-                                <select value={t.compteDebit || ''} onChange={(e) => handleUpdateField(t.id, e.target.value, 'compteDebit')} className="border border-indigo-300 rounded-lg p-1 text-xs bg-indigo-50 w-full text-indigo-800 outline-none">
-                                  <option value="">Non défini</option>
-                                  {comptesList.map(c => <option key={`d-${c.id}`} value={c.code}>{c.code} - {c.libelle}</option>)}
-                                </select>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-bold text-slate-500 w-3">C:</span>
-                                <select value={t.compteCredit || ''} onChange={(e) => handleUpdateField(t.id, e.target.value, 'compteCredit')} className="border border-indigo-300 rounded-lg p-1 text-xs bg-indigo-50 w-full text-indigo-800 outline-none">
-                                  <option value="">Non défini</option>
-                                  {comptesList.map(c => <option key={`c-${c.id}`} value={c.code}>{c.code} - {c.libelle}</option>)}
-                                </select>
-                              </div>
-                            </div>
-                          ) : (
-                            <select 
-                              value={t.compteDebit || t.compteCredit || ''} 
-                              onChange={(e) => {
-                                handleUpdateField(t.id, e.target.value, t.compteDebit ? 'compteDebit' : 'compteCredit');
-                                setEditingRowId(null);
-                              }}
-                              className="border border-purple-300 rounded-lg p-1.5 text-xs bg-purple-50 min-w-[200px] w-full text-purple-900 font-mono font-bold outline-none"
-                            >
-                              <option value="">Non défini</option>
-                              {comptesList.map(c => <option key={c.id} value={c.code}>{c.code} - {c.libelle}</option>)}
-                            </select>
-                          )
-                        ) : (
-                          <select 
-                            value={t.compte || ''} 
-                            onChange={(e) => {
-                              handleUpdateField(t.id, e.target.value, 'compte');
-                              setEditingRowId(null);
-                            }}
-                            className="border border-indigo-300 rounded-lg p-1.5 text-xs bg-indigo-50 min-w-[200px] w-full text-indigo-900 font-mono font-bold outline-none"
-                          >
-                            <option value="">Non défini</option>
-                            {comptesList.map(c => <option key={c.id} value={c.code}>{c.code} - {c.libelle}</option>)}
-                          </select>
-                        )
+                        <SearchableCompteSelect 
+                          value={t.compte || t.compteDebit || t.compteCredit || ''}
+                          comptesList={comptesList}
+                          onChange={(val) => {
+                            if (t.type === 'od') {
+                              handleUpdateField(t.id, val, t.compteDebit ? 'compteDebit' : 'compteCredit');
+                            } else {
+                              handleUpdateField(t.id, val, 'compte');
+                            }
+                            setEditingRowId(null);
+                          }}
+                        />
                       ) : (
                         t.type === 'od' ? (
                           (t.compteDebit && t.compteCredit) ? (
@@ -1837,7 +1889,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
                       )}
                     </td>
                     
-                    {/* Colonne Actions */}
                     <td className="py-3.5 px-4 text-center">
                       <div className="flex justify-center items-center gap-1.5">
                         {editingRowId === t.id ? (
@@ -1904,7 +1955,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
                 );
               })}
               
-              {/* ÉTAT VIDE DESIGN (EMPTY STATE) */}
               {filteredAndSortedTransactions.length === 0 && (
                 <tr>
                   <td colSpan="11" className="py-16 text-center bg-slate-50/40">
