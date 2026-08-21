@@ -335,7 +335,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
   const [editingRowId, setEditingRowId] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   
-  // Formulaire OD Multi-lignes avec Commentaire
   const [odFormDate, setOdFormDate] = useState('');
   const [odFormLibelle, setOdFormLibelle] = useState('');
   const [odFormCommentaire, setOdFormCommentaire] = useState('');
@@ -345,7 +344,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
   ]);
   
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCompteFilter, setSelectedCompteFilter] = useState(''); // NOUVEAU : Filtre par compte
+  const [selectedCompteFilter, setSelectedCompteFilter] = useState(''); 
   const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' });
   
   const fileInputCsvRef = useRef(null);
@@ -551,7 +550,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
     reader.readAsText(file, 'UTF-8');
   };
 
-  // NOUVEAU : Importation de masse OD adaptée aux colonnes A à I + L (Commentaire)
   const handleImportODMass = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -561,15 +559,24 @@ const GrandLivre = ({ transactionsGlobales }) => {
       for (let i = 1; i < rows.length; i++) {
         const cols = rows[i];
         if (cols && cols.length >= 9) {
-          // A(0)=Date, C(2)=Journal, D(3)=Compte, F(5)=Numéro pièce, G(6)=Libellé, H(7)=Débit, I(8)=Crédit, L(11)=Commentaire
           const rawDate = cols[0];
-          const journal = cols[2];
-          const compteNum = String(cols[3] || '').trim();
+          const journal = String(cols[2] || '').trim().toUpperCase();
+          let compteNum = String(cols[3] || '').trim();
           const pieceRef = cols[5] || '';
           const libelle = cols[6] || '';
-          const debitVal = parseFloat(String(cols[7] || '').replace(/\s/g, '').replace(',', '.')) || 0;
-          const creditVal = parseFloat(String(cols[8] || '').replace(/\s/g, '').replace(',', '.')) || 0;
-          const commentaire = cols[11] || ''; // Colonne L
+          
+          let debitVal = parseFloat(String(cols[7] || '').replace(/\s/g, '').replace(',', '.')) || 0;
+          let creditVal = parseFloat(String(cols[8] || '').replace(/\s/g, '').replace(',', '.')) || 0;
+          const commentaire = cols[11] || '';
+
+          // Étape 1 : Inversion purement mathématique
+          if (debitVal < 0) {
+            creditVal = Math.abs(debitVal);
+            debitVal = 0;
+          } else if (creditVal < 0) {
+            debitVal = Math.abs(creditVal);
+            creditVal = 0;
+          }
 
           if (rawDate && libelle && (debitVal !== 0 || creditVal !== 0)) {
             let formattedDate = rawDate;
@@ -578,18 +585,29 @@ const GrandLivre = ({ transactionsGlobales }) => {
               formattedDate = `${y.length === 2 ? '20'+y : y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
             }
 
-            const isDebit = debitVal !== 0;
-            const montantFinal = isDebit ? Math.abs(debitVal) : Math.abs(creditVal);
+            const isDebit = debitVal > 0;
+            const montantFinal = isDebit ? debitVal : creditVal;
+
+            // Étape 2 : Intelligence Comptable (Symétrie Classe 6 / Classe 7)
+            if (isDebit && compteNum.startsWith('7')) {
+              // Un compte 7 au débit devient un compte 6
+              compteNum = '6' + compteNum.substring(1);
+            } else if (!isDebit && compteNum.startsWith('6')) {
+              // Un compte 6 au crédit devient un compte 7
+              compteNum = '7' + compteNum.substring(1);
+            }
+
+            const prefix = journal === 'PAIE' ? '(PAIE)' : '(OD)';
 
             const newTx = {
               date: formattedDate,
-              libelle: `(OD) ${libelle}`,
+              libelle: `${prefix} ${libelle}`,
               montant: montantFinal,
               type: 'od',
               compteDebit: isDebit ? compteNum : '',
               compteCredit: !isDebit ? compteNum : '',
               reference: pieceRef,
-              typeOp: journal || 'OD',
+              typeOp: journal || 'OD', 
               commentaire: commentaire,
               date_creation: new Date().toISOString()
             };
@@ -603,7 +621,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
           }
         }
       }
-      alert(`${count} lignes d'OD importées avec succès depuis le fichier !`);
+      alert(`${count} lignes (OD/PAIE) importées avec succès dans le Grand Livre !`);
       if (fileInputODRef.current) fileInputODRef.current.value = '';
     };
 
@@ -652,6 +670,33 @@ const GrandLivre = ({ transactionsGlobales }) => {
       setLignesEnAttente(prev => prev.filter(l => l.id !== ligneId));
     } catch(e) {
       alert("Erreur de sauvegarde.");
+    }
+  };
+
+  const validerLignesPretes = async () => {
+    const lignesAValider = lignesEnAttente.filter(l => l.comptePropose);
+    if (lignesAValider.length === 0) return;
+    
+    if (window.confirm(`Vous êtes sur le point d'envoyer ${lignesAValider.length} écriture(s) d'un seul coup vers le Grand Livre. Confirmer ?`)) {
+      for (const ligne of lignesAValider) {
+        const newTx = {
+          date: ligne.date,
+          libelle: ligne.libelle,
+          montant: ligne.montant,
+          compte: ligne.comptePropose,
+          reference: ligne.reference || '',
+          typeOp: ligne.typeOp || '',
+          commentaire: ligne.commentaire || '',
+          type: ligne.montant < 0 ? 'depense' : 'recette',
+          date_creation: new Date().toISOString()
+        };
+        try {
+          await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), newTx);
+        } catch(e) {
+          console.error("Erreur sur l'insertion de masse", e);
+        }
+      }
+      setLignesEnAttente(prev => prev.filter(l => !l.comptePropose));
     }
   };
 
@@ -759,7 +804,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
   const filteredAndSortedTransactions = useMemo(() => {
     let result = [...transactionsGlobales];
 
-    // 1. Filtrage par texte global
     if (searchTerm) {
       const lowerTerm = searchTerm.toLowerCase();
       result = result.filter(t => 
@@ -772,7 +816,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
       );
     }
 
-    // 2. NOUVEAU : Filtrage spécifique par Compte Comptable
     if (selectedCompteFilter) {
       result = result.filter(t => 
         t.compte === selectedCompteFilter || 
@@ -781,7 +824,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
       );
     }
 
-    // 3. Tri
     result.sort((a, b) => {
       let valA, valB;
       
@@ -980,6 +1022,9 @@ const GrandLivre = ({ transactionsGlobales }) => {
                           className={`border rounded-lg px-3 py-2 w-full text-sm font-mono pr-8 focus:ring-2 focus:ring-indigo-500 appearance-none outline-none cursor-pointer transition-all ${ligne.comptePropose ? 'border-indigo-400 bg-indigo-50 text-indigo-800 font-bold shadow-inner' : 'border-slate-300 bg-white'}`}
                         >
                           <option value="">Sélectionner un compte...</option>
+                          {ligne.comptePropose && !comptesList.find(c => c.code === ligne.comptePropose) && (
+                            <option value={ligne.comptePropose}>{ligne.comptePropose} (Suggéré)</option>
+                          )}
                           {comptesList.map(c => (
                             <option key={c.id} value={c.code}>{c.code} - {c.libelle}</option>
                           ))}
@@ -1017,7 +1062,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
             <CheckCircle2 className="text-emerald-500" /> Écritures Validées au Grand Livre
           </h3>
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-            {/* NOUVEAU : Filtre par compte comptable précis */}
             <select 
               value={selectedCompteFilter}
               onChange={(e) => setSelectedCompteFilter(e.target.value)}
@@ -1066,7 +1110,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
                 </th>
                 <th className="py-3 px-3 text-slate-400 min-w-[150px]">Infos complémentaires</th>
                 <th className="py-3 px-3 text-slate-400">Type Op.</th>
-                {/* NOUVELLE COLONNE COMMENTAIRE EXTENSIBLE */}
                 <th className="py-3 px-3 text-slate-400 min-w-[180px]">Commentaire</th>
                 <th className="py-3 px-3 text-right cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('montant')}>
                   <div className="flex items-center justify-end gap-1">Débit {sortConfig.key === 'montant' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
@@ -1085,7 +1128,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
                 let sourceLabel = 'Banque';
                 let sourceColor = 'bg-blue-50 text-blue-700 border-blue-200';
                 if (t.type === 'od') {
-                  if (t.libelle && t.libelle.includes('(PAIE)')) {
+                  if (t.typeOp === 'PAIE' || (t.libelle && t.libelle.includes('(PAIE)'))) {
                     sourceLabel = 'Paie';
                     sourceColor = 'bg-pink-50 text-pink-700 border-pink-200';
                   } else {
@@ -1098,7 +1141,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
                   <tr key={t.id} className="hover:bg-slate-50 transition-colors">
                     <td className="py-3 px-3 text-slate-600 whitespace-nowrap">{t.date}</td>
                     
-                    {/* ID UNIQUE FIRESTORE */}
                     <td className="py-3 px-3 text-slate-400 font-mono text-[10px]" title={t.id}>
                       {t.id.substring(0, 6)}...
                     </td>
@@ -1109,12 +1151,10 @@ const GrandLivre = ({ transactionsGlobales }) => {
                       </span>
                     </td>
 
-                    {/* LIBELLÉ EXTENSIBLE (WHITESPACE-NORMAL) */}
                     <td className="py-3 px-3 text-slate-800 font-medium whitespace-normal max-w-xs">
                       {t.libelle}
                     </td>
 
-                    {/* INFOS COMPLÉMENTAIRES EXTENSIBLES */}
                     <td className="py-3 px-3 text-slate-600 text-xs whitespace-normal max-w-[150px]">
                       {t.reference || <span className="text-slate-300 italic">-</span>}
                     </td>
@@ -1123,7 +1163,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
                       {t.typeOp || <span className="text-slate-300 italic">-</span>}
                     </td>
                     
-                    {/* COMMENTAIRE MODIFIABLE EN DIRECT OU TEXTE */}
                     <td className="py-3 px-3 text-slate-600 text-xs whitespace-normal max-w-[200px]">
                       {editingRowId === t.id ? (
                         <input 
