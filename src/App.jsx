@@ -335,6 +335,9 @@ const GrandLivre = ({ transactionsGlobales }) => {
   const [editingRowId, setEditingRowId] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   
+  // NOUVEAU : État pour mémoriser le dernier import et permettre son annulation
+  const [lastImportBatch, setLastImportBatch] = useState(null);
+  
   const [odFormDate, setOdFormDate] = useState('');
   const [odFormLibelle, setOdFormLibelle] = useState('');
   const [odFormCommentaire, setOdFormCommentaire] = useState('');
@@ -347,8 +350,8 @@ const GrandLivre = ({ transactionsGlobales }) => {
   const [selectedCompteFilter, setSelectedCompteFilter] = useState(''); 
   const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' });
   
-  const fileInputCsvRef = useRef(null);
-  const fileInputXlsxRef = useRef(null);
+  // NOUVEAU : Réf unique pour la banque (fusion CSV/XLSX)
+  const fileInputBankRef = useRef(null);
   const fileInputPaieRef = useRef(null);
   const fileInputODRef = useRef(null);
 
@@ -409,12 +412,34 @@ const GrandLivre = ({ transactionsGlobales }) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transactionsGlobales]);
 
-  const handleImportFile = async (e, type) => {
+  // NOUVEAU : Fonction d'annulation globale d'un lot d'import
+  const handleUndoLastImport = async () => {
+    if (!lastImportBatch) return;
+    if (!window.confirm(`Voulez-vous vraiment annuler le dernier import de ${lastImportBatch.source} (${lastImportBatch.count} lignes) ?`)) return;
+
+    if (lastImportBatch.target === 'sas') {
+      // Nettoyage dans le brouillon d'attente
+      setLignesEnAttente(prev => prev.filter(l => l.batchId !== lastImportBatch.batchId));
+      alert("L'import a été annulé et retiré de la liste d'attente.");
+    } else if (lastImportBatch.target === 'firestore') {
+      // Nettoyage direct dans le Grand Livre
+      const txToDelete = transactionsGlobales.filter(t => t.batchId === lastImportBatch.batchId);
+      for (const tx of txToDelete) {
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', tx.id));
+      }
+      alert(`L'import a été annulé (${txToDelete.length} écritures ont été retirées du Grand Livre).`);
+    }
+    setLastImportBatch(null);
+  };
+
+  // MISE À JOUR : Un seul import pour la Banque (fusion CSV / XLSX) avec Lot ID
+  const handleImportBank = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    const batchId = 'batch_' + Date.now();
     let doublonsCount = 0;
 
-    const preparerLignes = (lignesBrutes) => {
+    const processRows = (lignesBrutes) => {
       const nouvellesLignes = [];
       for (let i = 0; i < lignesBrutes.length; i++) {
         const cols = lignesBrutes[i];
@@ -446,6 +471,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
             nouvellesLignes.push({
               id: Math.random().toString(36).substr(2, 9),
+              batchId: batchId, // NOUVEAU : Traçabilité du lot
               date: dateExtrait,
               libelle: libelleExtrait,
               reference: cols[2], 
@@ -461,34 +487,39 @@ const GrandLivre = ({ transactionsGlobales }) => {
       return nouvellesLignes;
     };
 
-    if (type === 'csv') {
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (ext === 'csv') {
       const reader = new FileReader();
       reader.onload = (event) => {
         const lines = event.target.result.split('\n');
         const lignesBrutes = lines.slice(1).map(line => line.split(';').map(c => c.trim().replace(/"/g, '')));
-        const resultat = preparerLignes(lignesBrutes);
+        const resultat = processRows(lignesBrutes);
         setLignesEnAttente(prev => [...prev, ...resultat]);
+        if (resultat.length > 0) setLastImportBatch({ batchId, target: 'sas', source: 'Journal de Banque', count: resultat.length });
         alert(`${resultat.length} ligne(s) importée(s) avec succès.${doublonsCount > 0 ? `\n(Sécurité : ${doublonsCount} doublon(s) ignoré(s))` : ''}`);
       };
       reader.readAsText(file, 'ISO-8859-1');
-    } else if (type === 'xlsx') {
+    } else if (ext === 'xlsx') {
       try {
         const data = await file.arrayBuffer();
         const workbook = XLSX.read(data, { type: 'array' });
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false, defval: '' });
-        const resultat = preparerLignes(rows.slice(1));
+        const resultat = processRows(rows.slice(1));
         setLignesEnAttente(prev => [...prev, ...resultat]);
+        if (resultat.length > 0) setLastImportBatch({ batchId, target: 'sas', source: 'Journal de Banque', count: resultat.length });
         alert(`${resultat.length} ligne(s) importée(s) avec succès.${doublonsCount > 0 ? `\n(Sécurité : ${doublonsCount} doublon(s) ignoré(s))` : ''}`);
       } catch (err) {
         alert("Erreur lors de la lecture du fichier XLSX.");
       }
     }
+    if (fileInputBankRef.current) fileInputBankRef.current.value = '';
   };
 
   const handleImportPaie = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    const batchId = 'batch_' + Date.now();
 
     const reader = new FileReader();
     reader.onload = async (event) => {
@@ -523,6 +554,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
             }
 
             const newTx = {
+              batchId: batchId, // NOUVEAU : Traçabilité
               date: formattedDate,
               libelle: libelleFinal,
               montant: mt,
@@ -544,6 +576,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
           }
         }
       }
+      if (count > 0) setLastImportBatch({ batchId, target: 'firestore', source: 'Fiches de Paie', count });
       alert(`${count} ligne(s) de paie intégrée(s) !${doublonsCount > 0 ? `\n(Sécurité : ${doublonsCount} doublon(s) ignoré(s))` : ''}`);
       if (fileInputPaieRef.current) fileInputPaieRef.current.value = '';
     };
@@ -553,6 +586,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
   const handleImportODMass = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    const batchId = 'batch_' + Date.now();
 
     const processRows = async (rows) => {
       let count = 0;
@@ -569,7 +603,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
           let creditVal = parseFloat(String(cols[8] || '').replace(/\s/g, '').replace(',', '.')) || 0;
           const commentaire = cols[11] || '';
 
-          // Étape 1 : Inversion purement mathématique
           if (debitVal < 0) {
             creditVal = Math.abs(debitVal);
             debitVal = 0;
@@ -588,18 +621,16 @@ const GrandLivre = ({ transactionsGlobales }) => {
             const isDebit = debitVal > 0;
             const montantFinal = isDebit ? debitVal : creditVal;
 
-            // Étape 2 : Intelligence Comptable (Symétrie Classe 6 / Classe 7)
             if (isDebit && compteNum.startsWith('7')) {
-              // Un compte 7 au débit devient un compte 6
               compteNum = '6' + compteNum.substring(1);
             } else if (!isDebit && compteNum.startsWith('6')) {
-              // Un compte 6 au crédit devient un compte 7
               compteNum = '7' + compteNum.substring(1);
             }
 
             const prefix = journal === 'PAIE' ? '(PAIE)' : '(OD)';
 
             const newTx = {
+              batchId: batchId, // NOUVEAU : Traçabilité
               date: formattedDate,
               libelle: `${prefix} ${libelle}`,
               montant: montantFinal,
@@ -621,7 +652,8 @@ const GrandLivre = ({ transactionsGlobales }) => {
           }
         }
       }
-      alert(`${count} lignes (OD/PAIE) importées avec succès dans le Grand Livre !`);
+      if (count > 0) setLastImportBatch({ batchId, target: 'firestore', source: 'Opérations Diverses', count });
+      alert(`${count} lignes importées avec succès dans le Grand Livre !`);
       if (fileInputODRef.current) fileInputODRef.current.value = '';
     };
 
@@ -867,19 +899,31 @@ const GrandLivre = ({ transactionsGlobales }) => {
         </div>
       </div>
 
+      {/* BANDEAU "UNDO" (ANNULER LE DERNIER IMPORT) */}
+      {lastImportBatch && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 px-5 py-3 rounded-xl flex justify-between items-center shadow-sm animate-fade-in">
+          <div className="flex items-center gap-3">
+            <AlertTriangle size={20} className="text-amber-500" />
+            <span className="text-sm font-medium">Dernier import effectué : <strong>{lastImportBatch.source}</strong> ({lastImportBatch.count} lignes).</span>
+          </div>
+          <button 
+            onClick={handleUndoLastImport} 
+            className="bg-white hover:bg-amber-100 border border-amber-300 text-amber-900 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-sm"
+          >
+            <XCircle size={16} /> Annuler cet import
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* BANQUE */}
+        {/* BANQUE (FUSION DES DEUX BOUTONS) */}
         <div className="bg-indigo-50 p-6 rounded-xl border border-indigo-100 flex flex-col justify-center items-center text-center space-y-4">
           <h3 className="font-bold text-indigo-900 text-lg">Journal de Banque</h3>
           <p className="text-sm text-indigo-700">Importez vos lignes bancaires pour les imputer.</p>
-          <div className="flex flex-col gap-2 w-full">
-            <input type="file" accept=".csv" className="hidden" ref={fileInputCsvRef} onChange={(e) => handleImportFile(e, 'csv')} />
-            <button onClick={() => fileInputCsvRef.current.click()} className="w-full justify-center bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition-colors">
-              <Download size={16} /> Import Relevé (.csv)
-            </button>
-            <input type="file" accept=".xlsx" className="hidden" ref={fileInputXlsxRef} onChange={(e) => handleImportFile(e, 'xlsx')} />
-            <button onClick={() => fileInputXlsxRef.current.click()} className="w-full justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition-colors">
-              <FileSpreadsheet size={16} /> Import Relevé (.xlsx)
+          <div className="flex flex-col gap-2 w-full mt-auto">
+            <input type="file" accept=".csv,.xlsx" className="hidden" ref={fileInputBankRef} onChange={handleImportBank} />
+            <button onClick={() => fileInputBankRef.current.click()} className="w-full justify-center bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg font-bold text-sm flex items-center gap-2 transition-colors shadow-sm">
+              <Download size={16} /> Import Relevé (.csv / .xlsx)
             </button>
           </div>
         </div>
@@ -890,7 +934,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
           <p className="text-sm text-pink-700">Importez le fichier TXT exporté depuis le logiciel de paie.</p>
           <div className="flex-1"></div>
           <input type="file" accept=".txt,.tsv" className="hidden" ref={fileInputPaieRef} onChange={handleImportPaie} />
-          <button onClick={() => fileInputPaieRef.current.click()} className="w-full justify-center bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition-colors">
+          <button onClick={() => fileInputPaieRef.current.click()} className="w-full justify-center bg-pink-600 hover:bg-pink-700 text-white px-4 py-2.5 rounded-lg font-bold text-sm flex items-center gap-2 transition-colors shadow-sm">
             <Users size={16} /> Importer Fichier (.txt)
           </button>
         </div>
@@ -902,7 +946,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
               <FileText size={18} /> Opération Diverse
             </h3>
             <input type="file" accept=".csv,.xlsx" className="hidden" ref={fileInputODRef} onChange={handleImportODMass} />
-            <button onClick={() => fileInputODRef.current.click()} className="text-[10px] uppercase font-bold bg-purple-200 text-purple-800 px-2 py-1 rounded hover:bg-purple-300 transition-colors flex items-center gap-1" title="Format Colonnes A à I + L">
+            <button onClick={() => fileInputODRef.current.click()} className="text-[10px] uppercase font-bold bg-purple-200 text-purple-800 px-2 py-1 rounded hover:bg-purple-300 transition-colors flex items-center gap-1 shadow-sm" title="Format Colonnes A à I + L">
               <Download size={12}/> Import masse (.csv / .xlsx)
             </button>
           </div>
@@ -944,7 +988,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
             <button 
               onClick={handleAddOD} 
               disabled={!isOdBalanced}
-              className={`w-full py-2 rounded font-medium text-sm transition-colors ${isOdBalanced ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-purple-300 text-purple-100 cursor-not-allowed'}`}
+              className={`w-full py-2 rounded font-medium text-sm transition-colors shadow-sm ${isOdBalanced ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-purple-300 text-purple-100 cursor-not-allowed'}`}
             >
               Enregistrer l'OD
             </button>
