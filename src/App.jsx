@@ -335,19 +335,23 @@ const GrandLivre = ({ transactionsGlobales }) => {
   const [editingRowId, setEditingRowId] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   
+  // Formulaire OD Multi-lignes avec Commentaire
   const [odFormDate, setOdFormDate] = useState('');
   const [odFormLibelle, setOdFormLibelle] = useState('');
+  const [odFormCommentaire, setOdFormCommentaire] = useState('');
   const [odLines, setOdLines] = useState([
     { id: 1, compte: '', debit: '', credit: '' },
     { id: 2, compte: '', debit: '', credit: '' }
   ]);
   
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCompteFilter, setSelectedCompteFilter] = useState(''); // NOUVEAU : Filtre par compte
   const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' });
   
   const fileInputCsvRef = useRef(null);
   const fileInputXlsxRef = useRef(null);
   const fileInputPaieRef = useRef(null);
+  const fileInputODRef = useRef(null);
 
   useEffect(() => {
     const q = collection(db, 'artifacts', appId, 'public', 'data', 'comptes');
@@ -446,7 +450,8 @@ const GrandLivre = ({ transactionsGlobales }) => {
               date: dateExtrait,
               libelle: libelleExtrait,
               reference: cols[2], 
-              typeOp: cols[4],    
+              typeOp: cols[4],
+              commentaire: '',
               montant: mt,
               comptePropose: devinerCompte(libelleExtrait),
               statut: 'attente'
@@ -526,6 +531,8 @@ const GrandLivre = ({ transactionsGlobales }) => {
               compteDebit: debit > 0 ? compteNum : '',
               compteCredit: credit > 0 ? compteNum : '',
               reference: pieceRef,
+              typeOp: 'Paie',
+              commentaire: '',
               date_creation: new Date().toISOString()
             };
             
@@ -544,7 +551,84 @@ const GrandLivre = ({ transactionsGlobales }) => {
     reader.readAsText(file, 'UTF-8');
   };
 
-  const validerLigneBank = async (ligneId, compteCode) => {
+  // NOUVEAU : Importation de masse OD adaptée aux colonnes A à I + L (Commentaire)
+  const handleImportODMass = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const processRows = async (rows) => {
+      let count = 0;
+      for (let i = 1; i < rows.length; i++) {
+        const cols = rows[i];
+        if (cols && cols.length >= 9) {
+          // A(0)=Date, C(2)=Journal, D(3)=Compte, F(5)=Numéro pièce, G(6)=Libellé, H(7)=Débit, I(8)=Crédit, L(11)=Commentaire
+          const rawDate = cols[0];
+          const journal = cols[2];
+          const compteNum = String(cols[3] || '').trim();
+          const pieceRef = cols[5] || '';
+          const libelle = cols[6] || '';
+          const debitVal = parseFloat(String(cols[7] || '').replace(/\s/g, '').replace(',', '.')) || 0;
+          const creditVal = parseFloat(String(cols[8] || '').replace(/\s/g, '').replace(',', '.')) || 0;
+          const commentaire = cols[11] || ''; // Colonne L
+
+          if (rawDate && libelle && (debitVal !== 0 || creditVal !== 0)) {
+            let formattedDate = rawDate;
+            if (rawDate.includes('/')) {
+              const [d, m, y] = rawDate.split('/');
+              formattedDate = `${y.length === 2 ? '20'+y : y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+            }
+
+            const isDebit = debitVal !== 0;
+            const montantFinal = isDebit ? Math.abs(debitVal) : Math.abs(creditVal);
+
+            const newTx = {
+              date: formattedDate,
+              libelle: `(OD) ${libelle}`,
+              montant: montantFinal,
+              type: 'od',
+              compteDebit: isDebit ? compteNum : '',
+              compteCredit: !isDebit ? compteNum : '',
+              reference: pieceRef,
+              typeOp: journal || 'OD',
+              commentaire: commentaire,
+              date_creation: new Date().toISOString()
+            };
+            
+            try {
+              await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), newTx);
+              count++;
+            } catch(err) {
+              console.error(err);
+            }
+          }
+        }
+      }
+      alert(`${count} lignes d'OD importées avec succès depuis le fichier !`);
+      if (fileInputODRef.current) fileInputODRef.current.value = '';
+    };
+
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (ext === 'csv') {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const lines = event.target.result.split('\n');
+        const rows = lines.map(line => line.split(';').map(c => c.trim().replace(/"/g, '')));
+        await processRows(rows);
+      };
+      reader.readAsText(file, 'ISO-8859-1');
+    } else if (ext === 'xlsx') {
+      try {
+        const data = await file.arrayBuffer();
+        const workbook = XLSX.read(data, { type: 'array' });
+        const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, raw: false, defval: '' });
+        await processRows(rows);
+      } catch (err) {
+        alert("Erreur de lecture du fichier XLSX.");
+      }
+    }
+  };
+
+  const validerLigneBank = async (ligneId, compteCode, commentaireTxt) => {
     const ligne = lignesEnAttente.find(l => l.id === ligneId);
     if (!ligne || !compteCode) {
       alert("Veuillez sélectionner un compte avant de valider.");
@@ -558,6 +642,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
       compte: compteCode,
       reference: ligne.reference || '',
       typeOp: ligne.typeOp || '',
+      commentaire: commentaireTxt || '',
       type: ligne.montant < 0 ? 'depense' : 'recette',
       date_creation: new Date().toISOString()
     };
@@ -567,32 +652,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
       setLignesEnAttente(prev => prev.filter(l => l.id !== ligneId));
     } catch(e) {
       alert("Erreur de sauvegarde.");
-    }
-  };
-
-  const validerLignesPretes = async () => {
-    const lignesAValider = lignesEnAttente.filter(l => l.comptePropose);
-    if (lignesAValider.length === 0) return;
-    
-    if (window.confirm(`Vous êtes sur le point d'envoyer ${lignesAValider.length} écriture(s) d'un seul coup vers le Grand Livre. Confirmer ?`)) {
-      for (const ligne of lignesAValider) {
-        const newTx = {
-          date: ligne.date,
-          libelle: ligne.libelle,
-          montant: ligne.montant,
-          compte: ligne.comptePropose,
-          reference: ligne.reference || '',
-          typeOp: ligne.typeOp || '',
-          type: ligne.montant < 0 ? 'depense' : 'recette',
-          date_creation: new Date().toISOString()
-        };
-        try {
-          await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), newTx);
-        } catch(e) {
-          console.error("Erreur sur l'insertion de masse", e);
-        }
-      }
-      setLignesEnAttente(prev => prev.filter(l => !l.comptePropose));
     }
   };
 
@@ -639,6 +698,8 @@ const GrandLivre = ({ transactionsGlobales }) => {
             type: 'od',
             compteDebit: debit > 0 ? line.compte : '',
             compteCredit: credit > 0 ? line.compte : '',
+            typeOp: 'OD',
+            commentaire: odFormCommentaire,
             date_creation: new Date().toISOString()
           };
           await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), newTx);
@@ -646,6 +707,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
       }
       setOdFormDate('');
       setOdFormLibelle('');
+      setOdFormCommentaire('');
       setOdLines([{ id: 1, compte: '', debit: '', credit: '' }, { id: 2, compte: '', debit: '', credit: '' }]);
       alert("OD enregistrée et ventilée avec succès !");
     } catch(e) {
@@ -667,13 +729,13 @@ const GrandLivre = ({ transactionsGlobales }) => {
     }
   };
 
-  const handleUpdateCompte = async (txId, newCompte, field) => {
+  const handleUpdateField = async (txId, newValue, field) => {
     try {
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', txId), {
-        [field]: newCompte
+        [field]: newValue
       });
     } catch(e) {
-      alert("Erreur lors de la mise à jour du compte.");
+      alert("Erreur lors de la mise à jour.");
     }
   };
 
@@ -697,6 +759,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
   const filteredAndSortedTransactions = useMemo(() => {
     let result = [...transactionsGlobales];
 
+    // 1. Filtrage par texte global
     if (searchTerm) {
       const lowerTerm = searchTerm.toLowerCase();
       result = result.filter(t => 
@@ -704,10 +767,21 @@ const GrandLivre = ({ transactionsGlobales }) => {
         (t.compte && t.compte.toLowerCase().includes(lowerTerm)) ||
         (t.compteDebit && t.compteDebit.toLowerCase().includes(lowerTerm)) ||
         (t.compteCredit && t.compteCredit.toLowerCase().includes(lowerTerm)) ||
-        (t.reference && t.reference.toLowerCase().includes(lowerTerm))
+        (t.reference && t.reference.toLowerCase().includes(lowerTerm)) ||
+        (t.commentaire && t.commentaire.toLowerCase().includes(lowerTerm))
       );
     }
 
+    // 2. NOUVEAU : Filtrage spécifique par Compte Comptable
+    if (selectedCompteFilter) {
+      result = result.filter(t => 
+        t.compte === selectedCompteFilter || 
+        t.compteDebit === selectedCompteFilter || 
+        t.compteCredit === selectedCompteFilter
+      );
+    }
+
+    // 3. Tri
     result.sort((a, b) => {
       let valA, valB;
       
@@ -735,7 +809,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
     });
 
     return result;
-  }, [transactionsGlobales, searchTerm, sortConfig]);
+  }, [transactionsGlobales, searchTerm, selectedCompteFilter, sortConfig]);
 
   const nbLignesPretes = lignesEnAttente.filter(l => l.comptePropose).length;
 
@@ -752,6 +826,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* BANQUE */}
         <div className="bg-indigo-50 p-6 rounded-xl border border-indigo-100 flex flex-col justify-center items-center text-center space-y-4">
           <h3 className="font-bold text-indigo-900 text-lg">Journal de Banque</h3>
           <p className="text-sm text-indigo-700">Importez vos lignes bancaires pour les imputer.</p>
@@ -767,6 +842,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
           </div>
         </div>
 
+        {/* PAIE */}
         <div className="bg-pink-50 p-6 rounded-xl border border-pink-200 flex flex-col justify-center items-center text-center space-y-4">
           <h3 className="font-bold text-pink-900 text-lg">Fiches de Paie</h3>
           <p className="text-sm text-pink-700">Importez le fichier TXT exporté depuis le logiciel de paie.</p>
@@ -777,17 +853,28 @@ const GrandLivre = ({ transactionsGlobales }) => {
           </button>
         </div>
 
-        <div className="bg-purple-50 p-5 rounded-xl border border-purple-100 flex flex-col h-[320px]">
-          <h3 className="font-bold text-purple-900 text-lg flex items-center gap-2 justify-center shrink-0 mb-3">
-            <FileText size={18} /> Opération Diverse
-          </h3>
+        {/* OD MANUELLE + IMPORT MASSE */}
+        <div className="bg-purple-50 p-5 rounded-xl border border-purple-100 flex flex-col h-[350px]">
+          <div className="flex justify-between items-center shrink-0 mb-3">
+            <h3 className="font-bold text-purple-900 text-lg flex items-center gap-2">
+              <FileText size={18} /> Opération Diverse
+            </h3>
+            <input type="file" accept=".csv,.xlsx" className="hidden" ref={fileInputODRef} onChange={handleImportODMass} />
+            <button onClick={() => fileInputODRef.current.click()} className="text-[10px] uppercase font-bold bg-purple-200 text-purple-800 px-2 py-1 rounded hover:bg-purple-300 transition-colors flex items-center gap-1" title="Format Colonnes A à I + L">
+              <Download size={12}/> Import masse (.csv / .xlsx)
+            </button>
+          </div>
           
           <div className="flex gap-2 shrink-0 mb-2">
             <input type="date" value={odFormDate} onChange={e => setOdFormDate(e.target.value)} className="border border-purple-200 rounded p-1.5 text-xs bg-white w-1/3 outline-none focus:ring-1 focus:ring-purple-500" />
             <input type="text" placeholder="Libellé OD..." value={odFormLibelle} onChange={e => setOdFormLibelle(e.target.value)} className="border border-purple-200 rounded p-1.5 text-xs bg-white flex-1 outline-none focus:ring-1 focus:ring-purple-500" />
           </div>
 
-          <div className="overflow-y-auto flex-1 space-y-1.5 pr-1 min-h-[100px]">
+          <div className="flex gap-2 shrink-0 mb-2">
+            <input type="text" placeholder="Commentaire optionnel..." value={odFormCommentaire} onChange={e => setOdFormCommentaire(e.target.value)} className="border border-purple-200 rounded p-1.5 text-xs bg-white w-full outline-none focus:ring-1 focus:ring-purple-500" />
+          </div>
+
+          <div className="overflow-y-auto flex-1 space-y-1.5 pr-1 min-h-[80px]">
             {odLines.map((l) => (
               <div key={l.id} className="flex gap-1 items-center">
                 <select value={l.compte} onChange={e => updateOdLine(l.id, 'compte', e.target.value)} className="border border-purple-200 rounded p-1 text-xs bg-white w-1/2 outline-none focus:ring-1 focus:ring-purple-500">
@@ -832,20 +919,15 @@ const GrandLivre = ({ transactionsGlobales }) => {
             <div className="flex items-center gap-3">
               {nbLignesPretes > 0 && (
                 <button 
-                  onClick={validerLignesPretes}
-                  className="text-sm bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold transition-colors flex items-center gap-2 shadow-md animate-fade-in"
+                  onClick={() => {
+                    lignesEnAttente.forEach(l => { if(l.comptePropose) validerLigneBank(l.id, l.comptePropose, l.commentaire); });
+                  }}
+                  className="text-sm bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold transition-colors flex items-center gap-2 shadow-md"
                 >
                   <CheckCircle2 size={18} /> Tout Valider ({nbLignesPretes})
                 </button>
               )}
-              <button 
-                onClick={() => {
-                  if (window.confirm("Êtes-vous sûr de vouloir annuler l'import en cours et vider cette liste ?")) {
-                    setLignesEnAttente([]);
-                  }
-                }}
-                className="text-sm bg-white border border-orange-300 hover:bg-orange-100 text-orange-800 px-3 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
-              >
+              <button onClick={() => setLignesEnAttente([])} className="text-sm bg-white border border-orange-300 hover:bg-orange-100 text-orange-800 px-3 py-2 rounded-lg font-medium transition-colors flex items-center gap-2">
                 <XCircle size={16} /> Vider la liste
               </button>
             </div>
@@ -858,7 +940,8 @@ const GrandLivre = ({ transactionsGlobales }) => {
                   <th className="py-2">Date</th>
                   <th className="py-2">Libellé</th>
                   <th className="py-2 text-right">Montant</th>
-                  <th className="py-2 px-4">Compte (Classe 6 ou 7)</th>
+                  <th className="py-2 px-2">Commentaire</th>
+                  <th className="py-2 px-4">Compte</th>
                   <th className="py-2 text-center w-28">Action</th>
                 </tr>
               </thead>
@@ -869,6 +952,18 @@ const GrandLivre = ({ transactionsGlobales }) => {
                     <td className="py-3 px-2 text-slate-800 truncate max-w-xs">{ligne.libelle}</td>
                     <td className={`py-3 px-2 text-right font-bold whitespace-nowrap ${ligne.montant > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                       {ligne.montant > 0 ? '+' : ''}{ligne.montant.toFixed(2)} €
+                    </td>
+                    <td className="py-3 px-2">
+                      <input 
+                        type="text" 
+                        placeholder="Commentaire..." 
+                        value={ligne.commentaire || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setLignesEnAttente(prev => prev.map(l => l.id === ligne.id ? { ...l, commentaire: val } : l));
+                        }}
+                        className="border border-slate-300 rounded px-2 py-1 text-xs w-full outline-none focus:border-indigo-500"
+                      />
                     </td>
                     <td className="py-3 px-4">
                       <div className="relative">
@@ -885,30 +980,23 @@ const GrandLivre = ({ transactionsGlobales }) => {
                           className={`border rounded-lg px-3 py-2 w-full text-sm font-mono pr-8 focus:ring-2 focus:ring-indigo-500 appearance-none outline-none cursor-pointer transition-all ${ligne.comptePropose ? 'border-indigo-400 bg-indigo-50 text-indigo-800 font-bold shadow-inner' : 'border-slate-300 bg-white'}`}
                         >
                           <option value="">Sélectionner un compte...</option>
-                          {ligne.comptePropose && !comptesList.find(c => c.code === ligne.comptePropose) && (
-                            <option value={ligne.comptePropose}>{ligne.comptePropose} (Suggéré)</option>
-                          )}
                           {comptesList.map(c => (
                             <option key={c.id} value={c.code}>{c.code} - {c.libelle}</option>
                           ))}
                         </select>
                         <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                        {ligne.comptePropose && (
-                          <Sparkles size={14} className="absolute right-8 top-1/2 -translate-y-1/2 text-indigo-500 pointer-events-none" title="Prêt à être validé" />
-                        )}
                       </div>
                     </td>
                     <td className="py-3 px-2 text-center">
                       <div className="flex justify-center items-center gap-1.5">
                         <button 
-                          onClick={() => validerLigneBank(ligne.id, ligne.comptePropose)}
+                          onClick={() => validerLigneBank(ligne.id, ligne.comptePropose, ligne.commentaire)}
                           disabled={!ligne.comptePropose}
                           className={`p-1.5 rounded-md transition-all shadow-sm ${ligne.comptePropose ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-500 hover:text-white' : 'bg-slate-100 text-slate-300 cursor-not-allowed'}`}
-                          title={ligne.comptePropose ? "Valider cette ligne" : "Sélectionnez un compte d'abord"}
                         >
                           <CheckCircle2 size={18} />
                         </button>
-                        <button onClick={() => setLignesEnAttente(prev => prev.filter(l => l.id !== ligne.id))} className="p-1.5 rounded-md bg-white border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-300 transition-colors shadow-sm" title="Supprimer cette ligne">
+                        <button onClick={() => setLignesEnAttente(prev => prev.filter(l => l.id !== ligne.id))} className="p-1.5 rounded-md bg-white border border-slate-200 text-slate-400 hover:text-red-600">
                           <Trash2 size={18} />
                         </button>
                       </div>
@@ -921,18 +1009,36 @@ const GrandLivre = ({ transactionsGlobales }) => {
         </div>
       )}
 
+      {/* TABLEAU DES ÉCRITURES VALIDÉES (LE GRAND LIVRE) */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         
         <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap justify-between items-center gap-4">
           <h3 className="font-bold text-slate-800 flex items-center gap-2">
             <CheckCircle2 className="text-emerald-500" /> Écritures Validées au Grand Livre
           </h3>
-          <div className="flex items-center gap-4 w-full md:w-auto">
+          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+            {/* NOUVEAU : Filtre par compte comptable précis */}
+            <select 
+              value={selectedCompteFilter}
+              onChange={(e) => setSelectedCompteFilter(e.target.value)}
+              className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+            >
+              <option value="">Tous les comptes (Filtre...)</option>
+              {comptesList.map(c => (
+                <option key={`filter-${c.id}`} value={c.code}>{c.code} - {c.libelle}</option>
+              ))}
+            </select>
+            {selectedCompteFilter && (
+              <button onClick={() => setSelectedCompteFilter('')} className="text-xs text-indigo-600 font-bold hover:underline">
+                Réinitialiser filtre
+              </button>
+            )}
+
             <div className="relative flex-1 md:w-64">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input 
                 type="text" 
-                placeholder="Rechercher (libellé, compte...)" 
+                placeholder="Rechercher (texte, commentaire...)" 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-9 pr-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
@@ -949,36 +1055,27 @@ const GrandLivre = ({ transactionsGlobales }) => {
             <thead className="bg-slate-50 text-slate-500 text-[11px] uppercase font-semibold sticky top-0 shadow-sm z-10">
               <tr>
                 <th className="py-3 px-3 cursor-pointer hover:bg-slate-100 transition-colors whitespace-nowrap" onClick={() => handleSort('date')}>
-                  <div className="flex items-center gap-1">
-                    Date comptable {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </div>
+                  <div className="flex items-center gap-1">Date comptable {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
                 </th>
+                <th className="py-3 px-3 text-slate-400">ID Unique</th>
                 <th className="py-3 px-3 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('source')}>
-                  <div className="flex items-center gap-1">
-                    Source {sortConfig.key === 'source' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </div>
+                  <div className="flex items-center gap-1">Source {sortConfig.key === 'source' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
                 </th>
-                <th className="py-3 px-3 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('libelle')}>
-                  <div className="flex items-center gap-1">
-                    Libellé simplifié {sortConfig.key === 'libelle' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </div>
+                <th className="py-3 px-3 cursor-pointer hover:bg-slate-100 transition-colors min-w-[200px]" onClick={() => handleSort('libelle')}>
+                  <div className="flex items-center gap-1">Libellé simplifié {sortConfig.key === 'libelle' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
                 </th>
-                <th className="py-3 px-3 text-slate-400">Infos complémentaires</th>
+                <th className="py-3 px-3 text-slate-400 min-w-[150px]">Infos complémentaires</th>
                 <th className="py-3 px-3 text-slate-400">Type Op.</th>
+                {/* NOUVELLE COLONNE COMMENTAIRE EXTENSIBLE */}
+                <th className="py-3 px-3 text-slate-400 min-w-[180px]">Commentaire</th>
                 <th className="py-3 px-3 text-right cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('montant')}>
-                  <div className="flex items-center justify-end gap-1">
-                    Débit {sortConfig.key === 'montant' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </div>
+                  <div className="flex items-center justify-end gap-1">Débit {sortConfig.key === 'montant' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
                 </th>
                 <th className="py-3 px-3 text-right cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('montant')}>
-                  <div className="flex items-center justify-end gap-1">
-                    Crédit {sortConfig.key === 'montant' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </div>
+                  <div className="flex items-center justify-end gap-1">Crédit {sortConfig.key === 'montant' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
                 </th>
-                <th className="py-3 px-3 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('compte')}>
-                  <div className="flex items-center gap-1">
-                    Détail Compte {sortConfig.key === 'compte' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </div>
+                <th className="py-3 px-3 cursor-pointer hover:bg-slate-100 transition-colors min-w-[220px]" onClick={() => handleSort('compte')}>
+                  <div className="flex items-center gap-1">Détail Compte {sortConfig.key === 'compte' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
                 </th>
                 <th className="py-3 px-3 text-center">Action</th>
               </tr>
@@ -1001,20 +1098,47 @@ const GrandLivre = ({ transactionsGlobales }) => {
                   <tr key={t.id} className="hover:bg-slate-50 transition-colors">
                     <td className="py-3 px-3 text-slate-600 whitespace-nowrap">{t.date}</td>
                     
+                    {/* ID UNIQUE FIRESTORE */}
+                    <td className="py-3 px-3 text-slate-400 font-mono text-[10px]" title={t.id}>
+                      {t.id.substring(0, 6)}...
+                    </td>
+
                     <td className="py-3 px-3">
                       <span className={`px-2 py-1 rounded border text-[10px] font-bold uppercase tracking-wider whitespace-nowrap ${sourceColor}`}>
                         {sourceLabel}
                       </span>
                     </td>
 
-                    <td className="py-3 px-3 text-slate-800 font-medium truncate max-w-[180px]">{t.libelle}</td>
-                    <td className="py-3 px-3 text-slate-500 text-xs truncate max-w-[120px]" title={t.reference}>
+                    {/* LIBELLÉ EXTENSIBLE (WHITESPACE-NORMAL) */}
+                    <td className="py-3 px-3 text-slate-800 font-medium whitespace-normal max-w-xs">
+                      {t.libelle}
+                    </td>
+
+                    {/* INFOS COMPLÉMENTAIRES EXTENSIBLES */}
+                    <td className="py-3 px-3 text-slate-600 text-xs whitespace-normal max-w-[150px]">
                       {t.reference || <span className="text-slate-300 italic">-</span>}
                     </td>
-                    <td className="py-3 px-3 text-slate-500 text-xs truncate max-w-[100px]">
+
+                    <td className="py-3 px-3 text-slate-500 text-xs whitespace-nowrap">
                       {t.typeOp || <span className="text-slate-300 italic">-</span>}
                     </td>
                     
+                    {/* COMMENTAIRE MODIFIABLE EN DIRECT OU TEXTE */}
+                    <td className="py-3 px-3 text-slate-600 text-xs whitespace-normal max-w-[200px]">
+                      {editingRowId === t.id ? (
+                        <input 
+                          type="text" 
+                          defaultValue={t.commentaire || ''} 
+                          onBlur={(e) => handleUpdateField(t.id, e.target.value, 'commentaire')}
+                          className="border border-indigo-300 rounded p-1 text-xs bg-indigo-50 w-full outline-none"
+                          placeholder="Ajouter un commentaire..."
+                          autoFocus
+                        />
+                      ) : (
+                        t.commentaire || <span className="text-slate-300 italic">-</span>
+                      )}
+                    </td>
+
                     {t.type === 'od' ? (
                       <>
                         <td className="py-3 px-3 text-right font-medium text-purple-600 whitespace-nowrap">
@@ -1042,14 +1166,14 @@ const GrandLivre = ({ transactionsGlobales }) => {
                             <div className="flex flex-col gap-1 w-full min-w-[200px]">
                               <div className="flex items-center gap-2">
                                 <span className="text-[10px] font-bold text-slate-500 w-3">D:</span>
-                                <select value={t.compteDebit || ''} onChange={(e) => handleUpdateCompte(t.id, e.target.value, 'compteDebit')} className="border border-indigo-300 rounded p-1 text-xs bg-indigo-50 w-full text-indigo-800 outline-none">
+                                <select value={t.compteDebit || ''} onChange={(e) => handleUpdateField(t.id, e.target.value, 'compteDebit')} className="border border-indigo-300 rounded p-1 text-xs bg-indigo-50 w-full text-indigo-800 outline-none">
                                   <option value="">Non défini</option>
                                   {comptesList.map(c => <option key={`d-${c.id}`} value={c.code}>{c.code} - {c.libelle}</option>)}
                                 </select>
                               </div>
                               <div className="flex items-center gap-2">
                                 <span className="text-[10px] font-bold text-slate-500 w-3">C:</span>
-                                <select value={t.compteCredit || ''} onChange={(e) => handleUpdateCompte(t.id, e.target.value, 'compteCredit')} className="border border-indigo-300 rounded p-1 text-xs bg-indigo-50 w-full text-indigo-800 outline-none">
+                                <select value={t.compteCredit || ''} onChange={(e) => handleUpdateField(t.id, e.target.value, 'compteCredit')} className="border border-indigo-300 rounded p-1 text-xs bg-indigo-50 w-full text-indigo-800 outline-none">
                                   <option value="">Non défini</option>
                                   {comptesList.map(c => <option key={`c-${c.id}`} value={c.code}>{c.code} - {c.libelle}</option>)}
                                 </select>
@@ -1059,7 +1183,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
                             <select 
                               value={t.compteDebit || t.compteCredit || ''} 
                               onChange={(e) => {
-                                handleUpdateCompte(t.id, e.target.value, t.compteDebit ? 'compteDebit' : 'compteCredit');
+                                handleUpdateField(t.id, e.target.value, t.compteDebit ? 'compteDebit' : 'compteCredit');
                                 setEditingRowId(null);
                               }}
                               className="border border-purple-300 rounded p-2 text-xs bg-purple-50 min-w-[200px] w-full text-purple-800 font-mono outline-none"
@@ -1072,7 +1196,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
                           <select 
                             value={t.compte || ''} 
                             onChange={(e) => {
-                              handleUpdateCompte(t.id, e.target.value, 'compte');
+                              handleUpdateField(t.id, e.target.value, 'compte');
                               setEditingRowId(null);
                             }}
                             className="border border-indigo-300 rounded p-2 text-xs bg-indigo-50 min-w-[200px] w-full text-indigo-800 font-mono outline-none"
@@ -1107,24 +1231,23 @@ const GrandLivre = ({ transactionsGlobales }) => {
                     
                     <td className="py-3 px-3 text-center flex items-center justify-center gap-2">
                       {editingRowId === t.id ? (
-                        <button onClick={() => setEditingRowId(null)} className="text-white bg-emerald-500 hover:bg-emerald-600 px-3 py-1 rounded text-xs font-bold transition-colors shadow-sm mt-1.5" title="Terminer l'édition">
+                        <button onClick={() => setEditingRowId(null)} className="text-white bg-emerald-500 hover:bg-emerald-600 px-3 py-1 rounded text-xs font-bold transition-colors shadow-sm mt-1.5">
                           OK
                         </button>
                       ) : (
                         <>
-                          <button onClick={() => setEditingRowId(t.id)} className="text-slate-300 hover:text-indigo-500 p-1.5 rounded transition-colors mt-1.5" title="Modifier le compte">
+                          <button onClick={() => setEditingRowId(t.id)} className="text-slate-300 hover:text-indigo-500 p-1.5 rounded transition-colors mt-1.5" title="Modifier">
                             <span className="font-bold text-lg leading-none">✎</span>
                           </button>
                           <button className="text-slate-300 hover:text-indigo-500 transition-colors mt-1.5" title="Attacher PDF">
                             <Paperclip size={16} />
                           </button>
-                          
                           {confirmDeleteId === t.id ? (
                             <button onClick={() => handleDeleteValidated(t.id)} className="text-white bg-red-500 hover:bg-red-600 px-2 py-1 rounded text-xs font-bold animate-pulse mt-1.5">
                               Confirmer ?
                             </button>
                           ) : (
-                            <button onClick={() => handleDeleteValidated(t.id)} className="text-slate-300 hover:text-red-500 p-1.5 rounded transition-colors mt-1.5" title="Supprimer l'écriture">
+                            <button onClick={() => handleDeleteValidated(t.id)} className="text-slate-300 hover:text-red-500 p-1.5 rounded transition-colors mt-1.5" title="Supprimer">
                               <Trash2 size={16}/>
                             </button>
                           )}
@@ -1136,7 +1259,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
               })}
               {filteredAndSortedTransactions.length === 0 && (
                 <tr>
-                  <td colSpan="9" className="py-8 text-center text-slate-400">Aucune écriture trouvée.</td>
+                  <td colSpan="11" className="py-8 text-center text-slate-400">Aucune écriture trouvée.</td>
                 </tr>
               )}
             </tbody>
