@@ -333,8 +333,8 @@ const GrandLivre = ({ transactionsGlobales }) => {
   const [lignesEnAttente, setLignesEnAttente] = useState([]);
   const [comptesList, setComptesList] = useState([]);
   const [editingRowId, setEditingRowId] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   
-  // NOUVEAU : État pour le formulaire d'OD multi-lignes
   const [odFormDate, setOdFormDate] = useState('');
   const [odFormLibelle, setOdFormLibelle] = useState('');
   const [odLines, setOdLines] = useState([
@@ -596,10 +596,20 @@ const GrandLivre = ({ transactionsGlobales }) => {
     }
   };
 
-  // NOUVEAU : Mécanique de gestion de l'OD Multi-lignes
   const addOdLine = () => setOdLines([...odLines, { id: Date.now(), compte: '', debit: '', credit: '' }]);
   const removeOdLine = (id) => setOdLines(odLines.filter(l => l.id !== id));
-  const updateOdLine = (id, field, value) => setOdLines(odLines.map(l => l.id === id ? { ...l, [field]: value } : l));
+  
+  const updateOdLine = (id, field, value) => {
+    setOdLines(odLines.map(l => {
+      if (l.id === id) {
+        const updatedLine = { ...l, [field]: value };
+        if (field === 'debit' && value !== '') updatedLine.credit = '';
+        if (field === 'credit' && value !== '') updatedLine.debit = '';
+        return updatedLine;
+      }
+      return l;
+    }));
+  };
 
   const totalDebitOD = odLines.reduce((sum, l) => sum + (parseFloat(l.debit) || 0), 0);
   const totalCreditOD = odLines.reduce((sum, l) => sum + (parseFloat(l.credit) || 0), 0);
@@ -609,7 +619,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
     if (!odFormDate || !odFormLibelle) return alert('Date et libellé requis.');
     if (!isOdBalanced) return alert("L'OD doit être équilibrée (Total Débit = Total Crédit) et supérieure à 0.");
     
-    // Vérification que chaque ligne remplie a bien un compte attribué
     for (const line of odLines) {
       const debit = parseFloat(line.debit) || 0;
       const credit = parseFloat(line.credit) || 0;
@@ -619,7 +628,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
     }
 
     try {
-      // Sauvegarde des lignes de l'OD en tant qu'écritures indépendantes dans la base
       for (const line of odLines) {
         const debit = parseFloat(line.debit) || 0;
         const credit = parseFloat(line.credit) || 0;
@@ -636,7 +644,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
           await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), newTx);
         }
       }
-      // Réinitialisation du formulaire
       setOdFormDate('');
       setOdFormLibelle('');
       setOdLines([{ id: 1, compte: '', debit: '', credit: '' }, { id: 2, compte: '', debit: '', credit: '' }]);
@@ -647,12 +654,16 @@ const GrandLivre = ({ transactionsGlobales }) => {
   };
 
   const handleDeleteValidated = async (txId) => {
-    if (window.confirm("ATTENTION : Êtes-vous sûr de vouloir supprimer définitivement cette écriture du Grand Livre ?")) {
+    if (confirmDeleteId === txId) {
       try {
         await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', txId));
+        setConfirmDeleteId(null);
       } catch(e) { 
         alert('Erreur lors de la suppression.'); 
       }
+    } else {
+      setConfirmDeleteId(txId);
+      setTimeout(() => setConfirmDeleteId(null), 3000);
     }
   };
 
@@ -700,7 +711,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
     result.sort((a, b) => {
       let valA, valB;
       
-      // NOUVEAU : Tri par Source
       if (sortConfig.key === 'source') {
         const getSource = (tx) => tx.type === 'od' ? (tx.libelle?.includes('(PAIE)') ? 'paie' : 'od') : 'banque';
         valA = getSource(a);
@@ -730,7 +740,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
   const nbLignesPretes = lignesEnAttente.filter(l => l.comptePropose).length;
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
+    <div className="space-y-6 w-full max-w-[1600px] mx-auto px-2">
       
       <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
@@ -742,7 +752,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* BLOC 1 : IMPORT BANQUE */}
         <div className="bg-indigo-50 p-6 rounded-xl border border-indigo-100 flex flex-col justify-center items-center text-center space-y-4">
           <h3 className="font-bold text-indigo-900 text-lg">Journal de Banque</h3>
           <p className="text-sm text-indigo-700">Importez vos lignes bancaires pour les imputer.</p>
@@ -758,7 +767,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
           </div>
         </div>
 
-        {/* BLOC 2 : IMPORT PAIE */}
         <div className="bg-pink-50 p-6 rounded-xl border border-pink-200 flex flex-col justify-center items-center text-center space-y-4">
           <h3 className="font-bold text-pink-900 text-lg">Fiches de Paie</h3>
           <p className="text-sm text-pink-700">Importez le fichier TXT exporté depuis le logiciel de paie.</p>
@@ -769,7 +777,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
           </button>
         </div>
 
-        {/* BLOC 3 : NOUVELLE SAISIE OD MULTI-LIGNES */}
         <div className="bg-purple-50 p-5 rounded-xl border border-purple-100 flex flex-col h-[320px]">
           <h3 className="font-bold text-purple-900 text-lg flex items-center gap-2 justify-center shrink-0 mb-3">
             <FileText size={18} /> Opération Diverse
@@ -860,7 +867,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
                   <tr key={ligne.id} className="border-b border-orange-100 bg-white hover:bg-orange-50/50 transition-colors">
                     <td className="py-3 px-2 text-slate-600">{ligne.date}</td>
                     <td className="py-3 px-2 text-slate-800 truncate max-w-xs">{ligne.libelle}</td>
-                    <td className={`py-3 px-2 text-right font-bold ${ligne.montant > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                    <td className={`py-3 px-2 text-right font-bold whitespace-nowrap ${ligne.montant > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                       {ligne.montant > 0 ? '+' : ''}{ligne.montant.toFixed(2)} €
                     </td>
                     <td className="py-3 px-4">
@@ -914,7 +921,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
         </div>
       )}
 
-      {/* TABLEAU DES ÉCRITURES VALIDÉES (LE GRAND LIVRE) */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         
         <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap justify-between items-center gap-4">
@@ -939,7 +945,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
         </div>
 
         <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-          <table className="w-full text-sm text-left">
+          <table className="w-full text-sm text-left min-w-max">
             <thead className="bg-slate-50 text-slate-500 text-[11px] uppercase font-semibold sticky top-0 shadow-sm z-10">
               <tr>
                 <th className="py-3 px-3 cursor-pointer hover:bg-slate-100 transition-colors whitespace-nowrap" onClick={() => handleSort('date')}>
@@ -947,7 +953,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
                     Date comptable {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </div>
                 </th>
-                {/* NOUVELLE COLONNE : SOURCE */}
                 <th className="py-3 px-3 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('source')}>
                   <div className="flex items-center gap-1">
                     Source {sortConfig.key === 'source' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
@@ -980,7 +985,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredAndSortedTransactions.map(t => {
-                // LOGIQUE D'AFFICHAGE DE LA SOURCE
                 let sourceLabel = 'Banque';
                 let sourceColor = 'bg-blue-50 text-blue-700 border-blue-200';
                 if (t.type === 'od') {
@@ -997,7 +1001,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
                   <tr key={t.id} className="hover:bg-slate-50 transition-colors">
                     <td className="py-3 px-3 text-slate-600 whitespace-nowrap">{t.date}</td>
                     
-                    {/* AFFICHAGE DE LA NOUVELLE COLONNE SOURCE */}
                     <td className="py-3 px-3">
                       <span className={`px-2 py-1 rounded border text-[10px] font-bold uppercase tracking-wider whitespace-nowrap ${sourceColor}`}>
                         {sourceLabel}
@@ -1014,19 +1017,19 @@ const GrandLivre = ({ transactionsGlobales }) => {
                     
                     {t.type === 'od' ? (
                       <>
-                        <td className="py-3 px-3 text-right font-medium text-purple-600">
+                        <td className="py-3 px-3 text-right font-medium text-purple-600 whitespace-nowrap">
                           {t.compteDebit ? Number(t.montant).toFixed(2) + ' €' : '-'}
                         </td>
-                        <td className="py-3 px-3 text-right font-medium text-purple-600">
+                        <td className="py-3 px-3 text-right font-medium text-purple-600 whitespace-nowrap">
                           {t.compteCredit ? Number(t.montant).toFixed(2) + ' €' : '-'}
                         </td>
                       </>
                     ) : (
                       <>
-                        <td className="py-3 px-3 text-right font-bold text-red-600">
+                        <td className="py-3 px-3 text-right font-bold text-red-600 whitespace-nowrap">
                           {t.montant < 0 ? Math.abs(t.montant).toFixed(2) + ' €' : '-'}
                         </td>
-                        <td className="py-3 px-3 text-right font-bold text-emerald-600">
+                        <td className="py-3 px-3 text-right font-bold text-emerald-600 whitespace-nowrap">
                           {t.montant > 0 ? Number(t.montant).toFixed(2) + ' €' : '-'}
                         </td>
                       </>
@@ -1115,9 +1118,16 @@ const GrandLivre = ({ transactionsGlobales }) => {
                           <button className="text-slate-300 hover:text-indigo-500 transition-colors mt-1.5" title="Attacher PDF">
                             <Paperclip size={16} />
                           </button>
-                          <button onClick={() => handleDeleteValidated(t.id)} className="text-slate-300 hover:text-red-500 p-1.5 rounded transition-colors mt-1.5" title="Supprimer l'écriture">
-                            <Trash2 size={16}/>
-                          </button>
+                          
+                          {confirmDeleteId === t.id ? (
+                            <button onClick={() => handleDeleteValidated(t.id)} className="text-white bg-red-500 hover:bg-red-600 px-2 py-1 rounded text-xs font-bold animate-pulse mt-1.5">
+                              Confirmer ?
+                            </button>
+                          ) : (
+                            <button onClick={() => handleDeleteValidated(t.id)} className="text-slate-300 hover:text-red-500 p-1.5 rounded transition-colors mt-1.5" title="Supprimer l'écriture">
+                              <Trash2 size={16}/>
+                            </button>
+                          )}
                         </>
                       )}
                     </td>
