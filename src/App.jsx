@@ -107,9 +107,8 @@ const InfosContact = () => (
     </div>
   </div>
 );
-// --- 2. ÉTAT FINANCIER (Bilan & Résultat Groupés) ---
+// --- ÉTAT FINANCIER (Bilan & Résultat Groupés) ---
 const EtatFinancier = ({ transactionsGlobales }) => {
-  // SÉCURITÉ ANTI-CRASH : On s'assure que la liste existe toujours
   const safeTransactions = transactionsGlobales || [];
 
   const [anneeDebut, setAnneeDebut] = useState(new Date().getFullYear() > 2025 ? 2025 : 2021);
@@ -132,7 +131,6 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     setDetailsOuverts(prev => ({ ...prev, [categorie]: !prev[categorie] }));
   };
 
-  // Dictionnaire officiel des familles à 2 chiffres du PCG
   const PREFIXES = {
     '10': 'Capital, réserves et fonds associatifs',
     '11': 'Report à nouveau',
@@ -181,21 +179,36 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     return c ? c.libelle : '';
   };
 
-  // SÉCURITÉ DATES : Transforme n'importe quel format de date en "Temps" calculable
+  // PARSER INFALLIBLE DE DATE (Gère JJ/MM/AAAA et AAAA-MM-JJ)
   const parseDateForFilter = (dStr) => {
     if (!dStr) return 0;
-    if (dStr.includes('/')) {
-      const [day, month, year] = dStr.split('/');
-      const y = year.length === 2 ? '20' + year : year;
-      return new Date(`${y}-${month}-${day}`).getTime();
+    const str = String(dStr).trim();
+    if (str.includes('/')) {
+      const parts = str.split('/');
+      if (parts.length === 3) {
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        let year = parseInt(parts[2], 10);
+        if (year < 100) year += 2000;
+        return new Date(year, month, day).getTime();
+      }
+    } else if (str.includes('-')) {
+      const parts = str.split('-');
+      if (parts.length === 3) {
+        if (parts[0].length === 4) { // AAAA-MM-JJ
+          return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)).getTime();
+        } else { // JJ-MM-AAAA
+          return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10)).getTime();
+        }
+      }
     }
-    return new Date(dStr).getTime();
+    return new Date(str).getTime() || 0;
   };
 
-  // Filtrage intelligent basé sur l'année scolaire sélectionnée
+  // Filtrage intelligent selon la période scolaire (01/09/N au 31/08/N+1)
   const transactionsFiltrees = useMemo(() => {
-    const start = new Date(`${anneeDebut}-09-01`).getTime();
-    const end = new Date(`${anneeDebut + 1}-08-31T23:59:59`).getTime();
+    const start = new Date(anneeDebut, 8, 1, 0, 0, 0).getTime(); // 1er Septembre
+    const end = new Date(anneeDebut + 1, 7, 31, 23, 59, 59).getTime(); // 31 Août
 
     return safeTransactions.filter(t => {
       if (!t.date) return false;
@@ -239,14 +252,12 @@ const EtatFinancier = ({ transactionsGlobales }) => {
   let totalProduits = 0;
 
   Object.keys(balances).forEach(code => {
-    // Sécurité si un compte est mal formaté
     if (!code || code.length < 2) return;
 
     const b = balances[code];
     const net = b.debit - b.credit;
     if (Math.abs(net) < 0.01) return;
 
-    // Regroupement strict sur 2 chiffres
     const prefix2 = code.substring(0, 2);
     const groupName = `${prefix2} - ${PREFIXES[prefix2] || 'Autres comptes'}`;
     const item = { code, libelle: getCompteLibelle(code), net: Math.abs(net) };
@@ -371,7 +382,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
               {sortedKeys(charges).length > 0 ? (
                 sortedKeys(charges).map(key => renderGroup(charges, key))
               ) : (
-                <div className="text-center text-slate-400 text-sm py-8">Aucune donnée</div>
+                <div className="text-center text-slate-400 text-sm py-8">Aucune donnée sur cette période</div>
               )}
             </div>
           </div>
@@ -383,7 +394,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
               {sortedKeys(produits).length > 0 ? (
                 sortedKeys(produits).map(key => renderGroup(produits, key))
               ) : (
-                <div className="text-center text-slate-400 text-sm py-8">Aucune donnée</div>
+                <div className="text-center text-slate-400 text-sm py-8">Aucune donnée sur cette période</div>
               )}
             </div>
           </div>
@@ -414,7 +425,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
               {sortedKeys(actif).length > 0 ? (
                 sortedKeys(actif).map(key => renderGroup(actif, key))
               ) : (
-                <div className="text-center text-slate-400 text-sm py-8">Aucune donnée</div>
+                <div className="text-center text-slate-400 text-sm py-8">Aucune donnée sur cette période</div>
               )}
             </div>
           </div>
@@ -426,7 +437,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
               {sortedKeys(passif).length > 0 ? (
                 sortedKeys(passif).map(key => renderGroup(passif, key))
               ) : (
-                <div className="text-center text-slate-400 text-sm py-8">Aucune donnée</div>
+                <div className="text-center text-slate-400 text-sm py-8">Aucune donnée sur cette période</div>
               )}
               <div className="border-t border-slate-200 mt-2 pt-2">
                 <div className="flex justify-between items-center px-4 py-2">
@@ -955,13 +966,27 @@ const GrandLivre = ({ transactionsGlobales }) => {
     setSortConfig({ key, direction });
   };
 
-  const parseDateForSort = (dStr) => {
+const parseDateForSort = (dStr) => {
     if (!dStr) return 0;
-    if (dStr.includes('/')) {
-      const [day, month, year] = dStr.split('/');
-      return new Date(`${year}-${month}-${day}`).getTime();
+    const str = String(dStr).trim();
+    if (str.includes('/')) {
+      const parts = str.split('/');
+      if (parts.length === 3) {
+        let year = parseInt(parts[2], 10);
+        if (year < 100) year += 2000;
+        return new Date(year, parseInt(parts[1], 10) - 1, parseInt(parts[0], 10)).getTime();
+      }
+    } else if (str.includes('-')) {
+      const parts = str.split('-');
+      if (parts.length === 3) {
+        if (parts[0].length === 4) {
+          return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)).getTime();
+        } else {
+          return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10)).getTime();
+        }
+      }
     }
-    return new Date(dStr).getTime();
+    return new Date(str).getTime() || 0;
   };
 
   const filteredAndSortedTransactions = useMemo(() => {
