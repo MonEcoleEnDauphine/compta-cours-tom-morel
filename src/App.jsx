@@ -470,6 +470,10 @@ const GrandLivre = ({ transactionsGlobales }) => {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [lastImportBatch, setLastImportBatch] = useState(null);
   
+  // NOUVEAU : Gestion des pièces jointes PDF
+  const [selectedTxForPdf, setSelectedTxForPdf] = useState(null);
+  const fileInputPdfRef = useRef(null);
+
   const [odFormDate, setOdFormDate] = useState('');
   const [odFormLibelle, setOdFormLibelle] = useState('');
   const [odFormCommentaire, setOdFormCommentaire] = useState('');
@@ -498,6 +502,39 @@ const GrandLivre = ({ transactionsGlobales }) => {
     });
     return () => unsubscribe();
   }, []);
+
+  // Gestionnaires pour pièces jointes
+  const handleTriggerPdf = (txId) => {
+    setSelectedTxForPdf(txId);
+    if (fileInputPdfRef.current) fileInputPdfRef.current.click();
+  };
+
+  const handlePdfChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file || !selectedTxForPdf) return;
+
+    if (file.size > 3 * 1024 * 1024) {
+      alert("Le fichier est trop volumineux (maximum 3 Mo).");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const base64Data = event.target.result;
+      try {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', selectedTxForPdf), {
+          pdfData: base64Data,
+          pdfName: file.name
+        });
+        alert(`Justificatif "${file.name}" rattaché avec succès !`);
+      } catch (err) {
+        alert("Erreur lors de l'enregistrement du document.");
+      }
+      setSelectedTxForPdf(null);
+      if (fileInputPdfRef.current) fileInputPdfRef.current.value = '';
+    };
+    reader.readAsDataURL(file);
+  };
 
   const devinerCompte = (libelleTxt) => {
     if (!libelleTxt) return '';
@@ -543,7 +580,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transactionsGlobales]);
 
-  // NOUVEAU : Harmoniseur de dates pour un affichage parfait (JJ/MM/AAAA)
   const formatDateAffichage = (dStr) => {
     if (!dStr) return '';
     if (dStr.includes('-')) {
@@ -552,17 +588,33 @@ const GrandLivre = ({ transactionsGlobales }) => {
         let y = parts[0];
         let p1 = parts[1]; 
         let p2 = parts[2]; 
-        
-        // Sécurité si le logiciel de paie a envoyé AAAA-JJ-MM (ex: 2024-29-02)
         if (parseInt(p1) > 12) {
           return `${p1}/${p2}/${y}`;
         } else {
-          // Format ISO classique AAAA-MM-JJ
           return `${p2}/${p1}/${y}`;
         }
       }
     }
-    return dStr; // Laisse tel quel si c'est déjà du JJ/MM/AAAA
+    return dStr; 
+  };
+
+  const parseMontant = (rawVal) => {
+    if (rawVal === undefined || rawVal === null || rawVal === '') return 0;
+    if (typeof rawVal === 'number') return rawVal;
+    
+    let s = String(rawVal).replace(/[\s\u00A0\u202F]/g, '');
+    
+    if (s.includes(',') && s.includes('.')) {
+      if (s.indexOf(',') < s.indexOf('.')) {
+        s = s.replace(/,/g, '');
+      } else {
+        s = s.replace(/\./g, '').replace(',', '.');
+      }
+    } else if (s.includes(',')) {
+      s = s.replace(/,/g, '.');
+    }
+    
+    return parseFloat(s) || 0;
   };
 
   const handleUndoLastImport = async () => {
@@ -593,16 +645,14 @@ const GrandLivre = ({ transactionsGlobales }) => {
       for (let i = 0; i < lignesBrutes.length; i++) {
         const cols = lignesBrutes[i];
         if (cols.length >= 6) {
-          const val5 = String(cols[5] || '').replace(/\s/g, '').replace(',', '.');
-          const val6 = String(cols[6] || '').replace(/\s/g, '').replace(',', '.');
+          const debit = parseMontant(cols[5]);
+          const credit = parseMontant(cols[6]);
           
           let mt = 0;
-          if (val6 !== '' && val6 !== 'undefined') {
-            const credit = parseFloat(val6) || 0;
-            const debit = parseFloat(val5) || 0;
+          if (cols[6] !== undefined && cols[6] !== '') {
             mt = credit !== 0 ? Math.abs(credit) : -Math.abs(debit);
           } else {
-            mt = parseFloat(val5) || 0;
+            mt = debit;
           }
           
           const dateExtrait = cols[0];
@@ -688,8 +738,8 @@ const GrandLivre = ({ transactionsGlobales }) => {
           const compteLib = cols[5].trim();
           const pieceRef = cols[8].trim();
           const ecritureLib = cols[10].trim();
-          const debit = parseFloat(cols[11].replace(',', '.')) || 0;
-          const credit = parseFloat(cols[12].replace(',', '.')) || 0;
+          const debit = parseMontant(cols[11]);
+          const credit = parseMontant(cols[12]);
           
           if (debit > 0 || credit > 0) {
             const libelleFinal = `(PAIE) ${ecritureLib} - ${compteLib}`;
@@ -748,8 +798,8 @@ const GrandLivre = ({ transactionsGlobales }) => {
           const pieceRef = cols[5] || '';
           const libelle = cols[6] || '';
           
-          let debitVal = parseFloat(String(cols[7] || '').replace(/\s/g, '').replace(',', '.')) || 0;
-          let creditVal = parseFloat(String(cols[8] || '').replace(/\s/g, '').replace(',', '.')) || 0;
+          let debitVal = parseMontant(cols[7]);
+          let creditVal = parseMontant(cols[8]);
           const commentaire = cols[11] || '';
 
           if (debitVal < 0) {
@@ -847,33 +897,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
     }
   };
 
-  const validerLignesPretes = async () => {
-    const lignesAValider = lignesEnAttente.filter(l => l.comptePropose);
-    if (lignesAValider.length === 0) return;
-    
-    if (window.confirm(`Vous êtes sur le point d'envoyer ${lignesAValider.length} écriture(s) d'un seul coup vers le Grand Livre. Confirmer ?`)) {
-      for (const ligne of lignesAValider) {
-        const newTx = {
-          date: ligne.date,
-          libelle: ligne.libelle,
-          montant: ligne.montant,
-          compte: ligne.comptePropose,
-          reference: ligne.reference || '',
-          typeOp: ligne.typeOp || '',
-          commentaire: ligne.commentaire || '',
-          type: ligne.montant < 0 ? 'depense' : 'recette',
-          date_creation: new Date().toISOString()
-        };
-        try {
-          await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), newTx);
-        } catch(e) {
-          console.error("Erreur sur l'insertion de masse", e);
-        }
-      }
-      setLignesEnAttente(prev => prev.filter(l => !l.comptePropose));
-    }
-  };
-
   const addOdLine = () => setOdLines([...odLines, { id: Date.now(), compte: '', debit: '', credit: '' }]);
   const removeOdLine = (id) => setOdLines(odLines.filter(l => l.id !== id));
   
@@ -966,7 +989,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
     setSortConfig({ key, direction });
   };
 
-const parseDateForSort = (dStr) => {
+  const parseDateForSort = (dStr) => {
     if (!dStr) return 0;
     const str = String(dStr).trim();
     if (str.includes('/')) {
@@ -1016,18 +1039,21 @@ const parseDateForSort = (dStr) => {
       let valA, valB;
       
       if (sortConfig.key === 'source') {
-        const getSource = (tx) => tx.type === 'od' ? (tx.libelle?.includes('(PAIE)') ? 'paie' : 'od') : 'banque';
+        const getSource = (tx) => tx.type === 'od' ? (tx.typeOp === 'PAIE' || tx.libelle?.includes('(PAIE)') ? 'paie' : 'od') : 'banque';
         valA = getSource(a);
         valB = getSource(b);
       } else if (sortConfig.key === 'date') {
         valA = parseDateForSort(a.date);
         valB = parseDateForSort(b.date);
-      } else if (sortConfig.key === 'montant') {
-        valA = Number(a.montant) || 0;
-        valB = Number(b.montant) || 0;
+      } else if (sortConfig.key === 'debit') {
+        valA = a.type === 'od' ? (a.compteDebit ? Number(a.montant) || 0 : 0) : (Number(a.montant) < 0 ? Math.abs(Number(a.montant)) : 0);
+        valB = b.type === 'od' ? (b.compteDebit ? Number(b.montant) || 0 : 0) : (Number(b.montant) < 0 ? Math.abs(Number(b.montant)) : 0);
+      } else if (sortConfig.key === 'credit') {
+        valA = a.type === 'od' ? (a.compteCredit ? Number(a.montant) || 0 : 0) : (Number(a.montant) > 0 ? Number(a.montant) : 0);
+        valB = b.type === 'od' ? (b.compteCredit ? Number(b.montant) || 0 : 0) : (Number(b.montant) > 0 ? Number(b.montant) : 0);
       } else if (sortConfig.key === 'compte') {
-        valA = (a.type === 'od' ? a.compteDebit : a.compte) || '';
-        valB = (b.type === 'od' ? b.compteDebit : b.compte) || '';
+        valA = a.compte || a.compteDebit || a.compteCredit || '';
+        valB = b.compte || b.compteDebit || b.compteCredit || '';
       } else {
         valA = (a[sortConfig.key] || '').toLowerCase();
         valB = (b[sortConfig.key] || '').toLowerCase();
@@ -1046,6 +1072,15 @@ const parseDateForSort = (dStr) => {
   return (
     <div className="space-y-6 w-full max-w-[1600px] mx-auto px-2">
       
+      {/* INPUT MASQUÉ POUR L'UPLOAD PDF */}
+      <input 
+        type="file" 
+        accept="application/pdf,image/*" 
+        className="hidden" 
+        ref={fileInputPdfRef} 
+        onChange={handlePdfChange} 
+      />
+
       <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
@@ -1186,7 +1221,6 @@ const parseDateForSort = (dStr) => {
               <tbody>
                 {lignesEnAttente.map((ligne) => (
                   <tr key={ligne.id} className="border-b border-orange-100 bg-white hover:bg-orange-50/50 transition-colors">
-                    {/* UTILISATION DU FORMATTEUR DE DATE ICI */}
                     <td className="py-3 px-2 text-slate-600">{formatDateAffichage(ligne.date)}</td>
                     <td className="py-3 px-2 text-slate-800 truncate max-w-xs">{ligne.libelle}</td>
                     <td className={`py-3 px-2 text-right font-bold whitespace-nowrap ${ligne.montant > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
@@ -1307,12 +1341,14 @@ const parseDateForSort = (dStr) => {
                 <th className="py-3 px-3 text-slate-400 min-w-[150px]">Infos complémentaires</th>
                 <th className="py-3 px-3 text-slate-400">Type Op.</th>
                 <th className="py-3 px-3 text-slate-400 min-w-[180px]">Commentaire</th>
-                <th className="py-3 px-3 text-right cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('montant')}>
-                  <div className="flex items-center justify-end gap-1">Débit {sortConfig.key === 'montant' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
+                
+                <th className="py-3 px-3 text-right cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('debit')}>
+                  <div className="flex items-center justify-end gap-1">Débit {sortConfig.key === 'debit' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
                 </th>
-                <th className="py-3 px-3 text-right cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('montant')}>
-                  <div className="flex items-center justify-end gap-1">Crédit {sortConfig.key === 'montant' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
+                <th className="py-3 px-3 text-right cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('credit')}>
+                  <div className="flex items-center justify-end gap-1">Crédit {sortConfig.key === 'credit' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
                 </th>
+                
                 <th className="py-3 px-3 cursor-pointer hover:bg-slate-100 transition-colors min-w-[220px]" onClick={() => handleSort('compte')}>
                   <div className="flex items-center gap-1">Détail Compte {sortConfig.key === 'compte' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
                 </th>
@@ -1335,7 +1371,6 @@ const parseDateForSort = (dStr) => {
 
                 return (
                   <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                    {/* UTILISATION DU FORMATTEUR DE DATE ICI */}
                     <td className="py-3 px-3 text-slate-600 whitespace-nowrap">{formatDateAffichage(t.date)}</td>
                     
                     <td className="py-3 px-3 text-slate-400 font-mono text-[10px]" title={t.id}>
@@ -1475,9 +1510,45 @@ const parseDateForSort = (dStr) => {
                           <button onClick={() => setEditingRowId(t.id)} className="text-slate-300 hover:text-indigo-500 p-1.5 rounded transition-colors mt-1.5" title="Modifier">
                             <span className="font-bold text-lg leading-none">✎</span>
                           </button>
-                          <button className="text-slate-300 hover:text-indigo-500 transition-colors mt-1.5" title="Attacher PDF">
-                            <Paperclip size={16} />
-                          </button>
+                          
+                          {/* NOUVELLE GESTION DES PIÈCES JOINTES PDF */}
+                          {t.pdfData ? (
+                            <div className="relative group/pdf inline-block">
+                              <button 
+                                onClick={() => {
+                                  const win = window.open();
+                                  if (win) {
+                                    win.document.write(`<iframe src="${t.pdfData}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+                                  }
+                                }}
+                                className="text-indigo-600 hover:text-indigo-800 p-1.5 rounded bg-indigo-50 border border-indigo-200 transition-colors mt-1.5"
+                                title={`Voir le document : ${t.pdfName || 'Pièce jointe'}`}
+                              >
+                                <Paperclip size={16} className="text-indigo-600" />
+                              </button>
+                              <button 
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (window.confirm("Supprimer la pièce jointe ?")) {
+                                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', t.id), { pdfData: '', pdfName: '' });
+                                  }
+                                }}
+                                className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-3.5 h-3.5 text-[9px] font-bold flex items-center justify-center opacity-0 group-hover/pdf:opacity-100 transition-opacity"
+                                title="Supprimer la pièce jointe"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ) : (
+                            <button 
+                              onClick={() => handleTriggerPdf(t.id)} 
+                              className="text-slate-300 hover:text-indigo-500 p-1.5 rounded transition-colors mt-1.5" 
+                              title="Joindre un PDF ou justificatif"
+                            >
+                              <Paperclip size={16} />
+                            </button>
+                          )}
+
                           {confirmDeleteId === t.id ? (
                             <button onClick={() => handleDeleteValidated(t.id)} className="text-white bg-red-500 hover:bg-red-600 px-2 py-1 rounded text-xs font-bold animate-pulse mt-1.5">
                               Confirmer ?
