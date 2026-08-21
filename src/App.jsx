@@ -532,6 +532,28 @@ const GrandLivre = ({ transactionsGlobales }) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transactionsGlobales]);
 
+  // NOUVEAU : Harmoniseur de dates pour un affichage parfait (JJ/MM/AAAA)
+  const formatDateAffichage = (dStr) => {
+    if (!dStr) return '';
+    if (dStr.includes('-')) {
+      const parts = dStr.split('-');
+      if (parts.length === 3 && parts[0].length === 4) {
+        let y = parts[0];
+        let p1 = parts[1]; 
+        let p2 = parts[2]; 
+        
+        // Sécurité si le logiciel de paie a envoyé AAAA-JJ-MM (ex: 2024-29-02)
+        if (parseInt(p1) > 12) {
+          return `${p1}/${p2}/${y}`;
+        } else {
+          // Format ISO classique AAAA-MM-JJ
+          return `${p2}/${p1}/${y}`;
+        }
+      }
+    }
+    return dStr; // Laisse tel quel si c'est déjà du JJ/MM/AAAA
+  };
+
   const handleUndoLastImport = async () => {
     if (!lastImportBatch) return;
     if (!window.confirm(`Voulez-vous vraiment annuler le dernier import de ${lastImportBatch.source} (${lastImportBatch.count} lignes) ?`)) return;
@@ -719,7 +741,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
           let creditVal = parseFloat(String(cols[8] || '').replace(/\s/g, '').replace(',', '.')) || 0;
           const commentaire = cols[11] || '';
 
-          // CORRECTION : Uniquement la bascule mathématique, on ne touche plus aux numéros de compte 7 et 6 !
           if (debitVal < 0) {
             creditVal = Math.abs(debitVal);
             debitVal = 0;
@@ -1140,7 +1161,8 @@ const GrandLivre = ({ transactionsGlobales }) => {
               <tbody>
                 {lignesEnAttente.map((ligne) => (
                   <tr key={ligne.id} className="border-b border-orange-100 bg-white hover:bg-orange-50/50 transition-colors">
-                    <td className="py-3 px-2 text-slate-600">{ligne.date}</td>
+                    {/* UTILISATION DU FORMATTEUR DE DATE ICI */}
+                    <td className="py-3 px-2 text-slate-600">{formatDateAffichage(ligne.date)}</td>
                     <td className="py-3 px-2 text-slate-800 truncate max-w-xs">{ligne.libelle}</td>
                     <td className={`py-3 px-2 text-right font-bold whitespace-nowrap ${ligne.montant > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                       {ligne.montant > 0 ? '+' : ''}{ligne.montant.toFixed(2)} €
@@ -1204,7 +1226,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
         </div>
       )}
 
-      {/* TABLEAU DES ÉCRITURES VALIDÉES (LE GRAND LIVRE) */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         
         <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap justify-between items-center gap-4">
@@ -1289,7 +1310,8 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
                 return (
                   <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="py-3 px-3 text-slate-600 whitespace-nowrap">{t.date}</td>
+                    {/* UTILISATION DU FORMATTEUR DE DATE ICI */}
+                    <td className="py-3 px-3 text-slate-600 whitespace-nowrap">{formatDateAffichage(t.date)}</td>
                     
                     <td className="py-3 px-3 text-slate-400 font-mono text-[10px]" title={t.id}>
                       {t.id.substring(0, 6)}...
