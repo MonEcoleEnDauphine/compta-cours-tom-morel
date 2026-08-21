@@ -334,8 +334,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
   const [comptesList, setComptesList] = useState([]);
   const [editingRowId, setEditingRowId] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
-  
-  // NOUVEAU : État pour mémoriser le dernier import et permettre son annulation
   const [lastImportBatch, setLastImportBatch] = useState(null);
   
   const [odFormDate, setOdFormDate] = useState('');
@@ -350,7 +348,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
   const [selectedCompteFilter, setSelectedCompteFilter] = useState(''); 
   const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' });
   
-  // NOUVEAU : Réf unique pour la banque (fusion CSV/XLSX)
   const fileInputBankRef = useRef(null);
   const fileInputPaieRef = useRef(null);
   const fileInputODRef = useRef(null);
@@ -412,17 +409,14 @@ const GrandLivre = ({ transactionsGlobales }) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transactionsGlobales]);
 
-  // NOUVEAU : Fonction d'annulation globale d'un lot d'import
   const handleUndoLastImport = async () => {
     if (!lastImportBatch) return;
     if (!window.confirm(`Voulez-vous vraiment annuler le dernier import de ${lastImportBatch.source} (${lastImportBatch.count} lignes) ?`)) return;
 
     if (lastImportBatch.target === 'sas') {
-      // Nettoyage dans le brouillon d'attente
       setLignesEnAttente(prev => prev.filter(l => l.batchId !== lastImportBatch.batchId));
       alert("L'import a été annulé et retiré de la liste d'attente.");
     } else if (lastImportBatch.target === 'firestore') {
-      // Nettoyage direct dans le Grand Livre
       const txToDelete = transactionsGlobales.filter(t => t.batchId === lastImportBatch.batchId);
       for (const tx of txToDelete) {
         await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', tx.id));
@@ -432,7 +426,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
     setLastImportBatch(null);
   };
 
-  // MISE À JOUR : Un seul import pour la Banque (fusion CSV / XLSX) avec Lot ID
   const handleImportBank = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -471,7 +464,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
             nouvellesLignes.push({
               id: Math.random().toString(36).substr(2, 9),
-              batchId: batchId, // NOUVEAU : Traçabilité du lot
+              batchId: batchId,
               date: dateExtrait,
               libelle: libelleExtrait,
               reference: cols[2], 
@@ -554,7 +547,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
             }
 
             const newTx = {
-              batchId: batchId, // NOUVEAU : Traçabilité
+              batchId: batchId, 
               date: formattedDate,
               libelle: libelleFinal,
               montant: mt,
@@ -595,7 +588,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
         if (cols && cols.length >= 9) {
           const rawDate = cols[0];
           const journal = String(cols[2] || '').trim().toUpperCase();
-          let compteNum = String(cols[3] || '').trim();
+          const compteNum = String(cols[3] || '').trim();
           const pieceRef = cols[5] || '';
           const libelle = cols[6] || '';
           
@@ -603,6 +596,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
           let creditVal = parseFloat(String(cols[8] || '').replace(/\s/g, '').replace(',', '.')) || 0;
           const commentaire = cols[11] || '';
 
+          // CORRECTION : Uniquement la bascule mathématique, on ne touche plus aux numéros de compte 7 et 6 !
           if (debitVal < 0) {
             creditVal = Math.abs(debitVal);
             debitVal = 0;
@@ -620,17 +614,10 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
             const isDebit = debitVal > 0;
             const montantFinal = isDebit ? debitVal : creditVal;
-
-            if (isDebit && compteNum.startsWith('7')) {
-              compteNum = '6' + compteNum.substring(1);
-            } else if (!isDebit && compteNum.startsWith('6')) {
-              compteNum = '7' + compteNum.substring(1);
-            }
-
             const prefix = journal === 'PAIE' ? '(PAIE)' : '(OD)';
 
             const newTx = {
-              batchId: batchId, // NOUVEAU : Traçabilité
+              batchId: batchId,
               date: formattedDate,
               libelle: `${prefix} ${libelle}`,
               montant: montantFinal,
@@ -899,7 +886,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
         </div>
       </div>
 
-      {/* BANDEAU "UNDO" (ANNULER LE DERNIER IMPORT) */}
       {lastImportBatch && (
         <div className="bg-amber-50 border border-amber-200 text-amber-800 px-5 py-3 rounded-xl flex justify-between items-center shadow-sm animate-fade-in">
           <div className="flex items-center gap-3">
@@ -916,7 +902,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* BANQUE (FUSION DES DEUX BOUTONS) */}
         <div className="bg-indigo-50 p-6 rounded-xl border border-indigo-100 flex flex-col justify-center items-center text-center space-y-4">
           <h3 className="font-bold text-indigo-900 text-lg">Journal de Banque</h3>
           <p className="text-sm text-indigo-700">Importez vos lignes bancaires pour les imputer.</p>
@@ -928,7 +913,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
           </div>
         </div>
 
-        {/* PAIE */}
         <div className="bg-pink-50 p-6 rounded-xl border border-pink-200 flex flex-col justify-center items-center text-center space-y-4">
           <h3 className="font-bold text-pink-900 text-lg">Fiches de Paie</h3>
           <p className="text-sm text-pink-700">Importez le fichier TXT exporté depuis le logiciel de paie.</p>
@@ -939,7 +923,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
           </button>
         </div>
 
-        {/* OD MANUELLE + IMPORT MASSE */}
         <div className="bg-purple-50 p-5 rounded-xl border border-purple-100 flex flex-col h-[350px]">
           <div className="flex justify-between items-center shrink-0 mb-3">
             <h3 className="font-bold text-purple-900 text-lg flex items-center gap-2">
