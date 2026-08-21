@@ -331,9 +331,16 @@ const EtatFinancier = ({ transactionsGlobales }) => {
 // --- 3. GRAND LIVRE (Import CSV/XLSX, OD, Validations) ---
 const GrandLivre = ({ transactionsGlobales }) => {
   const [lignesEnAttente, setLignesEnAttente] = useState([]);
-  const [odForm, setOdForm] = useState({ date: '', libelle: '', debit: '', credit: '', montant: '' });
   const [comptesList, setComptesList] = useState([]);
   const [editingRowId, setEditingRowId] = useState(null);
+  
+  // NOUVEAU : État pour le formulaire d'OD multi-lignes
+  const [odFormDate, setOdFormDate] = useState('');
+  const [odFormLibelle, setOdFormLibelle] = useState('');
+  const [odLines, setOdLines] = useState([
+    { id: 1, compte: '', debit: '', credit: '' },
+    { id: 2, compte: '', debit: '', credit: '' }
+  ]);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' });
@@ -402,7 +409,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
   const handleImportFile = async (e, type) => {
     const file = e.target.files[0];
     if (!file) return;
-
     let doublonsCount = 0;
 
     const preparerLignes = (lignesBrutes) => {
@@ -426,14 +432,13 @@ const GrandLivre = ({ transactionsGlobales }) => {
           const libelleExtrait = cols[1] || cols[3];
           
           if (mt !== 0) {
-            // NOUVEAU : Vérification stricte des doublons (Date + Libellé + Montant)
             const isDuplicate = transactionsGlobales.some(t => t.date === dateExtrait && t.libelle === libelleExtrait && Math.abs(t.montant) === Math.abs(mt)) ||
                                 lignesEnAttente.some(t => t.date === dateExtrait && t.libelle === libelleExtrait && Math.abs(t.montant) === Math.abs(mt)) ||
                                 nouvellesLignes.some(t => t.date === dateExtrait && t.libelle === libelleExtrait && Math.abs(t.montant) === Math.abs(mt));
 
             if (isDuplicate) {
               doublonsCount++;
-              continue; // On passe à la ligne suivante sans l'ajouter
+              continue; 
             }
 
             nouvellesLignes.push({
@@ -506,7 +511,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
             const libelleFinal = `(PAIE) ${ecritureLib} - ${compteLib}`;
             const mt = debit > 0 ? debit : credit;
 
-            // NOUVEAU : Vérification des doublons de Paie
             const isDuplicate = transactionsGlobales.some(t => t.date === formattedDate && t.libelle === libelleFinal && Math.abs(t.montant) === Math.abs(mt));
 
             if (isDuplicate) {
@@ -592,24 +596,51 @@ const GrandLivre = ({ transactionsGlobales }) => {
     }
   };
 
+  // NOUVEAU : Mécanique de gestion de l'OD Multi-lignes
+  const addOdLine = () => setOdLines([...odLines, { id: Date.now(), compte: '', debit: '', credit: '' }]);
+  const removeOdLine = (id) => setOdLines(odLines.filter(l => l.id !== id));
+  const updateOdLine = (id, field, value) => setOdLines(odLines.map(l => l.id === id ? { ...l, [field]: value } : l));
+
+  const totalDebitOD = odLines.reduce((sum, l) => sum + (parseFloat(l.debit) || 0), 0);
+  const totalCreditOD = odLines.reduce((sum, l) => sum + (parseFloat(l.credit) || 0), 0);
+  const isOdBalanced = Math.abs(totalDebitOD - totalCreditOD) < 0.01 && totalDebitOD > 0;
+
   const handleAddOD = async () => {
-    if (!odForm.date || !odForm.libelle || !odForm.debit || !odForm.credit || !odForm.montant) {
-      alert('Veuillez remplir tous les champs de l\'OD.');
-      return;
+    if (!odFormDate || !odFormLibelle) return alert('Date et libellé requis.');
+    if (!isOdBalanced) return alert("L'OD doit être équilibrée (Total Débit = Total Crédit) et supérieure à 0.");
+    
+    // Vérification que chaque ligne remplie a bien un compte attribué
+    for (const line of odLines) {
+      const debit = parseFloat(line.debit) || 0;
+      const credit = parseFloat(line.credit) || 0;
+      if (!line.compte && (debit > 0 || credit > 0)) {
+         return alert('Veuillez sélectionner un compte pour chaque ligne où vous avez saisi un montant.');
+      }
     }
-    const newTx = {
-      date: odForm.date,
-      libelle: `(OD) ${odForm.libelle}`,
-      montant: parseFloat(odForm.montant.replace(',', '.')),
-      type: 'od',
-      compteDebit: odForm.debit,
-      compteCredit: odForm.credit,
-      date_creation: new Date().toISOString()
-    };
+
     try {
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), newTx);
-      setOdForm({ date: '', libelle: '', debit: '', credit: '', montant: '' });
-      alert("OD ajoutée avec succès au Grand Livre.");
+      // Sauvegarde des lignes de l'OD en tant qu'écritures indépendantes dans la base
+      for (const line of odLines) {
+        const debit = parseFloat(line.debit) || 0;
+        const credit = parseFloat(line.credit) || 0;
+        if (debit > 0 || credit > 0) {
+          const newTx = {
+            date: odFormDate,
+            libelle: `(OD) ${odFormLibelle}`,
+            montant: debit > 0 ? debit : credit,
+            type: 'od',
+            compteDebit: debit > 0 ? line.compte : '',
+            compteCredit: credit > 0 ? line.compte : '',
+            date_creation: new Date().toISOString()
+          };
+          await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), newTx);
+        }
+      }
+      // Réinitialisation du formulaire
+      setOdFormDate('');
+      setOdFormLibelle('');
+      setOdLines([{ id: 1, compte: '', debit: '', credit: '' }, { id: 2, compte: '', debit: '', credit: '' }]);
+      alert("OD enregistrée et ventilée avec succès !");
     } catch(e) {
       alert("Erreur lors de la création de l'OD.");
     }
@@ -669,7 +700,12 @@ const GrandLivre = ({ transactionsGlobales }) => {
     result.sort((a, b) => {
       let valA, valB;
       
-      if (sortConfig.key === 'date') {
+      // NOUVEAU : Tri par Source
+      if (sortConfig.key === 'source') {
+        const getSource = (tx) => tx.type === 'od' ? (tx.libelle?.includes('(PAIE)') ? 'paie' : 'od') : 'banque';
+        valA = getSource(a);
+        valB = getSource(b);
+      } else if (sortConfig.key === 'date') {
         valA = parseDateForSort(a.date);
         valB = parseDateForSort(b.date);
       } else if (sortConfig.key === 'montant') {
@@ -701,11 +737,12 @@ const GrandLivre = ({ transactionsGlobales }) => {
           <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <BookOpen className="text-indigo-600" /> Grand Livre (Import & Saisie)
           </h2>
-          <p className="text-slate-500 text-sm mt-1">Importez vos relevés bancaires, fiches de paie ou saisissez une OD.</p>
+          <p className="text-slate-500 text-sm mt-1">Importez vos relevés bancaires, fiches de paie ou saisissez une OD ventilée.</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* BLOC 1 : IMPORT BANQUE */}
         <div className="bg-indigo-50 p-6 rounded-xl border border-indigo-100 flex flex-col justify-center items-center text-center space-y-4">
           <h3 className="font-bold text-indigo-900 text-lg">Journal de Banque</h3>
           <p className="text-sm text-indigo-700">Importez vos lignes bancaires pour les imputer.</p>
@@ -721,6 +758,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
           </div>
         </div>
 
+        {/* BLOC 2 : IMPORT PAIE */}
         <div className="bg-pink-50 p-6 rounded-xl border border-pink-200 flex flex-col justify-center items-center text-center space-y-4">
           <h3 className="font-bold text-pink-900 text-lg">Fiches de Paie</h3>
           <p className="text-sm text-pink-700">Importez le fichier TXT exporté depuis le logiciel de paie.</p>
@@ -731,26 +769,50 @@ const GrandLivre = ({ transactionsGlobales }) => {
           </button>
         </div>
 
-        <div className="bg-purple-50 p-6 rounded-xl border border-purple-100 space-y-4 flex flex-col">
-          <h3 className="font-bold text-purple-900 text-lg flex items-center gap-2 justify-center">
+        {/* BLOC 3 : NOUVELLE SAISIE OD MULTI-LIGNES */}
+        <div className="bg-purple-50 p-5 rounded-xl border border-purple-100 flex flex-col h-[320px]">
+          <h3 className="font-bold text-purple-900 text-lg flex items-center gap-2 justify-center shrink-0 mb-3">
             <FileText size={18} /> Opération Diverse
           </h3>
-          <div className="grid grid-cols-2 gap-2 flex-1">
-            <input type="date" value={odForm.date} onChange={e => setOdForm({...odForm, date: e.target.value})} className="border border-purple-200 rounded p-1.5 text-xs bg-white" />
-            <input type="text" placeholder="Libellé OD..." value={odForm.libelle} onChange={e => setOdForm({...odForm, libelle: e.target.value})} className="border border-purple-200 rounded p-1.5 text-xs bg-white" />
-            <select value={odForm.debit} onChange={e => setOdForm({...odForm, debit: e.target.value})} className="border border-purple-200 rounded p-1.5 text-xs bg-white">
-              <option value="">Compte Débit...</option>
-              {comptesList.map(c => <option key={c.id} value={c.code}>{c.code} - {c.libelle}</option>)}
-            </select>
-            <select value={odForm.credit} onChange={e => setOdForm({...odForm, credit: e.target.value})} className="border border-purple-200 rounded p-1.5 text-xs bg-white">
-              <option value="">Compte Crédit...</option>
-              {comptesList.map(c => <option key={c.id} value={c.code}>{c.code} - {c.libelle}</option>)}
-            </select>
-            <input type="number" placeholder="Montant (€)" value={odForm.montant} onChange={e => setOdForm({...odForm, montant: e.target.value})} className="border border-purple-200 rounded p-1.5 text-xs col-span-2 bg-white" />
+          
+          <div className="flex gap-2 shrink-0 mb-2">
+            <input type="date" value={odFormDate} onChange={e => setOdFormDate(e.target.value)} className="border border-purple-200 rounded p-1.5 text-xs bg-white w-1/3 outline-none focus:ring-1 focus:ring-purple-500" />
+            <input type="text" placeholder="Libellé OD..." value={odFormLibelle} onChange={e => setOdFormLibelle(e.target.value)} className="border border-purple-200 rounded p-1.5 text-xs bg-white flex-1 outline-none focus:ring-1 focus:ring-purple-500" />
           </div>
-          <button onClick={handleAddOD} className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded font-medium text-sm transition-colors mt-auto">
-            Enregistrer l'OD
-          </button>
+
+          <div className="overflow-y-auto flex-1 space-y-1.5 pr-1 min-h-[100px]">
+            {odLines.map((l) => (
+              <div key={l.id} className="flex gap-1 items-center">
+                <select value={l.compte} onChange={e => updateOdLine(l.id, 'compte', e.target.value)} className="border border-purple-200 rounded p-1 text-xs bg-white w-1/2 outline-none focus:ring-1 focus:ring-purple-500">
+                  <option value="">Compte...</option>
+                  {comptesList.map(c => <option key={c.id} value={c.code}>{c.code} - {c.libelle}</option>)}
+                </select>
+                <input type="number" placeholder="Débit" value={l.debit} onChange={e => updateOdLine(l.id, 'debit', e.target.value)} className="border border-purple-200 rounded p-1 text-xs bg-white w-1/4 outline-none focus:ring-1 focus:ring-purple-500" />
+                <input type="number" placeholder="Crédit" value={l.credit} onChange={e => updateOdLine(l.id, 'credit', e.target.value)} className="border border-purple-200 rounded p-1 text-xs bg-white w-1/4 outline-none focus:ring-1 focus:ring-purple-500" />
+                <button onClick={() => removeOdLine(l.id)} className="text-slate-300 hover:text-red-500"><XCircle size={14} /></button>
+              </div>
+            ))}
+            <button onClick={addOdLine} className="text-[11px] text-purple-600 font-bold mt-1 hover:underline">
+              + Ajouter une ligne
+            </button>
+          </div>
+
+          <div className="shrink-0 flex flex-col gap-2 pt-2 border-t border-purple-200 mt-2">
+            <div className="flex justify-between items-center text-xs font-bold text-purple-900 bg-purple-100 p-2 rounded">
+              <span>TOTAL</span>
+              <div className="flex gap-3">
+                <span className={isOdBalanced ? 'text-emerald-600' : 'text-red-600'}>D: {totalDebitOD.toFixed(2)}</span>
+                <span className={isOdBalanced ? 'text-emerald-600' : 'text-red-600'}>C: {totalCreditOD.toFixed(2)}</span>
+              </div>
+            </div>
+            <button 
+              onClick={handleAddOD} 
+              disabled={!isOdBalanced}
+              className={`w-full py-2 rounded font-medium text-sm transition-colors ${isOdBalanced ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-purple-300 text-purple-100 cursor-not-allowed'}`}
+            >
+              Enregistrer l'OD
+            </button>
+          </div>
         </div>
       </div>
 
@@ -885,17 +947,19 @@ const GrandLivre = ({ transactionsGlobales }) => {
                     Date comptable {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </div>
                 </th>
+                {/* NOUVELLE COLONNE : SOURCE */}
+                <th className="py-3 px-3 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('source')}>
+                  <div className="flex items-center gap-1">
+                    Source {sortConfig.key === 'source' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </div>
+                </th>
                 <th className="py-3 px-3 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('libelle')}>
                   <div className="flex items-center gap-1">
                     Libellé simplifié {sortConfig.key === 'libelle' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </div>
                 </th>
-                <th className="py-3 px-3 text-slate-400">
-                  Infos
-                </th>
-                <th className="py-3 px-3 text-slate-400">
-                  Type Op.
-                </th>
+                <th className="py-3 px-3 text-slate-400">Infos complémentaires</th>
+                <th className="py-3 px-3 text-slate-400">Type Op.</th>
                 <th className="py-3 px-3 text-right cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('montant')}>
                   <div className="flex items-center justify-end gap-1">
                     Débit {sortConfig.key === 'montant' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
@@ -915,115 +979,154 @@ const GrandLivre = ({ transactionsGlobales }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredAndSortedTransactions.map(t => (
-                <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="py-3 px-3 text-slate-600 whitespace-nowrap">{t.date}</td>
-                  <td className="py-3 px-3 text-slate-800 font-medium truncate max-w-[180px]">{t.libelle}</td>
-                  
-                  <td className="py-3 px-3 text-slate-500 text-xs truncate max-w-[120px]" title={t.reference}>
-                    {t.reference || <span className="text-slate-300 italic">-</span>}
-                  </td>
-                  <td className="py-3 px-3 text-slate-500 text-xs truncate max-w-[100px]">
-                    {t.typeOp || <span className="text-slate-300 italic">-</span>}
-                  </td>
-                  
-                  {t.type === 'od' ? (
-                    <>
-                      <td className="py-3 px-3 text-right font-medium text-purple-600">{Number(t.montant).toFixed(2)} €</td>
-                      <td className="py-3 px-3 text-right font-medium text-purple-600">{Number(t.montant).toFixed(2)} €</td>
-                    </>
-                  ) : (
-                    <>
-                      <td className="py-3 px-3 text-right font-bold text-red-600">
-                        {t.montant < 0 ? Math.abs(t.montant).toFixed(2) + ' €' : '-'}
-                      </td>
-                      <td className="py-3 px-3 text-right font-bold text-emerald-600">
-                        {t.montant > 0 ? Number(t.montant).toFixed(2) + ' €' : '-'}
-                      </td>
-                    </>
-                  )}
-                  
-                  <td className="py-3 px-3">
-                    {editingRowId === t.id ? (
-                      t.type === 'od' ? (
-                        <div className="flex flex-col gap-1 w-full min-w-[200px]">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-bold text-slate-500 w-3">D:</span>
-                            <select 
-                              value={t.compteDebit || ''} 
-                              onChange={(e) => handleUpdateCompte(t.id, e.target.value, 'compteDebit')}
-                              className="border border-indigo-300 rounded p-1 text-xs bg-indigo-50 w-full text-indigo-800 outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner"
-                            >
-                              <option value="">Non défini</option>
-                              {comptesList.map(c => <option key={`d-${c.id}`} value={c.code}>{c.code} - {c.libelle}</option>)}
-                            </select>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-bold text-slate-500 w-3">C:</span>
-                            <select 
-                              value={t.compteCredit || ''} 
-                              onChange={(e) => handleUpdateCompte(t.id, e.target.value, 'compteCredit')}
-                              className="border border-indigo-300 rounded p-1 text-xs bg-indigo-50 w-full text-indigo-800 outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner"
-                            >
-                              <option value="">Non défini</option>
-                              {comptesList.map(c => <option key={`c-${c.id}`} value={c.code}>{c.code} - {c.libelle}</option>)}
-                            </select>
-                          </div>
-                        </div>
-                      ) : (
-                        <select 
-                          value={t.compte || ''} 
-                          onChange={(e) => {
-                            handleUpdateCompte(t.id, e.target.value, 'compte');
-                            setEditingRowId(null);
-                          }}
-                          className="border border-indigo-300 rounded p-2 text-xs bg-indigo-50 min-w-[200px] w-full text-indigo-800 font-mono outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner cursor-pointer"
-                        >
-                          <option value="">Non défini</option>
-                          {comptesList.map(c => <option key={c.id} value={c.code}>{c.code} - {c.libelle}</option>)}
-                        </select>
-                      )
-                    ) : (
-                      t.type === 'od' ? (
-                        <div className="flex flex-col gap-0.5 min-w-[200px]">
-                          <div className="text-xs text-slate-500 truncate"><span className="font-bold text-slate-700">D:</span> {t.compteDebit} {t.compteDebit && `- ${comptesList.find(c => c.code === t.compteDebit)?.libelle || ''}`}</div>
-                          <div className="text-xs text-slate-500 truncate"><span className="font-bold text-slate-700">C:</span> {t.compteCredit} {t.compteCredit && `- ${comptesList.find(c => c.code === t.compteCredit)?.libelle || ''}`}</div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center w-fit min-w-[200px]">
-                          <span className="bg-slate-50 px-2 py-1.5 rounded-md text-xs font-mono text-slate-700 border border-slate-200 max-w-[220px] truncate shadow-sm">
-                            {t.compte ? `${t.compte} - ${comptesList.find(c => c.code === t.compte)?.libelle || ''}` : 'Non défini'}
-                          </span>
-                        </div>
-                      )
-                    )}
-                  </td>
-                  
-                  <td className="py-3 px-3 text-center flex items-center justify-center gap-2">
-                    {editingRowId === t.id ? (
-                      <button onClick={() => setEditingRowId(null)} className="text-white bg-emerald-500 hover:bg-emerald-600 px-3 py-1 rounded text-xs font-bold transition-colors shadow-sm mt-1.5" title="Terminer l'édition">
-                        OK
-                      </button>
+              {filteredAndSortedTransactions.map(t => {
+                // LOGIQUE D'AFFICHAGE DE LA SOURCE
+                let sourceLabel = 'Banque';
+                let sourceColor = 'bg-blue-50 text-blue-700 border-blue-200';
+                if (t.type === 'od') {
+                  if (t.libelle && t.libelle.includes('(PAIE)')) {
+                    sourceLabel = 'Paie';
+                    sourceColor = 'bg-pink-50 text-pink-700 border-pink-200';
+                  } else {
+                    sourceLabel = 'OD';
+                    sourceColor = 'bg-purple-50 text-purple-700 border-purple-200';
+                  }
+                }
+
+                return (
+                  <tr key={t.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="py-3 px-3 text-slate-600 whitespace-nowrap">{t.date}</td>
+                    
+                    {/* AFFICHAGE DE LA NOUVELLE COLONNE SOURCE */}
+                    <td className="py-3 px-3">
+                      <span className={`px-2 py-1 rounded border text-[10px] font-bold uppercase tracking-wider whitespace-nowrap ${sourceColor}`}>
+                        {sourceLabel}
+                      </span>
+                    </td>
+
+                    <td className="py-3 px-3 text-slate-800 font-medium truncate max-w-[180px]">{t.libelle}</td>
+                    <td className="py-3 px-3 text-slate-500 text-xs truncate max-w-[120px]" title={t.reference}>
+                      {t.reference || <span className="text-slate-300 italic">-</span>}
+                    </td>
+                    <td className="py-3 px-3 text-slate-500 text-xs truncate max-w-[100px]">
+                      {t.typeOp || <span className="text-slate-300 italic">-</span>}
+                    </td>
+                    
+                    {t.type === 'od' ? (
+                      <>
+                        <td className="py-3 px-3 text-right font-medium text-purple-600">
+                          {t.compteDebit ? Number(t.montant).toFixed(2) + ' €' : '-'}
+                        </td>
+                        <td className="py-3 px-3 text-right font-medium text-purple-600">
+                          {t.compteCredit ? Number(t.montant).toFixed(2) + ' €' : '-'}
+                        </td>
+                      </>
                     ) : (
                       <>
-                        {/* UN SEUL BOUTON CRAYON CONSERVÉ ICI */}
-                        <button onClick={() => setEditingRowId(t.id)} className="text-slate-300 hover:text-indigo-500 p-1.5 rounded transition-colors mt-1.5" title="Modifier le compte">
-                          <span className="font-bold text-lg leading-none">✎</span>
-                        </button>
-                        <button className="text-slate-300 hover:text-indigo-500 transition-colors mt-1.5" title="Attacher PDF">
-                          <Paperclip size={16} />
-                        </button>
-                        <button onClick={() => handleDeleteValidated(t.id)} className="text-slate-300 hover:text-red-500 p-1.5 rounded transition-colors mt-1.5" title="Supprimer l'écriture">
-                          <Trash2 size={16}/>
-                        </button>
+                        <td className="py-3 px-3 text-right font-bold text-red-600">
+                          {t.montant < 0 ? Math.abs(t.montant).toFixed(2) + ' €' : '-'}
+                        </td>
+                        <td className="py-3 px-3 text-right font-bold text-emerald-600">
+                          {t.montant > 0 ? Number(t.montant).toFixed(2) + ' €' : '-'}
+                        </td>
                       </>
                     )}
-                  </td>
-                </tr>
-              ))}
+                    
+                    <td className="py-3 px-3">
+                      {editingRowId === t.id ? (
+                        t.type === 'od' ? (
+                          (t.compteDebit && t.compteCredit) ? (
+                            <div className="flex flex-col gap-1 w-full min-w-[200px]">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-bold text-slate-500 w-3">D:</span>
+                                <select value={t.compteDebit || ''} onChange={(e) => handleUpdateCompte(t.id, e.target.value, 'compteDebit')} className="border border-indigo-300 rounded p-1 text-xs bg-indigo-50 w-full text-indigo-800 outline-none">
+                                  <option value="">Non défini</option>
+                                  {comptesList.map(c => <option key={`d-${c.id}`} value={c.code}>{c.code} - {c.libelle}</option>)}
+                                </select>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-bold text-slate-500 w-3">C:</span>
+                                <select value={t.compteCredit || ''} onChange={(e) => handleUpdateCompte(t.id, e.target.value, 'compteCredit')} className="border border-indigo-300 rounded p-1 text-xs bg-indigo-50 w-full text-indigo-800 outline-none">
+                                  <option value="">Non défini</option>
+                                  {comptesList.map(c => <option key={`c-${c.id}`} value={c.code}>{c.code} - {c.libelle}</option>)}
+                                </select>
+                              </div>
+                            </div>
+                          ) : (
+                            <select 
+                              value={t.compteDebit || t.compteCredit || ''} 
+                              onChange={(e) => {
+                                handleUpdateCompte(t.id, e.target.value, t.compteDebit ? 'compteDebit' : 'compteCredit');
+                                setEditingRowId(null);
+                              }}
+                              className="border border-purple-300 rounded p-2 text-xs bg-purple-50 min-w-[200px] w-full text-purple-800 font-mono outline-none"
+                            >
+                              <option value="">Non défini</option>
+                              {comptesList.map(c => <option key={c.id} value={c.code}>{c.code} - {c.libelle}</option>)}
+                            </select>
+                          )
+                        ) : (
+                          <select 
+                            value={t.compte || ''} 
+                            onChange={(e) => {
+                              handleUpdateCompte(t.id, e.target.value, 'compte');
+                              setEditingRowId(null);
+                            }}
+                            className="border border-indigo-300 rounded p-2 text-xs bg-indigo-50 min-w-[200px] w-full text-indigo-800 font-mono outline-none"
+                          >
+                            <option value="">Non défini</option>
+                            {comptesList.map(c => <option key={c.id} value={c.code}>{c.code} - {c.libelle}</option>)}
+                          </select>
+                        )
+                      ) : (
+                        t.type === 'od' ? (
+                          (t.compteDebit && t.compteCredit) ? (
+                            <div className="flex flex-col gap-0.5 min-w-[200px]">
+                              <div className="text-xs text-slate-500 truncate"><span className="font-bold text-slate-700">D:</span> {t.compteDebit} {t.compteDebit && `- ${comptesList.find(c => c.code === t.compteDebit)?.libelle || ''}`}</div>
+                              <div className="text-xs text-slate-500 truncate"><span className="font-bold text-slate-700">C:</span> {t.compteCredit} {t.compteCredit && `- ${comptesList.find(c => c.code === t.compteCredit)?.libelle || ''}`}</div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center w-fit min-w-[200px]">
+                              <span className="bg-purple-50 px-2 py-1.5 rounded-md text-xs font-mono text-purple-700 border border-purple-200 max-w-[220px] truncate shadow-sm">
+                                {t.compteDebit ? `${t.compteDebit} - ${comptesList.find(c => c.code === t.compteDebit)?.libelle || ''}` : `${t.compteCredit} - ${comptesList.find(c => c.code === t.compteCredit)?.libelle || ''}`}
+                              </span>
+                            </div>
+                          )
+                        ) : (
+                          <div className="flex items-center w-fit min-w-[200px]">
+                            <span className="bg-slate-50 px-2 py-1.5 rounded-md text-xs font-mono text-slate-700 border border-slate-200 max-w-[220px] truncate shadow-sm">
+                              {t.compte ? `${t.compte} - ${comptesList.find(c => c.code === t.compte)?.libelle || ''}` : 'Non défini'}
+                            </span>
+                          </div>
+                        )
+                      )}
+                    </td>
+                    
+                    <td className="py-3 px-3 text-center flex items-center justify-center gap-2">
+                      {editingRowId === t.id ? (
+                        <button onClick={() => setEditingRowId(null)} className="text-white bg-emerald-500 hover:bg-emerald-600 px-3 py-1 rounded text-xs font-bold transition-colors shadow-sm mt-1.5" title="Terminer l'édition">
+                          OK
+                        </button>
+                      ) : (
+                        <>
+                          <button onClick={() => setEditingRowId(t.id)} className="text-slate-300 hover:text-indigo-500 p-1.5 rounded transition-colors mt-1.5" title="Modifier le compte">
+                            <span className="font-bold text-lg leading-none">✎</span>
+                          </button>
+                          <button className="text-slate-300 hover:text-indigo-500 transition-colors mt-1.5" title="Attacher PDF">
+                            <Paperclip size={16} />
+                          </button>
+                          <button onClick={() => handleDeleteValidated(t.id)} className="text-slate-300 hover:text-red-500 p-1.5 rounded transition-colors mt-1.5" title="Supprimer l'écriture">
+                            <Trash2 size={16}/>
+                          </button>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
               {filteredAndSortedTransactions.length === 0 && (
                 <tr>
-                  <td colSpan="8" className="py-8 text-center text-slate-400">Aucune écriture trouvée.</td>
+                  <td colSpan="9" className="py-8 text-center text-slate-400">Aucune écriture trouvée.</td>
                 </tr>
               )}
             </tbody>
