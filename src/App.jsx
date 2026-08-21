@@ -107,171 +107,198 @@ const InfosContact = () => (
     </div>
   </div>
 );
-// --- 2. ÉTAT FINANCIER (Bilan & Résultat Groupés) ---
-const EtatFinancier = ({ transactionsGlobales }) => {
-  const [anneeDebut, setAnneeDebut] = useState(new Date().getFullYear() > 2025 ? 2025 : 2021);
-  const [detailsOuverts, setDetailsOuverts] = useState({});
+// --- 2. ÉTATS FINANCIERS ---
+const EtatsFinanciers = ({ transactionsGlobales }) => {
+  const [comptesList, setComptesList] = useState([]);
+  const [expandedGroups, setExpandedGroups] = useState({});
 
-  const periode = useMemo(() => {
-    return {
-      debut: `${anneeDebut}-09-01`,
-      fin: `${anneeDebut + 1}-08-31`,
-      label: `01/09/${String(anneeDebut).slice(-2)} au 31/08/${String(anneeDebut + 1).slice(-2)}`
-    };
-  }, [anneeDebut]);
-
-  const toggleDetail = (categorie) => {
-    setDetailsOuverts(prev => ({ ...prev, [categorie]: !prev[categorie] }));
-  };
-
-  const nommerCompte = (compteId) => {
-    const categories = {
-      '1': '1 - Capitaux propres et emprunts',
-      '2': '2 - Immobilisations',
-      '3': '3 - Stocks',
-      '4': '4 - Comptes de tiers (Clients/Fournisseurs)',
-      '5': '5 - Comptes financiers (Banque/Caisse)',
-      '60': '60 - Achats et variations de stocks',
-      '61': '61 - Services extérieurs',
-      '62': '62 - Autres services extérieurs',
-      '63': '63 - Impôts et taxes',
-      '64': '64 - Charges de personnel',
-      '65': '65 - Autres charges de gestion',
-      '66': '66 - Charges financières',
-      '67': '67 - Charges exceptionnelles',
-      '68': '68 - Dotations aux amortissements',
-      '70': '70 - Ventes et prestations (Scolarité)',
-      '74': '74 - Subventions',
-      '75': '75 - Autres produits de gestion (Dons)',
-      '76': '76 - Produits financiers',
-      '77': '77 - Produits exceptionnels',
-    };
-    
-    if (!compteId) return 'Non catégorisé';
-    const prefix2 = compteId.substring(0, 2);
-    const prefix1 = compteId.substring(0, 1);
-    return categories[prefix2] || categories[prefix1] || 'Autres comptes';
-  };
-
-  const analyse = useMemo(() => {
-    // CORRECTION : Traduction des dates (JJ/MM/AAAA -> AAAA-MM-JJ) pour le filtre
-    const txFiltrees = transactionsGlobales.filter(t => {
-      let dateIso = t.date;
-      if (dateIso && dateIso.includes('/')) {
-        const [d, m, y] = dateIso.split('/');
-        dateIso = `${y.length === 2 ? '20'+y : y}-${m}-${d}`;
-      }
-      return dateIso >= periode.debut && dateIso <= periode.fin;
+  useEffect(() => {
+    const q = collection(db, 'artifacts', appId, 'public', 'data', 'comptes');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const liste = [];
+      snapshot.forEach((doc) => {
+        liste.push({ id: doc.id, ...doc.data() });
+      });
+      setComptesList(liste);
     });
-    
-    let parCompte = {};
-    let soldeBanque = 0;
+    return () => unsubscribe();
+  }, []);
 
-    // Calculs de base
-    txFiltrees.forEach(t => {
-      if (t.type === 'od') {
-        if (t.compteDebit) {
-          if (!parCompte[t.compteDebit]) parCompte[t.compteDebit] = 0;
-          parCompte[t.compteDebit] -= Math.abs(t.montant); 
-        }
-        if (t.compteCredit) {
-          if (!parCompte[t.compteCredit]) parCompte[t.compteCredit] = 0;
-          parCompte[t.compteCredit] += Math.abs(t.montant); 
-        }
+  const toggleGroup = (grp) => {
+    setExpandedGroups(prev => ({ ...prev, [grp]: !prev[grp] }));
+  };
+
+  // Dictionnaire officiel des familles à 2 chiffres du PCG
+  const PREFIXES = {
+    '10': 'Capital, réserves et fonds associatifs',
+    '11': 'Report à nouveau',
+    '12': 'Résultat de l\'exercice',
+    '13': 'Subventions d\'investissement',
+    '15': 'Provisions',
+    '16': 'Emprunts et dettes',
+    '19': 'Fonds dédiés',
+    '20': 'Immobilisations incorporelles',
+    '21': 'Immobilisations corporelles',
+    '27': 'Autres immobilisations financières',
+    '28': 'Amortissements des immobilisations',
+    '31': 'Matières premières',
+    '37': 'Stocks de marchandises',
+    '40': 'Fournisseurs et comptes rattachés',
+    '41': 'Usagers, familles et comptes rattachés',
+    '42': 'Personnel et comptes rattachés',
+    '43': 'Sécurité sociale et autres org. sociaux',
+    '44': 'État et autres collectivités publiques',
+    '46': 'Débiteurs divers et créditeurs divers',
+    '47': 'Comptes transitoires ou d\'attente',
+    '48': 'Comptes de régularisation',
+    '51': 'Banques, établissements financiers',
+    '53': 'Caisse',
+    '58': 'Virements internes',
+    '60': 'Achats',
+    '61': 'Services extérieurs',
+    '62': 'Autres services extérieurs',
+    '63': 'Impôts, taxes et versements assimilés',
+    '64': 'Charges de personnel',
+    '65': 'Autres charges de gestion courante',
+    '66': 'Charges financières',
+    '67': 'Charges exceptionnelles',
+    '68': 'Dotations aux amortissements',
+    '70': 'Ventes de produits, prestations',
+    '74': 'Subventions d\'exploitation',
+    '75': 'Autres produits de gestion courante',
+    '76': 'Produits financiers',
+    '77': 'Produits exceptionnels',
+    '78': 'Reprises sur amortissements',
+    '79': 'Transferts de charges'
+  };
+
+  const getCompteLibelle = (code) => {
+    const c = comptesList.find(x => x.code === code);
+    return c ? c.libelle : '';
+  };
+
+  // Calcul des soldes nets
+  const balances = {};
+  transactionsGlobales.forEach(t => {
+    if (!t.compte && !t.compteDebit && !t.compteCredit) return;
+
+    const addAmount = (compte, deb, cred) => {
+      if (!compte) return;
+      if (!balances[compte]) balances[compte] = { debit: 0, credit: 0 };
+      balances[compte].debit += deb;
+      balances[compte].credit += cred;
+    };
+
+    if (t.type === 'od') {
+      addAmount(t.compteDebit, Number(t.montant) || 0, 0);
+      addAmount(t.compteCredit, 0, Number(t.montant) || 0);
+    } else {
+      if (t.montant < 0) {
+        addAmount(t.compte, Math.abs(t.montant), 0);
       } else {
-        soldeBanque += (t.montant || 0);
-        if (t.compte) {
-          if (!parCompte[t.compte]) parCompte[t.compte] = 0;
-          parCompte[t.compte] -= t.montant; 
-        }
+        addAmount(t.compte, 0, Number(t.montant));
       }
-    });
-
-    // On intègre la banque 512000 si y'a eu des mouvements
-    if (soldeBanque !== 0) {
-      if (!parCompte['512000']) parCompte['512000'] = 0;
-      parCompte['512000'] += soldeBanque; 
     }
+  });
 
-    let charges = {};
-    let produits = {};
-    let actif = {};
-    let passif = {};
-    let totalCharges = 0;
-    let totalProduits = 0;
+  const actif = {};
+  const passif = {};
+  const charges = {};
+  const produits = {};
 
-    Object.entries(parCompte).forEach(([compte, solde]) => {
-      if (solde === 0) return;
-      const categorie = nommerCompte(compte);
-      const prefix = compte.charAt(0);
-      const valeur = Math.abs(solde);
+  let totalActif = 0;
+  let totalPassif = 0;
+  let totalCharges = 0;
+  let totalProduits = 0;
 
-      if (['6'].includes(prefix)) {
-        if (!charges[categorie]) charges[categorie] = { total: 0, comptes: [] };
-        charges[categorie].comptes.push({ compte, solde: valeur });
-        charges[categorie].total += valeur;
-        totalCharges += valeur;
-      } else if (['7'].includes(prefix)) {
-        if (!produits[categorie]) produits[categorie] = { total: 0, comptes: [] };
-        produits[categorie].comptes.push({ compte, solde: valeur });
-        produits[categorie].total += valeur;
-        totalProduits += valeur;
-      } else if (['1', '2', '3', '4', '5'].includes(prefix)) {
-        if (['2', '3'].includes(prefix) || (prefix === '5' && solde > 0) || (prefix === '4' && solde > 0)) {
-          if (!actif[categorie]) actif[categorie] = { total: 0, comptes: [] };
-          actif[categorie].comptes.push({ compte, solde: valeur });
-          actif[categorie].total += valeur;
-        } else {
-          if (!passif[categorie]) passif[categorie] = { total: 0, comptes: [] };
-          passif[categorie].comptes.push({ compte, solde: valeur });
-          passif[categorie].total += valeur;
-        }
+  Object.keys(balances).forEach(code => {
+    const b = balances[code];
+    const net = b.debit - b.credit;
+    if (Math.abs(net) < 0.01) return;
+
+    // NOUVEAU : Récupération stricte des 2 premiers chiffres pour le groupe
+    const prefix2 = code.substring(0, 2);
+    const groupName = `${prefix2} - ${PREFIXES[prefix2] || 'Autres comptes'}`;
+    const item = { code, libelle: getCompteLibelle(code), net: Math.abs(net) };
+
+    const addToGroup = (category, group, data) => {
+      if (!category[group]) category[group] = { total: 0, items: [] };
+      category[group].items.push(data);
+      category[group].total += data.net;
+    };
+
+    const root = code[0];
+    if (root === '6') {
+      addToGroup(charges, groupName, item);
+      totalCharges += item.net;
+    } else if (root === '7') {
+      addToGroup(produits, groupName, item);
+      totalProduits += item.net;
+    } else if (['1'].includes(root)) {
+      addToGroup(passif, groupName, item);
+      totalPassif += item.net;
+    } else if (['2', '3'].includes(root)) {
+      addToGroup(actif, groupName, item);
+      totalActif += item.net;
+    } else if (['4', '5'].includes(root)) {
+      // Pour les classes 4 et 5, le solde détermine le sens (Actif ou Passif)
+      if (net > 0) {
+        addToGroup(actif, groupName, item);
+        totalActif += item.net;
+      } else {
+        addToGroup(passif, groupName, item);
+        totalPassif += item.net;
       }
+    }
+  });
+
+  const sortGroupItems = (groupObj) => {
+    Object.values(groupObj).forEach(grp => {
+      grp.items.sort((a, b) => a.code.localeCompare(b.code));
     });
+  };
+  sortGroupItems(actif);
+  sortGroupItems(passif);
+  sortGroupItems(charges);
+  sortGroupItems(produits);
 
-    const resultat = totalProduits - totalCharges;
+  const resultat = totalProduits - totalCharges;
+  const sortedKeys = (obj) => Object.keys(obj).sort();
 
-    return { charges, produits, actif, passif, totalCharges, totalProduits, resultat };
-  }, [transactionsGlobales, periode]);
-
-  const RenderTableauGroupé = ({ data, bgColor, textColor, title }) => (
-    <div className="w-full">
-      <div className={`p-3 font-bold text-center border-b ${bgColor} ${textColor}`}>{title}</div>
-      <div className="p-0">
-        {Object.keys(data).length === 0 ? (
-          <div className="p-4 text-center text-sm text-slate-400">Aucune donnée</div>
-        ) : (
-          Object.entries(data).sort().map(([categorie, obj]) => (
-            <div key={categorie} className="border-b border-slate-100 last:border-0">
-              <div 
-                className="flex justify-between items-center p-3 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors"
-                onClick={() => toggleDetail(categorie)}
-              >
-                <div className="font-semibold text-slate-700 text-sm flex items-center gap-2">
-                  <ChevronDown size={16} className={`transition-transform ${detailsOuverts[categorie] ? 'rotate-180' : ''}`} />
-                  {categorie}
+  const renderGroup = (category, groupKey) => {
+    const grp = category[groupKey];
+    const isExpanded = expandedGroups[groupKey];
+    return (
+      <div key={groupKey} className="border-b border-slate-100 last:border-0">
+        <div 
+          className="flex justify-between items-center p-3 hover:bg-slate-50 cursor-pointer transition-colors"
+          onClick={() => toggleGroup(groupKey)}
+        >
+          <div className="flex items-center gap-2">
+            {isExpanded ? <ChevronDown size={14} className="text-slate-400 shrink-0" /> : <ChevronRight size={14} className="text-slate-400 shrink-0" />}
+            <span className="text-sm font-semibold text-slate-700">{groupKey}</span>
+          </div>
+          <span className="text-sm font-bold text-slate-800 whitespace-nowrap ml-2">{grp.total.toFixed(2)} €</span>
+        </div>
+        {isExpanded && (
+          <div className="bg-slate-50 pb-2">
+            {grp.items.map(item => (
+              <div key={item.code} className="flex justify-between items-center px-8 py-1.5 hover:bg-slate-100 transition-colors">
+                <div className="flex items-center gap-2 overflow-hidden pr-2">
+                  <span className="text-[11px] font-mono bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-600 shrink-0">{item.code}</span>
+                  {/* NOUVEAU : Affichage du libellé du compte */}
+                  <span className="text-xs text-slate-600 truncate" title={item.libelle}>
+                    {item.libelle || <span className="italic text-slate-400">Sans libellé</span>}
+                  </span>
                 </div>
-                <div className="font-bold text-slate-800">{obj.total.toFixed(2)} €</div>
+                <span className="text-xs font-medium text-slate-600 shrink-0">{item.net.toFixed(2)} €</span>
               </div>
-              
-              {detailsOuverts[categorie] && (
-                <div className="bg-white p-2">
-                  {obj.comptes.map((c, i) => (
-                    <div key={i} className="flex justify-between py-1.5 px-6 text-sm border-b border-slate-50 last:border-0">
-                      <div className="text-slate-600 flex items-center gap-2">
-                        <span className="bg-slate-100 px-2 py-0.5 rounded text-xs font-mono">{c.compte}</span>
-                      </div>
-                      <div className="text-slate-700">{c.solde.toFixed(2)} €</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))
+            ))}
+          </div>
         )}
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto">
@@ -282,47 +309,111 @@ const EtatFinancier = ({ transactionsGlobales }) => {
           </h2>
           <p className="text-slate-500 text-sm mt-1">Bilan et Compte de Résultat groupés par familles comptables.</p>
         </div>
-        <div className="flex gap-4 items-center">
-          <select 
-            value={anneeDebut}
-            onChange={(e) => setAnneeDebut(Number(e.target.value))}
-            className="border-slate-300 rounded-lg text-sm bg-slate-50 px-4 py-2"
-          >
-            {[2021, 2022, 2023, 2024, 2025, 2026].map(annee => (
-              <option key={annee} value={annee}>01/09/{String(annee).slice(-2)} au 31/08/{String(annee+1).slice(-2)}</option>
-            ))}
-          </select>
-        </div>
       </div>
 
+      {/* COMPTE DE RÉSULTAT */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="bg-slate-800 text-white p-4">
-          <h3 className="font-bold text-lg flex items-center gap-2">Compte de Résultat (Classe 6 & 7)</h3>
-          <p className="text-slate-300 text-xs">Film de l'année : Compare les produits et les charges pour déterminer le bénéfice ou la perte.</p>
+        <div className="bg-slate-900 p-4">
+          <h3 className="text-white font-bold flex items-center gap-2 text-lg">
+            Compte de Résultat (Classe 6 & 7)
+          </h3>
+          <p className="text-slate-400 text-xs mt-1">Le film de l'année : Compare les produits et les charges pour déterminer le bénéfice ou la perte.</p>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2">
-          <RenderTableauGroupé data={analyse.charges} bgColor="bg-red-50" textColor="text-red-700" title="CHARGES (Dépenses)" />
-          <RenderTableauGroupé data={analyse.produits} bgColor="bg-emerald-50" textColor="text-emerald-700" title="PRODUITS (Recettes)" />
-        </div>
-        
-        <div className="bg-slate-100 p-4 flex justify-between items-center border-t border-slate-200">
-          <div className="font-bold text-slate-700">RÉSULTAT DE L'EXERCICE</div>
-          <div className={`text-xl font-bold ${analyse.resultat >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-            {analyse.resultat > 0 ? '+' : ''}{analyse.resultat.toFixed(2)} €
+        <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200">
+          {/* CHARGES */}
+          <div>
+            <div className="bg-red-50 text-red-700 font-bold p-3 text-center text-sm border-b border-red-100 uppercase tracking-wider">
+              Charges (Dépenses)
+            </div>
+            <div className="p-2">
+              {sortedKeys(charges).length > 0 ? (
+                sortedKeys(charges).map(key => renderGroup(charges, key))
+              ) : (
+                <div className="text-center text-slate-400 text-sm py-8">Aucune donnée</div>
+              )}
+            </div>
+          </div>
+
+          {/* PRODUITS */}
+          <div>
+            <div className="bg-emerald-50 text-emerald-700 font-bold p-3 text-center text-sm border-b border-emerald-100 uppercase tracking-wider">
+              Produits (Recettes)
+            </div>
+            <div className="p-2">
+              {sortedKeys(produits).length > 0 ? (
+                sortedKeys(produits).map(key => renderGroup(produits, key))
+              ) : (
+                <div className="text-center text-slate-400 text-sm py-8">Aucune donnée</div>
+              )}
+            </div>
           </div>
         </div>
+
+        {/* LIGNE RÉSULTAT */}
+        <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-between items-center">
+          <span className="font-bold text-slate-700 uppercase">Résultat de l'exercice</span>
+          <span className={`text-xl font-black ${resultat >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+            {resultat > 0 ? '+' : ''}{resultat.toFixed(2)} €
+          </span>
+        </div>
       </div>
 
+      {/* BILAN COMPTABLE */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="bg-slate-800 text-white p-4">
-          <h3 className="font-bold text-lg flex items-center gap-2"><Building size={20}/> Bilan Comptable (Classe 1 à 5)</h3>
-          <p className="text-slate-300 text-xs">Photographie du patrimoine : L'Actif (ce qu'on possède) et le Passif (ce qu'on doit).</p>
+        <div className="bg-slate-900 p-4">
+          <h3 className="text-white font-bold flex items-center gap-2 text-lg">
+            Bilan Comptable (Classe 1 à 5)
+          </h3>
+          <p className="text-slate-400 text-xs mt-1">La photographie du patrimoine : L'Actif (ce qu'on possède) et le Passif (ce qu'on doit).</p>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2">
-          <RenderTableauGroupé data={analyse.actif} bgColor="bg-blue-50" textColor="text-blue-700" title="ACTIF (Emplois)" />
-          <RenderTableauGroupé data={analyse.passif} bgColor="bg-orange-50" textColor="text-orange-700" title="PASSIF (Ressources)" />
+        <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200">
+          {/* ACTIF */}
+          <div>
+            <div className="bg-blue-50 text-blue-700 font-bold p-3 text-center text-sm border-b border-blue-100 uppercase tracking-wider">
+              Actif (Emplois)
+            </div>
+            <div className="p-2">
+              {sortedKeys(actif).length > 0 ? (
+                sortedKeys(actif).map(key => renderGroup(actif, key))
+              ) : (
+                <div className="text-center text-slate-400 text-sm py-8">Aucune donnée</div>
+              )}
+            </div>
+          </div>
+
+          {/* PASSIF */}
+          <div>
+            <div className="bg-orange-50 text-orange-700 font-bold p-3 text-center text-sm border-b border-orange-100 uppercase tracking-wider">
+              Passif (Ressources)
+            </div>
+            <div className="p-2">
+              {sortedKeys(passif).length > 0 ? (
+                sortedKeys(passif).map(key => renderGroup(passif, key))
+              ) : (
+                <div className="text-center text-slate-400 text-sm py-8">Aucune donnée</div>
+              )}
+              {/* Le résultat vient équilibrer le Passif */}
+              <div className="border-t border-slate-200 mt-2 pt-2">
+                <div className="flex justify-between items-center px-4 py-2">
+                  <span className="text-sm font-semibold text-slate-700">12 - Résultat de l'exercice (en cours)</span>
+                  <span className={`text-sm font-bold ${resultat >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {resultat > 0 ? '+' : ''}{resultat.toFixed(2)} €
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* LIGNE ÉQUILIBRE DU BILAN */}
+        <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-between items-center text-sm">
+          <span className="font-bold text-slate-500">TOTAL GÉNÉRAL</span>
+          <div className="flex gap-8">
+            <span className="font-bold text-blue-700">Actif : {totalActif.toFixed(2)} €</span>
+            <span className="font-bold text-orange-700">Passif + Résultat : {(totalPassif + resultat).toFixed(2)} €</span>
+          </div>
         </div>
       </div>
     </div>
