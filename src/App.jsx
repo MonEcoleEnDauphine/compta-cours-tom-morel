@@ -107,10 +107,14 @@ const InfosContact = () => (
     </div>
   </div>
 );
-// --- 2. ÉTATS FINANCIERS ---
-const EtatsFinanciers = ({ transactionsGlobales }) => {
+// --- 2. ÉTAT FINANCIER (Bilan & Résultat Groupés) ---
+const EtatFinancier = ({ transactionsGlobales }) => {
+  // SÉCURITÉ ANTI-CRASH : On s'assure que la liste existe toujours
+  const safeTransactions = transactionsGlobales || [];
+
+  const [anneeDebut, setAnneeDebut] = useState(new Date().getFullYear() > 2025 ? 2025 : 2021);
+  const [detailsOuverts, setDetailsOuverts] = useState({});
   const [comptesList, setComptesList] = useState([]);
-  const [expandedGroups, setExpandedGroups] = useState({});
 
   useEffect(() => {
     const q = collection(db, 'artifacts', appId, 'public', 'data', 'comptes');
@@ -124,8 +128,8 @@ const EtatsFinanciers = ({ transactionsGlobales }) => {
     return () => unsubscribe();
   }, []);
 
-  const toggleGroup = (grp) => {
-    setExpandedGroups(prev => ({ ...prev, [grp]: !prev[grp] }));
+  const toggleDetail = (categorie) => {
+    setDetailsOuverts(prev => ({ ...prev, [categorie]: !prev[categorie] }));
   };
 
   // Dictionnaire officiel des familles à 2 chiffres du PCG
@@ -177,26 +181,49 @@ const EtatsFinanciers = ({ transactionsGlobales }) => {
     return c ? c.libelle : '';
   };
 
-  // Calcul des soldes nets
+  // SÉCURITÉ DATES : Transforme n'importe quel format de date en "Temps" calculable
+  const parseDateForFilter = (dStr) => {
+    if (!dStr) return 0;
+    if (dStr.includes('/')) {
+      const [day, month, year] = dStr.split('/');
+      const y = year.length === 2 ? '20' + year : year;
+      return new Date(`${y}-${month}-${day}`).getTime();
+    }
+    return new Date(dStr).getTime();
+  };
+
+  // Filtrage intelligent basé sur l'année scolaire sélectionnée
+  const transactionsFiltrees = useMemo(() => {
+    const start = new Date(`${anneeDebut}-09-01`).getTime();
+    const end = new Date(`${anneeDebut + 1}-08-31T23:59:59`).getTime();
+
+    return safeTransactions.filter(t => {
+      if (!t.date) return false;
+      const tTime = parseDateForFilter(t.date);
+      return tTime >= start && tTime <= end;
+    });
+  }, [safeTransactions, anneeDebut]);
+
+  // Calcul des soldes sur la période
   const balances = {};
-  transactionsGlobales.forEach(t => {
+  transactionsFiltrees.forEach(t => {
     if (!t.compte && !t.compteDebit && !t.compteCredit) return;
 
     const addAmount = (compte, deb, cred) => {
       if (!compte) return;
       if (!balances[compte]) balances[compte] = { debit: 0, credit: 0 };
-      balances[compte].debit += deb;
-      balances[compte].credit += cred;
+      balances[compte].debit += (Number(deb) || 0);
+      balances[compte].credit += (Number(cred) || 0);
     };
 
     if (t.type === 'od') {
-      addAmount(t.compteDebit, Number(t.montant) || 0, 0);
-      addAmount(t.compteCredit, 0, Number(t.montant) || 0);
+      addAmount(t.compteDebit, t.montant, 0);
+      addAmount(t.compteCredit, 0, t.montant);
     } else {
-      if (t.montant < 0) {
+      if (Number(t.montant) < 0) {
         addAmount(t.compte, Math.abs(t.montant), 0);
       } else {
-        addAmount(t.compte, 0, Number(t.montant));
+        addAmount(t.compte, 0, t.montant);
       }
     }
   });
@@ -212,11 +239,14 @@ const EtatsFinanciers = ({ transactionsGlobales }) => {
   let totalProduits = 0;
 
   Object.keys(balances).forEach(code => {
+    // Sécurité si un compte est mal formaté
+    if (!code || code.length < 2) return;
+
     const b = balances[code];
     const net = b.debit - b.credit;
     if (Math.abs(net) < 0.01) return;
 
-    // NOUVEAU : Récupération stricte des 2 premiers chiffres pour le groupe
+    // Regroupement strict sur 2 chiffres
     const prefix2 = code.substring(0, 2);
     const groupName = `${prefix2} - ${PREFIXES[prefix2] || 'Autres comptes'}`;
     const item = { code, libelle: getCompteLibelle(code), net: Math.abs(net) };
@@ -241,7 +271,6 @@ const EtatsFinanciers = ({ transactionsGlobales }) => {
       addToGroup(actif, groupName, item);
       totalActif += item.net;
     } else if (['4', '5'].includes(root)) {
-      // Pour les classes 4 et 5, le solde détermine le sens (Actif ou Passif)
       if (net > 0) {
         addToGroup(actif, groupName, item);
         totalActif += item.net;
@@ -267,12 +296,12 @@ const EtatsFinanciers = ({ transactionsGlobales }) => {
 
   const renderGroup = (category, groupKey) => {
     const grp = category[groupKey];
-    const isExpanded = expandedGroups[groupKey];
+    const isExpanded = detailsOuverts[groupKey];
     return (
       <div key={groupKey} className="border-b border-slate-100 last:border-0">
         <div 
           className="flex justify-between items-center p-3 hover:bg-slate-50 cursor-pointer transition-colors"
-          onClick={() => toggleGroup(groupKey)}
+          onClick={() => toggleDetail(groupKey)}
         >
           <div className="flex items-center gap-2">
             {isExpanded ? <ChevronDown size={14} className="text-slate-400 shrink-0" /> : <ChevronRight size={14} className="text-slate-400 shrink-0" />}
@@ -286,7 +315,6 @@ const EtatsFinanciers = ({ transactionsGlobales }) => {
               <div key={item.code} className="flex justify-between items-center px-8 py-1.5 hover:bg-slate-100 transition-colors">
                 <div className="flex items-center gap-2 overflow-hidden pr-2">
                   <span className="text-[11px] font-mono bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-600 shrink-0">{item.code}</span>
-                  {/* NOUVEAU : Affichage du libellé du compte */}
                   <span className="text-xs text-slate-600 truncate" title={item.libelle}>
                     {item.libelle || <span className="italic text-slate-400">Sans libellé</span>}
                   </span>
@@ -309,19 +337,32 @@ const EtatsFinanciers = ({ transactionsGlobales }) => {
           </h2>
           <p className="text-slate-500 text-sm mt-1">Bilan et Compte de Résultat groupés par familles comptables.</p>
         </div>
+        
+        <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
+          <Calendar size={18} className="text-slate-500" />
+          <select 
+            value={anneeDebut} 
+            onChange={(e) => setAnneeDebut(Number(e.target.value))}
+            className="bg-transparent border-none text-sm font-bold text-slate-700 outline-none cursor-pointer"
+          >
+            {[2021, 2022, 2023, 2024, 2025, 2026].map(year => (
+              <option key={year} value={year}>
+                01/09/{String(year).slice(-2)} au 31/08/{String(year + 1).slice(-2)}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
-      {/* COMPTE DE RÉSULTAT */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="bg-slate-900 p-4">
           <h3 className="text-white font-bold flex items-center gap-2 text-lg">
             Compte de Résultat (Classe 6 & 7)
           </h3>
-          <p className="text-slate-400 text-xs mt-1">Le film de l'année : Compare les produits et les charges pour déterminer le bénéfice ou la perte.</p>
+          <p className="text-slate-400 text-xs mt-1">Compare les produits et les charges pour déterminer le bénéfice ou la perte.</p>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200">
-          {/* CHARGES */}
           <div>
             <div className="bg-red-50 text-red-700 font-bold p-3 text-center text-sm border-b border-red-100 uppercase tracking-wider">
               Charges (Dépenses)
@@ -334,8 +375,6 @@ const EtatsFinanciers = ({ transactionsGlobales }) => {
               )}
             </div>
           </div>
-
-          {/* PRODUITS */}
           <div>
             <div className="bg-emerald-50 text-emerald-700 font-bold p-3 text-center text-sm border-b border-emerald-100 uppercase tracking-wider">
               Produits (Recettes)
@@ -350,7 +389,6 @@ const EtatsFinanciers = ({ transactionsGlobales }) => {
           </div>
         </div>
 
-        {/* LIGNE RÉSULTAT */}
         <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-between items-center">
           <span className="font-bold text-slate-700 uppercase">Résultat de l'exercice</span>
           <span className={`text-xl font-black ${resultat >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
@@ -359,17 +397,15 @@ const EtatsFinanciers = ({ transactionsGlobales }) => {
         </div>
       </div>
 
-      {/* BILAN COMPTABLE */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="bg-slate-900 p-4">
           <h3 className="text-white font-bold flex items-center gap-2 text-lg">
             Bilan Comptable (Classe 1 à 5)
           </h3>
-          <p className="text-slate-400 text-xs mt-1">La photographie du patrimoine : L'Actif (ce qu'on possède) et le Passif (ce qu'on doit).</p>
+          <p className="text-slate-400 text-xs mt-1">Photographie du patrimoine : L'Actif (ce qu'on possède) et le Passif (ce qu'on doit).</p>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200">
-          {/* ACTIF */}
           <div>
             <div className="bg-blue-50 text-blue-700 font-bold p-3 text-center text-sm border-b border-blue-100 uppercase tracking-wider">
               Actif (Emplois)
@@ -382,8 +418,6 @@ const EtatsFinanciers = ({ transactionsGlobales }) => {
               )}
             </div>
           </div>
-
-          {/* PASSIF */}
           <div>
             <div className="bg-orange-50 text-orange-700 font-bold p-3 text-center text-sm border-b border-orange-100 uppercase tracking-wider">
               Passif (Ressources)
@@ -394,10 +428,9 @@ const EtatsFinanciers = ({ transactionsGlobales }) => {
               ) : (
                 <div className="text-center text-slate-400 text-sm py-8">Aucune donnée</div>
               )}
-              {/* Le résultat vient équilibrer le Passif */}
               <div className="border-t border-slate-200 mt-2 pt-2">
                 <div className="flex justify-between items-center px-4 py-2">
-                  <span className="text-sm font-semibold text-slate-700">12 - Résultat de l'exercice (en cours)</span>
+                  <span className="text-sm font-semibold text-slate-700">12 - Résultat de l'exercice</span>
                   <span className={`text-sm font-bold ${resultat >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                     {resultat > 0 ? '+' : ''}{resultat.toFixed(2)} €
                   </span>
@@ -407,7 +440,6 @@ const EtatsFinanciers = ({ transactionsGlobales }) => {
           </div>
         </div>
 
-        {/* LIGNE ÉQUILIBRE DU BILAN */}
         <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-between items-center text-sm">
           <span className="font-bold text-slate-500">TOTAL GÉNÉRAL</span>
           <div className="flex gap-8">
