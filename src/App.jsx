@@ -589,6 +589,130 @@ const SearchableCompteSelect = ({ value, onChange, comptesList, placeholder = "S
   );
 };
 
+// --- FONCTION DE NORMALISATION STRICTE DES DATES EN JJ/MM/AAAA ---
+const normaliserDateFR = (rawVal) => {
+  if (!rawVal) return '';
+
+  if (rawVal instanceof Date && !isNaN(rawVal)) {
+    const d = String(rawVal.getDate()).padStart(2, '0');
+    const m = String(rawVal.getMonth() + 1).padStart(2, '0');
+    const y = rawVal.getFullYear();
+    return `${d}/${m}/${y}`;
+  }
+
+  const str = String(rawVal).trim();
+  if (!str) return '';
+
+  if (str.includes('-')) {
+    const parts = str.split('T')[0].split('-');
+    if (parts.length === 3 && parts[0].length === 4) {
+      const [y, m, d] = parts;
+      return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+    }
+  }
+
+  if (str.includes('/')) {
+    const parts = str.split('/');
+    if (parts.length === 3) {
+      if (parts[0].length === 4) { 
+        const [y, m, d] = parts;
+        return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+      } else { 
+        let [d, m, y] = parts;
+        if (y.length === 2) y = '20' + y;
+        return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+      }
+    }
+  }
+
+  return str;
+};
+
+// --- SÉLECTEUR DE COMPTE AVEC RECHERCHE PAR CODE ET LIBELLÉ ---
+const SearchableCompteSelect = ({ value, onChange, comptesList, placeholder = "Sélectionner un compte..." }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const normalizeStr = (str) => (str || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+  const filteredComptes = useMemo(() => {
+    if (!search.trim()) return comptesList;
+    const term = normalizeStr(search);
+    return comptesList.filter(c => 
+      normalizeStr(c.code).includes(term) || 
+      normalizeStr(c.libelle).includes(term)
+    );
+  }, [comptesList, search]);
+
+  const selectedCompte = comptesList.find(c => c.code === value);
+
+  return (
+    <div className="relative w-full" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full text-left border rounded-xl px-3 py-2 text-xs font-mono font-bold flex justify-between items-center transition-all bg-white shadow-2xs ${
+          value ? 'border-indigo-300 bg-indigo-50/80 text-indigo-900' : 'border-slate-200 text-slate-400'
+        }`}
+      >
+        <span className="truncate">
+          {selectedCompte ? `${selectedCompte.code} - ${selectedCompte.libelle}` : (value ? `${value} (Suggéré)` : placeholder)}
+        </span>
+        <ChevronDown size={14} className="text-slate-400 shrink-0 ml-1" />
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-2xl shadow-2xl p-2 max-h-60 overflow-y-auto">
+          <div className="relative mb-2">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input 
+              type="text" 
+              placeholder="Code ou libellé (ex : AS, 616)..." 
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-9 pr-3 py-1.5 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-600 font-sans"
+              autoFocus
+            />
+          </div>
+          <div className="space-y-0.5">
+            {filteredComptes.length > 0 ? (
+              filteredComptes.map(c => (
+                <div 
+                  key={c.id}
+                  onClick={() => {
+                    onChange(c.code);
+                    setIsOpen(false);
+                    setSearch('');
+                  }}
+                  className={`px-3 py-2 rounded-xl text-xs cursor-pointer flex justify-between items-center transition-colors ${
+                    c.code === value ? 'bg-indigo-100 text-indigo-950 font-extrabold' : 'hover:bg-slate-100/80 text-slate-700 font-medium'
+                  }`}
+                >
+                  <span className="font-mono font-extrabold text-indigo-700 shrink-0">{c.code}</span>
+                  <span className="truncate text-slate-600 ml-2 text-right flex-1">{c.libelle}</span>
+                </div>
+              ))
+            ) : (
+              <div className="text-xs text-slate-400 text-center py-3">Aucun compte correspondant</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // --- 3. GRAND LIVRE (Import CSV/XLSX, OD, Validations) ---
 const GrandLivre = ({ transactionsGlobales }) => {
   const [lignesEnAttente, setLignesEnAttente] = useState([]);
@@ -604,6 +728,9 @@ const GrandLivre = ({ transactionsGlobales }) => {
   // Pop-up création de compte à 6 chiffres
   const [showCompteModal, setShowCompteModal] = useState(false);
   const [pendingCompte, setPendingCompte] = useState({ code: '', libelle: '', lineId: null });
+
+  // Accordéon (Onglets déroulants)
+  const [activeTab, setActiveTab] = useState(null); // 'banque', 'paie', ou 'od'
 
   // Formulaire OD
   const [odFormDate, setOdFormDate] = useState('');
@@ -789,6 +916,24 @@ const GrandLivre = ({ transactionsGlobales }) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transactionsGlobales]);
 
+  const formatDateAffichage = (dStr) => {
+    if (!dStr) return '';
+    if (dStr.includes('-')) {
+      const parts = dStr.split('-');
+      if (parts.length === 3 && parts[0].length === 4) {
+        let y = parts[0];
+        let p1 = parts[1]; 
+        let p2 = parts[2]; 
+        if (parseInt(p1) > 12) {
+          return `${p1}/${p2}/${y}`;
+        } else {
+          return `${p2}/${p1}/${y}`;
+        }
+      }
+    }
+    return dStr; 
+  };
+
   const parseMontant = (rawVal) => {
     if (rawVal === undefined || rawVal === null || rawVal === '') return 0;
     if (typeof rawVal === 'number') return rawVal;
@@ -842,7 +987,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
             mt = debit;
           }
 
-          // CONVERSION STRICTE DE LA DATE EN JJ/MM/AAAA
           const dateExtrait = normaliserDateFR(cols[0]);
           const libelleExtrait = cols[1] || cols[3];
           
@@ -889,7 +1033,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
     } else if (ext === 'xlsx') {
       try {
         const data = await file.arrayBuffer();
-        // cellDates: true empêche SheetJS de formater les dates en MM/DD/YY us
         const workbook = XLSX.read(data, { type: 'array', cellDates: true });
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: true, defval: '' });
@@ -902,6 +1045,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
       }
     }
     if (fileInputBankRef.current) fileInputBankRef.current.value = '';
+    setActiveTab(null); // On ferme le bandeau après import
   };
 
   const handleImportPaie = async (e) => {
@@ -967,6 +1111,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
       if (count > 0) setLastImportBatch({ batchId, target: 'firestore', source: 'Fiches de Paie', count });
       alert(`${count} ligne(s) de paie intégrée(s) !${doublonsCount > 0 ? `\n(Sécurité : ${doublonsCount} doublon(s) ignoré(s))` : ''}`);
       if (fileInputPaieRef.current) fileInputPaieRef.current.value = '';
+      setActiveTab(null);
     };
     reader.readAsText(file, 'UTF-8');
   };
@@ -1031,6 +1176,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
       if (count > 0) setLastImportBatch({ batchId, target: 'firestore', source: 'Opérations Diverses', count });
       alert(`${count} lignes importées avec succès dans le Grand Livre !`);
       if (fileInputODRef.current) fileInputODRef.current.value = '';
+      setActiveTab(null);
     };
 
     const ext = file.name.split('.').pop().toLowerCase();
@@ -1137,6 +1283,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
       setOdFormCommentaire('');
       setOdLines([{ id: 1, compte: '', debit: '', credit: '' }, { id: 2, compte: '', debit: '', credit: '' }]);
       alert("OD enregistrée et ventilée avec succès !");
+      setActiveTab(null);
     } catch(e) {
       alert("Erreur lors de la création de l'OD.");
     }
@@ -1174,7 +1321,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
     setSortConfig({ key, direction });
   };
 
-  // PARSER DE TRI CHRONOLOGIQUE
   const parseDateForSort = (dStr) => {
     if (!dStr) return 0;
     const str = String(dStr).trim();
@@ -1266,14 +1412,11 @@ const GrandLivre = ({ transactionsGlobales }) => {
   return (
     <div className="space-y-6 w-full max-w-[1600px] mx-auto px-3 py-2 font-sans">
       
-      {/* INPUT MASQUÉ UPLOAD PDF */}
-      <input 
-        type="file" 
-        accept="application/pdf,image/*" 
-        className="hidden" 
-        ref={fileInputPdfRef} 
-        onChange={handlePdfChange} 
-      />
+      {/* INPUTS CACHÉS */}
+      <input type="file" accept="application/pdf,image/*" className="hidden" ref={fileInputPdfRef} onChange={handlePdfChange} />
+      <input type="file" accept=".csv,.xlsx" className="hidden" ref={fileInputBankRef} onChange={handleImportBank} />
+      <input type="file" accept=".txt,.tsv" className="hidden" ref={fileInputPaieRef} onChange={handleImportPaie} />
+      <input type="file" accept=".csv,.xlsx" className="hidden" ref={fileInputODRef} onChange={handleImportODMass} />
 
       {/* MODAL CRÉATION DE COMPTE (6 CHIFFRES) */}
       {showCompteModal && (
@@ -1409,182 +1552,209 @@ const GrandLivre = ({ transactionsGlobales }) => {
         </div>
       )}
 
-      {/* 3 CARTE D'ACTION FINTECH (BANQUE / PAIE / OD) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* PANNEAUX D'ACTIONS EN ACCORDÉON */}
+      <div className="bg-white border border-slate-200/80 rounded-3xl shadow-sm overflow-hidden flex flex-col divide-y divide-slate-100">
         
-        {/* CARTE 1 : JOURNAL DE BANQUE */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-5 relative overflow-hidden group">
-          <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
-          
-          <div className="space-y-3">
-            <div className="flex justify-between items-start">
-              <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl group-hover:scale-105 transition-transform">
-                <Download size={22} />
-              </div>
-              <span className="text-[10px] font-extrabold uppercase bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full border border-indigo-100">
-                .CSV / .XLSX
-              </span>
-            </div>
-            <div>
-              <h3 className="font-extrabold text-slate-800 text-lg">Journal de Banque</h3>
-              <p className="text-xs text-slate-500 mt-1 leading-relaxed">Importation directe des relevés de comptes bancaires pour intégration et pré-imputation.</p>
-            </div>
-          </div>
-
-          <input type="file" accept=".csv,.xlsx" className="hidden" ref={fileInputBankRef} onChange={handleImportBank} />
+        {/* ONGLET BANQUE */}
+        <div className="flex flex-col relative overflow-hidden">
           <button 
-            onClick={() => fileInputBankRef.current.click()} 
-            className="w-full justify-center bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-2xl font-bold text-sm flex items-center gap-2 transition-all shadow-md shadow-indigo-100 active:scale-[0.99]"
+            onClick={() => setActiveTab(activeTab === 'banque' ? null : 'banque')}
+            className={`w-full text-left p-5 flex justify-between items-center transition-colors hover:bg-slate-50/50 ${activeTab === 'banque' ? 'bg-indigo-50/20' : ''}`}
           >
-            <Download size={16} /> Importer un relevé
-          </button>
-        </div>
-
-        {/* CARTE 2 : FICHES DE PAIE */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-5 relative overflow-hidden group">
-          <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-pink-500 to-rose-600"></div>
-          
-          <div className="space-y-3">
-            <div className="flex justify-between items-start">
-              <div className="p-3 bg-pink-50 text-pink-600 rounded-2xl group-hover:scale-105 transition-transform">
-                <Users size={22} />
+            <div className="flex items-center gap-4">
+              <div className={`p-2.5 rounded-2xl transition-colors ${activeTab === 'banque' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'bg-indigo-50 text-indigo-600'}`}>
+                <Download size={20} />
               </div>
-              <span className="text-[10px] font-extrabold uppercase bg-pink-50 text-pink-700 px-2.5 py-1 rounded-full border border-pink-100">
-                .TXT / .TSV
-              </span>
+              <div>
+                <h3 className={`font-extrabold text-lg ${activeTab === 'banque' ? 'text-indigo-950' : 'text-slate-800'}`}>Journal de Banque</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Importation des relevés (.CSV / .XLSX)</p>
+              </div>
             </div>
-            <div>
-              <h3 className="font-extrabold text-slate-800 text-lg">Fiches de Paie</h3>
-              <p className="text-xs text-slate-500 mt-1 leading-relaxed">Intégration du journal des salaires, cotisations sociales et prélèvements à la source.</p>
-            </div>
-          </div>
-
-          <input type="file" accept=".txt,.tsv" className="hidden" ref={fileInputPaieRef} onChange={handleImportPaie} />
-          <button 
-            onClick={() => fileInputPaieRef.current.click()} 
-            className="w-full justify-center bg-pink-600 hover:bg-pink-700 text-white py-3 rounded-2xl font-bold text-sm flex items-center gap-2 transition-all shadow-md shadow-pink-100 active:scale-[0.99]"
-          >
-            <Users size={16} /> Importer le fichier paie
+            <ChevronDown size={20} className={`text-slate-400 transition-transform duration-300 ${activeTab === 'banque' ? 'rotate-180 text-indigo-600' : ''}`} />
           </button>
-        </div>
-
-        {/* CARTE 3 : OPÉRATION DIVERSE */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all flex flex-col h-[390px] relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-purple-500 to-indigo-600"></div>
-
-          <div className="flex justify-between items-center shrink-0 mb-3">
-            <div className="flex items-center gap-2">
-              <span className="p-2 bg-purple-50 text-purple-600 rounded-xl">
-                <FileText size={18} />
-              </span>
-              <h3 className="font-extrabold text-slate-800 text-base">Opération Diverse (OD)</h3>
-            </div>
-            <input type="file" accept=".csv,.xlsx" className="hidden" ref={fileInputODRef} onChange={handleImportODMass} />
-            <button 
-              onClick={() => fileInputODRef.current.click()} 
-              className="text-[10px] font-bold uppercase tracking-wider bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5"
-              title="Importer un fichier d'OD ou de Paie en masse"
-            >
-              <Download size={13}/> Import masse
-            </button>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2 shrink-0 mb-2">
-            <input 
-              type="date" 
-              value={odFormDate} 
-              onChange={e => setOdFormDate(e.target.value)} 
-              className="border border-slate-200 rounded-xl p-2 text-xs bg-slate-50/50 outline-none focus:ring-2 focus:ring-purple-600 font-mono font-semibold" 
-            />
-            <input 
-              type="text" 
-              placeholder="Libellé OD..." 
-              value={odFormLibelle} 
-              onChange={e => setOdFormLibelle(e.target.value)} 
-              className="col-span-2 border border-slate-200 rounded-xl p-2 text-xs bg-slate-50/50 outline-none focus:ring-2 focus:ring-purple-600 font-medium" 
-            />
-          </div>
-
-          <div className="shrink-0 mb-2">
-            <input 
-              type="text" 
-              placeholder="Commentaire ou référence optionnelle..." 
-              value={odFormCommentaire} 
-              onChange={e => setOdFormCommentaire(e.target.value)} 
-              className="border border-slate-200 rounded-xl p-2 text-xs bg-slate-50/50 w-full outline-none focus:ring-2 focus:ring-purple-600" 
-            />
-          </div>
-
-          <div className="overflow-y-auto flex-1 space-y-2 pr-1 min-h-[90px]">
-            {odLines.map((l) => (
-              <div key={l.id} className="flex gap-1.5 items-center bg-slate-50/80 p-1.5 rounded-xl border border-slate-200/60">
-                <div className="w-1/2 relative">
-                  <input 
-                    type="text" 
-                    list="comptes-datalist"
-                    placeholder="N° Compte (min 6 chiffres)" 
-                    value={l.compte} 
-                    onChange={e => updateOdLine(l.id, 'compte', e.target.value)}
-                    onBlur={e => handleCompteOdBlur(l.id, e.target.value)}
-                    className="border border-slate-200 rounded-lg p-1.5 text-xs bg-white w-full outline-none focus:ring-2 focus:ring-purple-600 font-mono font-bold text-slate-800"
-                  />
-                  <datalist id="comptes-datalist">
-                    {comptesList.map(c => <option key={c.id} value={c.code}>{c.libelle}</option>)}
-                  </datalist>
-                </div>
-
-                <input 
-                  type="number" 
-                  placeholder="Débit €" 
-                  value={l.debit} 
-                  onChange={e => updateOdLine(l.id, 'debit', e.target.value)} 
-                  className="border border-slate-200 rounded-lg p-1.5 text-xs bg-white w-1/4 outline-none focus:ring-2 focus:ring-purple-600 font-bold text-right" 
-                />
-                <input 
-                  type="number" 
-                  placeholder="Crédit €" 
-                  value={l.credit} 
-                  onChange={e => updateOdLine(l.id, 'credit', e.target.value)} 
-                  className="border border-slate-200 rounded-lg p-1.5 text-xs bg-white w-1/4 outline-none focus:ring-2 focus:ring-purple-600 font-bold text-right" 
-                />
-                <button onClick={() => removeOdLine(l.id)} className="text-slate-300 hover:text-rose-500 transition-colors p-1">
-                  <XCircle size={16} />
+          
+          {activeTab === 'banque' && (
+            <div className="p-6 pt-2 pl-20 animate-fade-in border-l-4 border-indigo-500">
+              <div className="bg-indigo-50/50 rounded-2xl p-5 border border-indigo-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <p className="text-sm text-indigo-900">Importation directe des relevés de comptes bancaires pour intégration et pré-imputation.</p>
+                <button 
+                  onClick={() => fileInputBankRef.current.click()} 
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-all shadow-md shadow-indigo-200 whitespace-nowrap active:scale-95"
+                >
+                  <Download size={16} /> Parcourir le fichier
                 </button>
               </div>
-            ))}
-            <button onClick={addOdLine} className="text-xs text-purple-700 font-bold mt-1 hover:underline flex items-center gap-1">
-              + Ajouter une ligne de ventilation
-            </button>
-          </div>
-
-          <div className="shrink-0 flex flex-col gap-2 pt-2 border-t border-slate-100 mt-2">
-            <div className={`flex justify-between items-center text-xs font-bold p-2.5 rounded-xl border transition-colors ${
-              isOdBalanced 
-                ? 'bg-emerald-50 text-emerald-900 border-emerald-200' 
-                : 'bg-slate-100 text-slate-700 border-slate-200'
-            }`}>
-              <span className="uppercase text-[10px] tracking-wider">Équilibre</span>
-              <div className="flex gap-4 font-mono">
-                <span className={isOdBalanced ? 'text-emerald-700 font-extrabold' : 'text-rose-600'}>D: {totalDebitOD.toFixed(2)} €</span>
-                <span className={isOdBalanced ? 'text-emerald-700 font-extrabold' : 'text-rose-600'}>C: {totalCreditOD.toFixed(2)} €</span>
-              </div>
             </div>
-
-            <button 
-              onClick={handleAddOD} 
-              disabled={!isOdBalanced}
-              className={`w-full py-2.5 rounded-2xl font-bold text-sm transition-all shadow-md ${
-                isOdBalanced 
-                  ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-purple-100 cursor-pointer active:scale-[0.99]' 
-                  : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed shadow-none'
-              }`}
-            >
-              Enregistrer l'OD
-            </button>
-          </div>
-
+          )}
         </div>
 
+        {/* ONGLET PAIE */}
+        <div className="flex flex-col relative overflow-hidden">
+          <button 
+            onClick={() => setActiveTab(activeTab === 'paie' ? null : 'paie')}
+            className={`w-full text-left p-5 flex justify-between items-center transition-colors hover:bg-slate-50/50 ${activeTab === 'paie' ? 'bg-pink-50/20' : ''}`}
+          >
+            <div className="flex items-center gap-4">
+              <div className={`p-2.5 rounded-2xl transition-colors ${activeTab === 'paie' ? 'bg-pink-600 text-white shadow-md shadow-pink-200' : 'bg-pink-50 text-pink-600'}`}>
+                <Users size={20} />
+              </div>
+              <div>
+                <h3 className={`font-extrabold text-lg ${activeTab === 'paie' ? 'text-pink-950' : 'text-slate-800'}`}>Fiches de Paie</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Intégration du journal des salaires (.TXT / .TSV)</p>
+              </div>
+            </div>
+            <ChevronDown size={20} className={`text-slate-400 transition-transform duration-300 ${activeTab === 'paie' ? 'rotate-180 text-pink-600' : ''}`} />
+          </button>
+          
+          {activeTab === 'paie' && (
+            <div className="p-6 pt-2 pl-20 animate-fade-in border-l-4 border-pink-500">
+              <div className="bg-pink-50/50 rounded-2xl p-5 border border-pink-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <p className="text-sm text-pink-900">Intégration des salaires bruts, nets, cotisations sociales et prélèvements à la source.</p>
+                <button 
+                  onClick={() => fileInputPaieRef.current.click()} 
+                  className="bg-pink-600 hover:bg-pink-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-all shadow-md shadow-pink-200 whitespace-nowrap active:scale-95"
+                >
+                  <Users size={16} /> Parcourir le fichier
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ONGLET OPÉRATION DIVERSE */}
+        <div className="flex flex-col relative overflow-hidden">
+          <button 
+            onClick={() => setActiveTab(activeTab === 'od' ? null : 'od')}
+            className={`w-full text-left p-5 flex justify-between items-center transition-colors hover:bg-slate-50/50 ${activeTab === 'od' ? 'bg-purple-50/20' : ''}`}
+          >
+            <div className="flex items-center gap-4">
+              <div className={`p-2.5 rounded-2xl transition-colors ${activeTab === 'od' ? 'bg-purple-600 text-white shadow-md shadow-purple-200' : 'bg-purple-50 text-purple-600'}`}>
+                <FileText size={20} />
+              </div>
+              <div>
+                <h3 className={`font-extrabold text-lg ${activeTab === 'od' ? 'text-purple-950' : 'text-slate-800'}`}>Opération Diverse (OD)</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Saisie manuelle ventilée & Import masse</p>
+              </div>
+            </div>
+            <ChevronDown size={20} className={`text-slate-400 transition-transform duration-300 ${activeTab === 'od' ? 'rotate-180 text-purple-600' : ''}`} />
+          </button>
+          
+          {activeTab === 'od' && (
+            <div className="p-6 pt-2 animate-fade-in border-l-4 border-purple-500">
+              <div className="bg-purple-50/30 rounded-3xl p-5 border border-purple-100 flex flex-col gap-4">
+                
+                {/* En-tête OD & Bouton Import Masse */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
+                  <h4 className="font-bold text-purple-900 text-sm uppercase tracking-wider">Créer une écriture comptable</h4>
+                  <button 
+                    onClick={() => fileInputODRef.current.click()} 
+                    className="text-xs font-bold bg-white text-purple-700 border border-purple-200 px-4 py-2 rounded-xl transition-all flex items-center gap-2 shadow-sm hover:shadow-md hover:border-purple-300"
+                    title="Importer un fichier (.csv / .xlsx)"
+                  >
+                    <Download size={14}/> Import masse depuis un fichier
+                  </button>
+                </div>
+
+                {/* Form OD */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <input 
+                    type="date" 
+                    value={odFormDate} 
+                    onChange={e => setOdFormDate(e.target.value)} 
+                    className="border border-slate-200 rounded-xl p-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-purple-600 font-mono font-semibold shadow-sm" 
+                  />
+                  <input 
+                    type="text" 
+                    placeholder="Libellé de l'OD..." 
+                    value={odFormLibelle} 
+                    onChange={e => setOdFormLibelle(e.target.value)} 
+                    className="md:col-span-2 border border-slate-200 rounded-xl p-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-purple-600 font-medium shadow-sm" 
+                  />
+                </div>
+                <div>
+                  <input 
+                    type="text" 
+                    placeholder="Commentaire ou référence optionnelle..." 
+                    value={odFormCommentaire} 
+                    onChange={e => setOdFormCommentaire(e.target.value)} 
+                    className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-purple-600 shadow-sm" 
+                  />
+                </div>
+
+                {/* Lignes OD ventilées */}
+                <div className="space-y-2 mt-2">
+                  {odLines.map((l) => (
+                    <div key={l.id} className="flex flex-wrap md:flex-nowrap gap-2 items-center bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
+                      <div className="w-full md:flex-1 relative">
+                        <input 
+                          type="text" 
+                          list={`comptes-datalist-${l.id}`}
+                          placeholder="N° Compte (min 6 chiffres)" 
+                          value={l.compte} 
+                          onChange={e => updateOdLine(l.id, 'compte', e.target.value)}
+                          onBlur={e => handleCompteOdBlur(l.id, e.target.value)}
+                          className="border border-slate-200 rounded-lg p-2 text-sm bg-slate-50 w-full outline-none focus:ring-2 focus:ring-purple-600 font-mono font-bold text-slate-800"
+                        />
+                        <datalist id={`comptes-datalist-${l.id}`}>
+                          {comptesList.map(c => <option key={c.id} value={c.code}>{c.libelle}</option>)}
+                        </datalist>
+                      </div>
+
+                      <div className="flex gap-2 w-full md:w-auto">
+                        <input 
+                          type="number" 
+                          placeholder="Débit €" 
+                          value={l.debit} 
+                          onChange={e => updateOdLine(l.id, 'debit', e.target.value)} 
+                          className="border border-slate-200 rounded-lg p-2 text-sm bg-white w-full md:w-32 outline-none focus:ring-2 focus:ring-purple-600 font-bold text-right" 
+                        />
+                        <input 
+                          type="number" 
+                          placeholder="Crédit €" 
+                          value={l.credit} 
+                          onChange={e => updateOdLine(l.id, 'credit', e.target.value)} 
+                          className="border border-slate-200 rounded-lg p-2 text-sm bg-white w-full md:w-32 outline-none focus:ring-2 focus:ring-purple-600 font-bold text-right" 
+                        />
+                        <button onClick={() => removeOdLine(l.id)} className="text-slate-400 hover:text-rose-500 transition-colors p-2 bg-slate-50 rounded-lg shrink-0">
+                          <XCircle size={18} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  <button onClick={addOdLine} className="text-sm text-purple-600 font-bold hover:underline flex items-center gap-1 p-1 ml-1">
+                    + Ajouter une ligne d'écriture
+                  </button>
+                </div>
+
+                {/* Footer Validation OD */}
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-purple-200/50 mt-2">
+                  <div className={`flex items-center gap-4 px-4 py-2.5 rounded-xl border transition-colors ${
+                    isOdBalanced ? 'bg-emerald-50 text-emerald-900 border-emerald-200' : 'bg-slate-100 text-slate-700 border-slate-200'
+                  }`}>
+                    <span className="uppercase text-xs font-bold tracking-wider">Équilibre</span>
+                    <div className="flex gap-4 font-mono text-sm">
+                      <span className={isOdBalanced ? 'text-emerald-700 font-extrabold' : 'text-rose-600 font-bold'}>D: {totalDebitOD.toFixed(2)} €</span>
+                      <span className={isOdBalanced ? 'text-emerald-700 font-extrabold' : 'text-rose-600 font-bold'}>C: {totalCreditOD.toFixed(2)} €</span>
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={handleAddOD} 
+                    disabled={!isOdBalanced}
+                    className={`px-8 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${
+                      isOdBalanced 
+                        ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-md shadow-purple-200 cursor-pointer active:scale-95' 
+                        : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                    }`}
+                  >
+                    <CheckCircle2 size={16} /> Enregistrer
+                  </button>
+                </div>
+
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* TAMPON / SAS D'IMPUTATION BANCAIRE AVEC SÉLECTEUR RECHERCHABLE */}
@@ -1651,6 +1821,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
                       />
                     </td>
                     
+                    {/* SÉLECTEUR AVEC RECHERCHE DE COMPTE INTELLIGENTE */}
                     <td className="py-3 px-4 min-w-[280px]">
                       <SearchableCompteSelect 
                         value={ligne.comptePropose || ''}
@@ -1692,7 +1863,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
       )}
 
       {/* GRAND LIVRE DÉFINITIF TABLEAU */}
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden">
+      <div className="bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden mt-8">
         
         <div className="p-5 bg-slate-50/80 border-b border-slate-200/80 flex flex-wrap justify-between items-center gap-4">
           <div className="flex items-center gap-3">
