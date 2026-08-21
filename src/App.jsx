@@ -470,9 +470,15 @@ const GrandLivre = ({ transactionsGlobales }) => {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [lastImportBatch, setLastImportBatch] = useState(null);
   
+  // Pièces jointes
   const [selectedTxForPdf, setSelectedTxForPdf] = useState(null);
   const fileInputPdfRef = useRef(null);
 
+  // POP-UP / MODAL DE CRÉATION DE COMPTE
+  const [showCompteModal, setShowCompteModal] = useState(false);
+  const [pendingCompte, setPendingCompte] = useState({ code: '', libelle: '', lineId: null });
+
+  // Formulaire OD
   const [odFormDate, setOdFormDate] = useState('');
   const [odFormLibelle, setOdFormLibelle] = useState('');
   const [odFormCommentaire, setOdFormCommentaire] = useState('');
@@ -502,6 +508,69 @@ const GrandLivre = ({ transactionsGlobales }) => {
     return () => unsubscribe();
   }, []);
 
+  // Détection automatique de la classe du compte pour la Modal
+  const getClasseLabel = (code) => {
+    if (!code) return '';
+    const root = code[0];
+    const map = {
+      '1': 'Classe 1 — Capitaux & Fonds propres',
+      '2': 'Classe 2 — Immobilisations',
+      '3': 'Classe 3 — Stocks',
+      '4': 'Classe 4 — Tiers (Usagers, Fournisseurs, Personnel)',
+      '5': 'Classe 5 — Trésorerie & Banques',
+      '6': 'Classe 6 — Charges (Dépenses)',
+      '7': 'Classe 7 — Produits (Recettes)'
+    };
+    return map[root] || 'Compte Général';
+  };
+
+  // Traitement à la saisie du compte dans l'OD
+  const handleCompteOdBlur = (lineId, rawCode) => {
+    if (!rawCode) return;
+    const cleanCode = rawCode.trim().replace(/[^0-9]/g, '');
+
+    // Condition stricte : Au moins 6 chiffres
+    if (cleanCode.length >= 6) {
+      const exists = comptesList.some(c => c.code === cleanCode);
+      if (!exists) {
+        setPendingCompte({ code: cleanCode, libelle: '', lineId });
+        setShowCompteModal(true);
+      } else {
+        // Mettre à jour avec le code propre s'il existe déjà
+        setOdLines(prev => prev.map(l => l.id === lineId ? { ...l, compte: cleanCode } : l));
+      }
+    }
+  };
+
+  // Validation depuis la Pop-up
+  const handleSaveNewCompteFromModal = async () => {
+    if (!pendingCompte.code || pendingCompte.code.length < 6) {
+      alert("Le numéro de compte doit contenir au moins 6 chiffres.");
+      return;
+    }
+    if (!pendingCompte.libelle.trim()) {
+      alert("Veuillez saisir un libellé pour ce compte.");
+      return;
+    }
+
+    try {
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'comptes'), {
+        code: pendingCompte.code,
+        libelle: pendingCompte.libelle.trim()
+      });
+      
+      // Affectation automatique à la ligne d'OD
+      if (pendingCompte.lineId) {
+        setOdLines(prev => prev.map(l => l.id === pendingCompte.lineId ? { ...l, compte: pendingCompte.code } : l));
+      }
+
+      setShowCompteModal(false);
+      setPendingCompte({ code: '', libelle: '', lineId: null });
+    } catch (e) {
+      alert("Erreur lors de la création du compte.");
+    }
+  };
+
   const handleTriggerPdf = (txId) => {
     setSelectedTxForPdf(txId);
     if (fileInputPdfRef.current) fileInputPdfRef.current.click();
@@ -524,7 +593,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
           pdfData: base64Data,
           pdfName: file.name
         });
-        alert(`Justificatif "${file.name}" rattaché avec succès !`);
       } catch (err) {
         alert("Erreur lors de l'enregistrement du document.");
       }
@@ -546,13 +614,13 @@ const GrandLivre = ({ transactionsGlobales }) => {
           for (const tx of transactionsGlobales) {
             await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', tx.id));
           }
-          alert("✅ Le Grand Livre a été entièrement vidé avec succès.");
+          alert("Le Grand Livre a été entièrement vidé avec succès.");
         } catch (e) {
           alert("Erreur lors de la suppression du Grand Livre.");
         }
       }
     } else if (pwd !== null) {
-      alert("❌ Mot de passe incorrect. Annulation de la suppression.");
+      alert("Mot de passe incorrect. Annulation de la suppression.");
     }
   };
 
@@ -621,9 +689,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
   const parseMontant = (rawVal) => {
     if (rawVal === undefined || rawVal === null || rawVal === '') return 0;
     if (typeof rawVal === 'number') return rawVal;
-    
     let s = String(rawVal).replace(/[\s\u00A0\u202F]/g, '');
-    
     if (s.includes(',') && s.includes('.')) {
       if (s.indexOf(',') < s.indexOf('.')) {
         s = s.replace(/,/g, '');
@@ -633,7 +699,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
     } else if (s.includes(',')) {
       s = s.replace(/,/g, '.');
     }
-    
     return parseFloat(s) || 0;
   };
 
@@ -667,14 +732,12 @@ const GrandLivre = ({ transactionsGlobales }) => {
         if (cols.length >= 6) {
           const debit = parseMontant(cols[5]);
           const credit = parseMontant(cols[6]);
-          
           let mt = 0;
           if (cols[6] !== undefined && cols[6] !== '') {
             mt = credit !== 0 ? Math.abs(credit) : -Math.abs(debit);
           } else {
             mt = debit;
           }
-          
           const dateExtrait = cols[0];
           const libelleExtrait = cols[1] || cols[3];
           
@@ -917,65 +980,8 @@ const GrandLivre = ({ transactionsGlobales }) => {
     }
   };
 
-  const validerLignesPretes = async () => {
-    const lignesAValider = lignesEnAttente.filter(l => l.comptePropose);
-    if (lignesAValider.length === 0) return;
-    
-    if (window.confirm(`Vous êtes sur le point d'envoyer ${lignesAValider.length} écriture(s) d'un seul coup vers le Grand Livre. Confirmer ?`)) {
-      for (const ligne of lignesAValider) {
-        const newTx = {
-          date: ligne.date,
-          libelle: ligne.libelle,
-          montant: ligne.montant,
-          compte: ligne.comptePropose,
-          reference: ligne.reference || '',
-          typeOp: ligne.typeOp || '',
-          commentaire: ligne.commentaire || '',
-          type: ligne.montant < 0 ? 'depense' : 'recette',
-          date_creation: new Date().toISOString()
-        };
-        try {
-          await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), newTx);
-        } catch(e) {
-          console.error("Erreur sur l'insertion de masse", e);
-        }
-      }
-      setLignesEnAttente(prev => prev.filter(l => !l.comptePropose));
-    }
-  };
-
   const addOdLine = () => setOdLines([...odLines, { id: Date.now(), compte: '', debit: '', credit: '' }]);
   const removeOdLine = (id) => setOdLines(odLines.filter(l => l.id !== id));
-  
-  // NOUVEAU : Création de compte à la volée depuis la saisie d'OD
-  const handleCompteOdChange = async (id, value) => {
-    // Si l'utilisateur a tapé un numéro et validé
-    if (value && value.length >= 2 && !comptesList.find(c => c.code === value)) {
-      const libelle = window.prompt(`Le compte ${value} n'existe pas dans le Plan Comptable.\n\nQuel libellé voulez-vous lui donner pour le créer immédiatement ?`);
-      if (libelle) {
-        try {
-          await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'comptes'), {
-            code: value,
-            libelle: libelle
-          });
-          alert(`Le compte ${value} a été créé !`);
-        } catch(e) {
-          alert("Erreur lors de la création du compte.");
-          return;
-        }
-      } else {
-        // L'utilisateur a annulé, on ne garde pas le numéro invalide
-        return; 
-      }
-    }
-    
-    setOdLines(odLines.map(l => {
-      if (l.id === id) {
-        return { ...l, compte: value };
-      }
-      return l;
-    }));
-  };
 
   const updateOdLine = (id, field, value) => {
     setOdLines(odLines.map(l => {
@@ -1149,6 +1155,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
   return (
     <div className="space-y-6 w-full max-w-[1600px] mx-auto px-2">
       
+      {/* INPUT CACHÉ UPLOAD PDF */}
       <input 
         type="file" 
         accept="application/pdf,image/*" 
@@ -1157,20 +1164,114 @@ const GrandLivre = ({ transactionsGlobales }) => {
         onChange={handlePdfChange} 
       />
 
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
+      {/* POP-UP MODAL MODERNE DE CRÉATION DE COMPTE */}
+      {showCompteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl border border-purple-100 w-full max-w-md overflow-hidden transform transition-all scale-100">
+            
+            {/* Header Modal */}
+            <div className="bg-gradient-to-r from-purple-700 to-indigo-700 p-5 text-white flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/10 rounded-lg">
+                  <Sparkles size={20} className="text-purple-200" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg leading-tight">Nouveau compte comptable</h3>
+                  <p className="text-purple-200 text-xs mt-0.5">Ajout direct au Plan Comptable</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowCompteModal(false)}
+                className="text-white/70 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
+              >
+                <XCircle size={20} />
+              </button>
+            </div>
+
+            {/* Corps Modal */}
+            <div className="p-6 space-y-4">
+              
+              {/* Badge indicatif de classe */}
+              <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 flex items-center justify-between">
+                <span className="text-xs font-semibold text-purple-700 uppercase tracking-wider">Détection PCG</span>
+                <span className="text-xs font-bold text-purple-900 bg-purple-200/60 px-2.5 py-1 rounded-md">
+                  {getClasseLabel(pendingCompte.code)}
+                </span>
+              </div>
+
+              {/* Champ N° de Compte */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Numéro de compte (Min. 6 chiffres)
+                </label>
+                <input 
+                  type="text" 
+                  value={pendingCompte.code}
+                  onChange={e => setPendingCompte({ ...pendingCompte, code: e.target.value.replace(/[^0-9]/g, '') })}
+                  className="w-full border border-slate-300 rounded-xl p-3 text-base font-mono font-bold text-slate-800 outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent bg-slate-50"
+                  placeholder="ex: 618500"
+                />
+              </div>
+
+              {/* Champ Libellé */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Libellé du compte
+                </label>
+                <input 
+                  type="text" 
+                  value={pendingCompte.libelle}
+                  onChange={e => setPendingCompte({ ...pendingCompte, libelle: e.target.value })}
+                  placeholder="ex: Abonnements Logiciels & SaaS"
+                  className="w-full border border-slate-300 rounded-xl p-3 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                  autoFocus
+                  onKeyDown={e => { if(e.key === 'Enter') handleSaveNewCompteFromModal(); }}
+                />
+              </div>
+
+            </div>
+
+            {/* Actions Modal */}
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+              <button 
+                onClick={() => setShowCompteModal(false)}
+                className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-200/60 transition-colors"
+              >
+                Annuler
+              </button>
+              <button 
+                onClick={handleSaveNewCompteFromModal}
+                disabled={pendingCompte.code.length < 6 || !pendingCompte.libelle.trim()}
+                className={`px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-md transition-all flex items-center gap-2 ${
+                  pendingCompte.code.length >= 6 && pendingCompte.libelle.trim()
+                    ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-200 cursor-pointer'
+                    : 'bg-purple-300 cursor-not-allowed'
+                }`}
+              >
+                <CheckCircle2 size={16} /> Créer & Attribuer
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* EN-TÊTE PRINCIPALE */}
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <BookOpen className="text-indigo-600" /> Grand Livre (Import & Saisie)
           </h2>
-          <p className="text-slate-500 text-sm mt-1">Importez vos relevés bancaires, fiches de paie ou saisissez une OD ventilée.</p>
+          <p className="text-slate-500 text-sm mt-1">Saisie ventilée, paie et relevés bancaires.</p>
         </div>
       </div>
 
+      {/* BANDEAU RECUL (UNDO) */}
       {lastImportBatch && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-800 px-5 py-3 rounded-xl flex justify-between items-center shadow-sm animate-fade-in">
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 px-5 py-3 rounded-xl flex justify-between items-center shadow-sm">
           <div className="flex items-center gap-3">
             <AlertTriangle size={20} className="text-amber-500" />
-            <span className="text-sm font-medium">Dernier import effectué : <strong>{lastImportBatch.source}</strong> ({lastImportBatch.count} lignes).</span>
+            <span className="text-sm font-medium">Dernier import : <strong>{lastImportBatch.source}</strong> ({lastImportBatch.count} lignes).</span>
           </div>
           <button 
             onClick={handleUndoLastImport} 
@@ -1181,98 +1282,154 @@ const GrandLivre = ({ transactionsGlobales }) => {
         </div>
       )}
 
+      {/* BLOCS DE SAISIE & IMPORTS */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="bg-indigo-50 p-6 rounded-xl border border-indigo-100 flex flex-col justify-center items-center text-center space-y-4">
-          <h3 className="font-bold text-indigo-900 text-lg">Journal de Banque</h3>
-          <p className="text-sm text-indigo-700">Importez vos lignes bancaires pour les imputer.</p>
-          <div className="flex flex-col gap-2 w-full mt-auto">
-            <input type="file" accept=".csv,.xlsx" className="hidden" ref={fileInputBankRef} onChange={handleImportBank} />
-            <button onClick={() => fileInputBankRef.current.click()} className="w-full justify-center bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg font-bold text-sm flex items-center gap-2 transition-colors shadow-sm">
-              <Download size={16} /> Import Relevé (.csv / .xlsx)
-            </button>
+        
+        {/* BANQUE */}
+        <div className="bg-indigo-50/70 p-6 rounded-2xl border border-indigo-100 flex flex-col justify-between text-center space-y-4 shadow-sm">
+          <div>
+            <h3 className="font-bold text-indigo-950 text-lg">Journal de Banque</h3>
+            <p className="text-sm text-indigo-700 mt-1">Relevés bancaires (.csv / .xlsx)</p>
           </div>
-        </div>
-
-        <div className="bg-pink-50 p-6 rounded-xl border border-pink-200 flex flex-col justify-center items-center text-center space-y-4">
-          <h3 className="font-bold text-pink-900 text-lg">Fiches de Paie</h3>
-          <p className="text-sm text-pink-700">Importez le fichier TXT exporté depuis le logiciel de paie.</p>
-          <div className="flex-1"></div>
-          <input type="file" accept=".txt,.tsv" className="hidden" ref={fileInputPaieRef} onChange={handleImportPaie} />
-          <button onClick={() => fileInputPaieRef.current.click()} className="w-full justify-center bg-pink-600 hover:bg-pink-700 text-white px-4 py-2.5 rounded-lg font-bold text-sm flex items-center gap-2 transition-colors shadow-sm">
-            <Users size={16} /> Importer Fichier (.txt)
+          <input type="file" accept=".csv,.xlsx" className="hidden" ref={fileInputBankRef} onChange={handleImportBank} />
+          <button onClick={() => fileInputBankRef.current.click()} className="w-full justify-center bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all shadow-md hover:shadow-indigo-200">
+            <Download size={18} /> Importer Relevé
           </button>
         </div>
 
-        <div className="bg-purple-50 p-5 rounded-xl border border-purple-100 flex flex-col h-[350px]">
+        {/* PAIE */}
+        <div className="bg-pink-50/70 p-6 rounded-2xl border border-pink-100 flex flex-col justify-between text-center space-y-4 shadow-sm">
+          <div>
+            <h3 className="font-bold text-pink-950 text-lg">Fiches de Paie</h3>
+            <p className="text-sm text-pink-700 mt-1">Exports paie (.txt / .tsv)</p>
+          </div>
+          <input type="file" accept=".txt,.tsv" className="hidden" ref={fileInputPaieRef} onChange={handleImportPaie} />
+          <button onClick={() => fileInputPaieRef.current.click()} className="w-full justify-center bg-pink-600 hover:bg-pink-700 text-white px-4 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all shadow-md hover:shadow-pink-200">
+            <Users size={18} /> Importer Fichier Paie
+          </button>
+        </div>
+
+        {/* OD MANUELLE & DESIGN ÉLÉGANT */}
+        <div className="bg-purple-50/80 p-5 rounded-2xl border border-purple-100 flex flex-col h-[380px] shadow-sm">
+          
+          {/* Top Header OD */}
           <div className="flex justify-between items-center shrink-0 mb-3">
-            <h3 className="font-bold text-purple-900 text-lg flex items-center gap-2">
-              <FileText size={18} /> Opération Diverse
+            <h3 className="font-bold text-purple-950 text-base flex items-center gap-2">
+              <FileText size={18} className="text-purple-600" /> Opération Diverse (OD)
             </h3>
             <input type="file" accept=".csv,.xlsx" className="hidden" ref={fileInputODRef} onChange={handleImportODMass} />
-            <button onClick={() => fileInputODRef.current.click()} className="text-[10px] uppercase font-bold bg-purple-200 text-purple-800 px-2 py-1 rounded hover:bg-purple-300 transition-colors flex items-center gap-1 shadow-sm" title="Format Colonnes A à I + L">
-              <Download size={12}/> Import masse (.csv / .xlsx)
+            <button 
+              onClick={() => fileInputODRef.current.click()} 
+              className="text-[10px] font-bold uppercase tracking-wider bg-purple-200/80 hover:bg-purple-200 text-purple-900 px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1 shadow-sm" 
+              title="Format Colonnes A à I + L"
+            >
+              <Download size={12}/> Import masse
             </button>
           </div>
           
+          {/* Champs d'en-tête OD */}
           <div className="flex gap-2 shrink-0 mb-2">
-            <input type="date" value={odFormDate} onChange={e => setOdFormDate(e.target.value)} className="border border-purple-200 rounded p-1.5 text-xs bg-white w-1/3 outline-none focus:ring-1 focus:ring-purple-500" />
-            <input type="text" placeholder="Libellé OD..." value={odFormLibelle} onChange={e => setOdFormLibelle(e.target.value)} className="border border-purple-200 rounded p-1.5 text-xs bg-white flex-1 outline-none focus:ring-1 focus:ring-purple-500" />
+            <input 
+              type="date" 
+              value={odFormDate} 
+              onChange={e => setOdFormDate(e.target.value)} 
+              className="border border-purple-200 rounded-xl p-2 text-xs bg-white w-1/3 outline-none focus:ring-2 focus:ring-purple-500 font-mono shadow-sm" 
+            />
+            <input 
+              type="text" 
+              placeholder="Libellé de l'OD..." 
+              value={odFormLibelle} 
+              onChange={e => setOdFormLibelle(e.target.value)} 
+              className="border border-purple-200 rounded-xl p-2 text-xs bg-white flex-1 outline-none focus:ring-2 focus:ring-purple-500 shadow-sm" 
+            />
           </div>
 
-          <div className="flex gap-2 shrink-0 mb-2">
-            <input type="text" placeholder="Commentaire optionnel..." value={odFormCommentaire} onChange={e => setOdFormCommentaire(e.target.value)} className="border border-purple-200 rounded p-1.5 text-xs bg-white w-full outline-none focus:ring-1 focus:ring-purple-500" />
+          <div className="shrink-0 mb-2">
+            <input 
+              type="text" 
+              placeholder="Commentaire optionnel..." 
+              value={odFormCommentaire} 
+              onChange={e => setOdFormCommentaire(e.target.value)} 
+              className="border border-purple-200 rounded-xl p-2 text-xs bg-white w-full outline-none focus:ring-2 focus:ring-purple-500 shadow-sm" 
+            />
           </div>
 
-          <div className="overflow-y-auto flex-1 space-y-1.5 pr-1 min-h-[80px]">
+          {/* Lignes OD ventilées */}
+          <div className="overflow-y-auto flex-1 space-y-2 pr-1 min-h-[90px]">
             {odLines.map((l) => (
-              <div key={l.id} className="flex gap-1 items-center">
-                {/* NOUVEAU: Input libre + DataList pour permettre la création à la volée */}
-                <input 
-                  type="text" 
-                  list="comptes-datalist"
-                  placeholder="Compte..." 
-                  value={l.compte} 
-                  onChange={e => handleCompteOdChange(l.id, e.target.value)} 
-                  className="border border-purple-200 rounded p-1 text-xs bg-white w-1/2 outline-none focus:ring-1 focus:ring-purple-500 font-mono"
-                />
-                <datalist id="comptes-datalist">
-                  {comptesList.map(c => <option key={c.id} value={c.code}>{c.libelle}</option>)}
-                </datalist>
+              <div key={l.id} className="flex gap-1.5 items-center bg-white/80 p-1.5 rounded-xl border border-purple-100 shadow-sm">
+                
+                {/* SELECTOR + CREATION LIBRE DE COMPTE */}
+                <div className="w-1/2 relative">
+                  <input 
+                    type="text" 
+                    list="comptes-datalist"
+                    placeholder="Compte (ex: 606100)" 
+                    value={l.compte} 
+                    onChange={e => updateOdLine(l.id, 'compte', e.target.value)}
+                    onBlur={e => handleCompteOdBlur(l.id, e.target.value)}
+                    className="border border-slate-200 rounded-lg p-1.5 text-xs bg-white w-full outline-none focus:ring-2 focus:ring-purple-500 font-mono font-bold text-slate-800"
+                  />
+                  <datalist id="comptes-datalist">
+                    {comptesList.map(c => <option key={c.id} value={c.code}>{c.libelle}</option>)}
+                  </datalist>
+                </div>
 
-                <input type="number" placeholder="Débit" value={l.debit} onChange={e => updateOdLine(l.id, 'debit', e.target.value)} className="border border-purple-200 rounded p-1 text-xs bg-white w-1/4 outline-none focus:ring-1 focus:ring-purple-500" />
-                <input type="number" placeholder="Crédit" value={l.credit} onChange={e => updateOdLine(l.id, 'credit', e.target.value)} className="border border-purple-200 rounded p-1 text-xs bg-white w-1/4 outline-none focus:ring-1 focus:ring-purple-500" />
-                <button onClick={() => removeOdLine(l.id)} className="text-slate-300 hover:text-red-500"><XCircle size={14} /></button>
+                <input 
+                  type="number" 
+                  placeholder="Débit €" 
+                  value={l.debit} 
+                  onChange={e => updateOdLine(l.id, 'debit', e.target.value)} 
+                  className="border border-slate-200 rounded-lg p-1.5 text-xs bg-white w-1/4 outline-none focus:ring-2 focus:ring-purple-500 font-bold text-right" 
+                />
+                <input 
+                  type="number" 
+                  placeholder="Crédit €" 
+                  value={l.credit} 
+                  onChange={e => updateOdLine(l.id, 'credit', e.target.value)} 
+                  className="border border-slate-200 rounded-lg p-1.5 text-xs bg-white w-1/4 outline-none focus:ring-2 focus:ring-purple-500 font-bold text-right" 
+                />
+                <button onClick={() => removeOdLine(l.id)} className="text-slate-300 hover:text-red-500 transition-colors p-1">
+                  <XCircle size={16} />
+                </button>
               </div>
             ))}
-            <button onClick={addOdLine} className="text-[11px] text-purple-600 font-bold mt-1 hover:underline">
-              + Ajouter une ligne
+            <button onClick={addOdLine} className="text-xs text-purple-700 font-bold mt-1 hover:underline flex items-center gap-1">
+              + Ajouter une ligne de ventilation
             </button>
           </div>
 
-          <div className="shrink-0 flex flex-col gap-2 pt-2 border-t border-purple-200 mt-2">
-            <div className="flex justify-between items-center text-xs font-bold text-purple-900 bg-purple-100 p-2 rounded">
-              <span>TOTAL</span>
-              <div className="flex gap-3">
-                <span className={isOdBalanced ? 'text-emerald-600' : 'text-red-600'}>D: {totalDebitOD.toFixed(2)}</span>
-                <span className={isOdBalanced ? 'text-emerald-600' : 'text-red-600'}>C: {totalCreditOD.toFixed(2)}</span>
+          {/* Totaux & Validation OD */}
+          <div className="shrink-0 flex flex-col gap-2 pt-2 border-t border-purple-200/60 mt-2">
+            <div className="flex justify-between items-center text-xs font-bold text-purple-950 bg-purple-200/50 p-2 rounded-xl">
+              <span>ÉQUILIBRE</span>
+              <div className="flex gap-4 font-mono">
+                <span className={isOdBalanced ? 'text-emerald-700' : 'text-red-600'}>D: {totalDebitOD.toFixed(2)} €</span>
+                <span className={isOdBalanced ? 'text-emerald-700' : 'text-red-600'}>C: {totalCreditOD.toFixed(2)} €</span>
               </div>
             </div>
             <button 
               onClick={handleAddOD} 
               disabled={!isOdBalanced}
-              className={`w-full py-2 rounded font-medium text-sm transition-colors shadow-sm ${isOdBalanced ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-purple-300 text-purple-100 cursor-not-allowed'}`}
+              className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all shadow-md ${
+                isOdBalanced 
+                  ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-purple-200' 
+                  : 'bg-purple-200/80 text-purple-400 cursor-not-allowed shadow-none'
+              }`}
             >
               Enregistrer l'OD
             </button>
           </div>
+
         </div>
       </div>
 
+      {/* IMPUTATION BANCAIRE EN ATTENTE */}
       {lignesEnAttente.length > 0 && (
-        <div className="bg-orange-50 p-6 rounded-xl border border-orange-200 shadow-sm">
+        <div className="bg-orange-50/70 p-6 rounded-2xl border border-orange-200 shadow-sm">
           <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
-            <h3 className="font-bold text-orange-800 flex items-center gap-2">
-              <AlertTriangle size={18} /> Lignes bancaires à imputer ({lignesEnAttente.length})
+            <h3 className="font-bold text-orange-900 flex items-center gap-2">
+              <AlertTriangle size={18} className="text-orange-600" /> Lignes bancaires à imputer ({lignesEnAttente.length})
             </h3>
             <div className="flex items-center gap-3">
               {nbLignesPretes > 0 && (
@@ -1280,12 +1437,12 @@ const GrandLivre = ({ transactionsGlobales }) => {
                   onClick={() => {
                     lignesEnAttente.forEach(l => { if(l.comptePropose) validerLigneBank(l.id, l.comptePropose, l.commentaire); });
                   }}
-                  className="text-sm bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold transition-colors flex items-center gap-2 shadow-md"
+                  className="text-sm bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold transition-colors flex items-center gap-2 shadow-md"
                 >
                   <CheckCircle2 size={18} /> Tout Valider ({nbLignesPretes})
                 </button>
               )}
-              <button onClick={() => setLignesEnAttente([])} className="text-sm bg-white border border-orange-300 hover:bg-orange-100 text-orange-800 px-3 py-2 rounded-lg font-medium transition-colors flex items-center gap-2">
+              <button onClick={() => setLignesEnAttente([])} className="text-sm bg-white border border-orange-300 hover:bg-orange-100 text-orange-800 px-3 py-2 rounded-xl font-medium transition-colors flex items-center gap-2">
                 <XCircle size={16} /> Vider la liste
               </button>
             </div>
@@ -1370,7 +1527,8 @@ const GrandLivre = ({ transactionsGlobales }) => {
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      {/* TABLEAU DES ÉCRITURES VALIDÉES AU GRAND LIVRE */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         
         <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap justify-between items-center gap-4">
           <h3 className="font-bold text-slate-800 flex items-center gap-2">
@@ -1380,7 +1538,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
             
             <button 
               onClick={handleResetGrandLivre}
-              className="text-xs bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg font-bold transition-colors flex items-center gap-2"
+              className="text-xs bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-3 py-2 rounded-xl font-bold transition-colors flex items-center gap-2"
               title="Vider entièrement le Grand Livre"
             >
               <Trash2 size={14} /> Vider le Grand Livre
@@ -1389,7 +1547,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
             <select 
               value={selectedCompteFilter}
               onChange={(e) => setSelectedCompteFilter(e.target.value)}
-              className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+              className="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
             >
               <option value="">Tous les comptes (Filtre...)</option>
               {comptesList.map(c => (
@@ -1409,10 +1567,10 @@ const GrandLivre = ({ transactionsGlobales }) => {
                 placeholder="Rechercher (texte, commentaire...)" 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
               />
             </div>
-            <span className="text-xs font-medium bg-white px-3 py-1.5 rounded-full border border-slate-200 text-slate-500 shadow-sm whitespace-nowrap">
+            <span className="text-xs font-medium bg-white px-3 py-2 rounded-full border border-slate-200 text-slate-500 shadow-sm whitespace-nowrap">
               {filteredAndSortedTransactions.length} écritures
             </span>
           </div>
