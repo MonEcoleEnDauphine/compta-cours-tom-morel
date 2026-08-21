@@ -1311,15 +1311,14 @@ const GrandLivre = ({ transactionsGlobales }) => {
 // --- 4. PLAN COMPTABLE ---
 const PlanComptable = () => {
   const [comptes, setComptes] = useState([]);
-  const [recherche, setRecherche] = useState('');
-  const [nouveauCode, setNouveauCode] = useState('');
-  const [nouveauLibelle, setNouveauLibelle] = useState('');
-  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
-  const [isImporting, setIsImporting] = useState(false);
+  const [newCompte, setNewCompte] = useState({ code: '', libelle: '' });
+  const [searchTerm, setSearchTerm] = useState('');
   
-  const fileInputPlanRef = useRef(null);
+  // États pour la modification en ligne
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({ code: '', libelle: '' });
 
-  // Récupération des comptes depuis Firebase
+  // Récupération des comptes
   useEffect(() => {
     const q = collection(db, 'artifacts', appId, 'public', 'data', 'comptes');
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -1334,230 +1333,213 @@ const PlanComptable = () => {
     return () => unsubscribe();
   }, []);
 
-  const handleAjouter = async (e) => {
-    e.preventDefault();
-    if (!nouveauCode || !nouveauLibelle) {
-      alert("Veuillez remplir le code et le libellé.");
+  // Ajouter un compte
+  const handleAddCompte = async () => {
+    if (!newCompte.code || !newCompte.libelle) return;
+    
+    // Vérifier si le code existe déjà
+    if (comptes.some(c => c.code === newCompte.code)) {
+      alert("Ce numéro de compte existe déjà !");
       return;
     }
-    
+
     try {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'comptes'), {
-        code: nouveauCode,
-        libelle: nouveauLibelle,
-        date_creation: new Date().toISOString()
+        code: newCompte.code,
+        libelle: newCompte.libelle
       });
-      setNouveauCode('');
-      setNouveauLibelle('');
-    } catch (error) {
-      console.error(error);
+      setNewCompte({ code: '', libelle: '' });
+    } catch(e) {
       alert("Erreur lors de l'ajout du compte.");
     }
   };
 
-  const handleSupprimer = async (id) => {
-    if (confirmDeleteId === id) {
+  // Supprimer un compte
+  const handleDeleteCompte = async (id, code) => {
+    if (window.confirm(`Êtes-vous sûr de vouloir supprimer le compte ${code} ?`)) {
       try {
         await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'comptes', id));
-        setConfirmDeleteId(null);
       } catch(e) {
         alert("Erreur lors de la suppression.");
       }
-    } else {
-      setConfirmDeleteId(id);
-      setTimeout(() => setConfirmDeleteId(null), 3000);
     }
   };
 
-  // NOUVEAU : Fonction d'importation CSV/XLSX
-  const handleImportPlan = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setIsImporting(true);
+  // Démarrer la modification
+  const startEdit = (compte) => {
+    setEditingId(compte.id);
+    setEditForm({ code: compte.code, libelle: compte.libelle });
+  };
 
-    const processRows = async (rows) => {
-      let count = 0;
-      // On commence à i = 1 pour ignorer la ligne d'en-tête
-      for (let i = 1; i < rows.length; i++) {
-        const cols = rows[i];
-        const code = cols[0] ? String(cols[0]).trim() : '';
-        const libelle = cols[1] ? String(cols[1]).trim() : '';
-
-        if (code && libelle) {
-          try {
-            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'comptes'), {
-              code: code,
-              libelle: libelle,
-              date_creation: new Date().toISOString()
-            });
-            count++;
-          } catch(err) {
-            console.error("Erreur sur la ligne", i, err);
-          }
-        }
-      }
-      setIsImporting(false);
-      alert(`${count} comptes importés avec succès !`);
-      if (fileInputPlanRef.current) fileInputPlanRef.current.value = ''; // Reset l'input
-    };
-
-    const ext = file.name.split('.').pop().toLowerCase();
+  // Sauvegarder la modification
+  const handleSaveEdit = async (id) => {
+    if (!editForm.code || !editForm.libelle) return alert("Les champs ne peuvent pas être vides.");
     
-    if (ext === 'csv') {
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        const lines = event.target.result.split('\n');
-        const rows = lines.map(line => line.split(';').map(c => c.trim().replace(/"/g, '')));
-        await processRows(rows);
-      };
-      reader.readAsText(file, 'ISO-8859-1');
-    } else if (ext === 'xlsx') {
-      try {
-        const data = await file.arrayBuffer();
-        const workbook = XLSX.read(data, { type: 'array' });
-        const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, raw: false, defval: '' });
-        await processRows(rows);
-      } catch (err) {
-        setIsImporting(false);
-        alert("Erreur de lecture du fichier XLSX.");
-      }
+    // Vérifier si le nouveau code existe déjà AILLEURS que sur la ligne actuelle
+    if (comptes.some(c => c.code === editForm.code && c.id !== id)) {
+      alert("Ce numéro de compte est déjà utilisé par un autre compte !");
+      return;
+    }
+
+    try {
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'comptes', id), {
+        code: editForm.code,
+        libelle: editForm.libelle
+      });
+      setEditingId(null);
+    } catch(e) {
+      alert("Erreur lors de la modification.");
     }
   };
 
-  const comptesFiltres = comptes.filter(c => 
-    c.code.includes(recherche) || c.libelle.toLowerCase().includes(recherche.toLowerCase())
+  // Filtrage
+  const filteredComptes = comptes.filter(c => 
+    c.code.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    c.libelle.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
+    <div className="space-y-6 max-w-4xl mx-auto">
       {/* En-tête */}
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <FileSignature className="text-indigo-600" /> Plan Comptable
+            <BookOpen className="text-indigo-600" /> Plan Comptable
           </h2>
-          <p className="text-slate-500 text-sm mt-1">Gérez la liste de vos comptes (Classes 1 à 7).</p>
+          <p className="text-slate-500 text-sm mt-1">Gérez la nomenclature de vos comptes (Classe 1 à 7).</p>
+        </div>
+        <div className="bg-indigo-50 px-4 py-2 rounded-lg border border-indigo-100">
+          <span className="text-indigo-800 font-bold text-lg">{comptes.length}</span>
+          <span className="text-indigo-600 text-sm ml-1">comptes actifs</span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Colonne gauche : Ajout & Importation */}
-        <div className="md:col-span-1">
-          <div className="bg-indigo-50 p-6 rounded-xl border border-indigo-100 sticky top-6">
-            <h3 className="font-bold text-indigo-900 text-lg mb-4 flex items-center gap-2">
-              <Plus size={18} /> Nouveau Compte
-            </h3>
-            <form onSubmit={handleAjouter} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-indigo-700 mb-1">Code Comptable</label>
-                <input 
-                  type="text" 
-                  placeholder="Ex: 606100" 
-                  value={nouveauCode}
-                  onChange={(e) => setNouveauCode(e.target.value)}
-                  className="w-full border border-indigo-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-indigo-700 mb-1">Libellé</label>
-                <input 
-                  type="text" 
-                  placeholder="Ex: Fournitures non stockables..." 
-                  value={nouveauLibelle}
-                  onChange={(e) => setNouveauLibelle(e.target.value)}
-                  className="w-full border border-indigo-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                />
-              </div>
-              <button 
-                type="submit" 
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-medium text-sm transition-colors"
-              >
-                Ajouter au plan
-              </button>
-            </form>
-
-            {/* NOUVEAU : Bloc d'importation */}
-            <div className="mt-6 pt-5 border-t border-indigo-200">
-              <h4 className="text-xs font-semibold text-indigo-700 mb-3 text-center uppercase tracking-wider">Importation en masse</h4>
-              <input type="file" accept=".csv, .xlsx" className="hidden" ref={fileInputPlanRef} onChange={handleImportPlan} />
-              <button 
-                type="button" 
-                onClick={() => fileInputPlanRef.current.click()}
-                disabled={isImporting}
-                className={`w-full bg-white border-2 border-indigo-200 hover:border-indigo-600 text-indigo-700 py-2 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2 ${isImporting ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <Download size={16} /> {isImporting ? "Importation..." : "Importer (CSV / XLSX)"}
-              </button>
-              <p className="text-[10px] text-indigo-500 mt-2 text-center leading-tight">
-                Fichier avec Colonne A : Code<br/>Colonne B : Libellé<br/>(La ligne 1 d'en-tête sera ignorée)
-              </p>
-            </div>
-
+      {/* Ajout et Recherche */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col gap-3">
+          <h3 className="font-bold text-slate-700 text-sm uppercase tracking-wider">Créer un nouveau compte</h3>
+          <div className="flex gap-2">
+            <input 
+              type="text" 
+              placeholder="Code (ex: 606100)" 
+              value={newCompte.code}
+              onChange={e => setNewCompte({...newCompte, code: e.target.value.replace(/[^0-9]/g, '')})}
+              className="border border-slate-300 rounded-lg p-2 text-sm w-1/3 outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+            />
+            <input 
+              type="text" 
+              placeholder="Libellé du compte..." 
+              value={newCompte.libelle}
+              onChange={e => setNewCompte({...newCompte, libelle: e.target.value})}
+              className="border border-slate-300 rounded-lg p-2 text-sm flex-1 outline-none focus:ring-2 focus:ring-indigo-500"
+              onKeyDown={(e) => { if(e.key === 'Enter') handleAddCompte(); }}
+            />
+            <button onClick={handleAddCompte} className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-lg transition-colors" title="Ajouter le compte">
+              <PlusCircle size={20} />
+            </button>
           </div>
         </div>
 
-        {/* Colonne droite : Liste des comptes */}
-        <div className="md:col-span-2">
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full">
-            <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center gap-4">
-              <div className="relative flex-1 max-w-sm">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input 
-                  type="text" 
-                  placeholder="Rechercher un compte..." 
-                  value={recherche}
-                  onChange={(e) => setRecherche(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                />
-              </div>
-              <span className="text-xs font-medium bg-white px-3 py-1 rounded-full border border-slate-200 text-slate-500">
-                {comptesFiltres.length} compte(s)
-              </span>
-            </div>
+        <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col gap-3">
+          <h3 className="font-bold text-slate-700 text-sm uppercase tracking-wider">Rechercher un compte</h3>
+          <div className="relative">
+            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input 
+              type="text" 
+              placeholder="Tapez un numéro ou un mot-clé..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="border border-slate-300 rounded-lg p-2 pl-10 text-sm w-full outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+        </div>
+      </div>
 
-            <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-semibold sticky top-0 shadow-sm">
-                  <tr>
-                    <th className="py-3 px-4 w-32">Code</th>
-                    <th className="py-3 px-4">Libellé</th>
-                    <th className="py-3 px-4 text-center w-24">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {comptesFiltres.map(c => (
-                    <tr key={c.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-3 px-4 font-mono font-bold text-slate-700">{c.code}</td>
-                      <td className="py-3 px-4 text-slate-600">{c.libelle}</td>
-                      <td className="py-3 px-4 text-center">
-                        {confirmDeleteId === c.id ? (
-                          <button onClick={() => handleSupprimer(c.id)} className="text-white bg-red-500 hover:bg-red-600 px-2 py-1 rounded text-xs font-bold animate-pulse">
-                            Confirmer ?
-                          </button>
-                        ) : (
-                          <button onClick={() => handleSupprimer(c.id)} className="text-slate-300 hover:text-red-500 p-1.5 rounded transition-colors" title="Supprimer">
-                            <Trash2 size={16}/>
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                  {comptesFiltres.length === 0 && (
-                    <tr>
-                      <td colSpan="3" className="py-8 text-center text-slate-400">Aucun compte trouvé.</td>
-                    </tr>
+      {/* Liste des comptes */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[11px] font-bold">
+            <tr>
+              <th className="py-3 px-4 w-32">N° de Compte</th>
+              <th className="py-3 px-4">Libellé Comptable</th>
+              <th className="py-3 px-4 text-center w-24">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {filteredComptes.map((c) => (
+              <tr key={c.id} className="hover:bg-slate-50 transition-colors group">
+                
+                {/* COLONNE CODE */}
+                <td className="py-2.5 px-4 font-mono">
+                  {editingId === c.id ? (
+                    <input 
+                      type="text" 
+                      value={editForm.code} 
+                      onChange={e => setEditForm({...editForm, code: e.target.value.replace(/[^0-9]/g, '')})}
+                      className="border border-indigo-400 bg-indigo-50 text-indigo-900 rounded px-2 py-1 w-full outline-none font-bold"
+                    />
+                  ) : (
+                    <span className="bg-slate-100 px-2 py-1 rounded border border-slate-200 text-slate-700 font-bold">
+                      {c.code}
+                    </span>
                   )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+                </td>
+
+                {/* COLONNE LIBELLÉ */}
+                <td className="py-2.5 px-4 text-slate-800 font-medium">
+                  {editingId === c.id ? (
+                    <input 
+                      type="text" 
+                      value={editForm.libelle} 
+                      onChange={e => setEditForm({...editForm, libelle: e.target.value})}
+                      className="border border-indigo-400 bg-indigo-50 text-indigo-900 rounded px-2 py-1 w-full outline-none"
+                      onKeyDown={(e) => { if(e.key === 'Enter') handleSaveEdit(c.id); }}
+                    />
+                  ) : (
+                    c.libelle
+                  )}
+                </td>
+
+                {/* COLONNE ACTIONS */}
+                <td className="py-2.5 px-4 text-center">
+                  <div className="flex justify-center gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                    {editingId === c.id ? (
+                      <>
+                        <button onClick={() => handleSaveEdit(c.id)} className="text-emerald-600 hover:bg-emerald-100 p-1.5 rounded transition-colors" title="Enregistrer">
+                          <CheckCircle2 size={18} />
+                        </button>
+                        <button onClick={() => setEditingId(null)} className="text-slate-400 hover:bg-slate-200 p-1.5 rounded transition-colors" title="Annuler">
+                          <XCircle size={18} />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button onClick={() => startEdit(c)} className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 p-1.5 rounded transition-colors" title="Modifier le compte">
+                          <Edit2 size={16} />
+                        </button>
+                        <button onClick={() => handleDeleteCompte(c.id, c.code)} className="text-slate-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded transition-colors" title="Supprimer le compte">
+                          <Trash2 size={16} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </td>
+
+              </tr>
+            ))}
+            {filteredComptes.length === 0 && (
+              <tr>
+                <td colSpan="3" className="py-8 text-center text-slate-400">
+                  Aucun compte trouvé.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );
 };
-
-
 // ==========================================
 // APPLICATION PRINCIPALE
 // ==========================================
