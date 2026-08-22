@@ -217,6 +217,17 @@ const SearchableCompteSelect = ({ value, onChange, comptesList, placeholder = "S
 
 // --- ÉTAT FINANCIER (Bilan & Résultat Groupés) ---
 const EtatFinancier = ({ transactionsGlobales }) => {
+  
+  // 1. SÉCURITÉ ANTI-CRASH : Formatage monétaire intégré directement dans le composant
+  const formatMontant = (valeur) => {
+    const num = Number(valeur);
+    if (isNaN(num)) return "0,00";
+    return new Intl.NumberFormat('fr-FR', { 
+      minimumFractionDigits: 2, 
+      maximumFractionDigits: 2 
+    }).format(num);
+  };
+
   const safeTransactions = transactionsGlobales || [];
 
   const [anneeDebut, setAnneeDebut] = useState('TOTAL');
@@ -283,8 +294,8 @@ const EtatFinancier = ({ transactionsGlobales }) => {
   };
 
   const getCompteLibelle = (code) => {
-    const codeStr = String(code);
-    const c = comptesList.find(x => String(x.code) === codeStr);
+    const codeStr = String(code).trim();
+    const c = comptesList.find(x => String(x.code).trim() === codeStr);
     if (c) return c.libelle;
     if (codeStr === '512000') return 'Banque';
     return '';
@@ -327,7 +338,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     const exo = [];
 
     safeTransactions.forEach(t => {
-      if (!t.date) return;
+      if (!t || !t.date) return;
       const tTime = parseDateForFilter(t.date);
       if (tTime < start) ant.push(t);
       else if (tTime >= start && tTime <= end) exo.push(t);
@@ -343,6 +354,8 @@ const EtatFinancier = ({ transactionsGlobales }) => {
   const addAmount = (balancesObj, compte, deb, cred) => {
     if (!compte) return;
     const compteStr = String(compte).trim();
+    if (!compteStr) return;
+    
     if (!balancesObj[compteStr]) balancesObj[compteStr] = { debit: 0, credit: 0 };
     balancesObj[compteStr].debit += (Number(deb) || 0);
     balancesObj[compteStr].credit += (Number(cred) || 0);
@@ -356,7 +369,6 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     const absM = Math.abs(m);
 
     if (isOD) {
-      // CORRECTION : Forcer la conversion en chaîne de texte pour éviter le plantage
       const dCode = t.compteDebit ? String(t.compteDebit).trim() : '';
       const cCode = t.compteCredit ? String(t.compteCredit).trim() : '';
 
@@ -375,7 +387,6 @@ const EtatFinancier = ({ transactionsGlobales }) => {
         }
       }
     } else {
-      // CORRECTION : Forcer la conversion en chaîne de texte
       const compteStr = t.compte ? String(t.compte).trim() : '';
       const isCharge = compteStr.startsWith('6');
       const isProduit = compteStr.startsWith('7');
@@ -388,7 +399,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
         else addAmount(balancesBilan, compteStr, 0, absM);
       }
 
-      // Contrepartie Banque
+      // Contrepartie 512000 automatique
       if (m < 0) addAmount(balancesBilan, '512000', 0, absM); 
       else addAmount(balancesBilan, '512000', absM, 0); 
     }
@@ -397,7 +408,6 @@ const EtatFinancier = ({ transactionsGlobales }) => {
   anterieures.forEach(t => processTx(t, true));
   exercice.forEach(t => processTx(t, false));
 
-  // Injection Résultat N-1
   let resultatAnterieur = 0;
   Object.keys(balancesResultatAnt).forEach(code => {
     const b = balancesResultatAnt[code];
@@ -405,8 +415,8 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     if (code.startsWith('6')) resultatAnterieur -= (b.debit - b.credit);
   });
 
-  if (resultatAnterieur !== 0) {
-    if (resultatAnterieur > 0) addAmount(balancesBilan, '120000', 0, resultatAnterieur); 
+  if (Math.abs(resultatAnterieur) > 0.01) {
+    if (resultatAnterieur > 0) addAmount(balancesBilan, '120000', 0, Math.abs(resultatAnterieur)); 
     else addAmount(balancesBilan, '120000', Math.abs(resultatAnterieur), 0); 
   }
 
@@ -472,8 +482,8 @@ const EtatFinancier = ({ transactionsGlobales }) => {
   });
 
   const sortGroupItems = (groupObj) => {
-    Object.values(groupObj).forEach(grp => {
-      grp.items.sort((a, b) => a.code.localeCompare(b.code));
+    Object.keys(groupObj).forEach(key => {
+      groupObj[key].items.sort((a, b) => a.code.localeCompare(b.code));
     });
   };
   sortGroupItems(actif);
@@ -490,6 +500,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
 
   const renderGroup = (category, groupKey) => {
     const grp = category[groupKey];
+    if (!grp) return null;
     const isExpanded = detailsOuverts[groupKey];
     return (
       <div key={groupKey} className="border-b border-slate-100 last:border-0">
@@ -610,7 +621,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
             </p>
             <div className="bg-white/60 border border-rose-100 p-3 rounded-xl mt-3 flex items-start gap-2">
               <span className="text-rose-600 font-bold">💡 Solution :</span>
-              <span className="text-xs text-rose-900 font-medium">Pour rééquilibrer, intégrez vos écritures de trésorerie via le <strong>Journal de Banque</strong> ou équilibrez correctement vos Opérations Diverses.</span>
+              <span className="text-xs text-rose-900 font-medium">Vérifiez que toutes vos écritures bancaires sont imputées ou que vos Opérations Diverses sont parfaitement équilibrées.</span>
             </div>
           </div>
         </div>
