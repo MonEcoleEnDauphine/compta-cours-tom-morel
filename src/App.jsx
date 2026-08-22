@@ -217,17 +217,6 @@ const SearchableCompteSelect = ({ value, onChange, comptesList, placeholder = "S
 
 // --- ÉTAT FINANCIER (Bilan & Résultat Groupés) ---
 const EtatFinancier = ({ transactionsGlobales }) => {
-  
-  // SÉCURITÉ : Formatage monétaire rapatrié à l'intérieur pour éviter tout plantage
-  const formatMontant = (valeur) => {
-    const num = Number(valeur);
-    if (isNaN(num)) return "0,00";
-    return new Intl.NumberFormat('fr-FR', { 
-      minimumFractionDigits: 2, 
-      maximumFractionDigits: 2 
-    }).format(num);
-  };
-
   const safeTransactions = transactionsGlobales || [];
 
   const [anneeDebut, setAnneeDebut] = useState('TOTAL');
@@ -294,11 +283,9 @@ const EtatFinancier = ({ transactionsGlobales }) => {
   };
 
   const getCompteLibelle = (code) => {
-    // SÉCURITÉ ANTI-CRASH : forcer la conversion en texte
-    const codeStr = String(code).trim();
-    const c = comptesList.find(x => String(x.code).trim() === codeStr);
+    const c = comptesList.find(x => x.code === code);
     if (c) return c.libelle;
-    if (codeStr === '512000') return 'Banque';
+    if (code === '512000') return 'Banque';
     return '';
   };
 
@@ -327,102 +314,47 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     return new Date(str).getTime() || 0;
   };
 
-  const { anterieures, exercice } = useMemo(() => {
+  const transactionsFiltrees = useMemo(() => {
     if (anneeDebut === 'TOTAL') {
-      return { anterieures: [], exercice: safeTransactions };
+      return safeTransactions;
     }
 
     const start = new Date(Number(anneeDebut), 8, 1, 0, 0, 0).getTime(); 
     const end = new Date(Number(anneeDebut) + 1, 7, 31, 23, 59, 59).getTime(); 
 
-    const ant = [];
-    const exo = [];
-
-    safeTransactions.forEach(t => {
-      if (!t || !t.date) return;
+    return safeTransactions.filter(t => {
+      if (!t.date) return false;
       const tTime = parseDateForFilter(t.date);
-      if (tTime < start) ant.push(t);
-      else if (tTime >= start && tTime <= end) exo.push(t);
+      return tTime >= start && tTime <= end;
     });
-
-    return { anterieures: ant, exercice: exo };
   }, [safeTransactions, anneeDebut]);
 
-  const balancesBilan = {};
-  const balancesResultat = {};
-  const balancesResultatAnt = {};
+  const balances = {};
+  transactionsFiltrees.forEach(t => {
+    if (!t.compte && !t.compteDebit && !t.compteCredit) return;
 
-  const addAmount = (balancesObj, compte, deb, cred) => {
-    if (!compte) return;
-    const compteStr = String(compte).trim();
-    if (!compteStr) return;
-    
-    if (!balancesObj[compteStr]) balancesObj[compteStr] = { debit: 0, credit: 0 };
-    balancesObj[compteStr].debit += (Number(deb) || 0);
-    balancesObj[compteStr].credit += (Number(cred) || 0);
-  };
+    const addAmount = (compte, deb, cred) => {
+      if (!compte) return;
+      if (!balances[compte]) balances[compte] = { debit: 0, credit: 0 };
+      balances[compte].debit += (Number(deb) || 0);
+      balances[compte].credit += (Number(cred) || 0);
+    };
 
-  const processTx = (t, isAnterieur) => {
-    if (!t) return;
-    const isOD = t.type === 'od';
-    const resObj = isAnterieur ? balancesResultatAnt : balancesResultat;
-    const m = Number(t.montant) || 0;
-    const absM = Math.abs(m);
-
-    if (isOD) {
-      // SÉCURITÉ ANTI-CRASH : conversion en String sécurisée
-      const dCode = t.compteDebit ? String(t.compteDebit).trim() : '';
-      const cCode = t.compteCredit ? String(t.compteCredit).trim() : '';
-
-      if (dCode) {
-        if (dCode.startsWith('6') || dCode.startsWith('7')) {
-          addAmount(resObj, dCode, absM, 0);
-        } else {
-          addAmount(balancesBilan, dCode, absM, 0);
-        }
-      }
-      if (cCode) {
-        if (cCode.startsWith('6') || cCode.startsWith('7')) {
-          addAmount(resObj, cCode, 0, absM);
-        } else {
-          addAmount(balancesBilan, cCode, 0, absM);
-        }
-      }
+    if (t.type === 'od') {
+      addAmount(t.compteDebit, t.montant, 0);
+      addAmount(t.compteCredit, 0, t.montant);
     } else {
-      const compteStr = t.compte ? String(t.compte).trim() : '';
-      const isCharge = compteStr.startsWith('6');
-      const isProduit = compteStr.startsWith('7');
-
-      if (isCharge || isProduit) {
-        if (m < 0) addAmount(resObj, compteStr, absM, 0);
-        else addAmount(resObj, compteStr, 0, absM);
-      } else if (compteStr) {
-        if (m < 0) addAmount(balancesBilan, compteStr, absM, 0);
-        else addAmount(balancesBilan, compteStr, 0, absM);
+      if (Number(t.montant) < 0) {
+        const absMontant = Math.abs(Number(t.montant));
+        addAmount(t.compte, absMontant, 0); 
+        addAmount('512000', 0, absMontant); 
+      } else {
+        const absMontant = Number(t.montant);
+        addAmount(t.compte, 0, absMontant); 
+        addAmount('512000', absMontant, 0); 
       }
-
-      // Génération de la contrepartie en Banque 512 automatique
-      if (m < 0) addAmount(balancesBilan, '512000', 0, absM); 
-      else addAmount(balancesBilan, '512000', absM, 0); 
     }
-  };
-
-  // On lance les calculs
-  anterieures.forEach(t => processTx(t, true));
-  exercice.forEach(t => processTx(t, false));
-
-  // Injection du Résultat N-1 dans le Bilan
-  let resultatAnterieur = 0;
-  Object.keys(balancesResultatAnt).forEach(code => {
-    const b = balancesResultatAnt[code];
-    if (code.startsWith('7')) resultatAnterieur += (b.credit - b.debit);
-    if (code.startsWith('6')) resultatAnterieur -= (b.debit - b.credit);
   });
-
-  if (Math.abs(resultatAnterieur) > 0.01) {
-    if (resultatAnterieur > 0) addAmount(balancesBilan, '120000', 0, Math.abs(resultatAnterieur)); 
-    else addAmount(balancesBilan, '120000', Math.abs(resultatAnterieur), 0); 
-  }
 
   const actif = {};
   const passif = {};
@@ -434,66 +366,50 @@ const EtatFinancier = ({ transactionsGlobales }) => {
   let totalCharges = 0;
   let totalProduits = 0;
 
-  const addToGroup = (category, code, val) => {
+  Object.keys(balances).forEach(code => {
+    if (!code || code.length < 2) return;
+
+    const b = balances[code];
+    const net = b.debit - b.credit;
+    if (Math.abs(net) < 0.01) return;
+
     const prefix2 = code.substring(0, 2);
     const groupName = `${prefix2} - ${PREFIXES[prefix2] || 'Autres comptes'}`;
-    if (!category[groupName]) category[groupName] = { total: 0, items: [] };
-    category[groupName].items.push({ code, libelle: getCompteLibelle(code), net: val });
-    category[groupName].total += val;
-  };
+    const item = { code, libelle: getCompteLibelle(code), net: Math.abs(net) };
 
-  // Traitement du Bilan (avec gestion experte des signes de solde)
-  Object.keys(balancesBilan).forEach(code => {
-    if (!code || code.length < 2) return;
-    const b = balancesBilan[code];
-    const netDebit = b.debit - b.credit;
-    const netCredit = b.credit - b.debit;
-    
-    // Ignore les comptes soldés à zéro
-    if (Math.abs(netDebit) < 0.01) return;
+    const addToGroup = (category, group, data) => {
+      if (!category[group]) category[group] = { total: 0, items: [] };
+      category[group].items.push(data);
+      category[group].total += data.net;
+    };
 
     const root = code[0];
-    if (['1'].includes(root)) {
-      // Les comptes de Passif ont un solde créditeur naturel.
-      // S'ils sont débiteurs (ex: perte), la valeur netCredit sera négative et se soustraira du total !
-      addToGroup(passif, code, netCredit); 
-      totalPassif += netCredit;
+    if (root === '6') {
+      addToGroup(charges, groupName, item);
+      totalCharges += item.net;
+    } else if (root === '7') {
+      addToGroup(produits, groupName, item);
+      totalProduits += item.net;
+    } else if (['1'].includes(root)) {
+      addToGroup(passif, groupName, item);
+      totalPassif += item.net;
     } else if (['2', '3'].includes(root)) {
-      addToGroup(actif, code, netDebit);
-      totalActif += netDebit;
+      addToGroup(actif, groupName, item);
+      totalActif += item.net;
     } else if (['4', '5'].includes(root)) {
-      if (netDebit > 0) {
-        addToGroup(actif, code, netDebit);
-        totalActif += netDebit;
+      if (net > 0) {
+        addToGroup(actif, groupName, item);
+        totalActif += item.net;
       } else {
-        addToGroup(passif, code, netCredit);
-        totalPassif += netCredit;
+        addToGroup(passif, groupName, item);
+        totalPassif += item.net;
       }
     }
   });
 
-  // Traitement du Résultat de l'année
-  Object.keys(balancesResultat).forEach(code => {
-    if (!code || code.length < 2) return;
-    const b = balancesResultat[code];
-    const netDebit = b.debit - b.credit;
-    const netCredit = b.credit - b.debit;
-    
-    if (Math.abs(netDebit) < 0.01) return;
-
-    const root = code[0];
-    if (root === '6') {
-      addToGroup(charges, code, netDebit);
-      totalCharges += netDebit;
-    } else if (root === '7') {
-      addToGroup(produits, code, netCredit);
-      totalProduits += netCredit;
-    }
-  });
-
   const sortGroupItems = (groupObj) => {
-    Object.keys(groupObj).forEach(key => {
-      groupObj[key].items.sort((a, b) => a.code.localeCompare(b.code));
+    Object.values(groupObj).forEach(grp => {
+      grp.items.sort((a, b) => a.code.localeCompare(b.code));
     });
   };
   sortGroupItems(actif);
@@ -510,7 +426,6 @@ const EtatFinancier = ({ transactionsGlobales }) => {
 
   const renderGroup = (category, groupKey) => {
     const grp = category[groupKey];
-    if (!grp) return null;
     const isExpanded = detailsOuverts[groupKey];
     return (
       <div key={groupKey} className="border-b border-slate-100 last:border-0">
@@ -573,6 +488,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
         </div>
       </div>
 
+      {/* COMPTE DE RÉSULTAT CACHÉ SI "BILAN TOTAL" EST SÉLECTIONNÉ */}
       {anneeDebut !== 'TOTAL' && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="bg-slate-900 p-4">
