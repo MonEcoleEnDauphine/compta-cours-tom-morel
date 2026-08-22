@@ -23,17 +23,12 @@ const firebaseConfig = {
   measurementId: "G-XL0L5MG9LK"
 };
 
-// Initialisation conditionnelle
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = "cours-tom-morel-erp";
 
 const LOGO_URL = 'https://lh3.googleusercontent.com/sitesv/AG8ngQXc96dCEFn_IAzMJapefM9CVcMYjacEj4SRG34_lJVisC1M2RC4JkeFV2b8VN30TwAnTJN-HEkeXqfMpIH6JEChx3G9H1CUQ1SZDm-NSmFVdlj6GrkzkC3KCDkK_StXgHclve-6ytuuMw4fYkWcKQqjzjQzYeMm3ScP0VIQbBepycX8NGq429QMYo05=w16383';
-
-// ==========================================
-// COMPOSANTS DE PAGES (Placeholders & Réels)
-// ==========================================
 
 const PlaceholderPage = ({ title }) => (
   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
@@ -42,32 +37,26 @@ const PlaceholderPage = ({ title }) => (
   </div>
 );
 
-// --- 1. INFOS & CONTACT ---
 const InfosContact = () => (
   <div className="space-y-6 max-w-6xl mx-auto">
     <div className="bg-blue-600 p-8 rounded-xl shadow-md text-white">
       <h1 className="text-3xl font-bold mb-2">Bienvenue sur le portail du Cours Tom Morel</h1>
       <p className="text-blue-100">Retrouvez ici toutes les informations de scolarité et les plannings.</p>
     </div>
-    
+
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      
-      {/* Carte 1 : L'École (Site) */}
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center">
         <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center mb-4">
           <Globe size={24} />
         </div>
         <h3 className="text-lg font-bold text-slate-800 mb-1">Le Cours Tom Morel</h3>
         <p className="text-blue-500 text-sm mb-6">24 rue de la Chapelle, Saint-Chef</p>
-        
         <div className="flex-1"></div>
-        
         <a href="https://sites.google.com/view/courstommorel/cours-tom-morel" target="_blank" rel="noreferrer" className="w-full inline-flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-600 px-4 py-2.5 rounded-lg transition-colors font-medium text-sm">
           <Globe size={18} /> Visiter le site
         </a>
       </div>
 
-      {/* Carte 2 : Direction */}
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center">
         <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center mb-4">
           <Mail size={24} />
@@ -75,38 +64,150 @@ const InfosContact = () => (
         <h3 className="text-lg font-bold text-slate-800 mb-1">Direction de l'École</h3>
         <p className="text-slate-600 text-sm font-medium mb-1">Mme Laurence Gérard</p>
         <p className="text-slate-400 text-xs mb-5">Équipe enseignante: Mme Cécile Sublet & Mme Florence</p>
-        
         <div className="w-full border border-slate-200 rounded-lg py-2 mb-3 flex items-center justify-center gap-2 text-slate-600 text-sm font-medium">
           <Phone size={16} /> 06 67 90 95 76
         </div>
-        
         <a href="mailto:direction@courstommorel.fr" className="w-full inline-flex items-center justify-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 px-4 py-2.5 rounded-lg transition-colors font-medium text-sm">
           <Mail size={18} /> Écrire
         </a>
       </div>
 
-      {/* Carte 3 : Association */}
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center">
         <div className="w-12 h-12 rounded-full bg-purple-50 text-purple-500 flex items-center justify-center mb-4">
           <Building size={24} />
         </div>
         <h3 className="text-lg font-bold text-slate-800 mb-1">Association (Bureau)</h3>
         <p className="text-purple-500 text-sm mb-6">Mon École en Dauphiné</p>
-        
         <div className="flex-1"></div>
-        
         <div className="w-full border border-slate-200 rounded-lg py-2 mb-3 flex items-center justify-center gap-2 text-slate-600 text-sm font-medium">
           <Phone size={16} /> 06 60 20 29 80
         </div>
-        
         <a href="mailto:association@courstommorel.fr" className="w-full inline-flex items-center justify-center gap-2 bg-purple-50 hover:bg-purple-100 text-purple-600 px-4 py-2.5 rounded-lg transition-colors font-medium text-sm">
           <Mail size={18} /> Écrire
         </a>
       </div>
-
     </div>
   </div>
 );
+
+// --- FONCTIONS UTILITAIRES GLOBALES ---
+const normaliserDateFR = (rawVal) => {
+  if (!rawVal) return '';
+  if (rawVal instanceof Date && !isNaN(rawVal)) {
+    const d = String(rawVal.getDate()).padStart(2, '0');
+    const m = String(rawVal.getMonth() + 1).padStart(2, '0');
+    const y = rawVal.getFullYear();
+    return `${d}/${m}/${y}`;
+  }
+  const str = String(rawVal).trim();
+  if (!str) return '';
+  if (str.includes('-')) {
+    const parts = str.split('T')[0].split('-');
+    if (parts.length === 3 && parts[0].length === 4) {
+      const [y, m, d] = parts;
+      return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+    }
+  }
+  if (str.includes('/')) {
+    const parts = str.split('/');
+    if (parts.length === 3) {
+      if (parts[0].length === 4) { 
+        const [y, m, d] = parts;
+        return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+      } else { 
+        let [d, m, y] = parts;
+        if (y.length === 2) y = '20' + y;
+        return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+      }
+    }
+  }
+  return str;
+};
+
+const SearchableCompteSelect = ({ value, onChange, comptesList, placeholder = "Sélectionner un compte..." }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const normalizeStr = (str) => (str || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+  const filteredComptes = useMemo(() => {
+    if (!search.trim()) return comptesList;
+    const term = normalizeStr(search);
+    return comptesList.filter(c => 
+      normalizeStr(c.code).includes(term) || 
+      normalizeStr(c.libelle).includes(term)
+    );
+  }, [comptesList, search]);
+
+  const selectedCompte = comptesList.find(c => c.code === value);
+
+  return (
+    <div className="relative w-full" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full text-left border rounded-xl px-3 py-2 text-xs font-mono font-bold flex justify-between items-center transition-all bg-white shadow-2xs ${
+          value ? 'border-indigo-300 bg-indigo-50/80 text-indigo-900' : 'border-slate-200 text-slate-400'
+        }`}
+      >
+        <span className="truncate">
+          {selectedCompte ? `${selectedCompte.code} - ${selectedCompte.libelle}` : (value ? `${value} (Suggéré)` : placeholder)}
+        </span>
+        <ChevronDown size={14} className="text-slate-400 shrink-0 ml-1" />
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-2xl shadow-2xl p-2 max-h-60 overflow-y-auto">
+          <div className="relative mb-2">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input 
+              type="text" 
+              placeholder="Code ou libellé (ex : AS, 616)..." 
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-9 pr-3 py-1.5 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-600 font-sans"
+              autoFocus
+            />
+          </div>
+          <div className="space-y-0.5">
+            {filteredComptes.length > 0 ? (
+              filteredComptes.map(c => (
+                <div 
+                  key={c.id}
+                  onClick={() => {
+                    onChange(c.code);
+                    setIsOpen(false);
+                    setSearch('');
+                  }}
+                  className={`px-3 py-2 rounded-xl text-xs cursor-pointer flex justify-between items-center transition-colors ${
+                    c.code === value ? 'bg-indigo-100 text-indigo-950 font-extrabold' : 'hover:bg-slate-100/80 text-slate-700 font-medium'
+                  }`}
+                >
+                  <span className="font-mono font-extrabold text-indigo-700 shrink-0">{c.code}</span>
+                  <span className="truncate text-slate-600 ml-2 text-right flex-1">{c.libelle}</span>
+                </div>
+              ))
+            ) : (
+              <div className="text-xs text-slate-400 text-center py-3">Aucun compte correspondant</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // --- ÉTAT FINANCIER (Bilan & Résultat Groupés) ---
 const EtatFinancier = ({ transactionsGlobales }) => {
   const safeTransactions = transactionsGlobales || [];
@@ -194,9 +295,9 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     } else if (str.includes('-')) {
       const parts = str.split('-');
       if (parts.length === 3) {
-        if (parts[0].length === 4) {
+        if (parts[0].length === 4) { 
           return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)).getTime();
-        } else {
+        } else { 
           return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10)).getTime();
         }
       }
@@ -205,8 +306,8 @@ const EtatFinancier = ({ transactionsGlobales }) => {
   };
 
   const transactionsFiltrees = useMemo(() => {
-    const start = new Date(anneeDebut, 8, 1, 0, 0, 0).getTime();
-    const end = new Date(anneeDebut + 1, 7, 31, 23, 59, 59).getTime();
+    const start = new Date(anneeDebut, 8, 1, 0, 0, 0).getTime(); 
+    const end = new Date(anneeDebut + 1, 7, 31, 23, 59, 59).getTime(); 
 
     return safeTransactions.filter(t => {
       if (!t.date) return false;
@@ -302,7 +403,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
   const resultat = totalProduits - totalCharges;
   const sortedKeys = (obj) => Object.keys(obj).sort();
 
-  // NOUVEAU : Calcul pour vérifier si le bilan est bien équilibré
+  // ALERTE BILAN DÉSÉQUILIBRÉ
   const totalPassifPlusResultat = totalPassif + resultat;
   const ecartBilan = Math.abs(totalActif - totalPassifPlusResultat);
   const isBilanDesequilibre = ecartBilan > 0.01;
@@ -350,7 +451,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
           </h2>
           <p className="text-slate-500 text-sm mt-1">Bilan et Compte de Résultat groupés par familles comptables.</p>
         </div>
-        
+
         <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
           <Calendar size={18} className="text-slate-500" />
           <select 
@@ -374,7 +475,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
           </h3>
           <p className="text-slate-400 text-xs mt-1">Compare les produits et les charges pour déterminer le bénéfice ou la perte.</p>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200">
           <div>
             <div className="bg-red-50 text-red-700 font-bold p-3 text-center text-sm border-b border-red-100 uppercase tracking-wider">
@@ -410,7 +511,6 @@ const EtatFinancier = ({ transactionsGlobales }) => {
         </div>
       </div>
 
-      {/* NOUVEAU : ALERTE BIZAN DÉSÉQUILIBRÉ */}
       {isBilanDesequilibre && (
         <div className="bg-rose-50 border border-rose-200 p-5 rounded-2xl shadow-sm flex flex-col md:flex-row items-start gap-4 animate-pulse">
           <div className="p-3 bg-rose-500 text-white rounded-xl shadow-md shrink-0">
@@ -419,12 +519,12 @@ const EtatFinancier = ({ transactionsGlobales }) => {
           <div>
             <h4 className="font-black text-rose-900 text-lg uppercase tracking-tight">Déséquilibre du Bilan Détecté</h4>
             <p className="text-sm text-rose-800 mt-1 leading-relaxed">
-              En véritable comptabilité partie double, l'Actif doit <strong>obligatoirement</strong> être égal au Passif (incluant le Résultat). 
-              Actuellement, le logiciel détecte un écart de <strong className="bg-rose-200 px-1.5 py-0.5 rounded">{ecartBilan.toFixed(2)} €</strong>.
+              En comptabilité, l'Actif doit toujours être égal au Passif (incluant le Résultat). 
+              Écart actuel : <strong className="bg-rose-200 px-1.5 py-0.5 rounded">{ecartBilan.toFixed(2)} €</strong>.
             </p>
             <div className="bg-white/60 border border-rose-100 p-3 rounded-xl mt-3 flex items-start gap-2">
               <span className="text-rose-600 font-bold">💡 Solution :</span>
-              <span className="text-xs text-rose-900 font-medium">Pour rééquilibrer le bilan, assurez-vous d'avoir bien intégré vos écritures dans le <strong>Journal de Banque</strong> (qui alimentent le compte <em>512000</em> à l'Actif) en contrepartie de vos opérations diverses et fiches de paie.</span>
+              <span className="text-xs text-rose-900 font-medium">Pour rééquilibrer, intégrez vos écritures de trésorerie via le <strong>Journal de Banque</strong>. La contrepartie viendra automatiquement alimenter le compte <em>512000 (Banque)</em> à l'Actif.</span>
             </div>
           </div>
         </div>
@@ -437,7 +537,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
           </h3>
           <p className="text-slate-400 text-xs mt-1">Photographie du patrimoine : L'Actif (ce qu'on possède) et le Passif (ce qu'on doit).</p>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200">
           <div>
             <div className="bg-blue-50 text-blue-700 font-bold p-3 text-center text-sm border-b border-blue-100 uppercase tracking-wider">
@@ -484,403 +584,22 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     </div>
   );
 };
-  // Filtrage intelligent selon la période scolaire (01/09/N au 31/08/N+1)
-  const transactionsFiltrees = useMemo(() => {
-    const start = new Date(anneeDebut, 8, 1, 0, 0, 0).getTime(); // 1er Septembre
-    const end = new Date(anneeDebut + 1, 7, 31, 23, 59, 59).getTime(); // 31 Août
 
-    return safeTransactions.filter(t => {
-      if (!t.date) return false;
-      const tTime = parseDateForFilter(t.date);
-      return tTime >= start && tTime <= end;
-    });
-  }, [safeTransactions, anneeDebut]);
-
-  // Calcul des soldes sur la période
-  const balances = {};
-  transactionsFiltrees.forEach(t => {
-    if (!t.compte && !t.compteDebit && !t.compteCredit) return;
-
-    const addAmount = (compte, deb, cred) => {
-      if (!compte) return;
-      if (!balances[compte]) balances[compte] = { debit: 0, credit: 0 };
-      balances[compte].debit += (Number(deb) || 0);
-      balances[compte].credit += (Number(cred) || 0);
-    };
-
-    if (t.type === 'od') {
-      addAmount(t.compteDebit, t.montant, 0);
-      addAmount(t.compteCredit, 0, t.montant);
-    } else {
-      if (Number(t.montant) < 0) {
-        addAmount(t.compte, Math.abs(t.montant), 0);
-      } else {
-        addAmount(t.compte, 0, t.montant);
-      }
-    }
-  });
-
-  const actif = {};
-  const passif = {};
-  const charges = {};
-  const produits = {};
-
-  let totalActif = 0;
-  let totalPassif = 0;
-  let totalCharges = 0;
-  let totalProduits = 0;
-
-  Object.keys(balances).forEach(code => {
-    if (!code || code.length < 2) return;
-
-    const b = balances[code];
-    const net = b.debit - b.credit;
-    if (Math.abs(net) < 0.01) return;
-
-    const prefix2 = code.substring(0, 2);
-    const groupName = `${prefix2} - ${PREFIXES[prefix2] || 'Autres comptes'}`;
-    const item = { code, libelle: getCompteLibelle(code), net: Math.abs(net) };
-
-    const addToGroup = (category, group, data) => {
-      if (!category[group]) category[group] = { total: 0, items: [] };
-      category[group].items.push(data);
-      category[group].total += data.net;
-    };
-
-    const root = code[0];
-    if (root === '6') {
-      addToGroup(charges, groupName, item);
-      totalCharges += item.net;
-    } else if (root === '7') {
-      addToGroup(produits, groupName, item);
-      totalProduits += item.net;
-    } else if (['1'].includes(root)) {
-      addToGroup(passif, groupName, item);
-      totalPassif += item.net;
-    } else if (['2', '3'].includes(root)) {
-      addToGroup(actif, groupName, item);
-      totalActif += item.net;
-    } else if (['4', '5'].includes(root)) {
-      if (net > 0) {
-        addToGroup(actif, groupName, item);
-        totalActif += item.net;
-      } else {
-        addToGroup(passif, groupName, item);
-        totalPassif += item.net;
-      }
-    }
-  });
-
-  const sortGroupItems = (groupObj) => {
-    Object.values(groupObj).forEach(grp => {
-      grp.items.sort((a, b) => a.code.localeCompare(b.code));
-    });
-  };
-  sortGroupItems(actif);
-  sortGroupItems(passif);
-  sortGroupItems(charges);
-  sortGroupItems(produits);
-
-  const resultat = totalProduits - totalCharges;
-  const sortedKeys = (obj) => Object.keys(obj).sort();
-
-  const renderGroup = (category, groupKey) => {
-    const grp = category[groupKey];
-    const isExpanded = detailsOuverts[groupKey];
-    return (
-      <div key={groupKey} className="border-b border-slate-100 last:border-0">
-        <div 
-          className="flex justify-between items-center p-3 hover:bg-slate-50 cursor-pointer transition-colors"
-          onClick={() => toggleDetail(groupKey)}
-        >
-          <div className="flex items-center gap-2">
-            {isExpanded ? <ChevronDown size={14} className="text-slate-400 shrink-0" /> : <ChevronRight size={14} className="text-slate-400 shrink-0" />}
-            <span className="text-sm font-semibold text-slate-700">{groupKey}</span>
-          </div>
-          <span className="text-sm font-bold text-slate-800 whitespace-nowrap ml-2">{grp.total.toFixed(2)} €</span>
-        </div>
-        {isExpanded && (
-          <div className="bg-slate-50 pb-2">
-            {grp.items.map(item => (
-              <div key={item.code} className="flex justify-between items-center px-8 py-1.5 hover:bg-slate-100 transition-colors">
-                <div className="flex items-center gap-2 overflow-hidden pr-2">
-                  <span className="text-[11px] font-mono bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-600 shrink-0">{item.code}</span>
-                  <span className="text-xs text-slate-600 truncate" title={item.libelle}>
-                    {item.libelle || <span className="italic text-slate-400">Sans libellé</span>}
-                  </span>
-                </div>
-                <span className="text-xs font-medium text-slate-600 shrink-0">{item.net.toFixed(2)} €</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  return (
-    <div className="space-y-8 max-w-6xl mx-auto">
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <PieChart className="text-indigo-600" /> États Financiers
-          </h2>
-          <p className="text-slate-500 text-sm mt-1">Bilan et Compte de Résultat groupés par familles comptables.</p>
-        </div>
-        
-        <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
-          <Calendar size={18} className="text-slate-500" />
-          <select 
-            value={anneeDebut} 
-            onChange={(e) => setAnneeDebut(Number(e.target.value))}
-            className="bg-transparent border-none text-sm font-bold text-slate-700 outline-none cursor-pointer"
-          >
-            {[2021, 2022, 2023, 2024, 2025, 2026].map(year => (
-              <option key={year} value={year}>
-                01/09/{String(year).slice(-2)} au 31/08/{String(year + 1).slice(-2)}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="bg-slate-900 p-4">
-          <h3 className="text-white font-bold flex items-center gap-2 text-lg">
-            Compte de Résultat (Classe 6 & 7)
-          </h3>
-          <p className="text-slate-400 text-xs mt-1">Compare les produits et les charges pour déterminer le bénéfice ou la perte.</p>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200">
-          <div>
-            <div className="bg-red-50 text-red-700 font-bold p-3 text-center text-sm border-b border-red-100 uppercase tracking-wider">
-              Charges (Dépenses)
-            </div>
-            <div className="p-2">
-              {sortedKeys(charges).length > 0 ? (
-                sortedKeys(charges).map(key => renderGroup(charges, key))
-              ) : (
-                <div className="text-center text-slate-400 text-sm py-8">Aucune donnée sur cette période</div>
-              )}
-            </div>
-          </div>
-          <div>
-            <div className="bg-emerald-50 text-emerald-700 font-bold p-3 text-center text-sm border-b border-emerald-100 uppercase tracking-wider">
-              Produits (Recettes)
-            </div>
-            <div className="p-2">
-              {sortedKeys(produits).length > 0 ? (
-                sortedKeys(produits).map(key => renderGroup(produits, key))
-              ) : (
-                <div className="text-center text-slate-400 text-sm py-8">Aucune donnée sur cette période</div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-between items-center">
-          <span className="font-bold text-slate-700 uppercase">Résultat de l'exercice</span>
-          <span className={`text-xl font-black ${resultat >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-            {resultat > 0 ? '+' : ''}{resultat.toFixed(2)} €
-          </span>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="bg-slate-900 p-4">
-          <h3 className="text-white font-bold flex items-center gap-2 text-lg">
-            Bilan Comptable (Classe 1 à 5)
-          </h3>
-          <p className="text-slate-400 text-xs mt-1">Photographie du patrimoine : L'Actif (ce qu'on possède) et le Passif (ce qu'on doit).</p>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200">
-          <div>
-            <div className="bg-blue-50 text-blue-700 font-bold p-3 text-center text-sm border-b border-blue-100 uppercase tracking-wider">
-              Actif (Emplois)
-            </div>
-            <div className="p-2">
-              {sortedKeys(actif).length > 0 ? (
-                sortedKeys(actif).map(key => renderGroup(actif, key))
-              ) : (
-                <div className="text-center text-slate-400 text-sm py-8">Aucune donnée sur cette période</div>
-              )}
-            </div>
-          </div>
-          <div>
-            <div className="bg-orange-50 text-orange-700 font-bold p-3 text-center text-sm border-b border-orange-100 uppercase tracking-wider">
-              Passif (Ressources)
-            </div>
-            <div className="p-2">
-              {sortedKeys(passif).length > 0 ? (
-                sortedKeys(passif).map(key => renderGroup(passif, key))
-              ) : (
-                <div className="text-center text-slate-400 text-sm py-8">Aucune donnée sur cette période</div>
-              )}
-              <div className="border-t border-slate-200 mt-2 pt-2">
-                <div className="flex justify-between items-center px-4 py-2">
-                  <span className="text-sm font-semibold text-slate-700">12 - Résultat de l'exercice</span>
-                  <span className={`text-sm font-bold ${resultat >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                    {resultat > 0 ? '+' : ''}{resultat.toFixed(2)} €
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-between items-center text-sm">
-          <span className="font-bold text-slate-500">TOTAL GÉNÉRAL</span>
-          <div className="flex gap-8">
-            <span className="font-bold text-blue-700">Actif : {totalActif.toFixed(2)} €</span>
-            <span className="font-bold text-orange-700">Passif + Résultat : {(totalPassif + resultat).toFixed(2)} €</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-// --- FONCTION DE NORMALISATION STRICTE DES DATES EN JJ/MM/AAAA ---
-const normaliserDateFR = (rawVal) => {
-  if (!rawVal) return '';
-
-  if (rawVal instanceof Date && !isNaN(rawVal)) {
-    const d = String(rawVal.getDate()).padStart(2, '0');
-    const m = String(rawVal.getMonth() + 1).padStart(2, '0');
-    const y = rawVal.getFullYear();
-    return `${d}/${m}/${y}`;
-  }
-
-  const str = String(rawVal).trim();
-  if (!str) return '';
-
-  if (str.includes('-')) {
-    const parts = str.split('T')[0].split('-');
-    if (parts.length === 3 && parts[0].length === 4) {
-      const [y, m, d] = parts;
-      return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
-    }
-  }
-
-  if (str.includes('/')) {
-    const parts = str.split('/');
-    if (parts.length === 3) {
-      if (parts[0].length === 4) { 
-        const [y, m, d] = parts;
-        return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
-      } else { 
-        let [d, m, y] = parts;
-        if (y.length === 2) y = '20' + y;
-        return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
-      }
-    }
-  }
-
-  return str;
-};
-
-// --- SÉLECTEUR DE COMPTE AVEC RECHERCHE PAR CODE ET LIBELLÉ ---
-const SearchableCompteSelect = ({ value, onChange, comptesList, placeholder = "Sélectionner un compte..." }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [search, setSearch] = useState('');
-  const dropdownRef = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const normalizeStr = (str) => (str || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-
-  const filteredComptes = useMemo(() => {
-    if (!search.trim()) return comptesList;
-    const term = normalizeStr(search);
-    return comptesList.filter(c => 
-      normalizeStr(c.code).includes(term) || 
-      normalizeStr(c.libelle).includes(term)
-    );
-  }, [comptesList, search]);
-
-  const selectedCompte = comptesList.find(c => c.code === value);
-
-  return (
-    <div className="relative w-full" ref={dropdownRef}>
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className={`w-full text-left border rounded-xl px-3 py-2 text-xs font-mono font-bold flex justify-between items-center transition-all bg-white shadow-2xs ${
-          value ? 'border-indigo-300 bg-indigo-50/80 text-indigo-900' : 'border-slate-200 text-slate-400'
-        }`}
-      >
-        <span className="truncate">
-          {selectedCompte ? `${selectedCompte.code} - ${selectedCompte.libelle}` : (value ? `${value} (Suggéré)` : placeholder)}
-        </span>
-        <ChevronDown size={14} className="text-slate-400 shrink-0 ml-1" />
-      </button>
-
-      {isOpen && (
-        <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-2xl shadow-2xl p-2 max-h-60 overflow-y-auto">
-          <div className="relative mb-2">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input 
-              type="text" 
-              placeholder="Code ou libellé (ex : AS, 616)..." 
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-600 font-sans"
-              autoFocus
-            />
-          </div>
-          <div className="space-y-0.5">
-            {filteredComptes.length > 0 ? (
-              filteredComptes.map(c => (
-                <div 
-                  key={c.id}
-                  onClick={() => {
-                    onChange(c.code);
-                    setIsOpen(false);
-                    setSearch('');
-                  }}
-                  className={`px-3 py-2 rounded-xl text-xs cursor-pointer flex justify-between items-center transition-colors ${
-                    c.code === value ? 'bg-indigo-100 text-indigo-950 font-extrabold' : 'hover:bg-slate-100/80 text-slate-700 font-medium'
-                  }`}
-                >
-                  <span className="font-mono font-extrabold text-indigo-700 shrink-0">{c.code}</span>
-                  <span className="truncate text-slate-600 ml-2 text-right flex-1">{c.libelle}</span>
-                </div>
-              ))
-            ) : (
-              <div className="text-xs text-slate-400 text-center py-3">Aucun compte correspondant</div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// --- 3. GRAND LIVRE (Import CSV/XLSX, OD, Validations) ---
+// --- GRAND LIVRE (Import CSV/XLSX, OD, Validations) ---
 const GrandLivre = ({ transactionsGlobales }) => {
   const [lignesEnAttente, setLignesEnAttente] = useState([]);
   const [comptesList, setComptesList] = useState([]);
   const [editingRowId, setEditingRowId] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [lastImportBatch, setLastImportBatch] = useState(null);
-  
+
   const [selectedTxForPdf, setSelectedTxForPdf] = useState(null);
   const fileInputPdfRef = useRef(null);
 
   const [showCompteModal, setShowCompteModal] = useState(false);
   const [pendingCompte, setPendingCompte] = useState({ code: '', libelle: '', lineId: null });
 
-  // Accordéon (Onglets déroulants)
-  const [activeTab, setActiveTab] = useState(null); // 'banque', 'paie', ou 'od'
+  const [activeTab, setActiveTab] = useState(null);
 
   const [odFormDate, setOdFormDate] = useState('');
   const [odFormLibelle, setOdFormLibelle] = useState('');
@@ -889,11 +608,11 @@ const GrandLivre = ({ transactionsGlobales }) => {
     { id: 1, compte: '', debit: '', credit: '' },
     { id: 2, compte: '', debit: '', credit: '' }
   ]);
-  
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCompteFilter, setSelectedCompteFilter] = useState(''); 
   const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' });
-  
+
   const fileInputBankRef = useRef(null);
   const fileInputPaieRef = useRef(null);
   const fileInputODRef = useRef(null);
@@ -956,7 +675,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
         code: pendingCompte.code,
         libelle: pendingCompte.libelle.trim()
       });
-      
+
       if (pendingCompte.lineId) {
         setOdLines(prev => prev.map(l => l.id === pendingCompte.lineId ? { ...l, compte: pendingCompte.code } : l));
       }
@@ -1001,9 +720,9 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
   const handleResetGrandLivre = async () => {
     if (transactionsGlobales.length === 0) return alert("Le Grand Livre est déjà vide.");
-    
+
     const pwd = window.prompt("⚠️ DANGER : Vous allez supprimer TOUTES les écritures validées du Grand Livre.\n\nVeuillez entrer le mot de passe administrateur pour confirmer :");
-    
+
     if (pwd === 'admin123') {
       const confirm = window.confirm(`Êtes-vous absolument sûr ? ${transactionsGlobales.length} écritures vont être définitivement effacées.`);
       if (confirm) {
@@ -1120,7 +839,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
           const dateExtrait = normaliserDateFR(cols[0]);
           const libelleExtrait = cols[1] || cols[3];
-          
+
           if (mt !== 0) {
             const isDuplicate = transactionsGlobales.some(t => t.date === dateExtrait && t.libelle === libelleExtrait && Math.abs(t.montant) === Math.abs(mt)) ||
                                 lignesEnAttente.some(t => t.date === dateExtrait && t.libelle === libelleExtrait && Math.abs(t.montant) === Math.abs(mt)) ||
@@ -1189,11 +908,11 @@ const GrandLivre = ({ transactionsGlobales }) => {
       const lines = event.target.result.split('\n');
       let count = 0;
       let doublonsCount = 0;
-      
+
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim();
         if (!line) continue;
-        
+
         const cols = line.split('\t');
         if (cols.length >= 13) {
           const rawDate = cols[3].trim();
@@ -1204,7 +923,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
           const ecritureLib = cols[10].trim();
           const debit = parseMontant(cols[11]);
           const credit = parseMontant(cols[12]);
-          
+
           if (debit > 0 || credit > 0) {
             const libelleFinal = `(PAIE) ${ecritureLib} - ${compteLib}`;
             const mt = debit > 0 ? debit : credit;
@@ -1229,7 +948,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
               commentaire: '',
               date_creation: new Date().toISOString()
             };
-            
+
             try {
               await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), newTx);
               count++;
@@ -1262,7 +981,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
           const compteNum = String(cols[3] || '').trim();
           const pieceRef = cols[5] || '';
           const libelle = cols[6] || '';
-          
+
           let debitVal = parseMontant(cols[7]);
           let creditVal = parseMontant(cols[8]);
           const commentaire = cols[11] || '';
@@ -1294,7 +1013,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
               commentaire: commentaire,
               date_creation: new Date().toISOString()
             };
-            
+
             try {
               await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), newTx);
               count++;
@@ -1337,7 +1056,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
       alert("Veuillez sélectionner un compte avant de valider.");
       return;
     }
-    
+
     const newTx = {
       date: normaliserDateFR(ligne.date),
       libelle: ligne.libelle,
@@ -1349,7 +1068,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
       type: ligne.montant < 0 ? 'depense' : 'recette',
       date_creation: new Date().toISOString()
     };
-    
+
     try {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), newTx);
       setLignesEnAttente(prev => prev.filter(l => l.id !== ligneId));
@@ -1380,7 +1099,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
   const handleAddOD = async () => {
     if (!odFormDate || !odFormLibelle) return alert('Date et libellé requis.');
     if (!isOdBalanced) return alert("L'OD doit être équilibrée (Total Débit = Total Crédit) et supérieure à 0.");
-    
+
     for (const line of odLines) {
       const debit = parseFloat(line.debit) || 0;
       const credit = parseFloat(line.credit) || 0;
@@ -1498,7 +1217,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
     result.sort((a, b) => {
       let valA, valB;
-      
+
       if (sortConfig.key === 'source') {
         const getSource = (tx) => tx.type === 'od' ? (tx.typeOp === 'PAIE' || tx.libelle?.includes('(PAIE)') ? 'paie' : 'od') : 'banque';
         valA = getSource(a);
@@ -1542,12 +1261,14 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
   return (
     <div className="space-y-6 w-full max-w-[1600px] mx-auto px-3 py-2 font-sans">
-      
+
+      {/* INPUTS CACHÉS */}
       <input type="file" accept="application/pdf,image/*" className="hidden" ref={fileInputPdfRef} onChange={handlePdfChange} />
       <input type="file" accept=".csv,.xlsx" className="hidden" ref={fileInputBankRef} onChange={handleImportBank} />
       <input type="file" accept=".txt,.tsv" className="hidden" ref={fileInputPaieRef} onChange={handleImportPaie} />
       <input type="file" accept=".csv,.xlsx" className="hidden" ref={fileInputODRef} onChange={handleImportODMass} />
 
+      {/* MODAL CRÉATION DE COMPTE */}
       {showCompteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
           <div className="bg-white rounded-3xl shadow-2xl border border-purple-100 w-full max-w-md overflow-hidden transition-all scale-100">
@@ -1637,22 +1358,19 @@ const GrandLivre = ({ transactionsGlobales }) => {
         </div>
       )}
 
-      {/* PANNEAUX D'ACTIONS : DISPOSITION HORIZONTALE COMPACTE */}
+      {/* PANNEAUX D'ACTIONS : DISPOSITION HORIZONTALE COMPACTE CÔTE À CÔTE */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* ONGLET BANQUE */}
         <div className={`bg-white border rounded-3xl shadow-sm flex flex-col transition-all overflow-hidden ${activeTab === 'banque' ? 'border-indigo-400 ring-4 ring-indigo-50' : 'border-slate-200/80 hover:border-indigo-300'}`}>
-          <button 
-            onClick={() => setActiveTab(activeTab === 'banque' ? null : 'banque')} 
-            className={`w-full text-left p-5 flex justify-between items-center transition-colors ${activeTab === 'banque' ? 'bg-indigo-50/50' : 'hover:bg-slate-50/50'}`}
-          >
+          <button onClick={() => setActiveTab(activeTab === 'banque' ? null : 'banque')} className={`w-full text-left p-5 flex justify-between items-center transition-colors ${activeTab === 'banque' ? 'bg-indigo-50/50' : 'hover:bg-slate-50/50'}`}>
             <div className="flex items-center gap-4">
               <div className={`p-2.5 rounded-2xl transition-colors ${activeTab === 'banque' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'bg-indigo-50 text-indigo-600'}`}>
                 <Download size={20} />
               </div>
               <div>
                 <h3 className={`font-extrabold text-base ${activeTab === 'banque' ? 'text-indigo-950' : 'text-slate-800'}`}>Journal de Banque</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Import des relevés bancaires</p>
+                <p className="text-xs text-slate-500 mt-0.5">Import des relevés</p>
               </div>
             </div>
             <ChevronDown size={20} className={`text-slate-400 transition-transform duration-300 ${activeTab === 'banque' ? 'rotate-180 text-indigo-600' : ''}`} />
@@ -1660,9 +1378,9 @@ const GrandLivre = ({ transactionsGlobales }) => {
           {activeTab === 'banque' && (
             <div className="p-5 pt-0 animate-fade-in flex-1 flex flex-col justify-end">
               <div className="bg-indigo-50/50 rounded-2xl p-4 border border-indigo-100 flex flex-col gap-4 text-center mt-4">
-                <p className="text-xs text-indigo-900 leading-relaxed">Formats acceptés : <strong>.CSV</strong> ou <strong>.XLSX</strong>.<br/>Importez directement depuis votre banque.</p>
+                <p className="text-xs text-indigo-900 leading-relaxed">Formats acceptés : <strong>.CSV</strong> ou <strong>.XLSX</strong>.</p>
                 <button onClick={() => fileInputBankRef.current.click()} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-md shadow-indigo-200 active:scale-95">
-                  <Download size={16} /> Sélectionner le fichier
+                  <Download size={16} /> Parcourir le fichier
                 </button>
               </div>
             </div>
@@ -1671,17 +1389,14 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
         {/* ONGLET PAIE */}
         <div className={`bg-white border rounded-3xl shadow-sm flex flex-col transition-all overflow-hidden ${activeTab === 'paie' ? 'border-pink-400 ring-4 ring-pink-50' : 'border-slate-200/80 hover:border-pink-300'}`}>
-          <button 
-            onClick={() => setActiveTab(activeTab === 'paie' ? null : 'paie')} 
-            className={`w-full text-left p-5 flex justify-between items-center transition-colors ${activeTab === 'paie' ? 'bg-pink-50/50' : 'hover:bg-slate-50/50'}`}
-          >
+          <button onClick={() => setActiveTab(activeTab === 'paie' ? null : 'paie')} className={`w-full text-left p-5 flex justify-between items-center transition-colors ${activeTab === 'paie' ? 'bg-pink-50/50' : 'hover:bg-slate-50/50'}`}>
             <div className="flex items-center gap-4">
               <div className={`p-2.5 rounded-2xl transition-colors ${activeTab === 'paie' ? 'bg-pink-600 text-white shadow-md shadow-pink-200' : 'bg-pink-50 text-pink-600'}`}>
                 <Users size={20} />
               </div>
               <div>
                 <h3 className={`font-extrabold text-base ${activeTab === 'paie' ? 'text-pink-950' : 'text-slate-800'}`}>Fiches de Paie</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Intégration du journal des salaires</p>
+                <p className="text-xs text-slate-500 mt-0.5">Importation des salaires</p>
               </div>
             </div>
             <ChevronDown size={20} className={`text-slate-400 transition-transform duration-300 ${activeTab === 'paie' ? 'rotate-180 text-pink-600' : ''}`} />
@@ -1689,9 +1404,9 @@ const GrandLivre = ({ transactionsGlobales }) => {
           {activeTab === 'paie' && (
             <div className="p-5 pt-0 animate-fade-in flex-1 flex flex-col justify-end">
               <div className="bg-pink-50/50 rounded-2xl p-4 border border-pink-100 flex flex-col gap-4 text-center mt-4">
-                <p className="text-xs text-pink-900 leading-relaxed">Formats acceptés : <strong>.TXT</strong> ou <strong>.TSV</strong>.<br/>Import de votre logiciel de paie externe.</p>
+                <p className="text-xs text-pink-900 leading-relaxed">Formats acceptés : <strong>.TXT</strong> ou <strong>.TSV</strong>.</p>
                 <button onClick={() => fileInputPaieRef.current.click()} className="w-full bg-pink-600 hover:bg-pink-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-md shadow-pink-200 active:scale-95">
-                  <Users size={16} /> Sélectionner le fichier
+                  <Users size={16} /> Parcourir le fichier
                 </button>
               </div>
             </div>
@@ -1700,26 +1415,18 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
         {/* ONGLET OD */}
         <div className={`bg-white border rounded-3xl shadow-sm flex flex-col transition-all overflow-hidden lg:col-span-1 md:col-span-2 ${activeTab === 'od' ? 'border-purple-400 ring-4 ring-purple-50 lg:col-span-3' : 'border-slate-200/80 hover:border-purple-300'}`}>
-          <button 
-            onClick={() => setActiveTab(activeTab === 'od' ? null : 'od')} 
-            className={`w-full text-left p-5 flex justify-between items-center transition-colors ${activeTab === 'od' ? 'bg-purple-50/50' : 'hover:bg-slate-50/50'}`}
-          >
+          <button onClick={() => setActiveTab(activeTab === 'od' ? null : 'od')} className={`w-full text-left p-5 flex justify-between items-center transition-colors ${activeTab === 'od' ? 'bg-purple-50/50' : 'hover:bg-slate-50/50'}`}>
             <div className="flex items-center gap-4">
               <div className={`p-2.5 rounded-2xl transition-colors ${activeTab === 'od' ? 'bg-purple-600 text-white shadow-md shadow-purple-200' : 'bg-purple-50 text-purple-600'}`}>
                 <FileText size={20} />
               </div>
               <div>
-                <h3 className={`font-extrabold text-base ${activeTab === 'od' ? 'text-purple-950' : 'text-slate-800'}`}>Opération Diverse (OD)</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Saisie manuelle ventilée & Import masse</p>
+                <h3 className={`font-extrabold text-base ${activeTab === 'od' ? 'text-purple-950' : 'text-slate-800'}`}>Opération Diverse</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Saisie ou Import masse</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {/* Le bouton d'import OD reste cliquable même si le bandeau est fermé */}
-              <button 
-                onClick={(e) => { e.stopPropagation(); fileInputODRef.current.click(); }} 
-                className="text-[10px] font-bold uppercase tracking-wider bg-purple-100 hover:bg-purple-200 text-purple-700 border border-purple-200 px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-sm"
-                title="Importer un fichier d'OD ou de Paie en masse (.csv / .xlsx)"
-              >
+              <button onClick={(e) => { e.stopPropagation(); fileInputODRef.current.click(); }} className="text-[10px] font-bold uppercase tracking-wider bg-purple-100 hover:bg-purple-200 text-purple-700 border border-purple-200 px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-sm" title="Importer un fichier d'OD ou de Paie en masse (.csv / .xlsx)">
                 <Download size={13}/> Import masse
               </button>
               <ChevronDown size={20} className={`text-slate-400 transition-transform duration-300 ${activeTab === 'od' ? 'rotate-180 text-purple-600' : ''}`} />
@@ -1729,8 +1436,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
           {activeTab === 'od' && (
             <div className="p-5 pt-0 animate-fade-in bg-purple-50/30">
               <div className="flex flex-col gap-4 mt-4">
-                
-                {/* Formulaire vertical compact pour tenir dans le 1/3 d'écran */}
                 <div className="flex flex-col gap-3">
                   <div className="flex gap-3">
                     <input type="date" value={odFormDate} onChange={e => setOdFormDate(e.target.value)} className="w-1/3 border border-slate-200 rounded-xl p-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-purple-600 font-mono font-semibold shadow-sm" />
@@ -1741,37 +1446,30 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
                 <div className="space-y-3 mt-2">
                   {odLines.map((l) => (
-                    <div key={l.id} className="flex flex-col gap-2 bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                      <div className="w-full relative">
-                        <SearchableCompteSelect 
-                          value={l.compte || ''}
-                          comptesList={comptesList}
-                          placeholder="Sélectionnez ou tapez (ex: 606100)"
-                          onChange={(val) => updateOdLine(l.id, 'compte', val)}
-                        />
-                        <input type="text" className="hidden" value={l.compte} onBlur={e => handleCompteOdBlur(l.id, e.target.value)} />
+                    <div key={l.id} className="flex flex-wrap md:flex-nowrap gap-2 items-center bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
+                      <div className="w-full md:flex-1 relative">
+                        <SearchableCompteSelect value={l.compte || ''} comptesList={comptesList} placeholder="Sélectionnez ou tapez (ex: 606100)" onChange={(val) => updateOdLine(l.id, 'compte', val)} />
+                        <div className="absolute top-1/2 -translate-y-1/2 right-8 pointer-events-none opacity-0">
+                          <input type="text" className="hidden" value={l.compte} onBlur={e => handleCompteOdBlur(l.id, e.target.value)} />
+                        </div>
                       </div>
 
-                      <div className="flex gap-2">
-                        <input type="number" placeholder="Débit €" value={l.debit} onChange={e => updateOdLine(l.id, 'debit', e.target.value)} className="border border-slate-200 rounded-xl p-2 text-sm bg-slate-50 w-full outline-none focus:ring-2 focus:ring-purple-600 font-bold text-right" />
-                        <input type="number" placeholder="Crédit €" value={l.credit} onChange={e => updateOdLine(l.id, 'credit', e.target.value)} className="border border-slate-200 rounded-xl p-2 text-sm bg-slate-50 w-full outline-none focus:ring-2 focus:ring-purple-600 font-bold text-right" />
-                        <button onClick={() => removeOdLine(l.id)} className="text-slate-400 hover:text-rose-500 transition-colors p-2 bg-slate-100 rounded-xl shrink-0">
-                          <XCircle size={18} />
-                        </button>
+                      <div className="flex gap-2 w-full md:w-auto">
+                        <input type="number" placeholder="Débit €" value={l.debit} onChange={e => updateOdLine(l.id, 'debit', e.target.value)} className="border border-slate-200 rounded-xl p-2 text-sm bg-slate-50 w-full md:w-32 outline-none focus:ring-2 focus:ring-purple-600 font-bold text-right" />
+                        <input type="number" placeholder="Crédit €" value={l.credit} onChange={e => updateOdLine(l.id, 'credit', e.target.value)} className="border border-slate-200 rounded-xl p-2 text-sm bg-slate-50 w-full md:w-32 outline-none focus:ring-2 focus:ring-purple-600 font-bold text-right" />
+                        <button onClick={() => removeOdLine(l.id)} className="text-slate-400 hover:text-rose-500 transition-colors p-2 bg-slate-50 rounded-xl shrink-0"><XCircle size={18} /></button>
                       </div>
                     </div>
                   ))}
-                  <button onClick={addOdLine} className="text-sm text-purple-600 font-bold hover:underline flex items-center gap-1 p-1">
-                    + Ajouter une ligne de ventilation
-                  </button>
+                  <button onClick={addOdLine} className="text-sm text-purple-600 font-bold hover:underline flex items-center gap-1 p-1 ml-1">+ Ajouter une ligne de ventilation</button>
                 </div>
 
                 <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-purple-200/50 mt-2">
                   <div className={`flex items-center gap-4 px-4 py-2.5 rounded-xl border w-full sm:w-auto justify-between sm:justify-start transition-colors ${isOdBalanced ? 'bg-emerald-50 text-emerald-900 border-emerald-200' : 'bg-slate-100 text-slate-700 border-slate-200'}`}>
                     <span className="uppercase text-xs font-bold tracking-wider">Équilibre</span>
                     <div className="flex gap-4 font-mono text-sm">
-                      <span className={isOdBalanced ? 'text-emerald-700 font-extrabold' : 'text-rose-600 font-bold'}>D: {totalDebitOD.toFixed(2)}</span>
-                      <span className={isOdBalanced ? 'text-emerald-700 font-extrabold' : 'text-rose-600 font-bold'}>C: {totalCreditOD.toFixed(2)}</span>
+                      <span className={isOdBalanced ? 'text-emerald-700 font-extrabold' : 'text-rose-600 font-bold'}>D: {totalDebitOD.toFixed(2)} €</span>
+                      <span className={isOdBalanced ? 'text-emerald-700 font-extrabold' : 'text-rose-600 font-bold'}>C: {totalCreditOD.toFixed(2)} €</span>
                     </div>
                   </div>
 
@@ -1785,6 +1483,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
         </div>
       </div>
 
+      {/* SAS D'IMPUTATION BANCAIRE */}
       {lignesEnAttente.length > 0 && (
         <div className="bg-orange-50/80 p-6 rounded-3xl border border-orange-200/80 shadow-sm animate-fade-in">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
@@ -1816,7 +1515,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
                   <th className="py-3 px-4">Libellé</th>
                   <th className="py-3 px-4 text-right">Montant</th>
                   <th className="py-3 px-4">Commentaire</th>
-                  <th className="py-3 px-4 min-w-[280px]">Compte comptable (Recherchable)</th>
+                  <th className="py-3 px-4 min-w-[280px]">Compte comptable</th>
                   <th className="py-3 px-4 text-center">Action</th>
                 </tr>
               </thead>
@@ -1852,6 +1551,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
         </div>
       )}
 
+      {/* TABLEAU GRAND LIVRE */}
       <div className="bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden mt-8">
         <div className="p-5 bg-slate-50/80 border-b border-slate-200/80 flex flex-wrap justify-between items-center gap-4">
           <div className="flex items-center gap-3">
@@ -2016,17 +1716,15 @@ const GrandLivre = ({ transactionsGlobales }) => {
     </div>
   );
 };
+
 // --- 4. PLAN COMPTABLE ---
 const PlanComptable = () => {
   const [comptes, setComptes] = useState([]);
   const [newCompte, setNewCompte] = useState({ code: '', libelle: '' });
   const [searchTerm, setSearchTerm] = useState('');
-  
-  // États pour la modification en ligne
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({ code: '', libelle: '' });
 
-  // Récupération des comptes
   useEffect(() => {
     const q = collection(db, 'artifacts', appId, 'public', 'data', 'comptes');
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -2034,23 +1732,18 @@ const PlanComptable = () => {
       snapshot.forEach((doc) => {
         liste.push({ id: doc.id, ...doc.data() });
       });
-      // Tri par numéro de compte
       liste.sort((a, b) => a.code.localeCompare(b.code));
       setComptes(liste);
     });
     return () => unsubscribe();
   }, []);
 
-  // Ajouter un compte
   const handleAddCompte = async () => {
     if (!newCompte.code || !newCompte.libelle) return;
-    
-    // Vérifier si le code existe déjà
     if (comptes.some(c => c.code === newCompte.code)) {
       alert("Ce numéro de compte existe déjà !");
       return;
     }
-
     try {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'comptes'), {
         code: newCompte.code,
@@ -2062,7 +1755,6 @@ const PlanComptable = () => {
     }
   };
 
-  // Supprimer un compte
   const handleDeleteCompte = async (id, code) => {
     if (window.confirm(`Êtes-vous sûr de vouloir supprimer le compte ${code} ?`)) {
       try {
@@ -2073,22 +1765,17 @@ const PlanComptable = () => {
     }
   };
 
-  // Démarrer la modification
   const startEdit = (compte) => {
     setEditingId(compte.id);
     setEditForm({ code: compte.code, libelle: compte.libelle });
   };
 
-  // Sauvegarder la modification
   const handleSaveEdit = async (id) => {
     if (!editForm.code || !editForm.libelle) return alert("Les champs ne peuvent pas être vides.");
-    
-    // Vérifier si le nouveau code existe déjà AILLEURS que sur la ligne actuelle
     if (comptes.some(c => c.code === editForm.code && c.id !== id)) {
       alert("Ce numéro de compte est déjà utilisé par un autre compte !");
       return;
     }
-
     try {
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'comptes', id), {
         code: editForm.code,
@@ -2100,7 +1787,6 @@ const PlanComptable = () => {
     }
   };
 
-  // Filtrage
   const filteredComptes = comptes.filter(c => 
     c.code.toLowerCase().includes(searchTerm.toLowerCase()) || 
     c.libelle.toLowerCase().includes(searchTerm.toLowerCase())
@@ -2108,7 +1794,6 @@ const PlanComptable = () => {
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
-      {/* En-tête */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
@@ -2122,7 +1807,6 @@ const PlanComptable = () => {
         </div>
       </div>
 
-      {/* Ajout et Recherche */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col gap-3">
           <h3 className="font-bold text-slate-700 text-sm uppercase tracking-wider">Créer un nouveau compte</h3>
@@ -2163,7 +1847,6 @@ const PlanComptable = () => {
         </div>
       </div>
 
-      {/* Liste des comptes */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[11px] font-bold">
@@ -2176,8 +1859,6 @@ const PlanComptable = () => {
           <tbody className="divide-y divide-slate-100">
             {filteredComptes.map((c) => (
               <tr key={c.id} className="hover:bg-slate-50 transition-colors group">
-                
-                {/* COLONNE CODE */}
                 <td className="py-2.5 px-4 font-mono">
                   {editingId === c.id ? (
                     <input 
@@ -2192,8 +1873,6 @@ const PlanComptable = () => {
                     </span>
                   )}
                 </td>
-
-                {/* COLONNE LIBELLÉ */}
                 <td className="py-2.5 px-4 text-slate-800 font-medium">
                   {editingId === c.id ? (
                     <input 
@@ -2207,8 +1886,6 @@ const PlanComptable = () => {
                     c.libelle
                   )}
                 </td>
-
-                {/* COLONNE ACTIONS */}
                 <td className="py-2.5 px-4 text-center">
                   <div className="flex justify-center gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                     {editingId === c.id ? (
@@ -2232,7 +1909,6 @@ const PlanComptable = () => {
                     )}
                   </div>
                 </td>
-
               </tr>
             ))}
             {filteredComptes.length === 0 && (
@@ -2248,6 +1924,7 @@ const PlanComptable = () => {
     </div>
   );
 };
+
 // ==========================================
 // APPLICATION PRINCIPALE
 // ==========================================
@@ -2256,7 +1933,6 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('tableau_bord');
   const [transactionsGlobales, setTransactionsGlobales] = useState([]);
 
-  // Fetch transactions from Firebase
   useEffect(() => {
     const fetchTx = () => {
       const q = collection(db, 'artifacts', appId, 'public', 'data', 'transactions');
@@ -2279,8 +1955,7 @@ export default function App() {
       case 'etat_financier': return <EtatFinancier transactionsGlobales={transactionsGlobales} />;
       case 'grand_livre': return <GrandLivre transactionsGlobales={transactionsGlobales} />;
       case 'plan_comptable': return <PlanComptable />;
-      
-      // Placeholders pour les autres pages
+
       case 'tableau_bord': return <PlaceholderPage title="Tableau de Bord" />;
       case 'scolarite': return <PlaceholderPage title="Scolarité" />;
       case 'factures_parents': return <PlaceholderPage title="Mes Factures (Parents)" />;
@@ -2301,7 +1976,7 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-800">
-      
+
       {/* MENU LATÉRAL */}
       <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col shadow-xl z-20">
         <div className="p-6 flex flex-col items-center border-b border-slate-800">
@@ -2313,7 +1988,7 @@ export default function App() {
         </div>
 
         <nav className="flex-1 overflow-y-auto py-4 px-3 custom-scrollbar">
-          
+
           {/* ESPACE FAMILLE */}
           <div className="mb-6">
             <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Espace Famille</h3>
