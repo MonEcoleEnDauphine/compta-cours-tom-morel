@@ -283,9 +283,10 @@ const EtatFinancier = ({ transactionsGlobales }) => {
   };
 
   const getCompteLibelle = (code) => {
-    const c = comptesList.find(x => x.code === code);
+    const codeStr = String(code).trim();
+    const c = comptesList.find(x => String(x.code).trim() === codeStr);
     if (c) return c.libelle;
-    if (code === '512000') return 'Banque';
+    if (codeStr === '512000') return 'Banque';
     return '';
   };
 
@@ -314,47 +315,100 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     return new Date(str).getTime() || 0;
   };
 
-  const transactionsFiltrees = useMemo(() => {
+  const { anterieures, exercice } = useMemo(() => {
     if (anneeDebut === 'TOTAL') {
-      return safeTransactions;
+      return { anterieures: [], exercice: safeTransactions };
     }
 
     const start = new Date(Number(anneeDebut), 8, 1, 0, 0, 0).getTime(); 
     const end = new Date(Number(anneeDebut) + 1, 7, 31, 23, 59, 59).getTime(); 
 
-    return safeTransactions.filter(t => {
-      if (!t.date) return false;
+    const ant = [];
+    const exo = [];
+
+    safeTransactions.forEach(t => {
+      if (!t || !t.date) return;
       const tTime = parseDateForFilter(t.date);
-      return tTime >= start && tTime <= end;
+      if (tTime < start) ant.push(t);
+      else if (tTime >= start && tTime <= end) exo.push(t);
     });
+
+    return { anterieures: ant, exercice: exo };
   }, [safeTransactions, anneeDebut]);
 
-  const balances = {};
-  transactionsFiltrees.forEach(t => {
-    if (!t.compte && !t.compteDebit && !t.compteCredit) return;
+  const balancesBilan = {};
+  const balancesResultat = {};
+  const balancesResultatAnt = {};
 
-    const addAmount = (compte, deb, cred) => {
-      if (!compte) return;
-      if (!balances[compte]) balances[compte] = { debit: 0, credit: 0 };
-      balances[compte].debit += (Number(deb) || 0);
-      balances[compte].credit += (Number(cred) || 0);
-    };
+  const addAmount = (balancesObj, compte, deb, cred) => {
+    if (!compte) return;
+    const compteStr = String(compte).trim();
+    if (!compteStr) return;
+    
+    if (!balancesObj[compteStr]) balancesObj[compteStr] = { debit: 0, credit: 0 };
+    balancesObj[compteStr].debit += (Number(deb) || 0);
+    balancesObj[compteStr].credit += (Number(cred) || 0);
+  };
 
-    if (t.type === 'od') {
-      addAmount(t.compteDebit, t.montant, 0);
-      addAmount(t.compteCredit, 0, t.montant);
-    } else {
-      if (Number(t.montant) < 0) {
-        const absMontant = Math.abs(Number(t.montant));
-        addAmount(t.compte, absMontant, 0); 
-        addAmount('512000', 0, absMontant); 
-      } else {
-        const absMontant = Number(t.montant);
-        addAmount(t.compte, 0, absMontant); 
-        addAmount('512000', absMontant, 0); 
+  const processTx = (t, isAnterieur) => {
+    if (!t) return;
+    const isOD = t.type === 'od';
+    const resObj = isAnterieur ? balancesResultatAnt : balancesResultat;
+    const m = Number(t.montant) || 0;
+    const absM = Math.abs(m);
+
+    if (isOD) {
+      const dCode = t.compteDebit ? String(t.compteDebit).trim() : '';
+      const cCode = t.compteCredit ? String(t.compteCredit).trim() : '';
+
+      if (dCode) {
+        if (dCode.startsWith('6') || dCode.startsWith('7')) {
+          addAmount(resObj, dCode, absM, 0);
+        } else {
+          addAmount(balancesBilan, dCode, absM, 0);
+        }
       }
+      if (cCode) {
+        if (cCode.startsWith('6') || cCode.startsWith('7')) {
+          addAmount(resObj, cCode, 0, absM);
+        } else {
+          addAmount(balancesBilan, cCode, 0, absM);
+        }
+      }
+    } else {
+      const compteStr = t.compte ? String(t.compte).trim() : '';
+      const isCharge = compteStr.startsWith('6');
+      const isProduit = compteStr.startsWith('7');
+
+      if (isCharge || isProduit) {
+        if (m < 0) addAmount(resObj, compteStr, absM, 0);
+        else addAmount(resObj, compteStr, 0, absM);
+      } else if (compteStr) {
+        if (m < 0) addAmount(balancesBilan, compteStr, absM, 0);
+        else addAmount(balancesBilan, compteStr, 0, absM);
+      }
+
+      // Génération de la contrepartie en Banque 512 automatique
+      if (m < 0) addAmount(balancesBilan, '512000', 0, absM); 
+      else addAmount(balancesBilan, '512000', absM, 0); 
     }
+  };
+
+  anterieures.forEach(t => processTx(t, true));
+  exercice.forEach(t => processTx(t, false));
+
+  // Calcul du Résultat N-1 et injection
+  let resultatAnterieur = 0;
+  Object.keys(balancesResultatAnt).forEach(code => {
+    const b = balancesResultatAnt[code];
+    if (code.startsWith('7')) resultatAnterieur += (b.credit - b.debit);
+    if (code.startsWith('6')) resultatAnterieur -= (b.debit - b.credit);
   });
+
+  if (Math.abs(resultatAnterieur) > 0.01) {
+    if (resultatAnterieur > 0) addAmount(balancesBilan, '120000', 0, Math.abs(resultatAnterieur)); 
+    else addAmount(balancesBilan, '120000', Math.abs(resultatAnterieur), 0); 
+  }
 
   const actif = {};
   const passif = {};
@@ -366,50 +420,68 @@ const EtatFinancier = ({ transactionsGlobales }) => {
   let totalCharges = 0;
   let totalProduits = 0;
 
-  Object.keys(balances).forEach(code => {
-    if (!code || code.length < 2) return;
-
-    const b = balances[code];
-    const net = b.debit - b.credit;
-    if (Math.abs(net) < 0.01) return;
-
+  const addToGroup = (category, code, val) => {
     const prefix2 = code.substring(0, 2);
     const groupName = `${prefix2} - ${PREFIXES[prefix2] || 'Autres comptes'}`;
-    const item = { code, libelle: getCompteLibelle(code), net: Math.abs(net) };
+    if (!category[groupName]) category[groupName] = { total: 0, items: [] };
+    category[groupName].items.push({ code, libelle: getCompteLibelle(code), net: val });
+    category[groupName].total += val;
+  };
 
-    const addToGroup = (category, group, data) => {
-      if (!category[group]) category[group] = { total: 0, items: [] };
-      category[group].items.push(data);
-      category[group].total += data.net;
-    };
+  // Traitement strict des soldes comptables (PLUS de Math.abs global !)
+  Object.keys(balancesBilan).forEach(code => {
+    if (!code || code.length < 2) return;
+    const b = balancesBilan[code];
+    
+    // Solde mathématique
+    const soldeDebit = b.debit - b.credit;
+    const soldeCredit = b.credit - b.debit;
+    
+    if (Math.abs(soldeDebit) < 0.01) return;
 
     const root = code[0];
-    if (root === '6') {
-      addToGroup(charges, groupName, item);
-      totalCharges += item.net;
-    } else if (root === '7') {
-      addToGroup(produits, groupName, item);
-      totalProduits += item.net;
-    } else if (['1'].includes(root)) {
-      addToGroup(passif, groupName, item);
-      totalPassif += item.net;
+    if (['1'].includes(root)) {
+      // Les comptes de Passif fonctionnent en solde Créditeur. 
+      // S'ils sont débiteurs (comme le 120000 via l'OD), la valeur soldeCredit sera NÉGATIVE et se soustraira !
+      addToGroup(passif, code, soldeCredit); 
+      totalPassif += soldeCredit;
     } else if (['2', '3'].includes(root)) {
-      addToGroup(actif, groupName, item);
-      totalActif += item.net;
+      // Les comptes d'Actif fonctionnent en solde Débiteur.
+      addToGroup(actif, code, soldeDebit);
+      totalActif += soldeDebit;
     } else if (['4', '5'].includes(root)) {
-      if (net > 0) {
-        addToGroup(actif, groupName, item);
-        totalActif += item.net;
+      // Comptes de tiers et trésorerie basculent à l'actif ou passif selon leur signe
+      if (soldeDebit > 0) {
+        addToGroup(actif, code, soldeDebit);
+        totalActif += soldeDebit;
       } else {
-        addToGroup(passif, groupName, item);
-        totalPassif += item.net;
+        addToGroup(passif, code, soldeCredit);
+        totalPassif += soldeCredit;
       }
     }
   });
 
+  Object.keys(balancesResultat).forEach(code => {
+    if (!code || code.length < 2) return;
+    const b = balancesResultat[code];
+    const soldeDebit = b.debit - b.credit;
+    const soldeCredit = b.credit - b.debit;
+    
+    if (Math.abs(soldeDebit) < 0.01) return;
+
+    const root = code[0];
+    if (root === '6') {
+      addToGroup(charges, code, soldeDebit);
+      totalCharges += soldeDebit;
+    } else if (root === '7') {
+      addToGroup(produits, code, soldeCredit);
+      totalProduits += soldeCredit;
+    }
+  });
+
   const sortGroupItems = (groupObj) => {
-    Object.values(groupObj).forEach(grp => {
-      grp.items.sort((a, b) => a.code.localeCompare(b.code));
+    Object.keys(groupObj).forEach(key => {
+      groupObj[key].items.sort((a, b) => a.code.localeCompare(b.code));
     });
   };
   sortGroupItems(actif);
@@ -426,6 +498,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
 
   const renderGroup = (category, groupKey) => {
     const grp = category[groupKey];
+    if (!grp) return null;
     const isExpanded = detailsOuverts[groupKey];
     return (
       <div key={groupKey} className="border-b border-slate-100 last:border-0">
@@ -449,7 +522,10 @@ const EtatFinancier = ({ transactionsGlobales }) => {
                     {item.libelle || <span className="italic text-slate-400">Sans libellé</span>}
                   </span>
                 </div>
-                <span className="text-xs font-medium text-slate-600 shrink-0">{formatMontant(item.net)} €</span>
+                {/* S'affichera avec un signe moins si item.net est négatif */}
+                <span className={`text-xs font-medium shrink-0 ${item.net < 0 ? 'text-rose-600' : 'text-slate-600'}`}>
+                  {formatMontant(item.net)} €
+                </span>
               </div>
             ))}
           </div>
@@ -488,7 +564,6 @@ const EtatFinancier = ({ transactionsGlobales }) => {
         </div>
       </div>
 
-      {/* COMPTE DE RÉSULTAT CACHÉ SI "BILAN TOTAL" EST SÉLECTIONNÉ */}
       {anneeDebut !== 'TOTAL' && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="bg-slate-900 p-4">
