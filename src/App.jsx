@@ -283,9 +283,10 @@ const EtatFinancier = ({ transactionsGlobales }) => {
   };
 
   const getCompteLibelle = (code) => {
-    const c = comptesList.find(x => x.code === code);
+    const codeStr = String(code);
+    const c = comptesList.find(x => String(x.code) === codeStr);
     if (c) return c.libelle;
-    if (code === '512000') return 'Banque';
+    if (codeStr === '512000') return 'Banque';
     return '';
   };
 
@@ -341,42 +342,49 @@ const EtatFinancier = ({ transactionsGlobales }) => {
 
   const addAmount = (balancesObj, compte, deb, cred) => {
     if (!compte) return;
-    if (!balancesObj[compte]) balancesObj[compte] = { debit: 0, credit: 0 };
-    balancesObj[compte].debit += (Number(deb) || 0);
-    balancesObj[compte].credit += (Number(cred) || 0);
+    const compteStr = String(compte);
+    const d = Number(deb) || 0;
+    const c = Number(cred) || 0;
+    if (!balancesObj[compteStr]) balancesObj[compteStr] = { debit: 0, credit: 0 };
+    balancesObj[compteStr].debit += d;
+    balancesObj[compteStr].credit += c;
   };
 
   const processTx = (t, isAnterieur) => {
     const isOD = t.type === 'od';
     const resObj = isAnterieur ? balancesResultatAnt : balancesResultat;
+    const m = Number(t.montant) || 0;
+    const absM = Math.abs(m);
 
     if (isOD) {
-      if (t.compteDebit) {
-        if (t.compteDebit.startsWith('6') || t.compteDebit.startsWith('7')) {
-          addAmount(resObj, t.compteDebit, t.montant, 0);
+      const dCode = t.compteDebit ? String(t.compteDebit) : '';
+      const cCode = t.compteCredit ? String(t.compteCredit) : '';
+
+      if (dCode) {
+        if (dCode.startsWith('6') || dCode.startsWith('7')) {
+          addAmount(resObj, dCode, m, 0);
         } else {
-          addAmount(balancesBilan, t.compteDebit, t.montant, 0);
+          addAmount(balancesBilan, dCode, m, 0);
         }
       }
-      if (t.compteCredit) {
-        if (t.compteCredit.startsWith('6') || t.compteCredit.startsWith('7')) {
-          addAmount(resObj, t.compteCredit, 0, t.montant);
+      if (cCode) {
+        if (cCode.startsWith('6') || cCode.startsWith('7')) {
+          addAmount(resObj, cCode, 0, m);
         } else {
-          addAmount(balancesBilan, t.compteCredit, 0, t.montant);
+          addAmount(balancesBilan, cCode, 0, m);
         }
       }
     } else {
-      const isCharge = t.compte && String(t.compte).startsWith('6');
-      const isProduit = t.compte && String(t.compte).startsWith('7');
-      const m = Number(t.montant);
-      const absM = Math.abs(m);
+      const compteStr = t.compte ? String(t.compte) : '';
+      const isCharge = compteStr.startsWith('6');
+      const isProduit = compteStr.startsWith('7');
 
       if (isCharge || isProduit) {
-        if (m < 0) addAmount(resObj, t.compte, absM, 0);
-        else addAmount(resObj, t.compte, 0, absM);
-      } else if (t.compte) {
-        if (m < 0) addAmount(balancesBilan, t.compte, absM, 0);
-        else addAmount(balancesBilan, t.compte, 0, absM);
+        if (m < 0) addAmount(resObj, compteStr, absM, 0);
+        else addAmount(resObj, compteStr, 0, absM);
+      } else if (compteStr) {
+        if (m < 0) addAmount(balancesBilan, compteStr, absM, 0);
+        else addAmount(balancesBilan, compteStr, 0, absM);
       }
 
       // Génération automatique de la contrepartie en Banque
