@@ -12,7 +12,6 @@ import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, on
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, addDoc, getDoc, updateDoc } from "firebase/firestore";
 import * as XLSX from 'xlsx';
 
-// Configuration Firebase Officielle
 const firebaseConfig = {
   apiKey: "AIzaSyDhKe4Nl3mUHagW1LkG5GT-tI1bB2-wtnE",
   authDomain: "cours-tom-morel.firebaseapp.com",
@@ -43,7 +42,6 @@ const InfosContact = () => (
       <h1 className="text-3xl font-bold mb-2">Bienvenue sur le portail du Cours Tom Morel</h1>
       <p className="text-blue-100">Retrouvez ici toutes les informations de scolarité et les plannings.</p>
     </div>
-
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center">
         <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center mb-4">
@@ -56,7 +54,6 @@ const InfosContact = () => (
           <Globe size={18} /> Visiter le site
         </a>
       </div>
-
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center">
         <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center mb-4">
           <Mail size={24} />
@@ -71,7 +68,6 @@ const InfosContact = () => (
           <Mail size={18} /> Écrire
         </a>
       </div>
-
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center">
         <div className="w-12 h-12 rounded-full bg-purple-50 text-purple-500 flex items-center justify-center mb-4">
           <Building size={24} />
@@ -124,7 +120,6 @@ const normaliserDateFR = (rawVal) => {
   return str;
 };
 
-// NOUVEAU : Formateur de monnaie FR (ex: 1 000,00)
 const formatMontant = (montant) => {
   return new Intl.NumberFormat('fr-FR', { 
     minimumFractionDigits: 2, 
@@ -315,7 +310,6 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     return new Date(str).getTime() || 0;
   };
 
-  // 1. SÉPARATION DES ÉCRITURES (Antérieures vs Année en cours)
   const { anterieures, exercice } = useMemo(() => {
     if (anneeDebut === 'TOTAL') {
       return { anterieures: [], exercice: safeTransactions };
@@ -348,7 +342,6 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     balancesObj[compte].credit += (Number(cred) || 0);
   };
 
-  // Moteur de traitement d'une écriture
   const processTx = (t, isAnterieur) => {
     const isOD = t.type === 'od';
     const resObj = isAnterieur ? balancesResultatAnt : balancesResultat;
@@ -388,11 +381,10 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     }
   };
 
-  // 2. EXÉCUTION DU MOTEUR COMPTABLE
   anterieures.forEach(t => processTx(t, true));
   exercice.forEach(t => processTx(t, false));
 
-  // 3. INJECTION AUTOMATIQUE DU RÉSULTAT N-1
+  // Injection Résultat N-1
   let resultatAnterieur = 0;
   Object.keys(balancesResultatAnt).forEach(code => {
     const b = balancesResultatAnt[code];
@@ -401,11 +393,10 @@ const EtatFinancier = ({ transactionsGlobales }) => {
   });
 
   if (resultatAnterieur !== 0) {
-    if (resultatAnterieur > 0) addAmount(balancesBilan, '120000', 0, resultatAnterieur); // Bénéfice au Crédit
-    else addAmount(balancesBilan, '120000', Math.abs(resultatAnterieur), 0); // Déficit au Débit
+    if (resultatAnterieur > 0) addAmount(balancesBilan, '120000', 0, resultatAnterieur); 
+    else addAmount(balancesBilan, '120000', Math.abs(resultatAnterieur), 0); 
   }
 
-  // 4. PRÉPARATION DE L'AFFICHAGE
   const actif = {};
   const passif = {};
   const charges = {};
@@ -424,19 +415,17 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     category[groupName].total += val;
   };
 
-  // Dispatch du Bilan (avec respect strict des soldes Débiteurs/Créditeurs)
   Object.keys(balancesBilan).forEach(code => {
     if (!code || code.length < 2) return;
     const b = balancesBilan[code];
     const netDebit = b.debit - b.credit;
     const netCredit = b.credit - b.debit;
     
-    // On ignore les comptes soldés
     if (Math.abs(netDebit) < 0.01) return;
 
     const root = code[0];
     if (['1'].includes(root)) {
-      addToGroup(passif, code, netCredit); // Un déficit donnera un netCredit négatif
+      addToGroup(passif, code, netCredit); 
       totalPassif += netCredit;
     } else if (['2', '3'].includes(root)) {
       addToGroup(actif, code, netDebit);
@@ -452,7 +441,6 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     }
   });
 
-  // Dispatch du Résultat de l'année sélectionnée
   Object.keys(balancesResultat).forEach(code => {
     if (!code || code.length < 2) return;
     const b = balancesResultat[code];
@@ -551,7 +539,6 @@ const EtatFinancier = ({ transactionsGlobales }) => {
         </div>
       </div>
 
-      {/* COMPTE DE RÉSULTAT CACHÉ SI "BILAN TOTAL" EST SÉLECTIONNÉ */}
       {anneeDebut !== 'TOTAL' && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="bg-slate-900 p-4">
@@ -610,7 +597,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
             </p>
             <div className="bg-white/60 border border-rose-100 p-3 rounded-xl mt-3 flex items-start gap-2">
               <span className="text-rose-600 font-bold">💡 Solution :</span>
-              <span className="text-xs text-rose-900 font-medium">Pour rééquilibrer, intégrez vos écritures de trésorerie via le <strong>Journal de Banque</strong> ou vérifiez les montants de vos Opérations Diverses.</span>
+              <span className="text-xs text-rose-900 font-medium">Pour rééquilibrer, intégrez vos écritures de trésorerie via le <strong>Journal de Banque</strong> ou équilibrez correctement vos Opérations Diverses.</span>
             </div>
           </div>
         </div>
@@ -1545,27 +1532,27 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
                 <div className="space-y-3 mt-2">
                   {odLines.map((l) => (
-                    <div key={l.id} className="flex flex-col gap-2 bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-                      <div className="w-full relative">
+                    <div key={l.id} className="flex flex-wrap md:flex-nowrap gap-2 items-center bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
+                      <div className="w-full md:flex-1 relative">
                         <SearchableCompteSelect 
                           value={l.compte || ''}
                           comptesList={comptesList}
                           placeholder="Sélectionnez ou tapez (ex: 606100)"
                           onChange={(val) => updateOdLine(l.id, 'compte', val)}
                         />
-                        <input type="text" className="hidden" value={l.compte} onBlur={e => handleCompteOdBlur(l.id, e.target.value)} />
+                        <div className="absolute top-1/2 -translate-y-1/2 right-8 pointer-events-none opacity-0">
+                          <input type="text" className="hidden" value={l.compte} onBlur={e => handleCompteOdBlur(l.id, e.target.value)} />
+                        </div>
                       </div>
 
-                      <div className="flex gap-2">
-                        <input type="number" placeholder="Débit €" value={l.debit} onChange={e => updateOdLine(l.id, 'debit', e.target.value)} className="border border-slate-200 rounded-xl p-2 text-sm bg-slate-50 w-full outline-none focus:ring-2 focus:ring-purple-600 font-bold text-right" />
-                        <input type="number" placeholder="Crédit €" value={l.credit} onChange={e => updateOdLine(l.id, 'credit', e.target.value)} className="border border-slate-200 rounded-xl p-2 text-sm bg-slate-50 w-full outline-none focus:ring-2 focus:ring-purple-600 font-bold text-right" />
-                        <button onClick={() => removeOdLine(l.id)} className="text-slate-400 hover:text-rose-500 transition-colors p-2 bg-slate-100 rounded-xl shrink-0">
-                          <XCircle size={18} />
-                        </button>
+                      <div className="flex gap-2 w-full md:w-auto">
+                        <input type="number" placeholder="Débit €" value={l.debit} onChange={e => updateOdLine(l.id, 'debit', e.target.value)} className="border border-slate-200 rounded-xl p-2 text-sm bg-slate-50 w-full md:w-32 outline-none focus:ring-2 focus:ring-purple-600 font-bold text-right" />
+                        <input type="number" placeholder="Crédit €" value={l.credit} onChange={e => updateOdLine(l.id, 'credit', e.target.value)} className="border border-slate-200 rounded-xl p-2 text-sm bg-slate-50 w-full md:w-32 outline-none focus:ring-2 focus:ring-purple-600 font-bold text-right" />
+                        <button onClick={() => removeOdLine(l.id)} className="text-slate-400 hover:text-rose-500 transition-colors p-2 bg-slate-100 rounded-xl shrink-0"><XCircle size={18} /></button>
                       </div>
                     </div>
                   ))}
-                  <button onClick={addOdLine} className="text-sm text-purple-600 font-bold hover:underline flex items-center gap-1 p-1">
+                  <button onClick={addOdLine} className="text-sm text-purple-600 font-bold hover:underline flex items-center gap-1 p-1 ml-1">
                     + Ajouter une ligne de ventilation
                   </button>
                 </div>
@@ -2031,10 +2018,6 @@ const PlanComptable = () => {
   );
 };
 
-// ==========================================
-// APPLICATION PRINCIPALE
-// ==========================================
-
 export default function App() {
   const [activeTab, setActiveTab] = useState('tableau_bord');
   const [transactionsGlobales, setTransactionsGlobales] = useState([]);
@@ -2083,7 +2066,6 @@ export default function App() {
   return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-800">
 
-      {/* MENU LATÉRAL */}
       <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col shadow-xl z-20">
         <div className="p-6 flex flex-col items-center border-b border-slate-800">
           <div className="bg-white p-2 rounded-xl mb-3 shadow-lg">
@@ -2095,7 +2077,6 @@ export default function App() {
 
         <nav className="flex-1 overflow-y-auto py-4 px-3 custom-scrollbar">
 
-          {/* ESPACE FAMILLE */}
           <div className="mb-6">
             <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Espace Famille</h3>
             <button onClick={() => setActiveTab('contact')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'contact' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
@@ -2109,7 +2090,6 @@ export default function App() {
             </button>
           </div>
 
-          {/* PLANNINGS PARENTS */}
           <div className="mb-6">
             <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Plannings Parents</h3>
             <button onClick={() => setActiveTab('menage_weekend')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'menage_weekend' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
@@ -2120,7 +2100,6 @@ export default function App() {
             </button>
           </div>
 
-          {/* PILOTAGE */}
           <div className="mb-6">
             <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Pilotage</h3>
             <button onClick={() => setActiveTab('tableau_bord')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'tableau_bord' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
@@ -2131,7 +2110,6 @@ export default function App() {
             </button>
           </div>
 
-          {/* COMPTABILITÉ & FINANCES */}
           <div className="mb-6">
             <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Compta & Finances</h3>
             <button onClick={() => setActiveTab('grand_livre')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'grand_livre' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
@@ -2151,7 +2129,6 @@ export default function App() {
             </button>
           </div>
 
-          {/* ÉVÈNEMENTS */}
           <div className="mb-6">
             <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Évènements</h3>
             <button onClick={() => setActiveTab('evenements_ecole')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'evenements_ecole' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
@@ -2162,7 +2139,6 @@ export default function App() {
             </button>
           </div>
 
-          {/* ADMINISTRATION */}
           <div className="mb-6">
             <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Administration</h3>
             <button onClick={() => setActiveTab('gestion_acces')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'gestion_acces' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
@@ -2182,9 +2158,7 @@ export default function App() {
         </nav>
       </aside>
 
-      {/* CONTENU PRINCIPAL */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
-        {/* TOPBAR */}
         <header className="bg-white h-16 border-b border-slate-200 flex items-center justify-between px-8 shrink-0 z-10">
           <div className="flex items-center gap-4 text-slate-500">
             <h2 className="font-semibold text-slate-800">
@@ -2202,7 +2176,6 @@ export default function App() {
           </div>
         </header>
 
-        {/* ZONE D'AFFICHAGE DES MODULES */}
         <div className="flex-1 overflow-y-auto p-8 bg-slate-50/50">
           {renderContent()}
         </div>
