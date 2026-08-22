@@ -124,6 +124,14 @@ const normaliserDateFR = (rawVal) => {
   return str;
 };
 
+// NOUVEAU : Formateur de monnaie FR (ex: 1 000,00)
+const formatMontant = (montant) => {
+  return new Intl.NumberFormat('fr-FR', { 
+    minimumFractionDigits: 2, 
+    maximumFractionDigits: 2 
+  }).format(montant || 0);
+};
+
 const SearchableCompteSelect = ({ value, onChange, comptesList, placeholder = "Sélectionner un compte..." }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -278,7 +286,6 @@ const EtatFinancier = ({ transactionsGlobales }) => {
   const getCompteLibelle = (code) => {
     const c = comptesList.find(x => x.code === code);
     if (c) return c.libelle;
-    // Fallback automatique si le compte 512000 n'est pas encore créé textuellement dans le Plan Comptable
     if (code === '512000') return 'Banque';
     return '';
   };
@@ -298,9 +305,9 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     } else if (str.includes('-')) {
       const parts = str.split('-');
       if (parts.length === 3) {
-        if (parts[0].length === 4) {
+        if (parts[0].length === 4) { 
           return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)).getTime();
-        } else {
+        } else { 
           return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10)).getTime();
         }
       }
@@ -309,8 +316,8 @@ const EtatFinancier = ({ transactionsGlobales }) => {
   };
 
   const transactionsFiltrees = useMemo(() => {
-    const start = new Date(anneeDebut, 8, 1, 0, 0, 0).getTime();
-    const end = new Date(anneeDebut + 1, 7, 31, 23, 59, 59).getTime();
+    const start = new Date(anneeDebut, 8, 1, 0, 0, 0).getTime(); 
+    const end = new Date(anneeDebut + 1, 7, 31, 23, 59, 59).getTime(); 
 
     return safeTransactions.filter(t => {
       if (!t.date) return false;
@@ -334,15 +341,14 @@ const EtatFinancier = ({ transactionsGlobales }) => {
       addAmount(t.compteDebit, t.montant, 0);
       addAmount(t.compteCredit, 0, t.montant);
     } else {
-      // CORRECTION : Écriture de la double-partie automatique pour la banque
       if (Number(t.montant) < 0) {
         const absMontant = Math.abs(Number(t.montant));
-        addAmount(t.compte, absMontant, 0); // Débit du compte de charge
-        addAmount('512000', 0, absMontant); // Crédit automatique de la banque
+        addAmount(t.compte, absMontant, 0); 
+        addAmount('512000', 0, absMontant); 
       } else {
         const absMontant = Number(t.montant);
-        addAmount(t.compte, 0, absMontant); // Crédit du compte de produit
-        addAmount('512000', absMontant, 0); // Débit automatique de la banque
+        addAmount(t.compte, 0, absMontant); 
+        addAmount('512000', absMontant, 0); 
       }
     }
   });
@@ -428,7 +434,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
             {isExpanded ? <ChevronDown size={14} className="text-slate-400 shrink-0" /> : <ChevronRight size={14} className="text-slate-400 shrink-0" />}
             <span className="text-sm font-semibold text-slate-700">{groupKey}</span>
           </div>
-          <span className="text-sm font-bold text-slate-800 whitespace-nowrap ml-2">{grp.total.toFixed(2)} €</span>
+          <span className="text-sm font-bold text-slate-800 whitespace-nowrap ml-2">{formatMontant(grp.total)} €</span>
         </div>
         {isExpanded && (
           <div className="bg-slate-50 pb-2">
@@ -440,7 +446,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
                     {item.libelle || <span className="italic text-slate-400">Sans libellé</span>}
                   </span>
                 </div>
-                <span className="text-xs font-medium text-slate-600 shrink-0">{item.net.toFixed(2)} €</span>
+                <span className="text-xs font-medium text-slate-600 shrink-0">{formatMontant(item.net)} €</span>
               </div>
             ))}
           </div>
@@ -458,7 +464,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
           </h2>
           <p className="text-slate-500 text-sm mt-1">Bilan et Compte de Résultat groupés par familles comptables.</p>
         </div>
-        
+
         <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
           <Calendar size={18} className="text-slate-500" />
           <select 
@@ -482,7 +488,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
           </h3>
           <p className="text-slate-400 text-xs mt-1">Compare les produits et les charges pour déterminer le bénéfice ou la perte.</p>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200">
           <div>
             <div className="bg-red-50 text-red-700 font-bold p-3 text-center text-sm border-b border-red-100 uppercase tracking-wider">
@@ -513,7 +519,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
         <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-between items-center">
           <span className="font-bold text-slate-700 uppercase">Résultat de l'exercice</span>
           <span className={`text-xl font-black ${resultat >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-            {resultat > 0 ? '+' : ''}{resultat.toFixed(2)} €
+            {resultat > 0 ? '+' : ''}{formatMontant(Math.abs(resultat))} €
           </span>
         </div>
       </div>
@@ -527,7 +533,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
             <h4 className="font-black text-rose-900 text-lg uppercase tracking-tight">Déséquilibre du Bilan Détecté</h4>
             <p className="text-sm text-rose-800 mt-1 leading-relaxed">
               En comptabilité, l'Actif doit toujours être égal au Passif (incluant le Résultat). 
-              Écart actuel : <strong className="bg-rose-200 px-1.5 py-0.5 rounded">{ecartBilan.toFixed(2)} €</strong>.
+              Écart actuel : <strong className="bg-rose-200 px-1.5 py-0.5 rounded">{formatMontant(ecartBilan)} €</strong>.
             </p>
             <div className="bg-white/60 border border-rose-100 p-3 rounded-xl mt-3 flex items-start gap-2">
               <span className="text-rose-600 font-bold">💡 Solution :</span>
@@ -544,7 +550,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
           </h3>
           <p className="text-slate-400 text-xs mt-1">Photographie du patrimoine : L'Actif (ce qu'on possède) et le Passif (ce qu'on doit).</p>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200">
           <div>
             <div className="bg-blue-50 text-blue-700 font-bold p-3 text-center text-sm border-b border-blue-100 uppercase tracking-wider">
@@ -572,7 +578,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
                 <div className="flex justify-between items-center px-4 py-2 bg-slate-50 rounded-lg">
                   <span className="text-sm font-bold text-slate-700">12 - Résultat de l'exercice</span>
                   <span className={`text-sm font-black ${resultat >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                    {resultat > 0 ? '+' : ''}{resultat.toFixed(2)} €
+                    {resultat > 0 ? '+' : ''}{formatMontant(Math.abs(resultat))} €
                   </span>
                 </div>
               </div>
@@ -583,8 +589,8 @@ const EtatFinancier = ({ transactionsGlobales }) => {
         <div className={`p-4 border-t flex justify-between items-center text-sm ${isBilanDesequilibre ? 'bg-rose-100 border-rose-300' : 'bg-slate-50 border-slate-200'}`}>
           <span className={`font-black uppercase ${isBilanDesequilibre ? 'text-rose-700' : 'text-slate-500'}`}>TOTAL GÉNÉRAL</span>
           <div className="flex gap-8">
-            <span className="font-bold text-blue-700">Actif : {totalActif.toFixed(2)} €</span>
-            <span className="font-bold text-orange-700">Passif + Résultat : {totalPassifPlusResultat.toFixed(2)} €</span>
+            <span className="font-bold text-blue-700">Actif : {formatMontant(totalActif)} €</span>
+            <span className="font-bold text-orange-700">Passif + Résultat : {formatMontant(totalPassifPlusResultat)} €</span>
           </div>
         </div>
       </div>
@@ -1342,11 +1348,11 @@ const GrandLivre = ({ transactionsGlobales }) => {
           </div>
           <div className="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/10 flex flex-col">
             <span className="text-[10px] uppercase font-bold text-rose-300 tracking-wider">Total Débit</span>
-            <span className="text-lg font-black text-rose-300">{totalGeneralDebit.toFixed(2)} €</span>
+            <span className="text-lg font-black text-rose-300">{formatMontant(totalGeneralDebit)} €</span>
           </div>
           <div className="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/10 flex flex-col">
             <span className="text-[10px] uppercase font-bold text-emerald-300 tracking-wider">Total Crédit</span>
-            <span className="text-lg font-black text-emerald-300">{totalGeneralCredit.toFixed(2)} €</span>
+            <span className="text-lg font-black text-emerald-300">{formatMontant(totalGeneralCredit)} €</span>
           </div>
         </div>
       </div>
@@ -1403,7 +1409,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
               </div>
               <div>
                 <h3 className={`font-extrabold text-base ${activeTab === 'paie' ? 'text-pink-950' : 'text-slate-800'}`}>Fiches de Paie</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Importation des salaires</p>
+                <p className="text-xs text-slate-500 mt-0.5">Intégration du journal des salaires</p>
               </div>
             </div>
             <ChevronDown size={20} className={`text-slate-400 transition-transform duration-300 ${activeTab === 'paie' ? 'rotate-180 text-pink-600' : ''}`} />
@@ -1411,9 +1417,9 @@ const GrandLivre = ({ transactionsGlobales }) => {
           {activeTab === 'paie' && (
             <div className="p-5 pt-0 animate-fade-in flex-1 flex flex-col justify-end">
               <div className="bg-pink-50/50 rounded-2xl p-4 border border-pink-100 flex flex-col gap-4 text-center mt-4">
-                <p className="text-xs text-pink-900 leading-relaxed">Formats acceptés : <strong>.TXT</strong> ou <strong>.TSV</strong>.</p>
+                <p className="text-xs text-pink-900 leading-relaxed">Formats acceptés : <strong>.TXT</strong> ou <strong>.TSV</strong>.<br/>Import de votre logiciel de paie externe.</p>
                 <button onClick={() => fileInputPaieRef.current.click()} className="w-full bg-pink-600 hover:bg-pink-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-md shadow-pink-200 active:scale-95">
-                  <Users size={16} /> Parcourir le fichier
+                  <Users size={16} /> Sélectionner le fichier
                 </button>
               </div>
             </div>
@@ -1453,30 +1459,37 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
                 <div className="space-y-3 mt-2">
                   {odLines.map((l) => (
-                    <div key={l.id} className="flex flex-wrap md:flex-nowrap gap-2 items-center bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
-                      <div className="w-full md:flex-1 relative">
-                        <SearchableCompteSelect value={l.compte || ''} comptesList={comptesList} placeholder="Sélectionnez ou tapez (ex: 606100)" onChange={(val) => updateOdLine(l.id, 'compte', val)} />
-                        <div className="absolute top-1/2 -translate-y-1/2 right-8 pointer-events-none opacity-0">
-                          <input type="text" className="hidden" value={l.compte} onBlur={e => handleCompteOdBlur(l.id, e.target.value)} />
-                        </div>
+                    <div key={l.id} className="flex flex-col gap-2 bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                      <div className="w-full relative">
+                        <SearchableCompteSelect 
+                          value={l.compte || ''}
+                          comptesList={comptesList}
+                          placeholder="Sélectionnez ou tapez (ex: 606100)"
+                          onChange={(val) => updateOdLine(l.id, 'compte', val)}
+                        />
+                        <input type="text" className="hidden" value={l.compte} onBlur={e => handleCompteOdBlur(l.id, e.target.value)} />
                       </div>
 
-                      <div className="flex gap-2 w-full md:w-auto">
-                        <input type="number" placeholder="Débit €" value={l.debit} onChange={e => updateOdLine(l.id, 'debit', e.target.value)} className="border border-slate-200 rounded-xl p-2 text-sm bg-slate-50 w-full md:w-32 outline-none focus:ring-2 focus:ring-purple-600 font-bold text-right" />
-                        <input type="number" placeholder="Crédit €" value={l.credit} onChange={e => updateOdLine(l.id, 'credit', e.target.value)} className="border border-slate-200 rounded-xl p-2 text-sm bg-slate-50 w-full md:w-32 outline-none focus:ring-2 focus:ring-purple-600 font-bold text-right" />
-                        <button onClick={() => removeOdLine(l.id)} className="text-slate-400 hover:text-rose-500 transition-colors p-2 bg-slate-50 rounded-xl shrink-0"><XCircle size={18} /></button>
+                      <div className="flex gap-2">
+                        <input type="number" placeholder="Débit €" value={l.debit} onChange={e => updateOdLine(l.id, 'debit', e.target.value)} className="border border-slate-200 rounded-xl p-2 text-sm bg-slate-50 w-full outline-none focus:ring-2 focus:ring-purple-600 font-bold text-right" />
+                        <input type="number" placeholder="Crédit €" value={l.credit} onChange={e => updateOdLine(l.id, 'credit', e.target.value)} className="border border-slate-200 rounded-xl p-2 text-sm bg-slate-50 w-full outline-none focus:ring-2 focus:ring-purple-600 font-bold text-right" />
+                        <button onClick={() => removeOdLine(l.id)} className="text-slate-400 hover:text-rose-500 transition-colors p-2 bg-slate-100 rounded-xl shrink-0">
+                          <XCircle size={18} />
+                        </button>
                       </div>
                     </div>
                   ))}
-                  <button onClick={addOdLine} className="text-sm text-purple-600 font-bold hover:underline flex items-center gap-1 p-1 ml-1">+ Ajouter une ligne de ventilation</button>
+                  <button onClick={addOdLine} className="text-sm text-purple-600 font-bold hover:underline flex items-center gap-1 p-1">
+                    + Ajouter une ligne de ventilation
+                  </button>
                 </div>
 
                 <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-purple-200/50 mt-2">
                   <div className={`flex items-center gap-4 px-4 py-2.5 rounded-xl border w-full sm:w-auto justify-between sm:justify-start transition-colors ${isOdBalanced ? 'bg-emerald-50 text-emerald-900 border-emerald-200' : 'bg-slate-100 text-slate-700 border-slate-200'}`}>
                     <span className="uppercase text-xs font-bold tracking-wider">Équilibre</span>
                     <div className="flex gap-4 font-mono text-sm">
-                      <span className={isOdBalanced ? 'text-emerald-700 font-extrabold' : 'text-rose-600 font-bold'}>D: {totalDebitOD.toFixed(2)} €</span>
-                      <span className={isOdBalanced ? 'text-emerald-700 font-extrabold' : 'text-rose-600 font-bold'}>C: {totalCreditOD.toFixed(2)} €</span>
+                      <span className={isOdBalanced ? 'text-emerald-700 font-extrabold' : 'text-rose-600 font-bold'}>D: {formatMontant(totalDebitOD)} €</span>
+                      <span className={isOdBalanced ? 'text-emerald-700 font-extrabold' : 'text-rose-600 font-bold'}>C: {formatMontant(totalCreditOD)} €</span>
                     </div>
                   </div>
 
@@ -1522,7 +1535,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
                   <th className="py-3 px-4">Libellé</th>
                   <th className="py-3 px-4 text-right">Montant</th>
                   <th className="py-3 px-4">Commentaire</th>
-                  <th className="py-3 px-4 min-w-[280px]">Compte comptable</th>
+                  <th className="py-3 px-4 min-w-[280px]">Compte comptable (Recherchable)</th>
                   <th className="py-3 px-4 text-center">Action</th>
                 </tr>
               </thead>
@@ -1532,7 +1545,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
                     <td className="py-3 px-4 font-mono font-semibold text-slate-600 whitespace-nowrap">{normaliserDateFR(ligne.date)}</td>
                     <td className="py-3 px-4 font-medium text-slate-800 truncate max-w-xs">{ligne.libelle}</td>
                     <td className={`py-3 px-4 text-right font-extrabold font-mono whitespace-nowrap ${ligne.montant > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      {ligne.montant > 0 ? '+' : ''}{ligne.montant.toFixed(2)} €
+                      {ligne.montant > 0 ? '+' : ''}{formatMontant(Math.abs(ligne.montant))} €
                     </td>
                     <td className="py-3 px-4">
                       <input type="text" placeholder="Ajouter un commentaire..." value={ligne.commentaire || ''} onChange={(e) => { const val = e.target.value; setLignesEnAttente(prev => prev.map(l => l.id === ligne.id ? { ...l, commentaire: val } : l)); }} className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs w-full outline-none focus:border-indigo-500 bg-slate-50/50" />
@@ -1649,13 +1662,13 @@ const GrandLivre = ({ transactionsGlobales }) => {
                     </td>
                     {t.type === 'od' ? (
                       <>
-                        <td className="py-3.5 px-4 text-right font-mono font-bold text-purple-700 whitespace-nowrap">{t.compteDebit ? Number(t.montant).toFixed(2) + ' €' : '-'}</td>
-                        <td className="py-3.5 px-4 text-right font-mono font-bold text-purple-700 whitespace-nowrap">{t.compteCredit ? Number(t.montant).toFixed(2) + ' €' : '-'}</td>
+                        <td className="py-3.5 px-4 text-right font-mono font-bold text-purple-700 whitespace-nowrap">{t.compteDebit ? formatMontant(t.montant) + ' €' : '-'}</td>
+                        <td className="py-3.5 px-4 text-right font-mono font-bold text-purple-700 whitespace-nowrap">{t.compteCredit ? formatMontant(t.montant) + ' €' : '-'}</td>
                       </>
                     ) : (
                       <>
-                        <td className="py-3.5 px-4 text-right font-mono font-extrabold text-rose-600 whitespace-nowrap">{t.montant < 0 ? Math.abs(t.montant).toFixed(2) + ' €' : '-'}</td>
-                        <td className="py-3.5 px-4 text-right font-mono font-extrabold text-emerald-600 whitespace-nowrap">{t.montant > 0 ? Number(t.montant).toFixed(2) + ' €' : '-'}</td>
+                        <td className="py-3.5 px-4 text-right font-mono font-extrabold text-rose-600 whitespace-nowrap">{t.montant < 0 ? formatMontant(Math.abs(t.montant)) + ' €' : '-'}</td>
+                        <td className="py-3.5 px-4 text-right font-mono font-extrabold text-emerald-600 whitespace-nowrap">{t.montant > 0 ? formatMontant(t.montant) + ' €' : '-'}</td>
                       </>
                     )}
                     <td className="py-3.5 px-4 min-w-[220px]">
