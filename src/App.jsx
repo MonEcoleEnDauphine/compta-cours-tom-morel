@@ -277,7 +277,10 @@ const EtatFinancier = ({ transactionsGlobales }) => {
 
   const getCompteLibelle = (code) => {
     const c = comptesList.find(x => x.code === code);
-    return c ? c.libelle : '';
+    if (c) return c.libelle;
+    // Fallback automatique si le compte 512000 n'est pas encore créé textuellement dans le Plan Comptable
+    if (code === '512000') return 'Banque';
+    return '';
   };
 
   const parseDateForFilter = (dStr) => {
@@ -295,9 +298,9 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     } else if (str.includes('-')) {
       const parts = str.split('-');
       if (parts.length === 3) {
-        if (parts[0].length === 4) { 
+        if (parts[0].length === 4) {
           return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)).getTime();
-        } else { 
+        } else {
           return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10)).getTime();
         }
       }
@@ -306,8 +309,8 @@ const EtatFinancier = ({ transactionsGlobales }) => {
   };
 
   const transactionsFiltrees = useMemo(() => {
-    const start = new Date(anneeDebut, 8, 1, 0, 0, 0).getTime(); 
-    const end = new Date(anneeDebut + 1, 7, 31, 23, 59, 59).getTime(); 
+    const start = new Date(anneeDebut, 8, 1, 0, 0, 0).getTime();
+    const end = new Date(anneeDebut + 1, 7, 31, 23, 59, 59).getTime();
 
     return safeTransactions.filter(t => {
       if (!t.date) return false;
@@ -331,10 +334,15 @@ const EtatFinancier = ({ transactionsGlobales }) => {
       addAmount(t.compteDebit, t.montant, 0);
       addAmount(t.compteCredit, 0, t.montant);
     } else {
+      // CORRECTION : Écriture de la double-partie automatique pour la banque
       if (Number(t.montant) < 0) {
-        addAmount(t.compte, Math.abs(t.montant), 0);
+        const absMontant = Math.abs(Number(t.montant));
+        addAmount(t.compte, absMontant, 0); // Débit du compte de charge
+        addAmount('512000', 0, absMontant); // Crédit automatique de la banque
       } else {
-        addAmount(t.compte, 0, t.montant);
+        const absMontant = Number(t.montant);
+        addAmount(t.compte, 0, absMontant); // Crédit du compte de produit
+        addAmount('512000', absMontant, 0); // Débit automatique de la banque
       }
     }
   });
@@ -403,7 +411,6 @@ const EtatFinancier = ({ transactionsGlobales }) => {
   const resultat = totalProduits - totalCharges;
   const sortedKeys = (obj) => Object.keys(obj).sort();
 
-  // ALERTE BILAN DÉSÉQUILIBRÉ
   const totalPassifPlusResultat = totalPassif + resultat;
   const ecartBilan = Math.abs(totalActif - totalPassifPlusResultat);
   const isBilanDesequilibre = ecartBilan > 0.01;
@@ -451,7 +458,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
           </h2>
           <p className="text-slate-500 text-sm mt-1">Bilan et Compte de Résultat groupés par familles comptables.</p>
         </div>
-
+        
         <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
           <Calendar size={18} className="text-slate-500" />
           <select 
@@ -475,7 +482,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
           </h3>
           <p className="text-slate-400 text-xs mt-1">Compare les produits et les charges pour déterminer le bénéfice ou la perte.</p>
         </div>
-
+        
         <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200">
           <div>
             <div className="bg-red-50 text-red-700 font-bold p-3 text-center text-sm border-b border-red-100 uppercase tracking-wider">
@@ -524,7 +531,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
             </p>
             <div className="bg-white/60 border border-rose-100 p-3 rounded-xl mt-3 flex items-start gap-2">
               <span className="text-rose-600 font-bold">💡 Solution :</span>
-              <span className="text-xs text-rose-900 font-medium">Pour rééquilibrer, intégrez vos écritures de trésorerie via le <strong>Journal de Banque</strong>. La contrepartie viendra automatiquement alimenter le compte <em>512000 (Banque)</em> à l'Actif.</span>
+              <span className="text-xs text-rose-900 font-medium">Pour rééquilibrer, intégrez vos écritures de trésorerie via le <strong>Journal de Banque</strong> ou équilibrez correctement vos Opérations Diverses.</span>
             </div>
           </div>
         </div>
@@ -537,7 +544,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
           </h3>
           <p className="text-slate-400 text-xs mt-1">Photographie du patrimoine : L'Actif (ce qu'on possède) et le Passif (ce qu'on doit).</p>
         </div>
-
+        
         <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200">
           <div>
             <div className="bg-blue-50 text-blue-700 font-bold p-3 text-center text-sm border-b border-blue-100 uppercase tracking-wider">
