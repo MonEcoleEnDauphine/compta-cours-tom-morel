@@ -146,7 +146,8 @@ const SearchableCompteSelect = ({ value, onChange, comptesList, placeholder = "S
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const normalizeStr = (str) => (str || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  // SÉCURITÉ : Forcer en String pour éviter les plantages si un code/libellé est un chiffre pur
+  const normalizeStr = (str) => String(str || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
   const filteredComptes = useMemo(() => {
     if (!search.trim()) return comptesList;
@@ -764,7 +765,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
   const handleCompteOdBlur = (lineId, rawCode) => {
     if (!rawCode) return;
-    const cleanCode = rawCode.trim().replace(/[^0-9]/g, '');
+    const cleanCode = String(rawCode).trim().replace(/[^0-9]/g, '');
 
     if (cleanCode.length >= 6) {
       const exists = comptesList.some(c => c.code === cleanCode);
@@ -859,10 +860,11 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
   const devinerCompte = (libelleTxt) => {
     if (!libelleTxt) return '';
-    const txt = libelleTxt.toLowerCase();
+    // SÉCURITÉ : Forcer la conversion en String pour éviter les plantages avec les nombres
+    const txt = String(libelleTxt).toLowerCase();
 
     const memoire = transactionsGlobales.find(tx => 
-      tx.compte && tx.type !== 'od' && tx.libelle && (txt.includes(tx.libelle.toLowerCase()) || tx.libelle.toLowerCase().includes(txt))
+      tx.compte && tx.type !== 'od' && tx.libelle && (txt.includes(String(tx.libelle).toLowerCase()) || String(tx.libelle).toLowerCase().includes(txt))
     );
     if (memoire) return memoire.compte;
 
@@ -955,7 +957,8 @@ const GrandLivre = ({ transactionsGlobales }) => {
           }
 
           const dateExtrait = normaliserDateFR(cols[0]);
-          const libelleExtrait = cols[1] || cols[3];
+          // SÉCURITÉ : Forcer en String pour éviter les crash Excel
+          const libelleExtrait = cols[1] ? String(cols[1]) : (cols[3] ? String(cols[3]) : '');
 
           if (mt !== 0) {
             const isDuplicate = transactionsGlobales.some(t => t.date === dateExtrait && t.libelle === libelleExtrait && Math.abs(t.montant) === Math.abs(mt)) ||
@@ -972,8 +975,8 @@ const GrandLivre = ({ transactionsGlobales }) => {
               batchId: batchId,
               date: dateExtrait,
               libelle: libelleExtrait,
-              reference: cols[2], 
-              typeOp: cols[4],
+              reference: cols[2] ? String(cols[2]) : '', 
+              typeOp: cols[4] ? String(cols[4]) : '',
               commentaire: '',
               montant: mt,
               comptePropose: devinerCompte(libelleExtrait),
@@ -1008,7 +1011,8 @@ const GrandLivre = ({ transactionsGlobales }) => {
         if (resultat.length > 0) setLastImportBatch({ batchId, target: 'sas', source: 'Journal de Banque', count: resultat.length });
         alert(`${resultat.length} ligne(s) importée(s) avec succès.${doublonsCount > 0 ? `\n(Sécurité : ${doublonsCount} doublon(s) ignoré(s))` : ''}`);
       } catch (err) {
-        alert("Erreur lors de la lecture du fichier XLSX.");
+        console.error("Détail de l'erreur Excel :", err);
+        alert("Erreur lors de la lecture du fichier XLSX. Détails dans la console (F12).");
       }
     }
     if (fileInputBankRef.current) fileInputBankRef.current.value = '';
@@ -1034,10 +1038,10 @@ const GrandLivre = ({ transactionsGlobales }) => {
         if (cols.length >= 13) {
           const rawDate = cols[3].trim();
           const formattedDate = normaliserDateFR(rawDate);
-          const compteNum = cols[4].trim();
-          const compteLib = cols[5].trim();
-          const pieceRef = cols[8].trim();
-          const ecritureLib = cols[10].trim();
+          const compteNum = String(cols[4]).trim();
+          const compteLib = String(cols[5]).trim();
+          const pieceRef = String(cols[8]).trim();
+          const ecritureLib = String(cols[10]).trim();
           const debit = parseMontant(cols[11]);
           const credit = parseMontant(cols[12]);
 
@@ -1096,12 +1100,12 @@ const GrandLivre = ({ transactionsGlobales }) => {
           const rawDate = cols[0];
           const journal = String(cols[2] || '').trim().toUpperCase();
           const compteNum = String(cols[3] || '').trim();
-          const pieceRef = cols[5] || '';
-          const libelle = cols[6] || '';
+          const pieceRef = cols[5] ? String(cols[5]) : '';
+          const libelle = cols[6] ? String(cols[6]) : '';
 
           let debitVal = parseMontant(cols[7]);
           let creditVal = parseMontant(cols[8]);
-          const commentaire = cols[11] || '';
+          const commentaire = cols[11] ? String(cols[11]) : '';
 
           if (debitVal < 0) {
             creditVal = Math.abs(debitVal);
@@ -1162,6 +1166,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
         const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, raw: true, defval: '' });
         await processRows(rows);
       } catch (err) {
+        console.error(err);
         alert("Erreur de lecture du fichier XLSX.");
       }
     }
@@ -1315,12 +1320,12 @@ const GrandLivre = ({ transactionsGlobales }) => {
     if (searchTerm) {
       const lowerTerm = searchTerm.toLowerCase();
       result = result.filter(t => 
-        (t.libelle && t.libelle.toLowerCase().includes(lowerTerm)) ||
-        (t.compte && t.compte.toLowerCase().includes(lowerTerm)) ||
-        (t.compteDebit && t.compteDebit.toLowerCase().includes(lowerTerm)) ||
-        (t.compteCredit && t.compteCredit.toLowerCase().includes(lowerTerm)) ||
-        (t.reference && t.reference.toLowerCase().includes(lowerTerm)) ||
-        (t.commentaire && t.commentaire.toLowerCase().includes(lowerTerm))
+        (t.libelle && String(t.libelle).toLowerCase().includes(lowerTerm)) ||
+        (t.compte && String(t.compte).toLowerCase().includes(lowerTerm)) ||
+        (t.compteDebit && String(t.compteDebit).toLowerCase().includes(lowerTerm)) ||
+        (t.compteCredit && String(t.compteCredit).toLowerCase().includes(lowerTerm)) ||
+        (t.reference && String(t.reference).toLowerCase().includes(lowerTerm)) ||
+        (t.commentaire && String(t.commentaire).toLowerCase().includes(lowerTerm))
       );
     }
 
@@ -1336,7 +1341,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
       let valA, valB;
 
       if (sortConfig.key === 'source') {
-        const getSource = (tx) => tx.type === 'od' ? (tx.typeOp === 'PAIE' || tx.libelle?.includes('(PAIE)') ? 'paie' : 'od') : 'banque';
+        const getSource = (tx) => tx.type === 'od' ? (tx.typeOp === 'PAIE' || (tx.libelle && String(tx.libelle).includes('(PAIE)')) ? 'paie' : 'od') : 'banque';
         valA = getSource(a);
         valB = getSource(b);
       } else if (sortConfig.key === 'date') {
@@ -1349,11 +1354,11 @@ const GrandLivre = ({ transactionsGlobales }) => {
         valA = a.type === 'od' ? (a.compteCredit ? Number(a.montant) || 0 : 0) : (Number(a.montant) > 0 ? Number(a.montant) : 0);
         valB = b.type === 'od' ? (b.compteCredit ? Number(b.montant) || 0 : 0) : (Number(b.montant) > 0 ? Number(b.montant) : 0);
       } else if (sortConfig.key === 'compte') {
-        valA = a.compte || a.compteDebit || a.compteCredit || '';
-        valB = b.compte || b.compteDebit || b.compteCredit || '';
+        valA = String(a.compte || a.compteDebit || a.compteCredit || '');
+        valB = String(b.compte || b.compteDebit || b.compteCredit || '');
       } else {
-        valA = (a[sortConfig.key] || '').toLowerCase();
-        valB = (b[sortConfig.key] || '').toLowerCase();
+        valA = String(a[sortConfig.key] || '').toLowerCase();
+        valB = String(b[sortConfig.key] || '').toLowerCase();
       }
 
       if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -1363,6 +1368,14 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
     return result;
   }, [transactionsGlobales, searchTerm, selectedCompteFilter, sortConfig]);
+
+  // SÉCURITÉ : Const pour affichage monétaire global dans le tableau de bord
+  const formatMontantTableau = (montant) => {
+    return new Intl.NumberFormat('fr-FR', { 
+      minimumFractionDigits: 2, 
+      maximumFractionDigits: 2 
+    }).format(montant || 0);
+  };
 
   const nbLignesPretes = lignesEnAttente.filter(l => l.comptePropose).length;
 
@@ -1452,11 +1465,11 @@ const GrandLivre = ({ transactionsGlobales }) => {
           </div>
           <div className="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/10 flex flex-col">
             <span className="text-[10px] uppercase font-bold text-rose-300 tracking-wider">Total Débit</span>
-            <span className="text-lg font-black text-rose-300">{formatMontant(totalGeneralDebit)} €</span>
+            <span className="text-lg font-black text-rose-300">{formatMontantTableau(totalGeneralDebit)} €</span>
           </div>
           <div className="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/10 flex flex-col">
             <span className="text-[10px] uppercase font-bold text-emerald-300 tracking-wider">Total Crédit</span>
-            <span className="text-lg font-black text-emerald-300">{formatMontant(totalGeneralCredit)} €</span>
+            <span className="text-lg font-black text-emerald-300">{formatMontantTableau(totalGeneralCredit)} €</span>
           </div>
         </div>
       </div>
@@ -1590,8 +1603,8 @@ const GrandLivre = ({ transactionsGlobales }) => {
                   <div className={`flex items-center gap-4 px-4 py-2.5 rounded-xl border w-full sm:w-auto justify-between sm:justify-start transition-colors ${isOdBalanced ? 'bg-emerald-50 text-emerald-900 border-emerald-200' : 'bg-slate-100 text-slate-700 border-slate-200'}`}>
                     <span className="uppercase text-xs font-bold tracking-wider">Équilibre</span>
                     <div className="flex gap-4 font-mono text-sm">
-                      <span className={isOdBalanced ? 'text-emerald-700 font-extrabold' : 'text-rose-600 font-bold'}>D: {formatMontant(totalDebitOD)} €</span>
-                      <span className={isOdBalanced ? 'text-emerald-700 font-extrabold' : 'text-rose-600 font-bold'}>C: {formatMontant(totalCreditOD)} €</span>
+                      <span className={isOdBalanced ? 'text-emerald-700 font-extrabold' : 'text-rose-600 font-bold'}>D: {formatMontantTableau(totalDebitOD)} €</span>
+                      <span className={isOdBalanced ? 'text-emerald-700 font-extrabold' : 'text-rose-600 font-bold'}>C: {formatMontantTableau(totalCreditOD)} €</span>
                     </div>
                   </div>
 
@@ -1647,7 +1660,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
                     <td className="py-3 px-4 font-mono font-semibold text-slate-600 whitespace-nowrap">{normaliserDateFR(ligne.date)}</td>
                     <td className="py-3 px-4 font-medium text-slate-800 truncate max-w-xs">{ligne.libelle}</td>
                     <td className={`py-3 px-4 text-right font-extrabold font-mono whitespace-nowrap ${ligne.montant > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      {ligne.montant > 0 ? '+' : ''}{formatMontant(Math.abs(ligne.montant))} €
+                      {ligne.montant > 0 ? '+' : ''}{formatMontantTableau(Math.abs(ligne.montant))} €
                     </td>
                     <td className="py-3 px-4">
                       <input type="text" placeholder="Ajouter un commentaire..." value={ligne.commentaire || ''} onChange={(e) => { const val = e.target.value; setLignesEnAttente(prev => prev.map(l => l.id === ligne.id ? { ...l, commentaire: val } : l)); }} className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs w-full outline-none focus:border-indigo-500 bg-slate-50/50" />
@@ -1740,7 +1753,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
                 let sourceLabel = 'Banque';
                 let sourceColor = 'bg-blue-50 text-blue-700 border-blue-200';
                 if (t.type === 'od') {
-                  if (t.typeOp === 'PAIE' || (t.libelle && t.libelle.includes('(PAIE)'))) {
+                  if (t.typeOp === 'PAIE' || (t.libelle && String(t.libelle).includes('(PAIE)'))) {
                     sourceLabel = 'Paie';
                     sourceColor = 'bg-pink-50 text-pink-700 border-pink-200';
                   } else {
@@ -1764,13 +1777,13 @@ const GrandLivre = ({ transactionsGlobales }) => {
                     </td>
                     {t.type === 'od' ? (
                       <>
-                        <td className="py-3.5 px-4 text-right font-mono font-bold text-purple-700 whitespace-nowrap">{t.compteDebit ? formatMontant(t.montant) + ' €' : '-'}</td>
-                        <td className="py-3.5 px-4 text-right font-mono font-bold text-purple-700 whitespace-nowrap">{t.compteCredit ? formatMontant(t.montant) + ' €' : '-'}</td>
+                        <td className="py-3.5 px-4 text-right font-mono font-bold text-purple-700 whitespace-nowrap">{t.compteDebit ? formatMontantTableau(t.montant) + ' €' : '-'}</td>
+                        <td className="py-3.5 px-4 text-right font-mono font-bold text-purple-700 whitespace-nowrap">{t.compteCredit ? formatMontantTableau(t.montant) + ' €' : '-'}</td>
                       </>
                     ) : (
                       <>
-                        <td className="py-3.5 px-4 text-right font-mono font-extrabold text-rose-600 whitespace-nowrap">{t.montant < 0 ? formatMontant(Math.abs(t.montant)) + ' €' : '-'}</td>
-                        <td className="py-3.5 px-4 text-right font-mono font-extrabold text-emerald-600 whitespace-nowrap">{t.montant > 0 ? formatMontant(t.montant) + ' €' : '-'}</td>
+                        <td className="py-3.5 px-4 text-right font-mono font-extrabold text-rose-600 whitespace-nowrap">{t.montant < 0 ? formatMontantTableau(Math.abs(t.montant)) + ' €' : '-'}</td>
+                        <td className="py-3.5 px-4 text-right font-mono font-extrabold text-emerald-600 whitespace-nowrap">{t.montant > 0 ? formatMontantTableau(t.montant) + ' €' : '-'}</td>
                       </>
                     )}
                     <td className="py-3.5 px-4 min-w-[220px]">
@@ -1780,14 +1793,14 @@ const GrandLivre = ({ transactionsGlobales }) => {
                         t.type === 'od' ? (
                           (t.compteDebit && t.compteCredit) ? (
                             <div className="flex flex-col gap-0.5 min-w-[200px]">
-                              <div className="text-xs text-slate-500 truncate"><span className="font-bold text-slate-700">D:</span> {t.compteDebit} {t.compteDebit && `- ${comptesList.find(c => c.code === t.compteDebit)?.libelle || ''}`}</div>
-                              <div className="text-xs text-slate-500 truncate"><span className="font-bold text-slate-700">C:</span> {t.compteCredit} {t.compteCredit && `- ${comptesList.find(c => c.code === t.compteCredit)?.libelle || ''}`}</div>
+                              <div className="text-xs text-slate-500 truncate"><span className="font-bold text-slate-700">D:</span> {t.compteDebit} {t.compteDebit && `- ${comptesList.find(c => String(c.code) === String(t.compteDebit))?.libelle || ''}`}</div>
+                              <div className="text-xs text-slate-500 truncate"><span className="font-bold text-slate-700">C:</span> {t.compteCredit} {t.compteCredit && `- ${comptesList.find(c => String(c.code) === String(t.compteCredit))?.libelle || ''}`}</div>
                             </div>
                           ) : (
-                            <div className="flex items-center w-fit min-w-[200px]"><span className="bg-purple-50/80 px-2.5 py-1.5 rounded-xl text-xs font-mono font-bold text-purple-800 border border-purple-200/80 max-w-[240px] truncate shadow-2xs">{t.compteDebit ? `${t.compteDebit} - ${comptesList.find(c => c.code === t.compteDebit)?.libelle || ''}` : `${t.compteCredit} - ${comptesList.find(c => c.code === t.compteCredit)?.libelle || ''}`}</span></div>
+                            <div className="flex items-center w-fit min-w-[200px]"><span className="bg-purple-50/80 px-2.5 py-1.5 rounded-xl text-xs font-mono font-bold text-purple-800 border border-purple-200/80 max-w-[240px] truncate shadow-2xs">{t.compteDebit ? `${t.compteDebit} - ${comptesList.find(c => String(c.code) === String(t.compteDebit))?.libelle || ''}` : `${t.compteCredit} - ${comptesList.find(c => String(c.code) === String(t.compteCredit))?.libelle || ''}`}</span></div>
                           )
                         ) : (
-                          <div className="flex items-center w-fit min-w-[200px]"><span className="bg-slate-100/80 px-2.5 py-1.5 rounded-xl text-xs font-mono font-bold text-slate-700 border border-slate-200/80 max-w-[240px] truncate shadow-2xs">{t.compte ? `${t.compte} - ${comptesList.find(c => c.code === t.compte)?.libelle || ''}` : 'Non défini'}</span></div>
+                          <div className="flex items-center w-fit min-w-[200px]"><span className="bg-slate-100/80 px-2.5 py-1.5 rounded-xl text-xs font-mono font-bold text-slate-700 border border-slate-200/80 max-w-[240px] truncate shadow-2xs">{t.compte ? `${t.compte} - ${comptesList.find(c => String(c.code) === String(t.compte))?.libelle || ''}` : 'Non défini'}</span></div>
                         )
                       )}
                     </td>
