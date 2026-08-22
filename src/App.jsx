@@ -220,7 +220,6 @@ const SearchableCompteSelect = ({ value, onChange, comptesList, placeholder = "S
 const EtatFinancier = ({ transactionsGlobales }) => {
   const safeTransactions = transactionsGlobales || [];
 
-  // NOUVEAU : On gère l'option 'TOTAL' en plus des années numériques
   const [anneeDebut, setAnneeDebut] = useState('TOTAL');
   const [detailsOuverts, setDetailsOuverts] = useState({});
   const [comptesList, setComptesList] = useState([]);
@@ -316,49 +315,97 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     return new Date(str).getTime() || 0;
   };
 
-  // NOUVEAU : Si 'TOTAL', on prend tout. Sinon, on filtre par année scolaire.
-  const transactionsFiltrees = useMemo(() => {
+  // 1. SÉPARATION DES ÉCRITURES (Antérieures vs Année en cours)
+  const { anterieures, exercice } = useMemo(() => {
     if (anneeDebut === 'TOTAL') {
-      return safeTransactions;
+      return { anterieures: [], exercice: safeTransactions };
     }
 
     const start = new Date(Number(anneeDebut), 8, 1, 0, 0, 0).getTime(); 
     const end = new Date(Number(anneeDebut) + 1, 7, 31, 23, 59, 59).getTime(); 
 
-    return safeTransactions.filter(t => {
-      if (!t.date) return false;
+    const ant = [];
+    const exo = [];
+
+    safeTransactions.forEach(t => {
+      if (!t.date) return;
       const tTime = parseDateForFilter(t.date);
-      return tTime >= start && tTime <= end;
+      if (tTime < start) ant.push(t);
+      else if (tTime >= start && tTime <= end) exo.push(t);
     });
+
+    return { anterieures: ant, exercice: exo };
   }, [safeTransactions, anneeDebut]);
 
-  const balances = {};
-  transactionsFiltrees.forEach(t => {
-    if (!t.compte && !t.compteDebit && !t.compteCredit) return;
+  const balancesBilan = {};
+  const balancesResultat = {};
+  const balancesResultatAnt = {};
 
-    const addAmount = (compte, deb, cred) => {
-      if (!compte) return;
-      if (!balances[compte]) balances[compte] = { debit: 0, credit: 0 };
-      balances[compte].debit += (Number(deb) || 0);
-      balances[compte].credit += (Number(cred) || 0);
-    };
+  const addAmount = (balancesObj, compte, deb, cred) => {
+    if (!compte) return;
+    if (!balancesObj[compte]) balancesObj[compte] = { debit: 0, credit: 0 };
+    balancesObj[compte].debit += (Number(deb) || 0);
+    balancesObj[compte].credit += (Number(cred) || 0);
+  };
 
-    if (t.type === 'od') {
-      addAmount(t.compteDebit, t.montant, 0);
-      addAmount(t.compteCredit, 0, t.montant);
-    } else {
-      if (Number(t.montant) < 0) {
-        const absMontant = Math.abs(Number(t.montant));
-        addAmount(t.compte, absMontant, 0); 
-        addAmount('512000', 0, absMontant); 
-      } else {
-        const absMontant = Number(t.montant);
-        addAmount(t.compte, 0, absMontant); 
-        addAmount('512000', absMontant, 0); 
+  // Moteur de traitement d'une écriture
+  const processTx = (t, isAnterieur) => {
+    const isOD = t.type === 'od';
+    const resObj = isAnterieur ? balancesResultatAnt : balancesResultat;
+
+    if (isOD) {
+      if (t.compteDebit) {
+        if (t.compteDebit.startsWith('6') || t.compteDebit.startsWith('7')) {
+          addAmount(resObj, t.compteDebit, t.montant, 0);
+        } else {
+          addAmount(balancesBilan, t.compteDebit, t.montant, 0);
+        }
       }
+      if (t.compteCredit) {
+        if (t.compteCredit.startsWith('6') || t.compteCredit.startsWith('7')) {
+          addAmount(resObj, t.compteCredit, 0, t.montant);
+        } else {
+          addAmount(balancesBilan, t.compteCredit, 0, t.montant);
+        }
+      }
+    } else {
+      const isCharge = t.compte && String(t.compte).startsWith('6');
+      const isProduit = t.compte && String(t.compte).startsWith('7');
+      const m = Number(t.montant);
+      const absM = Math.abs(m);
+
+      if (isCharge || isProduit) {
+        if (m < 0) addAmount(resObj, t.compte, absM, 0);
+        else addAmount(resObj, t.compte, 0, absM);
+      } else if (t.compte) {
+        if (m < 0) addAmount(balancesBilan, t.compte, absM, 0);
+        else addAmount(balancesBilan, t.compte, 0, absM);
+      }
+
+      // Génération automatique de la contrepartie en Banque
+      if (m < 0) addAmount(balancesBilan, '512000', 0, absM); 
+      else addAmount(balancesBilan, '512000', absM, 0); 
     }
+  };
+
+  // 2. EXÉCUTION DU MOTEUR COMPTABLE
+  anterieures.forEach(t => processTx(t, true));
+  exercice.forEach(t => processTx(t, false));
+
+  // 3. INJECTION AUTOMATIQUE DU RÉSULTAT N-1
+  let resultatAnterieur = 0;
+  Object.keys(balancesResultatAnt).forEach(code => {
+    const b = balancesResultatAnt[code];
+    if (code.startsWith('7')) resultatAnterieur += (b.credit - b.debit);
+    if (code.startsWith('6')) resultatAnterieur -= (b.debit - b.credit);
   });
 
+  if (resultatAnterieur !== 0) {
+    if (resultatAnterieur > 0) addAmount(balancesBilan, '120000', 0, resultatAnterieur); // Bénéfice au Crédit
+    else addAmount(balancesBilan, '120000', Math.abs(resultatAnterieur), 0); // Déficit au Débit
+  }
+
+  // 4. PRÉPARATION DE L'AFFICHAGE
   const actif = {};
   const passif = {};
   const charges = {};
@@ -369,44 +416,57 @@ const EtatFinancier = ({ transactionsGlobales }) => {
   let totalCharges = 0;
   let totalProduits = 0;
 
-  Object.keys(balances).forEach(code => {
-    if (!code || code.length < 2) return;
-
-    const b = balances[code];
-    const net = b.debit - b.credit;
-    if (Math.abs(net) < 0.01) return;
-
+  const addToGroup = (category, code, val) => {
     const prefix2 = code.substring(0, 2);
     const groupName = `${prefix2} - ${PREFIXES[prefix2] || 'Autres comptes'}`;
-    const item = { code, libelle: getCompteLibelle(code), net: Math.abs(net) };
+    if (!category[groupName]) category[groupName] = { total: 0, items: [] };
+    category[groupName].items.push({ code, libelle: getCompteLibelle(code), net: val });
+    category[groupName].total += val;
+  };
 
-    const addToGroup = (category, group, data) => {
-      if (!category[group]) category[group] = { total: 0, items: [] };
-      category[group].items.push(data);
-      category[group].total += data.net;
-    };
+  // Dispatch du Bilan (avec respect strict des soldes Débiteurs/Créditeurs)
+  Object.keys(balancesBilan).forEach(code => {
+    if (!code || code.length < 2) return;
+    const b = balancesBilan[code];
+    const netDebit = b.debit - b.credit;
+    const netCredit = b.credit - b.debit;
+    
+    // On ignore les comptes soldés
+    if (Math.abs(netDebit) < 0.01) return;
+
+    const root = code[0];
+    if (['1'].includes(root)) {
+      addToGroup(passif, code, netCredit); // Un déficit donnera un netCredit négatif
+      totalPassif += netCredit;
+    } else if (['2', '3'].includes(root)) {
+      addToGroup(actif, code, netDebit);
+      totalActif += netDebit;
+    } else if (['4', '5'].includes(root)) {
+      if (netDebit > 0) {
+        addToGroup(actif, code, netDebit);
+        totalActif += netDebit;
+      } else {
+        addToGroup(passif, code, netCredit);
+        totalPassif += netCredit;
+      }
+    }
+  });
+
+  // Dispatch du Résultat de l'année sélectionnée
+  Object.keys(balancesResultat).forEach(code => {
+    if (!code || code.length < 2) return;
+    const b = balancesResultat[code];
+    const netDebit = b.debit - b.credit;
+    const netCredit = b.credit - b.debit;
+    if (Math.abs(netDebit) < 0.01) return;
 
     const root = code[0];
     if (root === '6') {
-      addToGroup(charges, groupName, item);
-      totalCharges += item.net;
+      addToGroup(charges, code, netDebit);
+      totalCharges += netDebit;
     } else if (root === '7') {
-      addToGroup(produits, groupName, item);
-      totalProduits += item.net;
-    } else if (['1'].includes(root)) {
-      addToGroup(passif, groupName, item);
-      totalPassif += item.net;
-    } else if (['2', '3'].includes(root)) {
-      addToGroup(actif, groupName, item);
-      totalActif += item.net;
-    } else if (['4', '5'].includes(root)) {
-      if (net > 0) {
-        addToGroup(actif, groupName, item);
-        totalActif += item.net;
-      } else {
-        addToGroup(passif, groupName, item);
-        totalPassif += item.net;
-      }
+      addToGroup(produits, code, netCredit);
+      totalProduits += netCredit;
     }
   });
 
@@ -480,7 +540,6 @@ const EtatFinancier = ({ transactionsGlobales }) => {
             onChange={(e) => setAnneeDebut(e.target.value)}
             className="bg-transparent border-none text-sm font-bold text-slate-700 outline-none cursor-pointer"
           >
-            {/* NOUVELLE OPTION : Bilan Total */}
             <option value="TOTAL" className="font-bold text-indigo-700">⭐ Bilan Total (Toutes années)</option>
             <option disabled>──────────────</option>
             {[2021, 2022, 2023, 2024, 2025, 2026].map(year => (
@@ -492,50 +551,51 @@ const EtatFinancier = ({ transactionsGlobales }) => {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="bg-slate-900 p-4">
-          <h3 className="text-white font-bold flex items-center gap-2 text-lg">
-            Compte de Résultat (Classe 6 & 7)
-          </h3>
-          <p className="text-slate-400 text-xs mt-1">Compare les produits et les charges pour déterminer le bénéfice ou la perte.</p>
-        </div>
+      {/* COMPTE DE RÉSULTAT CACHÉ SI "BILAN TOTAL" EST SÉLECTIONNÉ */}
+      {anneeDebut !== 'TOTAL' && (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="bg-slate-900 p-4">
+            <h3 className="text-white font-bold flex items-center gap-2 text-lg">
+              Compte de Résultat (Classe 6 & 7)
+            </h3>
+            <p className="text-slate-400 text-xs mt-1">Compare les produits et les charges pour déterminer le bénéfice ou la perte.</p>
+          </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200">
-          <div>
-            <div className="bg-red-50 text-red-700 font-bold p-3 text-center text-sm border-b border-red-100 uppercase tracking-wider">
-              Charges (Dépenses)
+          <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200">
+            <div>
+              <div className="bg-red-50 text-red-700 font-bold p-3 text-center text-sm border-b border-red-100 uppercase tracking-wider">
+                Charges (Dépenses)
+              </div>
+              <div className="p-2">
+                {sortedKeys(charges).length > 0 ? (
+                  sortedKeys(charges).map(key => renderGroup(charges, key))
+                ) : (
+                  <div className="text-center text-slate-400 text-sm py-8">Aucune donnée sur cette période</div>
+                )}
+              </div>
             </div>
-            <div className="p-2">
-              {sortedKeys(charges).length > 0 ? (
-                sortedKeys(charges).map(key => renderGroup(charges, key))
-              ) : (
-                <div className="text-center text-slate-400 text-sm py-8">Aucune donnée sur cette période</div>
-              )}
+            <div>
+              <div className="bg-emerald-50 text-emerald-700 font-bold p-3 text-center text-sm border-b border-emerald-100 uppercase tracking-wider">
+                Produits (Recettes)
+              </div>
+              <div className="p-2">
+                {sortedKeys(produits).length > 0 ? (
+                  sortedKeys(produits).map(key => renderGroup(produits, key))
+                ) : (
+                  <div className="text-center text-slate-400 text-sm py-8">Aucune donnée sur cette période</div>
+                )}
+              </div>
             </div>
           </div>
-          <div>
-            <div className="bg-emerald-50 text-emerald-700 font-bold p-3 text-center text-sm border-b border-emerald-100 uppercase tracking-wider">
-              Produits (Recettes)
-            </div>
-            <div className="p-2">
-              {sortedKeys(produits).length > 0 ? (
-                sortedKeys(produits).map(key => renderGroup(produits, key))
-              ) : (
-                <div className="text-center text-slate-400 text-sm py-8">Aucune donnée sur cette période</div>
-              )}
-            </div>
+
+          <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-between items-center">
+            <span className="font-bold text-slate-700 uppercase">Résultat de l'exercice</span>
+            <span className={`text-xl font-black ${resultat >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+              {resultat > 0 ? '+' : ''}{formatMontant(Math.abs(resultat))} €
+            </span>
           </div>
         </div>
-
-        <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-between items-center">
-          <span className="font-bold text-slate-700 uppercase">
-            {anneeDebut === 'TOTAL' ? 'Résultat Global (Cumulé)' : "Résultat de l'exercice"}
-          </span>
-          <span className={`text-xl font-black ${resultat >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-            {resultat > 0 ? '+' : ''}{formatMontant(Math.abs(resultat))} €
-          </span>
-        </div>
-      </div>
+      )}
 
       {isBilanDesequilibre && (
         <div className="bg-rose-50 border border-rose-200 p-5 rounded-2xl shadow-sm flex flex-col md:flex-row items-start gap-4 animate-pulse">
@@ -550,13 +610,12 @@ const EtatFinancier = ({ transactionsGlobales }) => {
             </p>
             <div className="bg-white/60 border border-rose-100 p-3 rounded-xl mt-3 flex items-start gap-2">
               <span className="text-rose-600 font-bold">💡 Solution :</span>
-              <span className="text-xs text-rose-900 font-medium">Pour rééquilibrer, intégrez vos écritures de trésorerie via le <strong>Journal de Banque</strong> ou équilibrez correctement vos Opérations Diverses.</span>
+              <span className="text-xs text-rose-900 font-medium">Pour rééquilibrer, intégrez vos écritures de trésorerie via le <strong>Journal de Banque</strong> ou vérifiez les montants de vos Opérations Diverses.</span>
             </div>
           </div>
         </div>
       )}
 
-      {/* Si le bilan est bon (pas d'écart) et qu'on est sur l'onglet TOTAL, on affiche un message de succès */}
       {!isBilanDesequilibre && transactionsFiltrees.length > 0 && anneeDebut === 'TOTAL' && (
         <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl shadow-sm flex items-center gap-3">
           <div className="p-2 bg-emerald-500 text-white rounded-lg shadow-md shrink-0">
@@ -601,7 +660,9 @@ const EtatFinancier = ({ transactionsGlobales }) => {
               )}
               <div className="border-t border-slate-200 mt-2 pt-2">
                 <div className="flex justify-between items-center px-4 py-2 bg-slate-50 rounded-lg">
-                  <span className="text-sm font-bold text-slate-700">12 - Résultat de l'exercice</span>
+                  <span className="text-sm font-bold text-slate-700">
+                    12 - {anneeDebut === 'TOTAL' ? 'Résultat Global (Cumulé)' : "Résultat de l'exercice"}
+                  </span>
                   <span className={`text-sm font-black ${resultat >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                     {resultat > 0 ? '+' : ''}{formatMontant(Math.abs(resultat))} €
                   </span>
