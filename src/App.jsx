@@ -466,133 +466,6 @@ const EtatFinancier = ({ transactionsGlobales }) => {
 const normaliserDateFR = (rawVal) => {
   if (!rawVal) return '';
 
-  // 1. Si SheetJS renvoie un objet Date JS (avec cellDates: true)
-  if (rawVal instanceof Date && !isNaN(rawVal)) {
-    const d = String(rawVal.getDate()).padStart(2, '0');
-    const m = String(rawVal.getMonth() + 1).padStart(2, '0');
-    const y = rawVal.getFullYear();
-    return `${d}/${m}/${y}`;
-  }
-
-  const str = String(rawVal).trim();
-  if (!str) return '';
-
-  // 2. Format ISO YYYY-MM-DD
-  if (str.includes('-')) {
-    const parts = str.split('T')[0].split('-');
-    if (parts.length === 3 && parts[0].length === 4) {
-      const [y, m, d] = parts;
-      return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
-    }
-  }
-
-  // 3. Format avec slashes (DD/MM/YYYY ou D/M/YY ou YYYY/MM/DD)
-  if (str.includes('/')) {
-    const parts = str.split('/');
-    if (parts.length === 3) {
-      if (parts[0].length === 4) { // YYYY/MM/DD
-        const [y, m, d] = parts;
-        return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
-      } else { // DD/MM/YYYY ou D/M/YY
-        let [d, m, y] = parts;
-        if (y.length === 2) y = '20' + y;
-        return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
-      }
-    }
-  }
-
-  return str;
-};
-
-// --- SÉLECTEUR DE COMPTE AVEC RECHERCHE PAR CODE ET LIBELLÉ ---
-const SearchableCompteSelect = ({ value, onChange, comptesList, placeholder = "Sélectionner un compte..." }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [search, setSearch] = useState('');
-  const dropdownRef = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const normalizeStr = (str) => (str || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-
-  const filteredComptes = useMemo(() => {
-    if (!search.trim()) return comptesList;
-    const term = normalizeStr(search);
-    return comptesList.filter(c => 
-      normalizeStr(c.code).includes(term) || 
-      normalizeStr(c.libelle).includes(term)
-    );
-  }, [comptesList, search]);
-
-  const selectedCompte = comptesList.find(c => c.code === value);
-
-  return (
-    <div className="relative w-full" ref={dropdownRef}>
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className={`w-full text-left border rounded-xl px-3 py-2 text-xs font-mono font-bold flex justify-between items-center transition-all bg-white shadow-2xs ${
-          value ? 'border-indigo-300 bg-indigo-50/80 text-indigo-900' : 'border-slate-200 text-slate-400'
-        }`}
-      >
-        <span className="truncate">
-          {selectedCompte ? `${selectedCompte.code} - ${selectedCompte.libelle}` : (value ? `${value} (Suggéré)` : placeholder)}
-        </span>
-        <ChevronDown size={14} className="text-slate-400 shrink-0 ml-1" />
-      </button>
-
-      {isOpen && (
-        <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-2xl shadow-2xl p-2 max-h-60 overflow-y-auto">
-          <div className="relative mb-2">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input 
-              type="text" 
-              placeholder="Code ou libellé (ex : AS, 616)..." 
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-600 font-sans"
-              autoFocus
-            />
-          </div>
-          <div className="space-y-0.5">
-            {filteredComptes.length > 0 ? (
-              filteredComptes.map(c => (
-                <div 
-                  key={c.id}
-                  onClick={() => {
-                    onChange(c.code);
-                    setIsOpen(false);
-                    setSearch('');
-                  }}
-                  className={`px-3 py-2 rounded-xl text-xs cursor-pointer flex justify-between items-center transition-colors ${
-                    c.code === value ? 'bg-indigo-100 text-indigo-950 font-extrabold' : 'hover:bg-slate-100/80 text-slate-700 font-medium'
-                  }`}
-                >
-                  <span className="font-mono font-extrabold text-indigo-700 shrink-0">{c.code}</span>
-                  <span className="truncate text-slate-600 ml-2 text-right flex-1">{c.libelle}</span>
-                </div>
-              ))
-            ) : (
-              <div className="text-xs text-slate-400 text-center py-3">Aucun compte correspondant</div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// --- FONCTION DE NORMALISATION STRICTE DES DATES EN JJ/MM/AAAA ---
-const normaliserDateFR = (rawVal) => {
-  if (!rawVal) return '';
-
   if (rawVal instanceof Date && !isNaN(rawVal)) {
     const d = String(rawVal.getDate()).padStart(2, '0');
     const m = String(rawVal.getMonth() + 1).padStart(2, '0');
@@ -916,24 +789,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transactionsGlobales]);
 
-  const formatDateAffichage = (dStr) => {
-    if (!dStr) return '';
-    if (dStr.includes('-')) {
-      const parts = dStr.split('-');
-      if (parts.length === 3 && parts[0].length === 4) {
-        let y = parts[0];
-        let p1 = parts[1]; 
-        let p2 = parts[2]; 
-        if (parseInt(p1) > 12) {
-          return `${p1}/${p2}/${y}`;
-        } else {
-          return `${p2}/${p1}/${y}`;
-        }
-      }
-    }
-    return dStr; 
-  };
-
   const parseMontant = (rawVal) => {
     if (rawVal === undefined || rawVal === null || rawVal === '') return 0;
     if (typeof rawVal === 'number') return rawVal;
@@ -1045,7 +900,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
       }
     }
     if (fileInputBankRef.current) fileInputBankRef.current.value = '';
-    setActiveTab(null); // On ferme le bandeau après import
+    setActiveTab(null);
   };
 
   const handleImportPaie = async (e) => {
@@ -1412,13 +1267,11 @@ const GrandLivre = ({ transactionsGlobales }) => {
   return (
     <div className="space-y-6 w-full max-w-[1600px] mx-auto px-3 py-2 font-sans">
       
-      {/* INPUTS CACHÉS */}
       <input type="file" accept="application/pdf,image/*" className="hidden" ref={fileInputPdfRef} onChange={handlePdfChange} />
       <input type="file" accept=".csv,.xlsx" className="hidden" ref={fileInputBankRef} onChange={handleImportBank} />
       <input type="file" accept=".txt,.tsv" className="hidden" ref={fileInputPaieRef} onChange={handleImportPaie} />
       <input type="file" accept=".csv,.xlsx" className="hidden" ref={fileInputODRef} onChange={handleImportODMass} />
 
-      {/* MODAL CRÉATION DE COMPTE (6 CHIFFRES) */}
       {showCompteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
           <div className="bg-white rounded-3xl shadow-2xl border border-purple-100 w-full max-w-md overflow-hidden transition-all scale-100">
@@ -1432,10 +1285,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
                   <p className="text-purple-200 text-xs mt-0.5">Création automatique dans le Plan Comptable</p>
                 </div>
               </div>
-              <button 
-                onClick={() => setShowCompteModal(false)}
-                className="text-white/70 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-colors"
-              >
+              <button onClick={() => setShowCompteModal(false)} className="text-white/70 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-colors">
                 <XCircle size={20} />
               </button>
             </div>
@@ -1447,52 +1297,19 @@ const GrandLivre = ({ transactionsGlobales }) => {
                   {getClasseLabel(pendingCompte.code)}
                 </span>
               </div>
-
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Code Compte (6 chiffres min.)
-                </label>
-                <input 
-                  type="text" 
-                  value={pendingCompte.code}
-                  onChange={e => setPendingCompte({ ...pendingCompte, code: e.target.value.replace(/[^0-9]/g, '') })}
-                  className="w-full border border-slate-200 rounded-2xl p-3 text-base font-mono font-bold text-slate-800 outline-none focus:ring-2 focus:ring-purple-600 bg-slate-50/50"
-                  placeholder="ex: 618500"
-                />
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Code Compte (6 chiffres min.)</label>
+                <input type="text" value={pendingCompte.code} onChange={e => setPendingCompte({ ...pendingCompte, code: e.target.value.replace(/[^0-9]/g, '') })} className="w-full border border-slate-200 rounded-2xl p-3 text-base font-mono font-bold text-slate-800 outline-none focus:ring-2 focus:ring-purple-600 bg-slate-50/50" placeholder="ex: 618500" />
               </div>
-
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Libellé officiel
-                </label>
-                <input 
-                  type="text" 
-                  value={pendingCompte.libelle}
-                  onChange={e => setPendingCompte({ ...pendingCompte, libelle: e.target.value })}
-                  placeholder="ex: Abonnements Logiciels & SaaS"
-                  className="w-full border border-slate-200 rounded-2xl p-3 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-purple-600"
-                  autoFocus
-                  onKeyDown={e => { if(e.key === 'Enter') handleSaveNewCompteFromModal(); }}
-                />
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Libellé officiel</label>
+                <input type="text" value={pendingCompte.libelle} onChange={e => setPendingCompte({ ...pendingCompte, libelle: e.target.value })} placeholder="ex: Abonnements Logiciels & SaaS" className="w-full border border-slate-200 rounded-2xl p-3 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-purple-600" autoFocus onKeyDown={e => { if(e.key === 'Enter') handleSaveNewCompteFromModal(); }} />
               </div>
             </div>
 
             <div className="p-4 bg-slate-50/80 border-t border-slate-100 flex justify-end gap-3">
-              <button 
-                onClick={() => setShowCompteModal(false)}
-                className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-200/60 transition-colors"
-              >
-                Annuler
-              </button>
-              <button 
-                onClick={handleSaveNewCompteFromModal}
-                disabled={pendingCompte.code.length < 6 || !pendingCompte.libelle.trim()}
-                className={`px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all flex items-center gap-2 ${
-                  pendingCompte.code.length >= 6 && pendingCompte.libelle.trim()
-                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-purple-200 cursor-pointer'
-                    : 'bg-purple-300 cursor-not-allowed shadow-none'
-                }`}
-              >
+              <button onClick={() => setShowCompteModal(false)} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-200/60 transition-colors">Annuler</button>
+              <button onClick={handleSaveNewCompteFromModal} disabled={pendingCompte.code.length < 6 || !pendingCompte.libelle.trim()} className={`px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all flex items-center gap-2 ${pendingCompte.code.length >= 6 && pendingCompte.libelle.trim() ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-purple-200 cursor-pointer' : 'bg-purple-300 cursor-not-allowed shadow-none'}`}>
                 <CheckCircle2 size={16} /> Créer & Affecter
               </button>
             </div>
@@ -1503,7 +1320,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
       {/* EN-TÊTE DASHBOARD COMPTABLE */}
       <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-6 md:p-8 rounded-3xl text-white shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative overflow-hidden">
         <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
-        
         <div className="relative z-10">
           <div className="flex items-center gap-3">
             <span className="p-2.5 bg-indigo-500/20 rounded-2xl border border-indigo-400/30 text-indigo-300">
@@ -1515,7 +1331,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
             </div>
           </div>
         </div>
-
         <div className="relative z-10 flex flex-wrap items-center gap-3 w-full md:w-auto">
           <div className="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/10 flex flex-col">
             <span className="text-[10px] uppercase font-bold text-indigo-200/80 tracking-wider">Écritures enregistrées</span>
@@ -1532,21 +1347,15 @@ const GrandLivre = ({ transactionsGlobales }) => {
         </div>
       </div>
 
-      {/* BANDEAU ANNULER IMPORT (UNDO) */}
       {lastImportBatch && (
         <div className="bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/15 border border-amber-300/60 text-amber-950 p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-center gap-3 shadow-sm animate-fade-in">
           <div className="flex items-center gap-3">
             <span className="p-2 bg-amber-500 text-white rounded-xl shadow-sm">
               <AlertTriangle size={18} />
             </span>
-            <span className="text-sm font-semibold">
-              Dernier import : <strong>{lastImportBatch.source}</strong> ({lastImportBatch.count} lignes).
-            </span>
+            <span className="text-sm font-semibold">Dernier import : <strong>{lastImportBatch.source}</strong> ({lastImportBatch.count} lignes).</span>
           </div>
-          <button 
-            onClick={handleUndoLastImport} 
-            className="bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-sm"
-          >
+          <button onClick={handleUndoLastImport} className="bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-sm">
             <XCircle size={16} className="text-amber-600" /> Annuler cet import
           </button>
         </div>
@@ -1557,10 +1366,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
         
         {/* ONGLET BANQUE */}
         <div className="flex flex-col relative overflow-hidden">
-          <button 
-            onClick={() => setActiveTab(activeTab === 'banque' ? null : 'banque')}
-            className={`w-full text-left p-5 flex justify-between items-center transition-colors hover:bg-slate-50/50 ${activeTab === 'banque' ? 'bg-indigo-50/20' : ''}`}
-          >
+          <button onClick={() => setActiveTab(activeTab === 'banque' ? null : 'banque')} className={`w-full text-left p-5 flex justify-between items-center transition-colors hover:bg-slate-50/50 ${activeTab === 'banque' ? 'bg-indigo-50/20' : ''}`}>
             <div className="flex items-center gap-4">
               <div className={`p-2.5 rounded-2xl transition-colors ${activeTab === 'banque' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'bg-indigo-50 text-indigo-600'}`}>
                 <Download size={20} />
@@ -1572,15 +1378,11 @@ const GrandLivre = ({ transactionsGlobales }) => {
             </div>
             <ChevronDown size={20} className={`text-slate-400 transition-transform duration-300 ${activeTab === 'banque' ? 'rotate-180 text-indigo-600' : ''}`} />
           </button>
-          
           {activeTab === 'banque' && (
             <div className="p-6 pt-2 pl-20 animate-fade-in border-l-4 border-indigo-500">
               <div className="bg-indigo-50/50 rounded-2xl p-5 border border-indigo-100 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <p className="text-sm text-indigo-900">Importation directe des relevés de comptes bancaires pour intégration et pré-imputation.</p>
-                <button 
-                  onClick={() => fileInputBankRef.current.click()} 
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-all shadow-md shadow-indigo-200 whitespace-nowrap active:scale-95"
-                >
+                <button onClick={() => fileInputBankRef.current.click()} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-all shadow-md shadow-indigo-200 whitespace-nowrap active:scale-95">
                   <Download size={16} /> Parcourir le fichier
                 </button>
               </div>
@@ -1590,10 +1392,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
         {/* ONGLET PAIE */}
         <div className="flex flex-col relative overflow-hidden">
-          <button 
-            onClick={() => setActiveTab(activeTab === 'paie' ? null : 'paie')}
-            className={`w-full text-left p-5 flex justify-between items-center transition-colors hover:bg-slate-50/50 ${activeTab === 'paie' ? 'bg-pink-50/20' : ''}`}
-          >
+          <button onClick={() => setActiveTab(activeTab === 'paie' ? null : 'paie')} className={`w-full text-left p-5 flex justify-between items-center transition-colors hover:bg-slate-50/50 ${activeTab === 'paie' ? 'bg-pink-50/20' : ''}`}>
             <div className="flex items-center gap-4">
               <div className={`p-2.5 rounded-2xl transition-colors ${activeTab === 'paie' ? 'bg-pink-600 text-white shadow-md shadow-pink-200' : 'bg-pink-50 text-pink-600'}`}>
                 <Users size={20} />
@@ -1605,15 +1404,11 @@ const GrandLivre = ({ transactionsGlobales }) => {
             </div>
             <ChevronDown size={20} className={`text-slate-400 transition-transform duration-300 ${activeTab === 'paie' ? 'rotate-180 text-pink-600' : ''}`} />
           </button>
-          
           {activeTab === 'paie' && (
             <div className="p-6 pt-2 pl-20 animate-fade-in border-l-4 border-pink-500">
               <div className="bg-pink-50/50 rounded-2xl p-5 border border-pink-100 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <p className="text-sm text-pink-900">Intégration des salaires bruts, nets, cotisations sociales et prélèvements à la source.</p>
-                <button 
-                  onClick={() => fileInputPaieRef.current.click()} 
-                  className="bg-pink-600 hover:bg-pink-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-all shadow-md shadow-pink-200 whitespace-nowrap active:scale-95"
-                >
+                <button onClick={() => fileInputPaieRef.current.click()} className="bg-pink-600 hover:bg-pink-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-all shadow-md shadow-pink-200 whitespace-nowrap active:scale-95">
                   <Users size={16} /> Parcourir le fichier
                 </button>
               </div>
@@ -1621,12 +1416,9 @@ const GrandLivre = ({ transactionsGlobales }) => {
           )}
         </div>
 
-        {/* ONGLET OPÉRATION DIVERSE */}
+        {/* ONGLET OD */}
         <div className="flex flex-col relative overflow-hidden">
-          <button 
-            onClick={() => setActiveTab(activeTab === 'od' ? null : 'od')}
-            className={`w-full text-left p-5 flex justify-between items-center transition-colors hover:bg-slate-50/50 ${activeTab === 'od' ? 'bg-purple-50/20' : ''}`}
-          >
+          <button onClick={() => setActiveTab(activeTab === 'od' ? null : 'od')} className={`w-full text-left p-5 flex justify-between items-center transition-colors hover:bg-slate-50/50 ${activeTab === 'od' ? 'bg-purple-50/20' : ''}`}>
             <div className="flex items-center gap-4">
               <div className={`p-2.5 rounded-2xl transition-colors ${activeTab === 'od' ? 'bg-purple-600 text-white shadow-md shadow-purple-200' : 'bg-purple-50 text-purple-600'}`}>
                 <FileText size={20} />
@@ -1642,80 +1434,46 @@ const GrandLivre = ({ transactionsGlobales }) => {
           {activeTab === 'od' && (
             <div className="p-6 pt-2 animate-fade-in border-l-4 border-purple-500">
               <div className="bg-purple-50/30 rounded-3xl p-5 border border-purple-100 flex flex-col gap-4">
-                
-                {/* En-tête OD & Bouton Import Masse */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
                   <h4 className="font-bold text-purple-900 text-sm uppercase tracking-wider">Créer une écriture comptable</h4>
-                  <button 
-                    onClick={() => fileInputODRef.current.click()} 
-                    className="text-xs font-bold bg-white text-purple-700 border border-purple-200 px-4 py-2 rounded-xl transition-all flex items-center gap-2 shadow-sm hover:shadow-md hover:border-purple-300"
-                    title="Importer un fichier (.csv / .xlsx)"
-                  >
+                  <button onClick={() => fileInputODRef.current.click()} className="text-xs font-bold bg-white text-purple-700 border border-purple-200 px-4 py-2 rounded-xl transition-all flex items-center gap-2 shadow-sm hover:shadow-md hover:border-purple-300">
                     <Download size={14}/> Import masse depuis un fichier
                   </button>
                 </div>
 
-                {/* Form OD */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <input 
-                    type="date" 
-                    value={odFormDate} 
-                    onChange={e => setOdFormDate(e.target.value)} 
-                    className="border border-slate-200 rounded-xl p-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-purple-600 font-mono font-semibold shadow-sm" 
-                  />
-                  <input 
-                    type="text" 
-                    placeholder="Libellé de l'OD..." 
-                    value={odFormLibelle} 
-                    onChange={e => setOdFormLibelle(e.target.value)} 
-                    className="md:col-span-2 border border-slate-200 rounded-xl p-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-purple-600 font-medium shadow-sm" 
-                  />
+                  <input type="date" value={odFormDate} onChange={e => setOdFormDate(e.target.value)} className="border border-slate-200 rounded-xl p-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-purple-600 font-mono font-semibold shadow-sm" />
+                  <input type="text" placeholder="Libellé de l'OD..." value={odFormLibelle} onChange={e => setOdFormLibelle(e.target.value)} className="md:col-span-2 border border-slate-200 rounded-xl p-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-purple-600 font-medium shadow-sm" />
                 </div>
                 <div>
-                  <input 
-                    type="text" 
-                    placeholder="Commentaire ou référence optionnelle..." 
-                    value={odFormCommentaire} 
-                    onChange={e => setOdFormCommentaire(e.target.value)} 
-                    className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-purple-600 shadow-sm" 
-                  />
+                  <input type="text" placeholder="Commentaire ou référence optionnelle..." value={odFormCommentaire} onChange={e => setOdFormCommentaire(e.target.value)} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-purple-600 shadow-sm" />
                 </div>
 
-                {/* Lignes OD ventilées */}
                 <div className="space-y-2 mt-2">
                   {odLines.map((l) => (
                     <div key={l.id} className="flex flex-wrap md:flex-nowrap gap-2 items-center bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
                       <div className="w-full md:flex-1 relative">
-                        <input 
-                          type="text" 
-                          list={`comptes-datalist-${l.id}`}
-                          placeholder="N° Compte (min 6 chiffres)" 
-                          value={l.compte} 
-                          onChange={e => updateOdLine(l.id, 'compte', e.target.value)}
-                          onBlur={e => handleCompteOdBlur(l.id, e.target.value)}
-                          className="border border-slate-200 rounded-lg p-2 text-sm bg-slate-50 w-full outline-none focus:ring-2 focus:ring-purple-600 font-mono font-bold text-slate-800"
+                        <SearchableCompteSelect 
+                          value={l.compte || ''}
+                          comptesList={comptesList}
+                          placeholder="N° Compte (min 6 chiffres)"
+                          onChange={(val) => updateOdLine(l.id, 'compte', val)}
                         />
-                        <datalist id={`comptes-datalist-${l.id}`}>
-                          {comptesList.map(c => <option key={c.id} value={c.code}>{c.libelle}</option>)}
-                        </datalist>
+                        <div className="absolute top-1/2 -translate-y-1/2 right-8 pointer-events-none opacity-0">
+                          {/* Listener silencieux pour déclencher la modal si le code tapé n'existe pas */}
+                          <input 
+                            type="text" 
+                            className="hidden" 
+                            value={l.compte} 
+                            onBlur={e => handleCompteOdBlur(l.id, e.target.value)} 
+                          />
+                        </div>
                       </div>
 
                       <div className="flex gap-2 w-full md:w-auto">
-                        <input 
-                          type="number" 
-                          placeholder="Débit €" 
-                          value={l.debit} 
-                          onChange={e => updateOdLine(l.id, 'debit', e.target.value)} 
-                          className="border border-slate-200 rounded-lg p-2 text-sm bg-white w-full md:w-32 outline-none focus:ring-2 focus:ring-purple-600 font-bold text-right" 
-                        />
-                        <input 
-                          type="number" 
-                          placeholder="Crédit €" 
-                          value={l.credit} 
-                          onChange={e => updateOdLine(l.id, 'credit', e.target.value)} 
-                          className="border border-slate-200 rounded-lg p-2 text-sm bg-white w-full md:w-32 outline-none focus:ring-2 focus:ring-purple-600 font-bold text-right" 
-                        />
-                        <button onClick={() => removeOdLine(l.id)} className="text-slate-400 hover:text-rose-500 transition-colors p-2 bg-slate-50 rounded-lg shrink-0">
+                        <input type="number" placeholder="Débit €" value={l.debit} onChange={e => updateOdLine(l.id, 'debit', e.target.value)} className="border border-slate-200 rounded-xl p-2 text-sm bg-white w-full md:w-32 outline-none focus:ring-2 focus:ring-purple-600 font-bold text-right" />
+                        <input type="number" placeholder="Crédit €" value={l.credit} onChange={e => updateOdLine(l.id, 'credit', e.target.value)} className="border border-slate-200 rounded-xl p-2 text-sm bg-white w-full md:w-32 outline-none focus:ring-2 focus:ring-purple-600 font-bold text-right" />
+                        <button onClick={() => removeOdLine(l.id)} className="text-slate-400 hover:text-rose-500 transition-colors p-2 bg-slate-50 rounded-xl shrink-0">
                           <XCircle size={18} />
                         </button>
                       </div>
@@ -1726,11 +1484,8 @@ const GrandLivre = ({ transactionsGlobales }) => {
                   </button>
                 </div>
 
-                {/* Footer Validation OD */}
                 <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-purple-200/50 mt-2">
-                  <div className={`flex items-center gap-4 px-4 py-2.5 rounded-xl border transition-colors ${
-                    isOdBalanced ? 'bg-emerald-50 text-emerald-900 border-emerald-200' : 'bg-slate-100 text-slate-700 border-slate-200'
-                  }`}>
+                  <div className={`flex items-center gap-4 px-4 py-2.5 rounded-xl border transition-colors ${isOdBalanced ? 'bg-emerald-50 text-emerald-900 border-emerald-200' : 'bg-slate-100 text-slate-700 border-slate-200'}`}>
                     <span className="uppercase text-xs font-bold tracking-wider">Équilibre</span>
                     <div className="flex gap-4 font-mono text-sm">
                       <span className={isOdBalanced ? 'text-emerald-700 font-extrabold' : 'text-rose-600 font-bold'}>D: {totalDebitOD.toFixed(2)} €</span>
@@ -1738,33 +1493,21 @@ const GrandLivre = ({ transactionsGlobales }) => {
                     </div>
                   </div>
 
-                  <button 
-                    onClick={handleAddOD} 
-                    disabled={!isOdBalanced}
-                    className={`px-8 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${
-                      isOdBalanced 
-                        ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-md shadow-purple-200 cursor-pointer active:scale-95' 
-                        : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-                    }`}
-                  >
+                  <button onClick={handleAddOD} disabled={!isOdBalanced} className={`px-8 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${isOdBalanced ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-md shadow-purple-200 cursor-pointer active:scale-95' : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'}`}>
                     <CheckCircle2 size={16} /> Enregistrer
                   </button>
                 </div>
-
               </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* TAMPON / SAS D'IMPUTATION BANCAIRE AVEC SÉLECTEUR RECHERCHABLE */}
       {lignesEnAttente.length > 0 && (
         <div className="bg-orange-50/80 p-6 rounded-3xl border border-orange-200/80 shadow-sm animate-fade-in">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
             <div className="flex items-center gap-3">
-              <span className="p-2 bg-orange-500 text-white rounded-2xl shadow-sm">
-                <AlertTriangle size={20} />
-              </span>
+              <span className="p-2 bg-orange-500 text-white rounded-2xl shadow-sm"><AlertTriangle size={20} /></span>
               <div>
                 <h3 className="font-extrabold text-orange-950 text-base">Lignes bancaires à imputer ({lignesEnAttente.length})</h3>
                 <p className="text-xs text-orange-800/80">Recherche par numéro de compte ou par mot-clé (ex : AS, loyer, banque).</p>
@@ -1773,12 +1516,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
             <div className="flex items-center gap-3 w-full md:w-auto">
               {nbLignesPretes > 0 && (
-                <button 
-                  onClick={() => {
-                    lignesEnAttente.forEach(l => { if(l.comptePropose) validerLigneBank(l.id, l.comptePropose, l.commentaire); });
-                  }}
-                  className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-bold transition-all flex items-center gap-2 shadow-md shadow-emerald-200"
-                >
+                <button onClick={() => { lignesEnAttente.forEach(l => { if(l.comptePropose) validerLigneBank(l.id, l.comptePropose, l.commentaire); }); }} className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-bold transition-all flex items-center gap-2 shadow-md shadow-emerald-200">
                   <CheckCircle2 size={16} /> Tout Valider ({nbLignesPretes})
                 </button>
               )}
@@ -1809,44 +1547,14 @@ const GrandLivre = ({ transactionsGlobales }) => {
                       {ligne.montant > 0 ? '+' : ''}{ligne.montant.toFixed(2)} €
                     </td>
                     <td className="py-3 px-4">
-                      <input 
-                        type="text" 
-                        placeholder="Ajouter un commentaire..." 
-                        value={ligne.commentaire || ''}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setLignesEnAttente(prev => prev.map(l => l.id === ligne.id ? { ...l, commentaire: val } : l));
-                        }}
-                        className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs w-full outline-none focus:border-indigo-500 bg-slate-50/50"
-                      />
+                      <input type="text" placeholder="Ajouter un commentaire..." value={ligne.commentaire || ''} onChange={(e) => { const val = e.target.value; setLignesEnAttente(prev => prev.map(l => l.id === ligne.id ? { ...l, commentaire: val } : l)); }} className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs w-full outline-none focus:border-indigo-500 bg-slate-50/50" />
                     </td>
-                    
-                    {/* SÉLECTEUR AVEC RECHERCHE DE COMPTE INTELLIGENTE */}
                     <td className="py-3 px-4 min-w-[280px]">
-                      <SearchableCompteSelect 
-                        value={ligne.comptePropose || ''}
-                        comptesList={comptesList}
-                        onChange={(val) => {
-                          setLignesEnAttente(prev => prev.map(l => 
-                            (l.id === ligne.id || l.libelle === ligne.libelle) 
-                              ? { ...l, comptePropose: val } 
-                              : l
-                          ));
-                        }}
-                      />
+                      <SearchableCompteSelect value={ligne.comptePropose || ''} comptesList={comptesList} onChange={(val) => { setLignesEnAttente(prev => prev.map(l => (l.id === ligne.id || l.libelle === ligne.libelle) ? { ...l, comptePropose: val } : l )); }} />
                     </td>
-
                     <td className="py-3 px-4 text-center">
                       <div className="flex justify-center items-center gap-2">
-                        <button 
-                          onClick={() => validerLigneBank(ligne.id, ligne.comptePropose, ligne.commentaire)}
-                          disabled={!ligne.comptePropose}
-                          className={`p-2 rounded-xl transition-all shadow-sm ${
-                            ligne.comptePropose 
-                              ? 'bg-emerald-600 text-white hover:bg-emerald-700' 
-                              : 'bg-slate-100 text-slate-300 cursor-not-allowed'
-                          }`}
-                        >
+                        <button onClick={() => validerLigneBank(ligne.id, ligne.comptePropose, ligne.commentaire)} disabled={!ligne.comptePropose} className={`p-2 rounded-xl transition-all shadow-sm ${ligne.comptePropose ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-slate-100 text-slate-300 cursor-not-allowed'}`}>
                           <CheckCircle2 size={16} />
                         </button>
                         <button onClick={() => setLignesEnAttente(prev => prev.filter(l => l.id !== ligne.id))} className="p-2 rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-rose-600 transition-colors">
@@ -1864,50 +1572,29 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
       {/* GRAND LIVRE DÉFINITIF TABLEAU */}
       <div className="bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden mt-8">
-        
         <div className="p-5 bg-slate-50/80 border-b border-slate-200/80 flex flex-wrap justify-between items-center gap-4">
           <div className="flex items-center gap-3">
-            <span className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl">
-              <CheckCircle2 size={18} />
-            </span>
+            <span className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl"><CheckCircle2 size={18} /></span>
             <h3 className="font-extrabold text-slate-800 text-base">Écritures Validées au Grand Livre</h3>
           </div>
 
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-            <button 
-              onClick={handleResetGrandLivre}
-              className="text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-2 active:scale-95"
-              title="Vider entièrement le Grand Livre"
-            >
+            <button onClick={handleResetGrandLivre} className="text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-2 active:scale-95" title="Vider entièrement le Grand Livre">
               <Trash2 size={14} /> Vider le Grand Livre
             </button>
 
-            <select 
-              value={selectedCompteFilter}
-              onChange={(e) => setSelectedCompteFilter(e.target.value)}
-              className="border border-slate-200 rounded-xl px-3.5 py-2 text-xs bg-white outline-none focus:ring-2 focus:ring-indigo-600 font-mono font-bold text-slate-700 shadow-sm"
-            >
+            <select value={selectedCompteFilter} onChange={(e) => setSelectedCompteFilter(e.target.value)} className="border border-slate-200 rounded-xl px-3.5 py-2 text-xs bg-white outline-none focus:ring-2 focus:ring-indigo-600 font-mono font-bold text-slate-700 shadow-sm">
               <option value="">Tous les comptes (Filtre...)</option>
-              {comptesList.map(c => (
-                <option key={`filter-${c.id}`} value={c.code}>{c.code} - {c.libelle}</option>
-              ))}
+              {comptesList.map(c => <option key={`filter-${c.id}`} value={c.code}>{c.code} - {c.libelle}</option>)}
             </select>
 
             {selectedCompteFilter && (
-              <button onClick={() => setSelectedCompteFilter('')} className="text-xs text-indigo-600 font-bold hover:underline">
-                Réinitialiser
-              </button>
+              <button onClick={() => setSelectedCompteFilter('')} className="text-xs text-indigo-600 font-bold hover:underline">Réinitialiser</button>
             )}
 
             <div className="relative flex-1 md:w-64">
               <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input 
-                type="text" 
-                placeholder="Rechercher écriture..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-3.5 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-600 outline-none bg-white shadow-sm"
-              />
+              <input type="text" placeholder="Rechercher écriture..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-3.5 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-600 outline-none bg-white shadow-sm" />
             </div>
 
             <span className="text-xs font-bold bg-slate-200/60 px-3 py-2 rounded-xl text-slate-700 shadow-inner whitespace-nowrap">
@@ -1933,14 +1620,12 @@ const GrandLivre = ({ transactionsGlobales }) => {
                 <th className="py-3.5 px-3 text-slate-400 min-w-[140px]">Référence</th>
                 <th className="py-3.5 px-3 text-slate-400">Type Op.</th>
                 <th className="py-3.5 px-4 text-slate-400 min-w-[180px]">Commentaire</th>
-                
                 <th className="py-3.5 px-4 text-right cursor-pointer hover:bg-slate-200/50 transition-colors" onClick={() => handleSort('debit')}>
                   <div className="flex items-center justify-end gap-1">Débit {sortConfig.key === 'debit' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
                 </th>
                 <th className="py-3.5 px-4 text-right cursor-pointer hover:bg-slate-200/50 transition-colors" onClick={() => handleSort('credit')}>
                   <div className="flex items-center justify-end gap-1">Crédit {sortConfig.key === 'credit' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
                 </th>
-                
                 <th className="py-3.5 px-4 cursor-pointer hover:bg-slate-200/50 transition-colors min-w-[220px]" onClick={() => handleSort('compte')}>
                   <div className="flex items-center gap-1">Détail Compte {sortConfig.key === 'compte' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
                 </th>
@@ -1964,78 +1649,30 @@ const GrandLivre = ({ transactionsGlobales }) => {
                 return (
                   <tr key={t.id} className="hover:bg-slate-50/80 transition-colors group">
                     <td className="py-3.5 px-4 font-mono font-semibold text-slate-600 whitespace-nowrap">{normaliserDateFR(t.date)}</td>
-                    
-                    <td className="py-3.5 px-3 text-slate-400 font-mono text-[10px]" title={t.id}>
-                      {t.id.substring(0, 6)}...
-                    </td>
-
-                    <td className="py-3.5 px-3">
-                      <span className={`px-2.5 py-1 rounded-full border text-[10px] font-extrabold uppercase tracking-wider whitespace-nowrap ${sourceColor}`}>
-                        {sourceLabel}
-                      </span>
-                    </td>
-
-                    <td className="py-3.5 px-4 text-slate-800 font-semibold whitespace-normal max-w-xs leading-snug">
-                      {t.libelle}
-                    </td>
-
-                    <td className="py-3.5 px-3 text-slate-500 text-xs whitespace-normal max-w-[140px]">
-                      {t.reference || <span className="text-slate-300 italic">-</span>}
-                    </td>
-
-                    <td className="py-3.5 px-3 text-slate-500 text-xs whitespace-nowrap">
-                      {t.typeOp || <span className="text-slate-300 italic">-</span>}
-                    </td>
-                    
+                    <td className="py-3.5 px-3 text-slate-400 font-mono text-[10px]" title={t.id}>{t.id.substring(0, 6)}...</td>
+                    <td className="py-3.5 px-3"><span className={`px-2.5 py-1 rounded-full border text-[10px] font-extrabold uppercase tracking-wider whitespace-nowrap ${sourceColor}`}>{sourceLabel}</span></td>
+                    <td className="py-3.5 px-4 text-slate-800 font-semibold whitespace-normal max-w-xs leading-snug">{t.libelle}</td>
+                    <td className="py-3.5 px-3 text-slate-500 text-xs whitespace-normal max-w-[140px]">{t.reference || <span className="text-slate-300 italic">-</span>}</td>
+                    <td className="py-3.5 px-3 text-slate-500 text-xs whitespace-nowrap">{t.typeOp || <span className="text-slate-300 italic">-</span>}</td>
                     <td className="py-3.5 px-4 text-slate-600 text-xs whitespace-normal max-w-[180px]">
                       {editingRowId === t.id ? (
-                        <input 
-                          type="text" 
-                          defaultValue={t.commentaire || ''} 
-                          onBlur={(e) => handleUpdateField(t.id, e.target.value, 'commentaire')}
-                          className="border border-indigo-300 rounded-lg p-1.5 text-xs bg-indigo-50/50 w-full outline-none"
-                          placeholder="Modifier commentaire..."
-                          autoFocus
-                        />
-                      ) : (
-                        t.commentaire || <span className="text-slate-300 italic">-</span>
-                      )}
+                        <input type="text" defaultValue={t.commentaire || ''} onBlur={(e) => handleUpdateField(t.id, e.target.value, 'commentaire')} className="border border-indigo-300 rounded-lg p-1.5 text-xs bg-indigo-50/50 w-full outline-none" placeholder="Modifier commentaire..." autoFocus />
+                      ) : ( t.commentaire || <span className="text-slate-300 italic">-</span> )}
                     </td>
-
                     {t.type === 'od' ? (
                       <>
-                        <td className="py-3.5 px-4 text-right font-mono font-bold text-purple-700 whitespace-nowrap">
-                          {t.compteDebit ? Number(t.montant).toFixed(2) + ' €' : '-'}
-                        </td>
-                        <td className="py-3.5 px-4 text-right font-mono font-bold text-purple-700 whitespace-nowrap">
-                          {t.compteCredit ? Number(t.montant).toFixed(2) + ' €' : '-'}
-                        </td>
+                        <td className="py-3.5 px-4 text-right font-mono font-bold text-purple-700 whitespace-nowrap">{t.compteDebit ? Number(t.montant).toFixed(2) + ' €' : '-'}</td>
+                        <td className="py-3.5 px-4 text-right font-mono font-bold text-purple-700 whitespace-nowrap">{t.compteCredit ? Number(t.montant).toFixed(2) + ' €' : '-'}</td>
                       </>
                     ) : (
                       <>
-                        <td className="py-3.5 px-4 text-right font-mono font-extrabold text-rose-600 whitespace-nowrap">
-                          {t.montant < 0 ? Math.abs(t.montant).toFixed(2) + ' €' : '-'}
-                        </td>
-                        <td className="py-3.5 px-4 text-right font-mono font-extrabold text-emerald-600 whitespace-nowrap">
-                          {t.montant > 0 ? Number(t.montant).toFixed(2) + ' €' : '-'}
-                        </td>
+                        <td className="py-3.5 px-4 text-right font-mono font-extrabold text-rose-600 whitespace-nowrap">{t.montant < 0 ? Math.abs(t.montant).toFixed(2) + ' €' : '-'}</td>
+                        <td className="py-3.5 px-4 text-right font-mono font-extrabold text-emerald-600 whitespace-nowrap">{t.montant > 0 ? Number(t.montant).toFixed(2) + ' €' : '-'}</td>
                       </>
                     )}
-                    
                     <td className="py-3.5 px-4 min-w-[220px]">
                       {editingRowId === t.id ? (
-                        <SearchableCompteSelect 
-                          value={t.compte || t.compteDebit || t.compteCredit || ''}
-                          comptesList={comptesList}
-                          onChange={(val) => {
-                            if (t.type === 'od') {
-                              handleUpdateField(t.id, val, t.compteDebit ? 'compteDebit' : 'compteCredit');
-                            } else {
-                              handleUpdateField(t.id, val, 'compte');
-                            }
-                            setEditingRowId(null);
-                          }}
-                        />
+                        <SearchableCompteSelect value={t.compte || t.compteDebit || t.compteCredit || ''} comptesList={comptesList} onChange={(val) => { if (t.type === 'od') { handleUpdateField(t.id, val, t.compteDebit ? 'compteDebit' : 'compteCredit'); } else { handleUpdateField(t.id, val, 'compte'); } setEditingRowId(null); }} />
                       ) : (
                         t.type === 'od' ? (
                           (t.compteDebit && t.compteCredit) ? (
@@ -2044,79 +1681,34 @@ const GrandLivre = ({ transactionsGlobales }) => {
                               <div className="text-xs text-slate-500 truncate"><span className="font-bold text-slate-700">C:</span> {t.compteCredit} {t.compteCredit && `- ${comptesList.find(c => c.code === t.compteCredit)?.libelle || ''}`}</div>
                             </div>
                           ) : (
-                            <div className="flex items-center w-fit min-w-[200px]">
-                              <span className="bg-purple-50/80 px-2.5 py-1.5 rounded-xl text-xs font-mono font-bold text-purple-800 border border-purple-200/80 max-w-[240px] truncate shadow-2xs">
-                                {t.compteDebit ? `${t.compteDebit} - ${comptesList.find(c => c.code === t.compteDebit)?.libelle || ''}` : `${t.compteCredit} - ${comptesList.find(c => c.code === t.compteCredit)?.libelle || ''}`}
-                              </span>
-                            </div>
+                            <div className="flex items-center w-fit min-w-[200px]"><span className="bg-purple-50/80 px-2.5 py-1.5 rounded-xl text-xs font-mono font-bold text-purple-800 border border-purple-200/80 max-w-[240px] truncate shadow-2xs">{t.compteDebit ? `${t.compteDebit} - ${comptesList.find(c => c.code === t.compteDebit)?.libelle || ''}` : `${t.compteCredit} - ${comptesList.find(c => c.code === t.compteCredit)?.libelle || ''}`}</span></div>
                           )
                         ) : (
-                          <div className="flex items-center w-fit min-w-[200px]">
-                            <span className="bg-slate-100/80 px-2.5 py-1.5 rounded-xl text-xs font-mono font-bold text-slate-700 border border-slate-200/80 max-w-[240px] truncate shadow-2xs">
-                              {t.compte ? `${t.compte} - ${comptesList.find(c => c.code === t.compte)?.libelle || ''}` : 'Non défini'}
-                            </span>
-                          </div>
+                          <div className="flex items-center w-fit min-w-[200px]"><span className="bg-slate-100/80 px-2.5 py-1.5 rounded-xl text-xs font-mono font-bold text-slate-700 border border-slate-200/80 max-w-[240px] truncate shadow-2xs">{t.compte ? `${t.compte} - ${comptesList.find(c => c.code === t.compte)?.libelle || ''}` : 'Non défini'}</span></div>
                         )
                       )}
                     </td>
-                    
                     <td className="py-3.5 px-4 text-center">
                       <div className="flex justify-center items-center gap-1.5">
                         {editingRowId === t.id ? (
-                          <button onClick={() => setEditingRowId(null)} className="text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1 rounded-xl text-xs font-bold transition-colors shadow-sm">
-                            OK
-                          </button>
+                          <button onClick={() => setEditingRowId(null)} className="text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1 rounded-xl text-xs font-bold transition-colors shadow-sm">OK</button>
                         ) : (
                           <>
-                            <button onClick={() => setEditingRowId(t.id)} className="text-slate-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-indigo-50 transition-colors" title="Modifier">
-                              <span className="font-bold text-base leading-none">✎</span>
-                            </button>
-                            
+                            <button onClick={() => setEditingRowId(t.id)} className="text-slate-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-indigo-50 transition-colors" title="Modifier"><span className="font-bold text-base leading-none">✎</span></button>
                             {t.pdfData ? (
                               <div className="relative group/pdf inline-block">
-                                <button 
-                                  onClick={() => {
-                                    const win = window.open();
-                                    if (win) {
-                                      win.document.write(`<iframe src="${t.pdfData}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
-                                    }
-                                  }}
-                                  className="text-indigo-600 hover:text-indigo-800 p-1.5 rounded-xl bg-indigo-50 border border-indigo-200 transition-all shadow-2xs"
-                                  title={`Voir la facture/justificatif : ${t.pdfName || 'Pièce jointe'}`}
-                                >
+                                <button onClick={() => { const win = window.open(); if (win) { win.document.write(`<iframe src="${t.pdfData}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`); } }} className="text-indigo-600 hover:text-indigo-800 p-1.5 rounded-xl bg-indigo-50 border border-indigo-200 transition-all shadow-2xs" title={`Voir la facture/justificatif : ${t.pdfName || 'Pièce jointe'}`}>
                                   <Receipt size={16} className="text-indigo-600" />
                                 </button>
-                                <button 
-                                  onClick={async (e) => {
-                                    e.stopPropagation();
-                                    if (window.confirm("Supprimer la pièce jointe ?")) {
-                                      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', t.id), { pdfData: '', pdfName: '' });
-                                    }
-                                  }}
-                                  className="absolute -top-1.5 -right-1.5 bg-rose-600 text-white rounded-full w-4 h-4 text-[10px] font-bold flex items-center justify-center opacity-0 group-hover/pdf:opacity-100 transition-opacity shadow-xs"
-                                  title="Supprimer la pièce jointe"
-                                >
-                                  ×
-                                </button>
+                                <button onClick={async (e) => { e.stopPropagation(); if (window.confirm("Supprimer la pièce jointe ?")) { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', t.id), { pdfData: '', pdfName: '' }); } }} className="absolute -top-1.5 -right-1.5 bg-rose-600 text-white rounded-full w-4 h-4 text-[10px] font-bold flex items-center justify-center opacity-0 group-hover/pdf:opacity-100 transition-opacity shadow-xs" title="Supprimer la pièce jointe">×</button>
                               </div>
                             ) : (
-                              <button 
-                                onClick={() => handleTriggerPdf(t.id)} 
-                                className="text-slate-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-indigo-50 transition-colors" 
-                                title="Joindre un PDF ou justificatif"
-                              >
-                                <Paperclip size={16} />
-                              </button>
+                              <button onClick={() => handleTriggerPdf(t.id)} className="text-slate-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-indigo-50 transition-colors" title="Joindre un PDF ou justificatif"><Paperclip size={16} /></button>
                             )}
-
                             {confirmDeleteId === t.id ? (
-                              <button onClick={() => handleDeleteValidated(t.id)} className="text-white bg-rose-600 hover:bg-rose-700 px-2 py-1 rounded-lg text-[10px] font-extrabold animate-pulse">
-                                Valider ?
-                              </button>
+                              <button onClick={() => handleDeleteValidated(t.id)} className="text-white bg-rose-600 hover:bg-rose-700 px-2 py-1 rounded-lg text-[10px] font-extrabold animate-pulse">Valider ?</button>
                             ) : (
-                              <button onClick={() => handleDeleteValidated(t.id)} className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition-colors" title="Supprimer">
-                                <Trash2 size={16}/>
-                              </button>
+                              <button onClick={() => handleDeleteValidated(t.id)} className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition-colors" title="Supprimer"><Trash2 size={16}/></button>
                             )}
                           </>
                         )}
@@ -2125,18 +1717,13 @@ const GrandLivre = ({ transactionsGlobales }) => {
                   </tr>
                 );
               })}
-              
               {filteredAndSortedTransactions.length === 0 && (
                 <tr>
                   <td colSpan="11" className="py-16 text-center bg-slate-50/40">
                     <div className="flex flex-col items-center justify-center max-w-sm mx-auto space-y-3">
-                      <div className="p-4 bg-slate-100 text-slate-400 rounded-3xl">
-                        <BookOpen size={32} />
-                      </div>
+                      <div className="p-4 bg-slate-100 text-slate-400 rounded-3xl"><BookOpen size={32} /></div>
                       <h4 className="font-bold text-slate-700 text-base">Aucune écriture au Grand Livre</h4>
-                      <p className="text-xs text-slate-400 leading-relaxed">
-                        Importe un relevé bancaire, un fichier de paie ou enregistre une opération diverse pour alimenter ta comptabilité.
-                      </p>
+                      <p className="text-xs text-slate-400 leading-relaxed">Importe un relevé bancaire, un fichier de paie ou enregistre une opération diverse pour alimenter ta comptabilité.</p>
                     </div>
                   </td>
                 </tr>
