@@ -860,7 +860,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
   const devinerCompte = (libelleTxt) => {
     if (!libelleTxt) return '';
-    // SÉCURITÉ : Forcer la conversion en String pour éviter les plantages avec les nombres
+    // SÉCURITÉ ANTI-CRASH : Forcer en chaîne de caractères
     const txt = String(libelleTxt).toLowerCase();
 
     const memoire = transactionsGlobales.find(tx => 
@@ -957,7 +957,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
           }
 
           const dateExtrait = normaliserDateFR(cols[0]);
-          // SÉCURITÉ : Forcer en String pour éviter les crash Excel
+          // SÉCURITÉ ANTI-CRASH : Forcer en String
           const libelleExtrait = cols[1] ? String(cols[1]) : (cols[3] ? String(cols[3]) : '');
 
           if (mt !== 0) {
@@ -1012,7 +1012,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
         alert(`${resultat.length} ligne(s) importée(s) avec succès.${doublonsCount > 0 ? `\n(Sécurité : ${doublonsCount} doublon(s) ignoré(s))` : ''}`);
       } catch (err) {
         console.error("Détail de l'erreur Excel :", err);
-        alert("Erreur lors de la lecture du fichier XLSX. Détails dans la console (F12).");
+        alert("Erreur lors de la lecture du fichier XLSX. Détails dans la console (touche F12).");
       }
     }
     if (fileInputBankRef.current) fileInputBankRef.current.value = '';
@@ -1038,10 +1038,11 @@ const GrandLivre = ({ transactionsGlobales }) => {
         if (cols.length >= 13) {
           const rawDate = cols[3].trim();
           const formattedDate = normaliserDateFR(rawDate);
-          const compteNum = String(cols[4]).trim();
-          const compteLib = String(cols[5]).trim();
-          const pieceRef = String(cols[8]).trim();
-          const ecritureLib = String(cols[10]).trim();
+          // SÉCURITÉ ANTI-CRASH
+          const compteNum = cols[4] ? String(cols[4]).trim() : '';
+          const compteLib = cols[5] ? String(cols[5]).trim() : '';
+          const pieceRef = cols[8] ? String(cols[8]).trim() : '';
+          const ecritureLib = cols[10] ? String(cols[10]).trim() : '';
           const debit = parseMontant(cols[11]);
           const credit = parseMontant(cols[12]);
 
@@ -1369,7 +1370,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
     return result;
   }, [transactionsGlobales, searchTerm, selectedCompteFilter, sortConfig]);
 
-  // SÉCURITÉ : Const pour affichage monétaire global dans le tableau de bord
+  // SÉCURITÉ : Formatage pour le tableau de bord
   const formatMontantTableau = (montant) => {
     return new Intl.NumberFormat('fr-FR', { 
       minimumFractionDigits: 2, 
