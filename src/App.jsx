@@ -217,6 +217,17 @@ const SearchableCompteSelect = ({ value, onChange, comptesList, placeholder = "S
 
 // --- ÉTAT FINANCIER (Bilan & Résultat Groupés) ---
 const EtatFinancier = ({ transactionsGlobales }) => {
+  
+  // SÉCURITÉ : Formatage monétaire rapatrié à l'intérieur
+  const formatMontant = (valeur) => {
+    const num = Number(valeur);
+    if (isNaN(num)) return "0,00";
+    return new Intl.NumberFormat('fr-FR', { 
+      minimumFractionDigits: 2, 
+      maximumFractionDigits: 2 
+    }).format(num);
+  };
+
   const safeTransactions = transactionsGlobales || [];
 
   const [anneeDebut, setAnneeDebut] = useState('TOTAL');
@@ -428,12 +439,11 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     category[groupName].total += val;
   };
 
-  // Traitement strict des soldes comptables (PLUS de Math.abs global !)
+  // Traitement strict des soldes comptables
   Object.keys(balancesBilan).forEach(code => {
     if (!code || code.length < 2) return;
     const b = balancesBilan[code];
     
-    // Solde mathématique
     const soldeDebit = b.debit - b.credit;
     const soldeCredit = b.credit - b.debit;
     
@@ -441,16 +451,12 @@ const EtatFinancier = ({ transactionsGlobales }) => {
 
     const root = code[0];
     if (['1'].includes(root)) {
-      // Les comptes de Passif fonctionnent en solde Créditeur. 
-      // S'ils sont débiteurs (comme le 120000 via l'OD), la valeur soldeCredit sera NÉGATIVE et se soustraira !
       addToGroup(passif, code, soldeCredit); 
       totalPassif += soldeCredit;
     } else if (['2', '3'].includes(root)) {
-      // Les comptes d'Actif fonctionnent en solde Débiteur.
       addToGroup(actif, code, soldeDebit);
       totalActif += soldeDebit;
     } else if (['4', '5'].includes(root)) {
-      // Comptes de tiers et trésorerie basculent à l'actif ou passif selon leur signe
       if (soldeDebit > 0) {
         addToGroup(actif, code, soldeDebit);
         totalActif += soldeDebit;
@@ -522,7 +528,6 @@ const EtatFinancier = ({ transactionsGlobales }) => {
                     {item.libelle || <span className="italic text-slate-400">Sans libellé</span>}
                   </span>
                 </div>
-                {/* S'affichera avec un signe moins si item.net est négatif */}
                 <span className={`text-xs font-medium shrink-0 ${item.net < 0 ? 'text-rose-600' : 'text-slate-600'}`}>
                   {formatMontant(item.net)} €
                 </span>
@@ -622,13 +627,14 @@ const EtatFinancier = ({ transactionsGlobales }) => {
             </p>
             <div className="bg-white/60 border border-rose-100 p-3 rounded-xl mt-3 flex items-start gap-2">
               <span className="text-rose-600 font-bold">💡 Solution :</span>
-              <span className="text-xs text-rose-900 font-medium">Pour rééquilibrer, intégrez vos écritures de trésorerie via le <strong>Journal de Banque</strong> ou équilibrez correctement vos Opérations Diverses.</span>
+              <span className="text-xs text-rose-900 font-medium">Vérifiez que toutes vos écritures bancaires sont imputées ou que vos Opérations Diverses sont parfaitement équilibrées.</span>
             </div>
           </div>
         </div>
       )}
 
-      {!isBilanDesequilibre && transactionsFiltrees.length > 0 && anneeDebut === 'TOTAL' && (
+      {/* ICI LE BUG ÉTAIT PRÉSENT : Le nom de la variable a été corrigé en safeTransactions */}
+      {!isBilanDesequilibre && safeTransactions.length > 0 && anneeDebut === 'TOTAL' && (
         <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl shadow-sm flex items-center gap-3">
           <div className="p-2 bg-emerald-500 text-white rounded-lg shadow-md shrink-0">
             <CheckCircle2 size={20} />
