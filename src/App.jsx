@@ -218,7 +218,7 @@ const SearchableCompteSelect = ({ value, onChange, comptesList, placeholder = "S
 // --- ÉTAT FINANCIER (Bilan & Résultat Groupés) ---
 const EtatFinancier = ({ transactionsGlobales }) => {
   
-  // 1. SÉCURITÉ ANTI-CRASH : Formatage monétaire intégré directement dans le composant
+  // SÉCURITÉ : Formatage monétaire rapatrié à l'intérieur pour éviter tout plantage
   const formatMontant = (valeur) => {
     const num = Number(valeur);
     if (isNaN(num)) return "0,00";
@@ -294,6 +294,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
   };
 
   const getCompteLibelle = (code) => {
+    // SÉCURITÉ ANTI-CRASH : forcer la conversion en texte
     const codeStr = String(code).trim();
     const c = comptesList.find(x => String(x.code).trim() === codeStr);
     if (c) return c.libelle;
@@ -369,6 +370,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     const absM = Math.abs(m);
 
     if (isOD) {
+      // SÉCURITÉ ANTI-CRASH : conversion en String sécurisée
       const dCode = t.compteDebit ? String(t.compteDebit).trim() : '';
       const cCode = t.compteCredit ? String(t.compteCredit).trim() : '';
 
@@ -399,15 +401,17 @@ const EtatFinancier = ({ transactionsGlobales }) => {
         else addAmount(balancesBilan, compteStr, 0, absM);
       }
 
-      // Contrepartie 512000 automatique
+      // Génération de la contrepartie en Banque 512 automatique
       if (m < 0) addAmount(balancesBilan, '512000', 0, absM); 
       else addAmount(balancesBilan, '512000', absM, 0); 
     }
   };
 
+  // On lance les calculs
   anterieures.forEach(t => processTx(t, true));
   exercice.forEach(t => processTx(t, false));
 
+  // Injection du Résultat N-1 dans le Bilan
   let resultatAnterieur = 0;
   Object.keys(balancesResultatAnt).forEach(code => {
     const b = balancesResultatAnt[code];
@@ -438,16 +442,20 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     category[groupName].total += val;
   };
 
+  // Traitement du Bilan (avec gestion experte des signes de solde)
   Object.keys(balancesBilan).forEach(code => {
     if (!code || code.length < 2) return;
     const b = balancesBilan[code];
     const netDebit = b.debit - b.credit;
     const netCredit = b.credit - b.debit;
     
+    // Ignore les comptes soldés à zéro
     if (Math.abs(netDebit) < 0.01) return;
 
     const root = code[0];
     if (['1'].includes(root)) {
+      // Les comptes de Passif ont un solde créditeur naturel.
+      // S'ils sont débiteurs (ex: perte), la valeur netCredit sera négative et se soustraira du total !
       addToGroup(passif, code, netCredit); 
       totalPassif += netCredit;
     } else if (['2', '3'].includes(root)) {
@@ -464,11 +472,13 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     }
   });
 
+  // Traitement du Résultat de l'année
   Object.keys(balancesResultat).forEach(code => {
     if (!code || code.length < 2) return;
     const b = balancesResultat[code];
     const netDebit = b.debit - b.credit;
     const netCredit = b.credit - b.debit;
+    
     if (Math.abs(netDebit) < 0.01) return;
 
     const root = code[0];
@@ -621,7 +631,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
             </p>
             <div className="bg-white/60 border border-rose-100 p-3 rounded-xl mt-3 flex items-start gap-2">
               <span className="text-rose-600 font-bold">💡 Solution :</span>
-              <span className="text-xs text-rose-900 font-medium">Vérifiez que toutes vos écritures bancaires sont imputées ou que vos Opérations Diverses sont parfaitement équilibrées.</span>
+              <span className="text-xs text-rose-900 font-medium">Pour rééquilibrer, intégrez vos écritures de trésorerie via le <strong>Journal de Banque</strong> ou équilibrez correctement vos Opérations Diverses.</span>
             </div>
           </div>
         </div>
