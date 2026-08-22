@@ -860,32 +860,38 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
   const devinerCompte = (libelleTxt) => {
     if (!libelleTxt) return '';
-    // SÉCURITÉ ANTI-CRASH : Forcer en chaîne de caractères
     const txt = String(libelleTxt).toLowerCase();
 
     const memoire = transactionsGlobales.find(tx => 
       tx.compte && tx.type !== 'od' && tx.libelle && (txt.includes(String(tx.libelle).toLowerCase()) || String(tx.libelle).toLowerCase().includes(txt))
     );
-    if (memoire) return memoire.compte;
+    let guess = memoire ? memoire.compte : '';
 
-    const dictionnaire = [
-      { mots: ['edf', 'engie', 'eau', 'electricite', 'saur'], compte: '606100' }, 
-      { mots: ['loyer', 'sci '], compte: '613200' }, 
-      { mots: ['orange', 'sfr', 'bouygues', 'free', 'telephone', 'internet', 'ovh', 'vercel'], compte: '626000' }, 
-      { mots: ['banque', 'agios', 'cotisation', 'commission', 'frais bancaires', 'credit agricole', 'caisse epargne'], compte: '627000' }, 
-      { mots: ['assurance', 'macif', 'axa', 'maaf', 'mgen'], compte: '616000' }, 
-      { mots: ['dgfip', 'impot', 'urssaf', 'tresor public'], compte: '635000' }, 
-      { mots: ['salaire', 'virement salaire', 'paie'], compte: '421000' }, 
-      { mots: ['fourniture', 'bureau vallée', 'fnac', 'amazon', 'papeterie', 'leclerc', 'carrefour'], compte: '606400' }, 
-      { mots: ['nettoyage', 'menage', 'entretien'], compte: '611000' }, 
-      { mots: ['scolarite', 'frais de scolarite', 'ecolage', 'famille', 'inscription'], compte: '706000' }, 
-      { mots: ['don ', 'helloasso', 'mecenat'], compte: '754000' }, 
-    ];
+    if (!guess) {
+      const dictionnaire = [
+        { mots: ['edf', 'engie', 'eau', 'electricite', 'saur'], compte: '606100' }, 
+        { mots: ['loyer', 'sci '], compte: '613200' }, 
+        { mots: ['orange', 'sfr', 'bouygues', 'free', 'telephone', 'internet', 'ovh', 'vercel'], compte: '626000' }, 
+        { mots: ['banque', 'agios', 'cotisation', 'commission', 'frais bancaires', 'credit agricole', 'caisse epargne'], compte: '627000' }, 
+        { mots: ['assurance', 'macif', 'axa', 'maaf', 'mgen'], compte: '616000' }, 
+        { mots: ['dgfip', 'impot', 'urssaf', 'tresor public'], compte: '635000' }, 
+        { mots: ['salaire', 'virement salaire', 'paie'], compte: '421000' }, 
+        { mots: ['fourniture', 'bureau vallée', 'fnac', 'amazon', 'papeterie', 'leclerc', 'carrefour'], compte: '606400' }, 
+        { mots: ['nettoyage', 'menage', 'entretien'], compte: '611000' }, 
+        { mots: ['scolarite', 'frais de scolarite', 'ecolage', 'famille', 'inscription'], compte: '706000' }, 
+        { mots: ['don ', 'helloasso', 'mecenat'], compte: '754000' }, 
+      ];
 
-    for (let regle of dictionnaire) {
-      if (regle.mots.some(mot => txt.includes(mot))) {
-        return regle.compte;
+      for (let regle of dictionnaire) {
+        if (regle.mots.some(mot => txt.includes(mot))) {
+          guess = regle.compte;
+          break;
+        }
       }
+    }
+
+    if (guess && comptesList.some(c => c.code === guess)) {
+      return guess;
     }
     return '';
   };
@@ -893,7 +899,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
   useEffect(() => {
     if (lignesEnAttente.length > 0) {
       setLignesEnAttente(prev => prev.map(ligne => {
-        if (!ligne.comptePropose) {
+        if (!ligne.comptePropose && !ligne.modifieManuellement) {
           const guess = devinerCompte(ligne.libelle);
           if (guess) return { ...ligne, comptePropose: guess };
         }
@@ -901,7 +907,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
       }));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transactionsGlobales]);
+  }, [transactionsGlobales, comptesList]);
 
   const parseMontant = (rawVal) => {
     if (rawVal === undefined || rawVal === null || rawVal === '') return 0;
@@ -957,13 +963,13 @@ const GrandLivre = ({ transactionsGlobales }) => {
           }
 
           const dateExtrait = normaliserDateFR(cols[0]);
-          // SÉCURITÉ ANTI-CRASH : Forcer en String
           const libelleExtrait = cols[1] ? String(cols[1]) : (cols[3] ? String(cols[3]) : '');
 
           if (mt !== 0) {
+            // CORRECTION DOUBLE CHECK : On vérifie UNIQUEMENT dans le Grand Livre (transactionsGlobales)
+            // ou dans le SAS (lignesEnAttente). On ne vérifie PLUS les "nouvellesLignes" entre elles.
             const isDuplicate = transactionsGlobales.some(t => t.date === dateExtrait && t.libelle === libelleExtrait && Math.abs(t.montant) === Math.abs(mt)) ||
-                                lignesEnAttente.some(t => t.date === dateExtrait && t.libelle === libelleExtrait && Math.abs(t.montant) === Math.abs(mt)) ||
-                                nouvellesLignes.some(t => t.date === dateExtrait && t.libelle === libelleExtrait && Math.abs(t.montant) === Math.abs(mt));
+                                lignesEnAttente.some(t => t.date === dateExtrait && t.libelle === libelleExtrait && Math.abs(t.montant) === Math.abs(mt));
 
             if (isDuplicate) {
               doublonsCount++;
@@ -997,7 +1003,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
         const resultat = processRows(lignesBrutes);
         setLignesEnAttente(prev => [...prev, ...resultat]);
         if (resultat.length > 0) setLastImportBatch({ batchId, target: 'sas', source: 'Journal de Banque', count: resultat.length });
-        alert(`${resultat.length} ligne(s) importée(s) avec succès.${doublonsCount > 0 ? `\n(Sécurité : ${doublonsCount} doublon(s) ignoré(s))` : ''}`);
+        alert(`${resultat.length} ligne(s) importée(s) avec succès.${doublonsCount > 0 ? `\n(Sécurité : ${doublonsCount} doublon(s) existant(s) ignoré(s))` : ''}`);
       };
       reader.readAsText(file, 'ISO-8859-1');
     } else if (ext === 'xlsx') {
@@ -1009,7 +1015,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
         const resultat = processRows(rows.slice(1));
         setLignesEnAttente(prev => [...prev, ...resultat]);
         if (resultat.length > 0) setLastImportBatch({ batchId, target: 'sas', source: 'Journal de Banque', count: resultat.length });
-        alert(`${resultat.length} ligne(s) importée(s) avec succès.${doublonsCount > 0 ? `\n(Sécurité : ${doublonsCount} doublon(s) ignoré(s))` : ''}`);
+        alert(`${resultat.length} ligne(s) importée(s) avec succès.${doublonsCount > 0 ? `\n(Sécurité : ${doublonsCount} doublon(s) existant(s) ignoré(s))` : ''}`);
       } catch (err) {
         console.error("Détail de l'erreur Excel :", err);
         alert("Erreur lors de la lecture du fichier XLSX. Détails dans la console (touche F12).");
@@ -1038,7 +1044,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
         if (cols.length >= 13) {
           const rawDate = cols[3].trim();
           const formattedDate = normaliserDateFR(rawDate);
-          // SÉCURITÉ ANTI-CRASH
           const compteNum = cols[4] ? String(cols[4]).trim() : '';
           const compteLib = cols[5] ? String(cols[5]).trim() : '';
           const pieceRef = cols[8] ? String(cols[8]).trim() : '';
@@ -1081,7 +1086,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
         }
       }
       if (count > 0) setLastImportBatch({ batchId, target: 'firestore', source: 'Fiches de Paie', count });
-      alert(`${count} ligne(s) de paie intégrée(s) !${doublonsCount > 0 ? `\n(Sécurité : ${doublonsCount} doublon(s) ignoré(s))` : ''}`);
+      alert(`${count} ligne(s) de paie intégrée(s) !${doublonsCount > 0 ? `\n(Sécurité : ${doublonsCount} doublon(s) existant(s) ignoré(s))` : ''}`);
       if (fileInputPaieRef.current) fileInputPaieRef.current.value = '';
       setActiveTab(null);
     };
@@ -1370,7 +1375,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
     return result;
   }, [transactionsGlobales, searchTerm, selectedCompteFilter, sortConfig]);
 
-  // SÉCURITÉ : Formatage pour le tableau de bord
   const formatMontantTableau = (montant) => {
     return new Intl.NumberFormat('fr-FR', { 
       minimumFractionDigits: 2, 
@@ -1672,20 +1676,16 @@ const GrandLivre = ({ transactionsGlobales }) => {
                         comptesList={comptesList} 
                         onChange={(val) => { 
                           setLignesEnAttente(prev => prev.map(l => {
-                            // 1. On met à jour la ligne cliquée et on la marque comme "touchée"
                             if (l.id === ligne.id) {
                               return { ...l, comptePropose: val, modifieManuellement: true };
                             }
-                            // 2. On met à jour les autres lignes de même libellé UNIQUEMENT si on ne les a pas déjà modifiées à la main
                             if (l.libelle === ligne.libelle && !l.modifieManuellement) {
                               return { ...l, comptePropose: val };
                             }
-                            // 3. Les autres lignes restent intactes
                             return l;
                           })); 
                         }} 
                       />
-                      {/* Affiche une petite étiquette si le compte a été deviné automatiquement */}
                       {ligne.comptePropose && !ligne.modifieManuellement && (
                         <div className="text-[10px] text-indigo-500 font-bold mt-1.5 pr-1 flex items-center justify-end gap-1">
                           <Sparkles size={12} /> Suggestion auto
