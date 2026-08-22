@@ -342,40 +342,41 @@ const EtatFinancier = ({ transactionsGlobales }) => {
 
   const addAmount = (balancesObj, compte, deb, cred) => {
     if (!compte) return;
-    const compteStr = String(compte);
-    const d = Number(deb) || 0;
-    const c = Number(cred) || 0;
+    const compteStr = String(compte).trim();
     if (!balancesObj[compteStr]) balancesObj[compteStr] = { debit: 0, credit: 0 };
-    balancesObj[compteStr].debit += d;
-    balancesObj[compteStr].credit += c;
+    balancesObj[compteStr].debit += (Number(deb) || 0);
+    balancesObj[compteStr].credit += (Number(cred) || 0);
   };
 
   const processTx = (t, isAnterieur) => {
+    if (!t) return;
     const isOD = t.type === 'od';
     const resObj = isAnterieur ? balancesResultatAnt : balancesResultat;
     const m = Number(t.montant) || 0;
     const absM = Math.abs(m);
 
     if (isOD) {
-      const dCode = t.compteDebit ? String(t.compteDebit) : '';
-      const cCode = t.compteCredit ? String(t.compteCredit) : '';
+      // CORRECTION : Forcer la conversion en chaîne de texte pour éviter le plantage
+      const dCode = t.compteDebit ? String(t.compteDebit).trim() : '';
+      const cCode = t.compteCredit ? String(t.compteCredit).trim() : '';
 
       if (dCode) {
         if (dCode.startsWith('6') || dCode.startsWith('7')) {
-          addAmount(resObj, dCode, m, 0);
+          addAmount(resObj, dCode, absM, 0);
         } else {
-          addAmount(balancesBilan, dCode, m, 0);
+          addAmount(balancesBilan, dCode, absM, 0);
         }
       }
       if (cCode) {
         if (cCode.startsWith('6') || cCode.startsWith('7')) {
-          addAmount(resObj, cCode, 0, m);
+          addAmount(resObj, cCode, 0, absM);
         } else {
-          addAmount(balancesBilan, cCode, 0, m);
+          addAmount(balancesBilan, cCode, 0, absM);
         }
       }
     } else {
-      const compteStr = t.compte ? String(t.compte) : '';
+      // CORRECTION : Forcer la conversion en chaîne de texte
+      const compteStr = t.compte ? String(t.compte).trim() : '';
       const isCharge = compteStr.startsWith('6');
       const isProduit = compteStr.startsWith('7');
 
@@ -387,7 +388,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
         else addAmount(balancesBilan, compteStr, 0, absM);
       }
 
-      // Génération automatique de la contrepartie en Banque
+      // Contrepartie Banque
       if (m < 0) addAmount(balancesBilan, '512000', 0, absM); 
       else addAmount(balancesBilan, '512000', absM, 0); 
     }
