@@ -1667,7 +1667,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
                       <input type="text" placeholder="Ajouter un commentaire..." value={ligne.commentaire || ''} onChange={(e) => { const val = e.target.value; setLignesEnAttente(prev => prev.map(l => l.id === ligne.id ? { ...l, commentaire: val } : l)); }} className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs w-full outline-none focus:border-indigo-500 bg-slate-50/50" />
                     </td>
                     <td className="py-3 px-4 min-w-[280px]">
-                      <SearchableCompteSelect value={ligne.comptePropose || ''} comptesList={comptesList} onChange={(val) => { setLignesEnAttente(prev => prev.map(l => (l.id === ligne.id || l.libelle === ligne.libelle) ? { ...l, comptePropose: val } : l )); }} />
+                      <SearchableCompteSelect value={ligne.comptePropose || ''} comptesList={comptesList} onChange={(val) => { setLignesEnAttente(prev => prev.map(l => l.id === ligne.id ? { ...l, comptePropose: val } : l )); }} />
                     </td>
                     <td className="py-3 px-4 text-center">
                       <div className="flex justify-center items-center gap-2">
