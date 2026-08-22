@@ -622,6 +622,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     </div>
   );
 };
+
 // --- GRAND LIVRE (Import CSV/XLSX, OD, Validations) ---
 const GrandLivre = ({ transactionsGlobales }) => {
   const [lignesEnAttente, setLignesEnAttente] = useState([]);
