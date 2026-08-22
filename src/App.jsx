@@ -94,9 +94,10 @@ const InfosContact = () => (
 const normaliserDateFR = (rawVal) => {
   if (!rawVal) return '';
   if (rawVal instanceof Date && !isNaN(rawVal)) {
-    const d = String(rawVal.getDate()).padStart(2, '0');
-    const m = String(rawVal.getMonth() + 1).padStart(2, '0');
-    const y = rawVal.getFullYear();
+    // SÉCURITÉ J-1 : Utiliser "UTC" pour empêcher le décalage horaire d'Excel
+    const d = String(rawVal.getUTCDate()).padStart(2, '0');
+    const m = String(rawVal.getUTCMonth() + 1).padStart(2, '0');
+    const y = rawVal.getUTCFullYear();
     return `${d}/${m}/${y}`;
   }
   const str = String(rawVal).trim();
@@ -966,8 +967,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
           const libelleExtrait = cols[1] ? String(cols[1]) : (cols[3] ? String(cols[3]) : '');
 
           if (mt !== 0) {
-            // CORRECTION DOUBLE CHECK : On vérifie UNIQUEMENT dans le Grand Livre (transactionsGlobales)
-            // ou dans le SAS (lignesEnAttente). On ne vérifie PLUS les "nouvellesLignes" entre elles.
             const isDuplicate = transactionsGlobales.some(t => t.date === dateExtrait && t.libelle === libelleExtrait && Math.abs(t.montant) === Math.abs(mt)) ||
                                 lignesEnAttente.some(t => t.date === dateExtrait && t.libelle === libelleExtrait && Math.abs(t.montant) === Math.abs(mt));
 
@@ -1394,6 +1393,41 @@ const GrandLivre = ({ transactionsGlobales }) => {
     return acc + (Number(t.montant) > 0 ? Number(t.montant) : 0);
   }, 0);
 
+  // CORRECTION MASSIVE : TOUTE LA BASE
+  const handleFixAllDatesMassive = async () => {
+    const pwd = window.prompt(`⚠️ CORRECTION MASSIVE :\nVous allez ajouter +1 jour à TOUTES les écritures de la base (${transactionsGlobales.length} lignes).\n\nTapez 'OUI' en majuscules pour confirmer :`);
+    
+    if (pwd !== 'OUI') {
+      alert("Opération annulée.");
+      return;
+    }
+
+    let count = 0;
+    const chunkSize = 100; // Envoi par paquets de 100 pour aller très vite sans faire planter le navigateur
+    
+    for (let i = 0; i < transactionsGlobales.length; i += chunkSize) {
+      const chunk = transactionsGlobales.slice(i, i + chunkSize);
+      const promises = chunk.map(tx => {
+        if (tx.date && tx.date.includes('/')) {
+          const parts = tx.date.split('/');
+          if (parts.length === 3) {
+            const d = new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
+            d.setDate(d.getDate() + 1);
+            const newDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+            
+            return updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', tx.id), { date: newDate })
+              .then(() => { count++; })
+              .catch(e => console.error(e));
+          }
+        }
+        return Promise.resolve();
+      });
+      await Promise.all(promises);
+    }
+
+    alert(`✅ Mission accomplie ! ${count} écritures ont été corrigées avec succès (+1 jour) sur toute la base.`);
+  };
+
   return (
     <div className="space-y-6 w-full max-w-[1600px] mx-auto px-3 py-2 font-sans">
 
@@ -1719,6 +1753,11 @@ const GrandLivre = ({ transactionsGlobales }) => {
           </div>
 
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+            {/* BOUTON D'URGENCE POUR CORRIGER TOUTE LA BASE D'UN COUP */}
+            <button onClick={handleFixAllDatesMassive} className="text-xs bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-2 active:scale-95" title="Ajouter +1 jour à toutes les écritures du Grand Livre">
+              <Calendar size={14} /> +1 Jour (Base Entière)
+            </button>
+
             <button onClick={handleResetGrandLivre} className="text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-2 active:scale-95" title="Vider entièrement le Grand Livre">
               <Trash2 size={14} /> Vider le Grand Livre
             </button>
