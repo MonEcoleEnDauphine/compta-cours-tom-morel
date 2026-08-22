@@ -179,7 +179,6 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     return c ? c.libelle : '';
   };
 
-  // PARSER INFALLIBLE DE DATE (Gère JJ/MM/AAAA et AAAA-MM-JJ)
   const parseDateForFilter = (dStr) => {
     if (!dStr) return 0;
     const str = String(dStr).trim();
@@ -195,9 +194,9 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     } else if (str.includes('-')) {
       const parts = str.split('-');
       if (parts.length === 3) {
-        if (parts[0].length === 4) { // AAAA-MM-JJ
+        if (parts[0].length === 4) {
           return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)).getTime();
-        } else { // JJ-MM-AAAA
+        } else {
           return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10)).getTime();
         }
       }
@@ -205,6 +204,286 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     return new Date(str).getTime() || 0;
   };
 
+  const transactionsFiltrees = useMemo(() => {
+    const start = new Date(anneeDebut, 8, 1, 0, 0, 0).getTime();
+    const end = new Date(anneeDebut + 1, 7, 31, 23, 59, 59).getTime();
+
+    return safeTransactions.filter(t => {
+      if (!t.date) return false;
+      const tTime = parseDateForFilter(t.date);
+      return tTime >= start && tTime <= end;
+    });
+  }, [safeTransactions, anneeDebut]);
+
+  const balances = {};
+  transactionsFiltrees.forEach(t => {
+    if (!t.compte && !t.compteDebit && !t.compteCredit) return;
+
+    const addAmount = (compte, deb, cred) => {
+      if (!compte) return;
+      if (!balances[compte]) balances[compte] = { debit: 0, credit: 0 };
+      balances[compte].debit += (Number(deb) || 0);
+      balances[compte].credit += (Number(cred) || 0);
+    };
+
+    if (t.type === 'od') {
+      addAmount(t.compteDebit, t.montant, 0);
+      addAmount(t.compteCredit, 0, t.montant);
+    } else {
+      if (Number(t.montant) < 0) {
+        addAmount(t.compte, Math.abs(t.montant), 0);
+      } else {
+        addAmount(t.compte, 0, t.montant);
+      }
+    }
+  });
+
+  const actif = {};
+  const passif = {};
+  const charges = {};
+  const produits = {};
+
+  let totalActif = 0;
+  let totalPassif = 0;
+  let totalCharges = 0;
+  let totalProduits = 0;
+
+  Object.keys(balances).forEach(code => {
+    if (!code || code.length < 2) return;
+
+    const b = balances[code];
+    const net = b.debit - b.credit;
+    if (Math.abs(net) < 0.01) return;
+
+    const prefix2 = code.substring(0, 2);
+    const groupName = `${prefix2} - ${PREFIXES[prefix2] || 'Autres comptes'}`;
+    const item = { code, libelle: getCompteLibelle(code), net: Math.abs(net) };
+
+    const addToGroup = (category, group, data) => {
+      if (!category[group]) category[group] = { total: 0, items: [] };
+      category[group].items.push(data);
+      category[group].total += data.net;
+    };
+
+    const root = code[0];
+    if (root === '6') {
+      addToGroup(charges, groupName, item);
+      totalCharges += item.net;
+    } else if (root === '7') {
+      addToGroup(produits, groupName, item);
+      totalProduits += item.net;
+    } else if (['1'].includes(root)) {
+      addToGroup(passif, groupName, item);
+      totalPassif += item.net;
+    } else if (['2', '3'].includes(root)) {
+      addToGroup(actif, groupName, item);
+      totalActif += item.net;
+    } else if (['4', '5'].includes(root)) {
+      if (net > 0) {
+        addToGroup(actif, groupName, item);
+        totalActif += item.net;
+      } else {
+        addToGroup(passif, groupName, item);
+        totalPassif += item.net;
+      }
+    }
+  });
+
+  const sortGroupItems = (groupObj) => {
+    Object.values(groupObj).forEach(grp => {
+      grp.items.sort((a, b) => a.code.localeCompare(b.code));
+    });
+  };
+  sortGroupItems(actif);
+  sortGroupItems(passif);
+  sortGroupItems(charges);
+  sortGroupItems(produits);
+
+  const resultat = totalProduits - totalCharges;
+  const sortedKeys = (obj) => Object.keys(obj).sort();
+
+  // NOUVEAU : Calcul pour vérifier si le bilan est bien équilibré
+  const totalPassifPlusResultat = totalPassif + resultat;
+  const ecartBilan = Math.abs(totalActif - totalPassifPlusResultat);
+  const isBilanDesequilibre = ecartBilan > 0.01;
+
+  const renderGroup = (category, groupKey) => {
+    const grp = category[groupKey];
+    const isExpanded = detailsOuverts[groupKey];
+    return (
+      <div key={groupKey} className="border-b border-slate-100 last:border-0">
+        <div 
+          className="flex justify-between items-center p-3 hover:bg-slate-50 cursor-pointer transition-colors"
+          onClick={() => toggleDetail(groupKey)}
+        >
+          <div className="flex items-center gap-2">
+            {isExpanded ? <ChevronDown size={14} className="text-slate-400 shrink-0" /> : <ChevronRight size={14} className="text-slate-400 shrink-0" />}
+            <span className="text-sm font-semibold text-slate-700">{groupKey}</span>
+          </div>
+          <span className="text-sm font-bold text-slate-800 whitespace-nowrap ml-2">{grp.total.toFixed(2)} €</span>
+        </div>
+        {isExpanded && (
+          <div className="bg-slate-50 pb-2">
+            {grp.items.map(item => (
+              <div key={item.code} className="flex justify-between items-center px-8 py-1.5 hover:bg-slate-100 transition-colors">
+                <div className="flex items-center gap-2 overflow-hidden pr-2">
+                  <span className="text-[11px] font-mono bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-600 shrink-0">{item.code}</span>
+                  <span className="text-xs text-slate-600 truncate" title={item.libelle}>
+                    {item.libelle || <span className="italic text-slate-400">Sans libellé</span>}
+                  </span>
+                </div>
+                <span className="text-xs font-medium text-slate-600 shrink-0">{item.net.toFixed(2)} €</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-8 max-w-6xl mx-auto">
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+            <PieChart className="text-indigo-600" /> États Financiers
+          </h2>
+          <p className="text-slate-500 text-sm mt-1">Bilan et Compte de Résultat groupés par familles comptables.</p>
+        </div>
+        
+        <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
+          <Calendar size={18} className="text-slate-500" />
+          <select 
+            value={anneeDebut} 
+            onChange={(e) => setAnneeDebut(Number(e.target.value))}
+            className="bg-transparent border-none text-sm font-bold text-slate-700 outline-none cursor-pointer"
+          >
+            {[2021, 2022, 2023, 2024, 2025, 2026].map(year => (
+              <option key={year} value={year}>
+                01/09/{String(year).slice(-2)} au 31/08/{String(year + 1).slice(-2)}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-slate-900 p-4">
+          <h3 className="text-white font-bold flex items-center gap-2 text-lg">
+            Compte de Résultat (Classe 6 & 7)
+          </h3>
+          <p className="text-slate-400 text-xs mt-1">Compare les produits et les charges pour déterminer le bénéfice ou la perte.</p>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200">
+          <div>
+            <div className="bg-red-50 text-red-700 font-bold p-3 text-center text-sm border-b border-red-100 uppercase tracking-wider">
+              Charges (Dépenses)
+            </div>
+            <div className="p-2">
+              {sortedKeys(charges).length > 0 ? (
+                sortedKeys(charges).map(key => renderGroup(charges, key))
+              ) : (
+                <div className="text-center text-slate-400 text-sm py-8">Aucune donnée sur cette période</div>
+              )}
+            </div>
+          </div>
+          <div>
+            <div className="bg-emerald-50 text-emerald-700 font-bold p-3 text-center text-sm border-b border-emerald-100 uppercase tracking-wider">
+              Produits (Recettes)
+            </div>
+            <div className="p-2">
+              {sortedKeys(produits).length > 0 ? (
+                sortedKeys(produits).map(key => renderGroup(produits, key))
+              ) : (
+                <div className="text-center text-slate-400 text-sm py-8">Aucune donnée sur cette période</div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-between items-center">
+          <span className="font-bold text-slate-700 uppercase">Résultat de l'exercice</span>
+          <span className={`text-xl font-black ${resultat >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+            {resultat > 0 ? '+' : ''}{resultat.toFixed(2)} €
+          </span>
+        </div>
+      </div>
+
+      {/* NOUVEAU : ALERTE BIZAN DÉSÉQUILIBRÉ */}
+      {isBilanDesequilibre && (
+        <div className="bg-rose-50 border border-rose-200 p-5 rounded-2xl shadow-sm flex flex-col md:flex-row items-start gap-4 animate-pulse">
+          <div className="p-3 bg-rose-500 text-white rounded-xl shadow-md shrink-0">
+            <AlertTriangle size={24} />
+          </div>
+          <div>
+            <h4 className="font-black text-rose-900 text-lg uppercase tracking-tight">Déséquilibre du Bilan Détecté</h4>
+            <p className="text-sm text-rose-800 mt-1 leading-relaxed">
+              En véritable comptabilité partie double, l'Actif doit <strong>obligatoirement</strong> être égal au Passif (incluant le Résultat). 
+              Actuellement, le logiciel détecte un écart de <strong className="bg-rose-200 px-1.5 py-0.5 rounded">{ecartBilan.toFixed(2)} €</strong>.
+            </p>
+            <div className="bg-white/60 border border-rose-100 p-3 rounded-xl mt-3 flex items-start gap-2">
+              <span className="text-rose-600 font-bold">💡 Solution :</span>
+              <span className="text-xs text-rose-900 font-medium">Pour rééquilibrer le bilan, assurez-vous d'avoir bien intégré vos écritures dans le <strong>Journal de Banque</strong> (qui alimentent le compte <em>512000</em> à l'Actif) en contrepartie de vos opérations diverses et fiches de paie.</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-slate-900 p-4">
+          <h3 className="text-white font-bold flex items-center gap-2 text-lg">
+            Bilan Comptable (Classe 1 à 5)
+          </h3>
+          <p className="text-slate-400 text-xs mt-1">Photographie du patrimoine : L'Actif (ce qu'on possède) et le Passif (ce qu'on doit).</p>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200">
+          <div>
+            <div className="bg-blue-50 text-blue-700 font-bold p-3 text-center text-sm border-b border-blue-100 uppercase tracking-wider">
+              Actif (Emplois)
+            </div>
+            <div className="p-2">
+              {sortedKeys(actif).length > 0 ? (
+                sortedKeys(actif).map(key => renderGroup(actif, key))
+              ) : (
+                <div className="text-center text-slate-400 text-sm py-8">Aucune donnée sur cette période</div>
+              )}
+            </div>
+          </div>
+          <div>
+            <div className="bg-orange-50 text-orange-700 font-bold p-3 text-center text-sm border-b border-orange-100 uppercase tracking-wider">
+              Passif (Ressources)
+            </div>
+            <div className="p-2">
+              {sortedKeys(passif).length > 0 ? (
+                sortedKeys(passif).map(key => renderGroup(passif, key))
+              ) : (
+                <div className="text-center text-slate-400 text-sm py-8">Aucune donnée sur cette période</div>
+              )}
+              <div className="border-t border-slate-200 mt-2 pt-2">
+                <div className="flex justify-between items-center px-4 py-2 bg-slate-50 rounded-lg">
+                  <span className="text-sm font-bold text-slate-700">12 - Résultat de l'exercice</span>
+                  <span className={`text-sm font-black ${resultat >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {resultat > 0 ? '+' : ''}{resultat.toFixed(2)} €
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className={`p-4 border-t flex justify-between items-center text-sm ${isBilanDesequilibre ? 'bg-rose-100 border-rose-300' : 'bg-slate-50 border-slate-200'}`}>
+          <span className={`font-black uppercase ${isBilanDesequilibre ? 'text-rose-700' : 'text-slate-500'}`}>TOTAL GÉNÉRAL</span>
+          <div className="flex gap-8">
+            <span className="font-bold text-blue-700">Actif : {totalActif.toFixed(2)} €</span>
+            <span className="font-bold text-orange-700">Passif + Résultat : {totalPassifPlusResultat.toFixed(2)} €</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
   // Filtrage intelligent selon la période scolaire (01/09/N au 31/08/N+1)
   const transactionsFiltrees = useMemo(() => {
     const start = new Date(anneeDebut, 8, 1, 0, 0, 0).getTime(); // 1er Septembre
@@ -594,18 +873,15 @@ const GrandLivre = ({ transactionsGlobales }) => {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [lastImportBatch, setLastImportBatch] = useState(null);
   
-  // Pièces jointes
   const [selectedTxForPdf, setSelectedTxForPdf] = useState(null);
   const fileInputPdfRef = useRef(null);
 
-  // Pop-up création de compte à 6 chiffres
   const [showCompteModal, setShowCompteModal] = useState(false);
   const [pendingCompte, setPendingCompte] = useState({ code: '', libelle: '', lineId: null });
 
   // Accordéon (Onglets déroulants)
   const [activeTab, setActiveTab] = useState(null); // 'banque', 'paie', ou 'od'
 
-  // Formulaire OD
   const [odFormDate, setOdFormDate] = useState('');
   const [odFormLibelle, setOdFormLibelle] = useState('');
   const [odFormCommentaire, setOdFormCommentaire] = useState('');
@@ -1361,29 +1637,32 @@ const GrandLivre = ({ transactionsGlobales }) => {
         </div>
       )}
 
-      {/* PANNEAUX D'ACTIONS EN ACCORDÉON */}
-      <div className="bg-white border border-slate-200/80 rounded-3xl shadow-sm overflow-hidden flex flex-col divide-y divide-slate-100">
+      {/* PANNEAUX D'ACTIONS : DISPOSITION HORIZONTALE COMPACTE */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* ONGLET BANQUE */}
-        <div className="flex flex-col relative overflow-hidden">
-          <button onClick={() => setActiveTab(activeTab === 'banque' ? null : 'banque')} className={`w-full text-left p-5 flex justify-between items-center transition-colors hover:bg-slate-50/50 ${activeTab === 'banque' ? 'bg-indigo-50/20' : ''}`}>
+        <div className={`bg-white border rounded-3xl shadow-sm flex flex-col transition-all overflow-hidden ${activeTab === 'banque' ? 'border-indigo-400 ring-4 ring-indigo-50' : 'border-slate-200/80 hover:border-indigo-300'}`}>
+          <button 
+            onClick={() => setActiveTab(activeTab === 'banque' ? null : 'banque')} 
+            className={`w-full text-left p-5 flex justify-between items-center transition-colors ${activeTab === 'banque' ? 'bg-indigo-50/50' : 'hover:bg-slate-50/50'}`}
+          >
             <div className="flex items-center gap-4">
               <div className={`p-2.5 rounded-2xl transition-colors ${activeTab === 'banque' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'bg-indigo-50 text-indigo-600'}`}>
                 <Download size={20} />
               </div>
               <div>
-                <h3 className={`font-extrabold text-lg ${activeTab === 'banque' ? 'text-indigo-950' : 'text-slate-800'}`}>Journal de Banque</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Importation des relevés (.CSV / .XLSX)</p>
+                <h3 className={`font-extrabold text-base ${activeTab === 'banque' ? 'text-indigo-950' : 'text-slate-800'}`}>Journal de Banque</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Import des relevés bancaires</p>
               </div>
             </div>
             <ChevronDown size={20} className={`text-slate-400 transition-transform duration-300 ${activeTab === 'banque' ? 'rotate-180 text-indigo-600' : ''}`} />
           </button>
           {activeTab === 'banque' && (
-            <div className="p-6 pt-2 pl-20 animate-fade-in border-l-4 border-indigo-500">
-              <div className="bg-indigo-50/50 rounded-2xl p-5 border border-indigo-100 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <p className="text-sm text-indigo-900">Importation directe des relevés de comptes bancaires pour intégration et pré-imputation.</p>
-                <button onClick={() => fileInputBankRef.current.click()} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-all shadow-md shadow-indigo-200 whitespace-nowrap active:scale-95">
-                  <Download size={16} /> Parcourir le fichier
+            <div className="p-5 pt-0 animate-fade-in flex-1 flex flex-col justify-end">
+              <div className="bg-indigo-50/50 rounded-2xl p-4 border border-indigo-100 flex flex-col gap-4 text-center mt-4">
+                <p className="text-xs text-indigo-900 leading-relaxed">Formats acceptés : <strong>.CSV</strong> ou <strong>.XLSX</strong>.<br/>Importez directement depuis votre banque.</p>
+                <button onClick={() => fileInputBankRef.current.click()} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-md shadow-indigo-200 active:scale-95">
+                  <Download size={16} /> Sélectionner le fichier
                 </button>
               </div>
             </div>
@@ -1391,25 +1670,28 @@ const GrandLivre = ({ transactionsGlobales }) => {
         </div>
 
         {/* ONGLET PAIE */}
-        <div className="flex flex-col relative overflow-hidden">
-          <button onClick={() => setActiveTab(activeTab === 'paie' ? null : 'paie')} className={`w-full text-left p-5 flex justify-between items-center transition-colors hover:bg-slate-50/50 ${activeTab === 'paie' ? 'bg-pink-50/20' : ''}`}>
+        <div className={`bg-white border rounded-3xl shadow-sm flex flex-col transition-all overflow-hidden ${activeTab === 'paie' ? 'border-pink-400 ring-4 ring-pink-50' : 'border-slate-200/80 hover:border-pink-300'}`}>
+          <button 
+            onClick={() => setActiveTab(activeTab === 'paie' ? null : 'paie')} 
+            className={`w-full text-left p-5 flex justify-between items-center transition-colors ${activeTab === 'paie' ? 'bg-pink-50/50' : 'hover:bg-slate-50/50'}`}
+          >
             <div className="flex items-center gap-4">
               <div className={`p-2.5 rounded-2xl transition-colors ${activeTab === 'paie' ? 'bg-pink-600 text-white shadow-md shadow-pink-200' : 'bg-pink-50 text-pink-600'}`}>
                 <Users size={20} />
               </div>
               <div>
-                <h3 className={`font-extrabold text-lg ${activeTab === 'paie' ? 'text-pink-950' : 'text-slate-800'}`}>Fiches de Paie</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Intégration du journal des salaires (.TXT / .TSV)</p>
+                <h3 className={`font-extrabold text-base ${activeTab === 'paie' ? 'text-pink-950' : 'text-slate-800'}`}>Fiches de Paie</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Intégration du journal des salaires</p>
               </div>
             </div>
             <ChevronDown size={20} className={`text-slate-400 transition-transform duration-300 ${activeTab === 'paie' ? 'rotate-180 text-pink-600' : ''}`} />
           </button>
           {activeTab === 'paie' && (
-            <div className="p-6 pt-2 pl-20 animate-fade-in border-l-4 border-pink-500">
-              <div className="bg-pink-50/50 rounded-2xl p-5 border border-pink-100 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <p className="text-sm text-pink-900">Intégration des salaires bruts, nets, cotisations sociales et prélèvements à la source.</p>
-                <button onClick={() => fileInputPaieRef.current.click()} className="bg-pink-600 hover:bg-pink-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-all shadow-md shadow-pink-200 whitespace-nowrap active:scale-95">
-                  <Users size={16} /> Parcourir le fichier
+            <div className="p-5 pt-0 animate-fade-in flex-1 flex flex-col justify-end">
+              <div className="bg-pink-50/50 rounded-2xl p-4 border border-pink-100 flex flex-col gap-4 text-center mt-4">
+                <p className="text-xs text-pink-900 leading-relaxed">Formats acceptés : <strong>.TXT</strong> ou <strong>.TSV</strong>.<br/>Import de votre logiciel de paie externe.</p>
+                <button onClick={() => fileInputPaieRef.current.click()} className="w-full bg-pink-600 hover:bg-pink-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-md shadow-pink-200 active:scale-95">
+                  <Users size={16} /> Sélectionner le fichier
                 </button>
               </div>
             </div>
@@ -1417,84 +1699,84 @@ const GrandLivre = ({ transactionsGlobales }) => {
         </div>
 
         {/* ONGLET OD */}
-        <div className="flex flex-col relative overflow-hidden">
-          <button onClick={() => setActiveTab(activeTab === 'od' ? null : 'od')} className={`w-full text-left p-5 flex justify-between items-center transition-colors hover:bg-slate-50/50 ${activeTab === 'od' ? 'bg-purple-50/20' : ''}`}>
+        <div className={`bg-white border rounded-3xl shadow-sm flex flex-col transition-all overflow-hidden lg:col-span-1 md:col-span-2 ${activeTab === 'od' ? 'border-purple-400 ring-4 ring-purple-50 lg:col-span-3' : 'border-slate-200/80 hover:border-purple-300'}`}>
+          <button 
+            onClick={() => setActiveTab(activeTab === 'od' ? null : 'od')} 
+            className={`w-full text-left p-5 flex justify-between items-center transition-colors ${activeTab === 'od' ? 'bg-purple-50/50' : 'hover:bg-slate-50/50'}`}
+          >
             <div className="flex items-center gap-4">
               <div className={`p-2.5 rounded-2xl transition-colors ${activeTab === 'od' ? 'bg-purple-600 text-white shadow-md shadow-purple-200' : 'bg-purple-50 text-purple-600'}`}>
                 <FileText size={20} />
               </div>
               <div>
-                <h3 className={`font-extrabold text-lg ${activeTab === 'od' ? 'text-purple-950' : 'text-slate-800'}`}>Opération Diverse (OD)</h3>
+                <h3 className={`font-extrabold text-base ${activeTab === 'od' ? 'text-purple-950' : 'text-slate-800'}`}>Opération Diverse (OD)</h3>
                 <p className="text-xs text-slate-500 mt-0.5">Saisie manuelle ventilée & Import masse</p>
               </div>
             </div>
-            <ChevronDown size={20} className={`text-slate-400 transition-transform duration-300 ${activeTab === 'od' ? 'rotate-180 text-purple-600' : ''}`} />
+            <div className="flex items-center gap-3">
+              {/* Le bouton d'import OD reste cliquable même si le bandeau est fermé */}
+              <button 
+                onClick={(e) => { e.stopPropagation(); fileInputODRef.current.click(); }} 
+                className="text-[10px] font-bold uppercase tracking-wider bg-purple-100 hover:bg-purple-200 text-purple-700 border border-purple-200 px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-sm"
+                title="Importer un fichier d'OD ou de Paie en masse (.csv / .xlsx)"
+              >
+                <Download size={13}/> Import masse
+              </button>
+              <ChevronDown size={20} className={`text-slate-400 transition-transform duration-300 ${activeTab === 'od' ? 'rotate-180 text-purple-600' : ''}`} />
+            </div>
           </button>
           
           {activeTab === 'od' && (
-            <div className="p-6 pt-2 animate-fade-in border-l-4 border-purple-500">
-              <div className="bg-purple-50/30 rounded-3xl p-5 border border-purple-100 flex flex-col gap-4">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
-                  <h4 className="font-bold text-purple-900 text-sm uppercase tracking-wider">Créer une écriture comptable</h4>
-                  <button onClick={() => fileInputODRef.current.click()} className="text-xs font-bold bg-white text-purple-700 border border-purple-200 px-4 py-2 rounded-xl transition-all flex items-center gap-2 shadow-sm hover:shadow-md hover:border-purple-300">
-                    <Download size={14}/> Import masse depuis un fichier
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <input type="date" value={odFormDate} onChange={e => setOdFormDate(e.target.value)} className="border border-slate-200 rounded-xl p-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-purple-600 font-mono font-semibold shadow-sm" />
-                  <input type="text" placeholder="Libellé de l'OD..." value={odFormLibelle} onChange={e => setOdFormLibelle(e.target.value)} className="md:col-span-2 border border-slate-200 rounded-xl p-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-purple-600 font-medium shadow-sm" />
-                </div>
-                <div>
+            <div className="p-5 pt-0 animate-fade-in bg-purple-50/30">
+              <div className="flex flex-col gap-4 mt-4">
+                
+                {/* Formulaire vertical compact pour tenir dans le 1/3 d'écran */}
+                <div className="flex flex-col gap-3">
+                  <div className="flex gap-3">
+                    <input type="date" value={odFormDate} onChange={e => setOdFormDate(e.target.value)} className="w-1/3 border border-slate-200 rounded-xl p-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-purple-600 font-mono font-semibold shadow-sm" />
+                    <input type="text" placeholder="Libellé OD..." value={odFormLibelle} onChange={e => setOdFormLibelle(e.target.value)} className="flex-1 border border-slate-200 rounded-xl p-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-purple-600 font-medium shadow-sm" />
+                  </div>
                   <input type="text" placeholder="Commentaire ou référence optionnelle..." value={odFormCommentaire} onChange={e => setOdFormCommentaire(e.target.value)} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-purple-600 shadow-sm" />
                 </div>
 
-                <div className="space-y-2 mt-2">
+                <div className="space-y-3 mt-2">
                   {odLines.map((l) => (
-                    <div key={l.id} className="flex flex-wrap md:flex-nowrap gap-2 items-center bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
-                      <div className="w-full md:flex-1 relative">
+                    <div key={l.id} className="flex flex-col gap-2 bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                      <div className="w-full relative">
                         <SearchableCompteSelect 
                           value={l.compte || ''}
                           comptesList={comptesList}
-                          placeholder="N° Compte (min 6 chiffres)"
+                          placeholder="Sélectionnez ou tapez (ex: 606100)"
                           onChange={(val) => updateOdLine(l.id, 'compte', val)}
                         />
-                        <div className="absolute top-1/2 -translate-y-1/2 right-8 pointer-events-none opacity-0">
-                          {/* Listener silencieux pour déclencher la modal si le code tapé n'existe pas */}
-                          <input 
-                            type="text" 
-                            className="hidden" 
-                            value={l.compte} 
-                            onBlur={e => handleCompteOdBlur(l.id, e.target.value)} 
-                          />
-                        </div>
+                        <input type="text" className="hidden" value={l.compte} onBlur={e => handleCompteOdBlur(l.id, e.target.value)} />
                       </div>
 
-                      <div className="flex gap-2 w-full md:w-auto">
-                        <input type="number" placeholder="Débit €" value={l.debit} onChange={e => updateOdLine(l.id, 'debit', e.target.value)} className="border border-slate-200 rounded-xl p-2 text-sm bg-white w-full md:w-32 outline-none focus:ring-2 focus:ring-purple-600 font-bold text-right" />
-                        <input type="number" placeholder="Crédit €" value={l.credit} onChange={e => updateOdLine(l.id, 'credit', e.target.value)} className="border border-slate-200 rounded-xl p-2 text-sm bg-white w-full md:w-32 outline-none focus:ring-2 focus:ring-purple-600 font-bold text-right" />
-                        <button onClick={() => removeOdLine(l.id)} className="text-slate-400 hover:text-rose-500 transition-colors p-2 bg-slate-50 rounded-xl shrink-0">
+                      <div className="flex gap-2">
+                        <input type="number" placeholder="Débit €" value={l.debit} onChange={e => updateOdLine(l.id, 'debit', e.target.value)} className="border border-slate-200 rounded-xl p-2 text-sm bg-slate-50 w-full outline-none focus:ring-2 focus:ring-purple-600 font-bold text-right" />
+                        <input type="number" placeholder="Crédit €" value={l.credit} onChange={e => updateOdLine(l.id, 'credit', e.target.value)} className="border border-slate-200 rounded-xl p-2 text-sm bg-slate-50 w-full outline-none focus:ring-2 focus:ring-purple-600 font-bold text-right" />
+                        <button onClick={() => removeOdLine(l.id)} className="text-slate-400 hover:text-rose-500 transition-colors p-2 bg-slate-100 rounded-xl shrink-0">
                           <XCircle size={18} />
                         </button>
                       </div>
                     </div>
                   ))}
-                  <button onClick={addOdLine} className="text-sm text-purple-600 font-bold hover:underline flex items-center gap-1 p-1 ml-1">
-                    + Ajouter une ligne d'écriture
+                  <button onClick={addOdLine} className="text-sm text-purple-600 font-bold hover:underline flex items-center gap-1 p-1">
+                    + Ajouter une ligne de ventilation
                   </button>
                 </div>
 
                 <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-purple-200/50 mt-2">
-                  <div className={`flex items-center gap-4 px-4 py-2.5 rounded-xl border transition-colors ${isOdBalanced ? 'bg-emerald-50 text-emerald-900 border-emerald-200' : 'bg-slate-100 text-slate-700 border-slate-200'}`}>
+                  <div className={`flex items-center gap-4 px-4 py-2.5 rounded-xl border w-full sm:w-auto justify-between sm:justify-start transition-colors ${isOdBalanced ? 'bg-emerald-50 text-emerald-900 border-emerald-200' : 'bg-slate-100 text-slate-700 border-slate-200'}`}>
                     <span className="uppercase text-xs font-bold tracking-wider">Équilibre</span>
                     <div className="flex gap-4 font-mono text-sm">
-                      <span className={isOdBalanced ? 'text-emerald-700 font-extrabold' : 'text-rose-600 font-bold'}>D: {totalDebitOD.toFixed(2)} €</span>
-                      <span className={isOdBalanced ? 'text-emerald-700 font-extrabold' : 'text-rose-600 font-bold'}>C: {totalCreditOD.toFixed(2)} €</span>
+                      <span className={isOdBalanced ? 'text-emerald-700 font-extrabold' : 'text-rose-600 font-bold'}>D: {totalDebitOD.toFixed(2)}</span>
+                      <span className={isOdBalanced ? 'text-emerald-700 font-extrabold' : 'text-rose-600 font-bold'}>C: {totalCreditOD.toFixed(2)}</span>
                     </div>
                   </div>
 
-                  <button onClick={handleAddOD} disabled={!isOdBalanced} className={`px-8 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${isOdBalanced ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-md shadow-purple-200 cursor-pointer active:scale-95' : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'}`}>
-                    <CheckCircle2 size={16} /> Enregistrer
+                  <button onClick={handleAddOD} disabled={!isOdBalanced} className={`w-full sm:w-auto px-8 py-2.5 rounded-xl font-bold text-sm transition-all flex justify-center items-center gap-2 ${isOdBalanced ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-md shadow-purple-200 cursor-pointer active:scale-95' : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'}`}>
+                    <CheckCircle2 size={16} /> Enregistrer l'OD
                   </button>
                 </div>
               </div>
@@ -1570,7 +1852,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
         </div>
       )}
 
-      {/* GRAND LIVRE DÉFINITIF TABLEAU */}
       <div className="bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden mt-8">
         <div className="p-5 bg-slate-50/80 border-b border-slate-200/80 flex flex-wrap justify-between items-center gap-4">
           <div className="flex items-center gap-3">
