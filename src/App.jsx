@@ -220,7 +220,8 @@ const SearchableCompteSelect = ({ value, onChange, comptesList, placeholder = "S
 const EtatFinancier = ({ transactionsGlobales }) => {
   const safeTransactions = transactionsGlobales || [];
 
-  const [anneeDebut, setAnneeDebut] = useState(new Date().getFullYear() > 2025 ? 2025 : 2021);
+  // NOUVEAU : On gère l'option 'TOTAL' en plus des années numériques
+  const [anneeDebut, setAnneeDebut] = useState('TOTAL');
   const [detailsOuverts, setDetailsOuverts] = useState({});
   const [comptesList, setComptesList] = useState([]);
 
@@ -315,9 +316,14 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     return new Date(str).getTime() || 0;
   };
 
+  // NOUVEAU : Si 'TOTAL', on prend tout. Sinon, on filtre par année scolaire.
   const transactionsFiltrees = useMemo(() => {
-    const start = new Date(anneeDebut, 8, 1, 0, 0, 0).getTime(); 
-    const end = new Date(anneeDebut + 1, 7, 31, 23, 59, 59).getTime(); 
+    if (anneeDebut === 'TOTAL') {
+      return safeTransactions;
+    }
+
+    const start = new Date(Number(anneeDebut), 8, 1, 0, 0, 0).getTime(); 
+    const end = new Date(Number(anneeDebut) + 1, 7, 31, 23, 59, 59).getTime(); 
 
     return safeTransactions.filter(t => {
       if (!t.date) return false;
@@ -462,16 +468,21 @@ const EtatFinancier = ({ transactionsGlobales }) => {
           <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <PieChart className="text-indigo-600" /> États Financiers
           </h2>
-          <p className="text-slate-500 text-sm mt-1">Bilan et Compte de Résultat groupés par familles comptables.</p>
+          <p className="text-slate-500 text-sm mt-1">
+            {anneeDebut === 'TOTAL' ? 'Bilan consolidé de toutes les écritures enregistrées.' : 'Bilan et Compte de Résultat groupés par familles comptables.'}
+          </p>
         </div>
 
         <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
           <Calendar size={18} className="text-slate-500" />
           <select 
             value={anneeDebut} 
-            onChange={(e) => setAnneeDebut(Number(e.target.value))}
+            onChange={(e) => setAnneeDebut(e.target.value)}
             className="bg-transparent border-none text-sm font-bold text-slate-700 outline-none cursor-pointer"
           >
+            {/* NOUVELLE OPTION : Bilan Total */}
+            <option value="TOTAL" className="font-bold text-indigo-700">⭐ Bilan Total (Toutes années)</option>
+            <option disabled>──────────────</option>
             {[2021, 2022, 2023, 2024, 2025, 2026].map(year => (
               <option key={year} value={year}>
                 01/09/{String(year).slice(-2)} au 31/08/{String(year + 1).slice(-2)}
@@ -517,7 +528,9 @@ const EtatFinancier = ({ transactionsGlobales }) => {
         </div>
 
         <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-between items-center">
-          <span className="font-bold text-slate-700 uppercase">Résultat de l'exercice</span>
+          <span className="font-bold text-slate-700 uppercase">
+            {anneeDebut === 'TOTAL' ? 'Résultat Global (Cumulé)' : "Résultat de l'exercice"}
+          </span>
           <span className={`text-xl font-black ${resultat >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
             {resultat > 0 ? '+' : ''}{formatMontant(Math.abs(resultat))} €
           </span>
@@ -540,6 +553,18 @@ const EtatFinancier = ({ transactionsGlobales }) => {
               <span className="text-xs text-rose-900 font-medium">Pour rééquilibrer, intégrez vos écritures de trésorerie via le <strong>Journal de Banque</strong> ou équilibrez correctement vos Opérations Diverses.</span>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Si le bilan est bon (pas d'écart) et qu'on est sur l'onglet TOTAL, on affiche un message de succès */}
+      {!isBilanDesequilibre && transactionsFiltrees.length > 0 && anneeDebut === 'TOTAL' && (
+        <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl shadow-sm flex items-center gap-3">
+          <div className="p-2 bg-emerald-500 text-white rounded-lg shadow-md shrink-0">
+            <CheckCircle2 size={20} />
+          </div>
+          <p className="text-sm text-emerald-800 font-medium">
+            Excellente nouvelle ! Votre Bilan Total est <strong>parfaitement équilibré</strong> au centime près. L'Actif correspond exactement au Passif.
+          </p>
         </div>
       )}
 
@@ -597,7 +622,6 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     </div>
   );
 };
-
 // --- GRAND LIVRE (Import CSV/XLSX, OD, Validations) ---
 const GrandLivre = ({ transactionsGlobales }) => {
   const [lignesEnAttente, setLignesEnAttente] = useState([]);
