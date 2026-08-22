@@ -730,6 +730,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCompteFilter, setSelectedCompteFilter] = useState(''); 
+  const [anneeFiltre, setAnneeFiltre] = useState('TOTAL'); // NOUVEAU FILTRE PAR PÉRIODE
   const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' });
 
   const fileInputBankRef = useRef(null);
@@ -1322,6 +1323,18 @@ const GrandLivre = ({ transactionsGlobales }) => {
   const filteredAndSortedTransactions = useMemo(() => {
     let result = [...transactionsGlobales];
 
+    // NOUVEAU FILTRE PAR ANNÉE SCOLAIRE
+    if (anneeFiltre !== 'TOTAL') {
+      const start = new Date(Number(anneeFiltre), 8, 1, 0, 0, 0).getTime(); 
+      const end = new Date(Number(anneeFiltre) + 1, 7, 31, 23, 59, 59).getTime(); 
+      
+      result = result.filter(t => {
+        if (!t.date) return false;
+        const tTime = parseDateForSort(t.date);
+        return tTime >= start && tTime <= end;
+      });
+    }
+
     if (searchTerm) {
       const lowerTerm = searchTerm.toLowerCase();
       result = result.filter(t => 
@@ -1372,7 +1385,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
     });
 
     return result;
-  }, [transactionsGlobales, searchTerm, selectedCompteFilter, sortConfig]);
+  }, [transactionsGlobales, searchTerm, selectedCompteFilter, sortConfig, anneeFiltre]);
 
   const formatMontantTableau = (montant) => {
     return new Intl.NumberFormat('fr-FR', { 
@@ -1383,50 +1396,16 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
   const nbLignesPretes = lignesEnAttente.filter(l => l.comptePropose).length;
 
-  const totalGeneralDebit = transactionsGlobales.reduce((acc, t) => {
+  // MISE À JOUR DYNAMIQUE DES COMPTEURS EN FONCTION DES FILTRES
+  const totalGeneralDebit = filteredAndSortedTransactions.reduce((acc, t) => {
     if (t.type === 'od') return acc + (t.compteDebit ? Number(t.montant) || 0 : 0);
     return acc + (Number(t.montant) < 0 ? Math.abs(Number(t.montant)) : 0);
   }, 0);
 
-  const totalGeneralCredit = transactionsGlobales.reduce((acc, t) => {
+  const totalGeneralCredit = filteredAndSortedTransactions.reduce((acc, t) => {
     if (t.type === 'od') return acc + (t.compteCredit ? Number(t.montant) || 0 : 0);
     return acc + (Number(t.montant) > 0 ? Number(t.montant) : 0);
   }, 0);
-
-  // CORRECTION MASSIVE : TOUTE LA BASE
-  const handleFixAllDatesMassive = async () => {
-    const pwd = window.prompt(`⚠️ CORRECTION MASSIVE :\nVous allez ajouter +1 jour à TOUTES les écritures de la base (${transactionsGlobales.length} lignes).\n\nTapez 'OUI' en majuscules pour confirmer :`);
-    
-    if (pwd !== 'OUI') {
-      alert("Opération annulée.");
-      return;
-    }
-
-    let count = 0;
-    const chunkSize = 100; // Envoi par paquets de 100 pour aller très vite sans faire planter le navigateur
-    
-    for (let i = 0; i < transactionsGlobales.length; i += chunkSize) {
-      const chunk = transactionsGlobales.slice(i, i + chunkSize);
-      const promises = chunk.map(tx => {
-        if (tx.date && tx.date.includes('/')) {
-          const parts = tx.date.split('/');
-          if (parts.length === 3) {
-            const d = new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
-            d.setDate(d.getDate() + 1);
-            const newDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-            
-            return updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', tx.id), { date: newDate })
-              .then(() => { count++; })
-              .catch(e => console.error(e));
-          }
-        }
-        return Promise.resolve();
-      });
-      await Promise.all(promises);
-    }
-
-    alert(`✅ Mission accomplie ! ${count} écritures ont été corrigées avec succès (+1 jour) sur toute la base.`);
-  };
 
   return (
     <div className="space-y-6 w-full max-w-[1600px] mx-auto px-3 py-2 font-sans">
@@ -1499,8 +1478,8 @@ const GrandLivre = ({ transactionsGlobales }) => {
         </div>
         <div className="relative z-10 flex flex-wrap items-center gap-3 w-full md:w-auto">
           <div className="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/10 flex flex-col">
-            <span className="text-[10px] uppercase font-bold text-indigo-200/80 tracking-wider">Écritures enregistrées</span>
-            <span className="text-lg font-black text-white">{transactionsGlobales.length}</span>
+            <span className="text-[10px] uppercase font-bold text-indigo-200/80 tracking-wider">Écritures affichées</span>
+            <span className="text-lg font-black text-white">{filteredAndSortedTransactions.length}</span>
           </div>
           <div className="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/10 flex flex-col">
             <span className="text-[10px] uppercase font-bold text-rose-300 tracking-wider">Total Débit</span>
@@ -1753,10 +1732,19 @@ const GrandLivre = ({ transactionsGlobales }) => {
           </div>
 
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-            {/* BOUTON D'URGENCE POUR CORRIGER TOUTE LA BASE D'UN COUP */}
-            <button onClick={handleFixAllDatesMassive} className="text-xs bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-2 active:scale-95" title="Ajouter +1 jour à toutes les écritures du Grand Livre">
-              <Calendar size={14} /> +1 Jour (Base Entière)
-            </button>
+            {/* NOUVEAU FILTRE PAR ANNÉE SCOLAIRE */}
+            <select 
+              value={anneeFiltre} 
+              onChange={(e) => setAnneeFiltre(e.target.value)}
+              className="border border-slate-200 rounded-xl px-3.5 py-2 text-xs bg-white outline-none focus:ring-2 focus:ring-indigo-600 font-bold text-slate-700 shadow-sm"
+            >
+              <option value="TOTAL">Toutes les périodes</option>
+              {[2021, 2022, 2023, 2024, 2025, 2026].map(year => (
+                <option key={year} value={year}>
+                  01/09/{String(year).slice(-2)} au 31/08/{String(year + 1).slice(-2)}
+                </option>
+              ))}
+            </select>
 
             <button onClick={handleResetGrandLivre} className="text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-2 active:scale-95" title="Vider entièrement le Grand Livre">
               <Trash2 size={14} /> Vider le Grand Livre
@@ -1775,10 +1763,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
               <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input type="text" placeholder="Rechercher écriture..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-3.5 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-600 outline-none bg-white shadow-sm" />
             </div>
-
-            <span className="text-xs font-bold bg-slate-200/60 px-3 py-2 rounded-xl text-slate-700 shadow-inner whitespace-nowrap">
-              {filteredAndSortedTransactions.length} écritures
-            </span>
           </div>
         </div>
 
