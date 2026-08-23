@@ -96,41 +96,40 @@ const normaliserDateFR = (rawVal) => {
 
   // 1. Si c'est un objet Date (Import Excel XLSX)
   if (rawVal instanceof Date && !isNaN(rawVal)) {
-    // SÉCURITÉ ABSOLUE : On se place à MIDI pour éviter tout décalage J-1 ou J+1
-    const d = new Date(rawVal.getTime());
-    d.setHours(12, 0, 0, 0); 
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const year = d.getFullYear();
-    return `${day}/${month}/${year}`;
+    // SÉCURITÉ ABSOLUE : On place l'heure artificielle à MIDI (12h).
+    // Ainsi, aucun décalage de fuseau horaire ne fera basculer la date à la veille (J-1).
+    const safeDate = new Date(rawVal.getTime());
+    safeDate.setUTCHours(12);
+    const d = String(safeDate.getUTCDate()).padStart(2, '0');
+    const m = String(safeDate.getUTCMonth() + 1).padStart(2, '0');
+    const y = safeDate.getUTCFullYear();
+    return `${d}/${m}/${y}`;
   }
 
-  // 2. Si c'est un Numéro de série pur (Autre format Excel)
+  // 2. Si la date arrive sous forme de Numéro de série pur (Autre format Excel)
   if (typeof rawVal === 'number') {
     const jsDate = new Date(Math.round((rawVal - 25569) * 86400 * 1000));
-    jsDate.setUTCHours(12); // Sécurité MIDI
-    const day = String(jsDate.getUTCDate()).padStart(2, '0');
-    const month = String(jsDate.getUTCMonth() + 1).padStart(2, '0');
-    const year = jsDate.getUTCFullYear();
-    return `${day}/${month}/${year}`;
+    jsDate.setUTCHours(12); // Sécurité Midi
+    const d = String(jsDate.getUTCDate()).padStart(2, '0');
+    const m = String(jsDate.getUTCMonth() + 1).padStart(2, '0');
+    const y = jsDate.getUTCFullYear();
+    return `${d}/${m}/${y}`;
   }
 
-  // 3. Si c'est du Texte (Fichiers Paie TXT, OD CSV, ou saisie)
+  // 3. Si c'est du Texte pur (Fichiers CSV / TXT)
   let str = String(rawVal).trim();
-  str = str.split('T')[0]; // Enlève l'heure si elle traîne
-  str = str.replace(/-/g, '/'); // Transforme les tirets 31-08-2025 en 31/08/2025
+  str = str.split('T')[0]; // Coupe l'heure si elle est écrite dans le texte
+  str = str.replace(/-/g, '/'); // Transforme les tirets en slashs
 
   if (str.includes('/')) {
     const parts = str.split('/');
     if (parts.length === 3) {
-      if (parts[0].length === 4) {
-        // Format YYYY/MM/DD
+      if (parts[0].length === 4) { 
         const [y, m, d] = parts;
         return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
-      } else {
-        // Format DD/MM/YYYY ou DD/MM/YY
+      } else { 
         let [d, m, y] = parts;
-        if (y.length === 2) y = '20' + y; // Corrige les années "25" en "2025"
+        if (y.length === 2) y = '20' + y;
         return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
       }
     }
