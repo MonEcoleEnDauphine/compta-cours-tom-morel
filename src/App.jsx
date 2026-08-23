@@ -2729,8 +2729,8 @@ export default function App() {
       case 'etat_financier': return <EtatFinancier transactionsGlobales={transactionsGlobales} />;
       case 'grand_livre': return <GrandLivre transactionsGlobales={transactionsGlobales} />;
       case 'plan_comptable': return <PlanComptable />;
-
-      case 'tableau_bord': return <PlaceholderPage title="Tableau de Bord" />;
+      case 'tableau_bord': return <TableauBord transactionsGlobales={transactionsGlobales} />;
+        
       case 'scolarite': return <PlaceholderPage title="Scolarité" />;
       case 'factures_parents': return <PlaceholderPage title="Mes Factures (Parents)" />;
       case 'menage_weekend': return <PlaceholderPage title="Planning : Ménage Week-end" />;
