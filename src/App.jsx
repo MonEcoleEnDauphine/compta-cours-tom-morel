@@ -364,14 +364,16 @@ const EtatFinancier = ({ transactionsGlobales }) => {
   const balancesResultat = {};
   const balancesResultatAnt = {};
 
-  const addAmount = (balancesObj, compte, deb, cred) => {
+  // NOUVEAU : On stocke la transaction exacte dans le calcul du solde
+  const addAmount = (balancesObj, compte, deb, cred, tx) => {
     if (!compte) return;
     const compteStr = String(compte).trim();
     if (!compteStr) return;
     
-    if (!balancesObj[compteStr]) balancesObj[compteStr] = { debit: 0, credit: 0 };
+    if (!balancesObj[compteStr]) balancesObj[compteStr] = { debit: 0, credit: 0, txs: [] };
     balancesObj[compteStr].debit += (Number(deb) || 0);
     balancesObj[compteStr].credit += (Number(cred) || 0);
+    if (tx) balancesObj[compteStr].txs.push(tx); // Mémorisation de l'opération
   };
 
   const processTx = (t, isAnterieur) => {
@@ -386,12 +388,12 @@ const EtatFinancier = ({ transactionsGlobales }) => {
       const cCode = t.compteCredit ? String(t.compteCredit).trim() : '';
 
       if (dCode) {
-        if (dCode.startsWith('6') || dCode.startsWith('7')) addAmount(resObj, dCode, absM, 0);
-        else addAmount(balancesBilan, dCode, absM, 0);
+        if (dCode.startsWith('6') || dCode.startsWith('7')) addAmount(resObj, dCode, absM, 0, t);
+        else addAmount(balancesBilan, dCode, absM, 0, t);
       }
       if (cCode) {
-        if (cCode.startsWith('6') || cCode.startsWith('7')) addAmount(resObj, cCode, 0, absM);
-        else addAmount(balancesBilan, cCode, 0, absM);
+        if (cCode.startsWith('6') || cCode.startsWith('7')) addAmount(resObj, cCode, 0, absM, t);
+        else addAmount(balancesBilan, cCode, 0, absM, t);
       }
     } else {
       const compteStr = t.compte ? String(t.compte).trim() : '';
@@ -399,16 +401,17 @@ const EtatFinancier = ({ transactionsGlobales }) => {
       const isProduit = compteStr.startsWith('7');
 
       if (isCharge || isProduit) {
-        if (m < 0) addAmount(resObj, compteStr, absM, 0);
-        else addAmount(resObj, compteStr, 0, absM);
+        if (m < 0) addAmount(resObj, compteStr, absM, 0, t);
+        else addAmount(resObj, compteStr, 0, absM, t);
       } else if (compteStr) {
-        if (m < 0) addAmount(balancesBilan, compteStr, absM, 0);
-        else addAmount(balancesBilan, compteStr, 0, absM);
+        if (m < 0) addAmount(balancesBilan, compteStr, absM, 0, t);
+        else addAmount(balancesBilan, compteStr, 0, absM, t);
       }
 
-      // Contrepartie Banque automatique
-      if (m < 0) addAmount(balancesBilan, '512000', 0, absM); 
-      else addAmount(balancesBilan, '512000', absM, 0); 
+      // Contrepartie Banque automatique (On indique que c'est le miroir bancaire)
+      const txBanque = { ...t, libelle: `(Mouvement Bancaire) ${t.libelle}` };
+      if (m < 0) addAmount(balancesBilan, '512000', 0, absM, txBanque); 
+      else addAmount(balancesBilan, '512000', absM, 0, txBanque); 
     }
   };
 
@@ -424,8 +427,10 @@ const EtatFinancier = ({ transactionsGlobales }) => {
   });
 
   if (Math.abs(resultatAnterieur) > 0.01) {
-    if (resultatAnterieur > 0) addAmount(balancesBilan, '120000', 0, Math.abs(resultatAnterieur)); 
-    else addAmount(balancesBilan, '120000', Math.abs(resultatAnterieur), 0); 
+    // Fausse transaction pour expliquer le report
+    const txReport = { date: '-', libelle: "Report du résultat des exercices antérieurs", montant: resultatAnterieur };
+    if (resultatAnterieur > 0) addAmount(balancesBilan, '120000', 0, Math.abs(resultatAnterieur), txReport); 
+    else addAmount(balancesBilan, '120000', Math.abs(resultatAnterieur), 0, txReport); 
   }
 
   // --- STRUCTURE COMPTABLE ---
@@ -442,13 +447,14 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     prodExceptionnels: { label: "Produits Exceptionnels", total: 0, sousGroupes: {} }
   };
 
-  const addToGroup = (categorieObj, code, val) => {
+  // On attache les transactions (txs) dans les sous-groupes pour l'infobulle
+  const addToGroup = (categorieObj, code, val, txs) => {
     const prefix2 = code.substring(0, 2);
     const groupName = `${prefix2} - ${PREFIXES[prefix2] || 'Autres comptes'}`;
     if (!categorieObj.sousGroupes[groupName]) {
       categorieObj.sousGroupes[groupName] = { total: 0, items: [] };
     }
-    categorieObj.sousGroupes[groupName].items.push({ code, libelle: getCompteLibelle(code), net: val });
+    categorieObj.sousGroupes[groupName].items.push({ code, libelle: getCompteLibelle(code), net: val, txs: txs || [] });
     categorieObj.sousGroupes[groupName].total += val;
     categorieObj.total += val;
   };
@@ -466,13 +472,13 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     const prefix2 = code.substring(0, 2);
 
     if (root === '1') {
-      if (['15', '16'].includes(prefix2)) addToGroup(groupes.dettes, code, soldeCredit);
-      else addToGroup(groupes.fondsPropres, code, soldeCredit); 
+      if (['15', '16'].includes(prefix2)) addToGroup(groupes.dettes, code, soldeCredit, b.txs);
+      else addToGroup(groupes.fondsPropres, code, soldeCredit, b.txs); 
     } else if (root === '2') {
-      addToGroup(groupes.actifImmo, code, soldeDebit);
+      addToGroup(groupes.actifImmo, code, soldeDebit, b.txs);
     } else if (['3', '4', '5'].includes(root)) {
-      if (soldeDebit > 0) addToGroup(groupes.actifCirc, code, soldeDebit);
-      else addToGroup(groupes.dettes, code, soldeCredit); // Dettes (Ex: découvert bancaire, dettes fournisseurs)
+      if (soldeDebit > 0) addToGroup(groupes.actifCirc, code, soldeDebit, b.txs);
+      else addToGroup(groupes.dettes, code, soldeCredit, b.txs); 
     }
   });
 
@@ -489,17 +495,17 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     const prefix2 = code.substring(0, 2);
 
     if (root === '6') {
-      if (prefix2 === '66') addToGroup(groupes.chFinancieres, code, soldeDebit);
-      else if (prefix2 === '67') addToGroup(groupes.chExceptionnelles, code, soldeDebit);
-      else addToGroup(groupes.chExploitation, code, soldeDebit);
+      if (prefix2 === '66') addToGroup(groupes.chFinancieres, code, soldeDebit, b.txs);
+      else if (prefix2 === '67') addToGroup(groupes.chExceptionnelles, code, soldeDebit, b.txs);
+      else addToGroup(groupes.chExploitation, code, soldeDebit, b.txs);
     } else if (root === '7') {
-      if (prefix2 === '76') addToGroup(groupes.prodFinanciers, code, soldeCredit);
-      else if (prefix2 === '77') addToGroup(groupes.prodExceptionnels, code, soldeCredit);
-      else addToGroup(groupes.prodExploitation, code, soldeCredit);
+      if (prefix2 === '76') addToGroup(groupes.prodFinanciers, code, soldeCredit, b.txs);
+      else if (prefix2 === '77') addToGroup(groupes.prodExceptionnels, code, soldeCredit, b.txs);
+      else addToGroup(groupes.prodExploitation, code, soldeCredit, b.txs);
     }
   });
 
-  // Tri alphabétique des items
+  // Tri alphabétique
   Object.values(groupes).forEach(cat => {
     Object.values(cat.sousGroupes).forEach(sg => {
       sg.items.sort((a, b) => a.code.localeCompare(b.code));
@@ -520,17 +526,18 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     }
     
     const existingItem = groupes.fondsPropres.sousGroupes[groupName].items.find(i => i.code === '120000');
-    
-    // Fusion intelligente du résultat pour éviter les doublons de lignes "12"
+    const txCalcul = { date: '-', libelle: 'Calcul mathématique du résultat', montant: resultatExercice };
+
     if (anneeDebut === 'TOTAL') {
       if (existingItem) {
         existingItem.net += resultatExercice;
         existingItem.libelle = 'Résultat Global (Cumulé)';
+        existingItem.txs.push(txCalcul);
       } else {
-        groupes.fondsPropres.sousGroupes[groupName].items.push({ code: '120000', libelle: 'Résultat Global (Cumulé)', net: resultatExercice });
+        groupes.fondsPropres.sousGroupes[groupName].items.push({ code: '120000', libelle: 'Résultat Global (Cumulé)', net: resultatExercice, txs: [txCalcul] });
       }
     } else {
-      groupes.fondsPropres.sousGroupes[groupName].items.push({ code: '120000', libelle: "Résultat de l'exercice (En cours)", net: resultatExercice });
+      groupes.fondsPropres.sousGroupes[groupName].items.push({ code: '120000', libelle: "Résultat de l'exercice (En cours)", net: resultatExercice, txs: [txCalcul] });
     }
     
     groupes.fondsPropres.sousGroupes[groupName].total += resultatExercice;
@@ -538,12 +545,12 @@ const EtatFinancier = ({ transactionsGlobales }) => {
   }
 
   const totalActif = groupes.actifImmo.total + groupes.actifCirc.total;
-  const totalPassif = groupes.fondsPropres.total + groupes.dettes.total; // Le Résultat est désormais logé DANS les Fonds Propres !
+  const totalPassif = groupes.fondsPropres.total + groupes.dettes.total;
   
   const ecartBilan = Math.abs(totalActif - totalPassif);
   const isBilanDesequilibre = ecartBilan > 0.01;
 
-  // Composant de rendu pour une sous-catégorie
+  // COMPOSANT INFOBULLE ET LIGNES DU TABLEAU
   const renderSousGroupes = (categorieObj) => {
     if (Object.keys(categorieObj.sousGroupes).length === 0) {
       return <div className="text-center text-slate-400 text-sm py-3 italic">Aucune donnée</div>;
@@ -568,16 +575,39 @@ const EtatFinancier = ({ transactionsGlobales }) => {
           {isExpanded && (
             <div className="bg-white pb-2">
               {grp.items.map(item => (
-                <div key={item.code} className="flex justify-between items-center px-8 py-1.5 hover:bg-slate-50 transition-colors">
-                  <div className="flex items-center gap-2 overflow-hidden pr-2">
+                // NOUVEAU : La classe group/item active le survol de l'infobulle
+                <div key={item.code} className="flex justify-between items-center px-8 py-1.5 hover:bg-slate-50 transition-colors relative group/item">
+                  <div className="flex items-center gap-2 pr-2">
                     <span className="text-[10px] font-mono bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded text-slate-500 shrink-0">{item.code}</span>
                     <span className="text-xs text-slate-500 truncate" title={item.libelle}>
                       {item.libelle || <span className="italic text-slate-300">Sans libellé</span>}
                     </span>
                   </div>
-                  <span className={`text-[11px] font-medium shrink-0 ${item.net < 0 ? 'text-rose-500' : 'text-slate-500'}`}>
-                    {formatMontant(item.net)} €
-                  </span>
+                  
+                  {/* MONTANT SOULIGNÉ + INFOBULLE (TOOLTIP) */}
+                  <div className="relative flex items-center justify-end">
+                    <span className={`text-[11px] font-medium shrink-0 cursor-help border-b border-dotted ${item.net < 0 ? 'text-rose-500 border-rose-300' : 'text-slate-500 border-slate-300'}`}>
+                      {formatMontant(item.net)} €
+                    </span>
+                    
+                    <div className="absolute right-0 top-6 hidden group-hover/item:flex flex-col z-50 bg-slate-800 text-white text-xs p-3 rounded-xl shadow-2xl w-80 max-h-64 border border-slate-700 cursor-default">
+                      <div className="font-bold text-slate-300 border-b border-slate-600 pb-2 mb-2 flex justify-between shrink-0">
+                         <span>Opérations (Compte {item.code})</span>
+                         <span>{item.txs?.length || 0} op.</span>
+                      </div>
+                      <div className="overflow-y-auto space-y-1.5 custom-scrollbar pr-1">
+                         {item.txs && [...item.txs].reverse().map((tx, idx) => (
+                           <div key={idx} className="flex justify-between items-start gap-3 border-b border-slate-700/50 pb-1.5 last:border-0">
+                             <div className="flex flex-col overflow-hidden">
+                               <span className="text-slate-400 text-[9px] font-mono">{tx.date}</span>
+                               <span className="text-slate-200 leading-tight truncate">{tx.libelle}</span>
+                             </div>
+                             <span className="font-mono font-bold whitespace-nowrap text-[10px] mt-0.5">{formatMontant(Math.abs(tx.montant))} €</span>
+                           </div>
+                         ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
@@ -588,7 +618,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
   };
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto">
+    <div className="space-y-8 max-w-6xl mx-auto pb-20">
       <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
@@ -618,8 +648,8 @@ const EtatFinancier = ({ transactionsGlobales }) => {
       </div>
 
       {anneeDebut !== 'TOTAL' && (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="bg-slate-900 p-4">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200">
+          <div className="bg-slate-900 p-4 rounded-t-xl">
             <h3 className="text-white font-bold flex items-center gap-2 text-lg">
               Compte de Résultat (Classe 6 & 7)
             </h3>
@@ -691,7 +721,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
             </div>
           </div>
 
-          <div className="bg-slate-100 p-4 border-t border-slate-200 flex justify-between items-center">
+          <div className="bg-slate-100 p-4 border-t border-slate-200 flex justify-between items-center rounded-b-xl">
             <span className="font-bold text-slate-700 uppercase">Résultat de l'exercice</span>
             <span className={`text-xl font-black ${resultatExercice >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
               {resultatExercice > 0 ? '+' : ''}{formatMontant(resultatExercice)} €
@@ -726,8 +756,8 @@ const EtatFinancier = ({ transactionsGlobales }) => {
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="bg-slate-900 p-4">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200">
+        <div className="bg-slate-900 p-4 rounded-t-xl">
           <h3 className="text-white font-bold flex items-center gap-2 text-lg">
             Bilan Comptable (Classe 1 à 5)
           </h3>
@@ -785,7 +815,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
 
         </div>
 
-        <div className={`p-4 border-t flex justify-between items-center text-sm ${isBilanDesequilibre ? 'bg-rose-100 border-rose-300' : 'bg-slate-100 border-slate-200'}`}>
+        <div className={`p-4 border-t flex justify-between items-center text-sm rounded-b-xl ${isBilanDesequilibre ? 'bg-rose-100 border-rose-300' : 'bg-slate-100 border-slate-200'}`}>
           <span className={`font-black uppercase ${isBilanDesequilibre ? 'text-rose-700' : 'text-slate-500'}`}>ÉQUILIBRE DU BILAN</span>
           <div className="flex gap-8">
             <span className="font-bold text-blue-700">Actif : {formatMontant(totalActif)} €</span>
@@ -796,7 +826,6 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     </div>
   );
 };
-
 // --- GRAND LIVRE (Import CSV/XLSX, OD, Validations) ---
 const GrandLivre = ({ transactionsGlobales }) => {
   const [lignesEnAttente, setLignesEnAttente] = useState([]);
