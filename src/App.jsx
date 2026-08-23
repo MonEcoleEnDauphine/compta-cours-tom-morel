@@ -229,6 +229,274 @@ const SearchableCompteSelect = ({ value, onChange, comptesList, placeholder = "S
   );
 };
 
+// --- TABLEAU DE BORD (DASHBOARD) ---
+const TableauBord = ({ transactionsGlobales }) => {
+  const [anneeFiltre, setAnneeFiltre] = useState('TOTAL');
+
+  const formatMontant = (val) => new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val || 0);
+
+  const parseDateForFilter = (dStr) => {
+    if (!dStr) return 0;
+    const str = String(dStr).trim();
+    if (str.includes('/')) {
+      const parts = str.split('/');
+      if (parts.length === 3) {
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        let year = parseInt(parts[2], 10);
+        if (year < 100) year += 2000;
+        return new Date(year, month, day).getTime();
+      }
+    } else if (str.includes('-')) {
+      const parts = str.split('-');
+      if (parts.length === 3) {
+        if (parts[0].length === 4) return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)).getTime();
+        else return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10)).getTime();
+      }
+    }
+    return new Date(str).getTime() || 0;
+  };
+
+  const getMonthIndex = (dStr) => {
+    if (!dStr) return -1;
+    const str = String(dStr).trim();
+    let month = -1;
+    if (str.includes('/')) month = parseInt(str.split('/')[1], 10);
+    else if (str.includes('-')) {
+      const parts = str.split('-');
+      month = parts[0].length === 4 ? parseInt(parts[1], 10) : parseInt(parts[1], 10);
+    }
+    return month;
+  };
+
+  const data = useMemo(() => {
+    let totalRecettes = 0;
+    let totalDepenses = 0;
+    let tresorerieGlobale = 0; // La trésorerie n'a pas de frontière d'année
+
+    const moisScolaires = [
+      { id: 9, nom: 'Sep', recettes: 0, depenses: 0 }, { id: 10, nom: 'Oct', recettes: 0, depenses: 0 },
+      { id: 11, nom: 'Nov', recettes: 0, depenses: 0 }, { id: 12, nom: 'Déc', recettes: 0, depenses: 0 },
+      { id: 1, nom: 'Jan', recettes: 0, depenses: 0 }, { id: 2, nom: 'Fév', recettes: 0, depenses: 0 },
+      { id: 3, nom: 'Mar', recettes: 0, depenses: 0 }, { id: 4, nom: 'Avr', recettes: 0, depenses: 0 },
+      { id: 5, nom: 'Mai', recettes: 0, depenses: 0 }, { id: 6, nom: 'Juin', recettes: 0, depenses: 0 },
+      { id: 7, nom: 'Juil', recettes: 0, depenses: 0 }, { id: 8, nom: 'Aoû', recettes: 0, depenses: 0 }
+    ];
+
+    const depensesParCategorie = {};
+    const recettesParCategorie = {};
+
+    const start = anneeFiltre !== 'TOTAL' ? new Date(Number(anneeFiltre), 8, 1, 0, 0, 0).getTime() : 0;
+    const end = anneeFiltre !== 'TOTAL' ? new Date(Number(anneeFiltre) + 1, 7, 31, 23, 59, 59).getTime() : Infinity;
+
+    const addCat = (obj, compte, montant) => {
+      const prefix = String(compte).substring(0, 2);
+      if (!obj[prefix]) obj[prefix] = 0;
+      obj[prefix] += montant;
+    };
+
+    (transactionsGlobales || []).forEach(t => {
+      const tTime = parseDateForFilter(t.date);
+      const isOD = t.type === 'od';
+      const m = Number(t.montant) || 0;
+      const absM = Math.abs(m);
+
+      // Trésorerie globale (Comptes 512, 53) - Indépendante du filtre d'année
+      if (!isOD) {
+        tresorerieGlobale += m; // Si c'est un relevé bancaire, le montant impacte la banque
+      } else {
+        if (String(t.compteDebit).startsWith('5')) tresorerieGlobale += absM;
+        if (String(t.compteCredit).startsWith('5')) tresorerieGlobale -= absM;
+      }
+
+      // Filtre de la période sélectionnée
+      if (tTime >= start && tTime <= end) {
+        const monthIdx = getMonthIndex(t.date);
+        const moisRef = moisScolaires.find(m => m.id === monthIdx);
+
+        if (isOD) {
+          const dCode = String(t.compteDebit || '');
+          const cCode = String(t.compteCredit || '');
+          
+          if (dCode.startsWith('6')) { totalDepenses += absM; addCat(depensesParCategorie, dCode, absM); if(moisRef) moisRef.depenses += absM; }
+          if (cCode.startsWith('6')) { totalDepenses -= absM; addCat(depensesParCategorie, cCode, -absM); if(moisRef) moisRef.depenses -= absM; }
+          
+          if (cCode.startsWith('7')) { totalRecettes += absM; addCat(recettesParCategorie, cCode, absM); if(moisRef) moisRef.recettes += absM; }
+          if (dCode.startsWith('7')) { totalRecettes -= absM; addCat(recettesParCategorie, dCode, -absM); if(moisRef) moisRef.recettes -= absM; }
+        } else {
+          const compte = String(t.compte || '');
+          if (m < 0 && compte.startsWith('6')) { totalDepenses += absM; addCat(depensesParCategorie, compte, absM); if(moisRef) moisRef.depenses += absM; }
+          else if (m > 0 && compte.startsWith('7')) { totalRecettes += absM; addCat(recettesParCategorie, compte, absM); if(moisRef) moisRef.recettes += absM; }
+        }
+      }
+    });
+
+    const categoriesNoms = {
+      '60': 'Achats & Fournitures', '61': 'Services Extérieurs', '62': 'Frais Bancaires & Autres',
+      '63': 'Impôts & Taxes', '64': 'Salaires & Charges', '65': 'Autres charges', '66': 'Frais Financiers', '68': 'Amortissements',
+      '70': 'Scolarité & Ventes', '74': 'Subventions', '75': 'Dons & Autres produits', '76': 'Produits Financiers'
+    };
+
+    const formatTop = (obj) => Object.entries(obj)
+      .map(([k, v]) => ({ nom: categoriesNoms[k] || `Classe ${k}`, montant: v }))
+      .filter(item => item.montant > 0)
+      .sort((a, b) => b.montant - a.montant)
+      .slice(0, 5);
+
+    return {
+      totalRecettes,
+      totalDepenses,
+      resultat: totalRecettes - totalDepenses,
+      tresorerieGlobale,
+      moisScolaires,
+      topDepenses: formatTop(depensesParCategorie),
+      topRecettes: formatTop(recettesParCategorie)
+    };
+  }, [transactionsGlobales, anneeFiltre]);
+
+  const maxMoisValue = Math.max(...data.moisScolaires.map(m => Math.max(m.recettes, m.depenses)), 1000); // 1000 min pour éviter div by 0
+
+  return (
+    <div className="space-y-6 max-w-7xl mx-auto pb-10">
+      
+      {/* HEADER DASHBOARD */}
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+            <LayoutDashboard className="text-indigo-600" /> Vue d'ensemble
+          </h2>
+          <p className="text-slate-500 text-sm mt-1">Analyse financière et indicateurs de performance de l'école.</p>
+        </div>
+        <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
+          <Calendar size={18} className="text-slate-500" />
+          <select 
+            value={anneeFiltre} 
+            onChange={(e) => setAnneeFiltre(e.target.value)}
+            className="bg-transparent border-none text-sm font-bold text-slate-700 outline-none cursor-pointer"
+          >
+            <option value="TOTAL" className="font-bold text-indigo-700">Toutes les années</option>
+            <option disabled>──────────────</option>
+            {[2021, 2022, 2023, 2024, 2025, 2026].map(year => (
+              <option key={year} value={year}>Exercice {year}-{year + 1}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* 4 CARTES KPI */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 border-l-4 border-l-blue-500 flex items-center gap-4">
+          <div className="p-3 bg-blue-50 text-blue-600 rounded-xl"><Building size={24} /></div>
+          <div>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Tréso. Globale (Banque)</p>
+            <p className="text-xl font-black text-slate-800">{formatMontant(data.tresorerieGlobale)} €</p>
+          </div>
+        </div>
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 border-l-4 border-l-emerald-500 flex items-center gap-4">
+          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl"><TrendingUp size={24} /></div>
+          <div>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Encaissements</p>
+            <p className="text-xl font-black text-slate-800">{formatMontant(data.totalRecettes)} €</p>
+          </div>
+        </div>
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 border-l-4 border-l-rose-500 flex items-center gap-4">
+          <div className="p-3 bg-rose-50 text-rose-600 rounded-xl"><TrendingUp size={24} className="rotate-180" /></div>
+          <div>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Décaissements</p>
+            <p className="text-xl font-black text-slate-800">{formatMontant(data.totalDepenses)} €</p>
+          </div>
+        </div>
+        <div className={`bg-white p-5 rounded-2xl shadow-sm border border-slate-200 border-l-4 flex items-center gap-4 ${data.resultat >= 0 ? 'border-l-indigo-500' : 'border-l-orange-500'}`}>
+          <div className={`p-3 rounded-xl ${data.resultat >= 0 ? 'bg-indigo-50 text-indigo-600' : 'bg-orange-50 text-orange-600'}`}><PieChart size={24} /></div>
+          <div>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Résultat Net (Période)</p>
+            <p className={`text-xl font-black ${data.resultat >= 0 ? 'text-indigo-600' : 'text-orange-600'}`}>
+              {data.resultat > 0 ? '+' : ''}{formatMontant(data.resultat)} €
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* GRAPHIQUE ÉVOLUTION MENSUELLE (Prend 2 colonnes sur grand écran) */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 lg:col-span-2 p-6 flex flex-col">
+          <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
+            <Calendar className="text-indigo-600" size={20} /> Évolution mensuelle (Saison scolaire)
+          </h3>
+          <div className="flex-1 flex items-end justify-between gap-1 h-64 mt-4 border-b border-slate-100 pb-2">
+            {data.moisScolaires.map(mois => {
+              const hRec = Math.max((mois.recettes / maxMoisValue) * 100, 0);
+              const hDep = Math.max((mois.depenses / maxMoisValue) * 100, 0);
+              return (
+                <div key={mois.nom} className="flex flex-col items-center flex-1 group">
+                  {/* Tooltip Hover */}
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -mt-16 bg-slate-800 text-white text-[10px] p-2 rounded-lg pointer-events-none z-10 whitespace-nowrap">
+                    <p className="text-emerald-400 font-bold">+ {formatMontant(mois.recettes)} €</p>
+                    <p className="text-rose-400 font-bold">- {formatMontant(mois.depenses)} €</p>
+                  </div>
+                  {/* Barres */}
+                  <div className="flex gap-0.5 w-full justify-center h-48 items-end">
+                    <div className="w-1/3 bg-emerald-400 rounded-t-sm transition-all duration-500" style={{ height: `${hRec}%`, minHeight: mois.recettes > 0 ? '4px' : '0' }}></div>
+                    <div className="w-1/3 bg-rose-400 rounded-t-sm transition-all duration-500" style={{ height: `${hDep}%`, minHeight: mois.depenses > 0 ? '4px' : '0' }}></div>
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-400 mt-2 uppercase">{mois.nom}</span>
+                </div>
+              )
+            })}
+          </div>
+          <div className="flex justify-center gap-6 mt-4 text-xs font-bold text-slate-500">
+            <div className="flex items-center gap-2"><div className="w-3 h-3 bg-emerald-400 rounded-sm"></div> Recettes</div>
+            <div className="flex items-center gap-2"><div className="w-3 h-3 bg-rose-400 rounded-sm"></div> Dépenses</div>
+          </div>
+        </div>
+
+        {/* TOP DÉPENSES & RECETTES */}
+        <div className="space-y-6">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-sm">
+              <TrendingUp className="text-rose-500 rotate-180" size={18} /> Top Postes de Dépenses
+            </h3>
+            <div className="space-y-4">
+              {data.topDepenses.length === 0 ? <p className="text-xs text-slate-400 italic">Aucune donnée</p> : null}
+              {data.topDepenses.map((item, idx) => (
+                <div key={idx}>
+                  <div className="flex justify-between text-xs font-bold mb-1">
+                    <span className="text-slate-600 truncate">{item.nom}</span>
+                    <span className="text-rose-600 whitespace-nowrap ml-2">{formatMontant(item.montant)} €</span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                    <div className="bg-rose-400 h-1.5 rounded-full" style={{ width: `${(item.montant / data.totalDepenses) * 100}%` }}></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-sm">
+              <TrendingUp className="text-emerald-500" size={18} /> Principales Recettes
+            </h3>
+            <div className="space-y-4">
+              {data.topRecettes.length === 0 ? <p className="text-xs text-slate-400 italic">Aucune donnée</p> : null}
+              {data.topRecettes.map((item, idx) => (
+                <div key={idx}>
+                  <div className="flex justify-between text-xs font-bold mb-1">
+                    <span className="text-slate-600 truncate">{item.nom}</span>
+                    <span className="text-emerald-600 whitespace-nowrap ml-2">{formatMontant(item.montant)} €</span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                    <div className="bg-emerald-400 h-1.5 rounded-full" style={{ width: `${(item.montant / data.totalRecettes) * 100}%` }}></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // --- ÉTAT FINANCIER (Bilan & Résultat Groupés) ---
 const EtatFinancier = ({ transactionsGlobales }) => {
   
