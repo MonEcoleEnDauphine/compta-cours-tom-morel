@@ -719,6 +719,8 @@ const GrandLivre = ({ transactionsGlobales }) => {
   const [pendingCompte, setPendingCompte] = useState({ code: '', libelle: '', lineId: null });
 
   const [activeTab, setActiveTab] = useState(null);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetAnnee, setResetAnnee] = useState('TOTAL'); // NOUVEAU : Période sélectionnée pour la suppression
 
   const [odFormDate, setOdFormDate] = useState('');
   const [odFormLibelle, setOdFormLibelle] = useState('');
@@ -730,7 +732,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCompteFilter, setSelectedCompteFilter] = useState(''); 
-  const [anneeFiltre, setAnneeFiltre] = useState('TOTAL'); // NOUVEAU FILTRE PAR PÉRIODE
+  const [anneeFiltre, setAnneeFiltre] = useState('TOTAL');
   const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' });
 
   const fileInputBankRef = useRef(null);
@@ -763,6 +765,28 @@ const GrandLivre = ({ transactionsGlobales }) => {
       '7': 'Classe 7 — Produits (Recettes)'
     };
     return map[root] || 'Compte Général';
+  };
+
+  // NOUVEAU : Fonction parseDateForSort déplacée en haut pour être utilisable partout (filtre ET suppression)
+  const parseDateForSort = (dStr) => {
+    if (!dStr) return 0;
+    const str = String(dStr).trim();
+    if (str.includes('/')) {
+      const parts = str.split('/');
+      if (parts.length === 3) {
+        let day = parseInt(parts[0], 10);
+        let month = parseInt(parts[1], 10) - 1;
+        let year = parseInt(parts[2], 10);
+        if (year < 100) year += 2000;
+        return new Date(year, month, day).getTime();
+      }
+    } else if (str.includes('-')) {
+      const parts = str.split('-');
+      if (parts.length === 3 && parts[0].length === 4) {
+        return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)).getTime();
+      }
+    }
+    return new Date(str).getTime() || 0;
   };
 
   const handleCompteOdBlur = (lineId, rawCode) => {
@@ -838,25 +862,67 @@ const GrandLivre = ({ transactionsGlobales }) => {
     reader.readAsDataURL(file);
   };
 
-  const handleResetGrandLivre = async () => {
-    if (transactionsGlobales.length === 0) return alert("Le Grand Livre est déjà vide.");
+  // NOUVELLE FONCTION DE SUPPRESSION SÉLECTIVE (PAR SOURCE + PÉRIODE)
+  const handleResetPartiel = async (sourceToDelete) => {
+    const txToDelete = transactionsGlobales.filter(tx => {
+      // 1. Filtre par Source
+      let matchSource = false;
+      if (sourceToDelete === 'tout') {
+        matchSource = true;
+      } else {
+        const source = tx.type === 'od' ? (tx.typeOp === 'PAIE' || (tx.libelle && String(tx.libelle).includes('(PAIE)')) ? 'paie' : 'od') : 'banque';
+        matchSource = (source === sourceToDelete);
+      }
 
-    const pwd = window.prompt("⚠️ DANGER : Vous allez supprimer TOUTES les écritures validées du Grand Livre.\n\nVeuillez entrer le mot de passe administrateur pour confirmer :");
+      // 2. Filtre par Période
+      let matchPeriod = true;
+      if (resetAnnee !== 'TOTAL') {
+        const start = new Date(Number(resetAnnee), 8, 1, 0, 0, 0).getTime();
+        const end = new Date(Number(resetAnnee) + 1, 7, 31, 23, 59, 59).getTime();
+        if (!tx.date) {
+          matchPeriod = false;
+        } else {
+          const tTime = parseDateForSort(tx.date);
+          matchPeriod = (tTime >= start && tTime <= end);
+        }
+      }
+
+      return matchSource && matchPeriod;
+    });
+
+    if (txToDelete.length === 0) {
+      alert("Aucune écriture validée trouvée pour cette source et cette période.");
+      return;
+    }
+
+    const nomsSources = {
+      'banque': 'du Journal de Banque',
+      'paie': 'des Fiches de Paie',
+      'od': 'des Opérations Diverses',
+      'tout': 'de toutes les sources'
+    };
+
+    const nomPeriode = resetAnnee === 'TOTAL' ? 'sur toutes les années' : `sur l'exercice ${resetAnnee}-${Number(resetAnnee) + 1}`;
+
+    const pwd = window.prompt(`⚠️ DANGER : Vous allez supprimer définitivement ${txToDelete.length} écriture(s) provenant ${nomsSources[sourceToDelete]} ${nomPeriode}.\n\nVeuillez entrer le mot de passe administrateur pour confirmer :`);
 
     if (pwd === 'admin123') {
-      const confirm = window.confirm(`Êtes-vous absolument sûr ? ${transactionsGlobales.length} écritures vont être définitivement effacées.`);
+      const confirm = window.confirm(`Êtes-vous absolument sûr ?\nCeci effacera ${txToDelete.length} écritures de façon irréversible.`);
       if (confirm) {
+        setShowResetModal(false);
         try {
-          for (const tx of transactionsGlobales) {
+          let count = 0;
+          for (const tx of txToDelete) {
             await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', tx.id));
+            count++;
           }
-          alert("Le Grand Livre a été entièrement vidé avec succès.");
+          alert(`Succès : ${count} écriture(s) effacée(s).`);
         } catch (e) {
-          alert("Erreur lors de la suppression du Grand Livre.");
+          alert("Erreur lors de la suppression.");
         }
       }
     } else if (pwd !== null) {
-      alert("Mot de passe incorrect. Annulation de la suppression.");
+      alert("Mot de passe incorrect. Annulation.");
     }
   };
 
@@ -1299,31 +1365,9 @@ const GrandLivre = ({ transactionsGlobales }) => {
     setSortConfig({ key, direction });
   };
 
-  const parseDateForSort = (dStr) => {
-    if (!dStr) return 0;
-    const str = String(dStr).trim();
-    if (str.includes('/')) {
-      const parts = str.split('/');
-      if (parts.length === 3) {
-        let day = parseInt(parts[0], 10);
-        let month = parseInt(parts[1], 10) - 1;
-        let year = parseInt(parts[2], 10);
-        if (year < 100) year += 2000;
-        return new Date(year, month, day).getTime();
-      }
-    } else if (str.includes('-')) {
-      const parts = str.split('-');
-      if (parts.length === 3 && parts[0].length === 4) {
-        return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)).getTime();
-      }
-    }
-    return new Date(str).getTime() || 0;
-  };
-
   const filteredAndSortedTransactions = useMemo(() => {
     let result = [...transactionsGlobales];
 
-    // NOUVEAU FILTRE PAR ANNÉE SCOLAIRE
     if (anneeFiltre !== 'TOTAL') {
       const start = new Date(Number(anneeFiltre), 8, 1, 0, 0, 0).getTime(); 
       const end = new Date(Number(anneeFiltre) + 1, 7, 31, 23, 59, 59).getTime(); 
@@ -1396,7 +1440,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
   const nbLignesPretes = lignesEnAttente.filter(l => l.comptePropose).length;
 
-  // MISE À JOUR DYNAMIQUE DES COMPTEURS EN FONCTION DES FILTRES
   const totalGeneralDebit = filteredAndSortedTransactions.reduce((acc, t) => {
     if (t.type === 'od') return acc + (t.compteDebit ? Number(t.montant) || 0 : 0);
     return acc + (Number(t.montant) < 0 ? Math.abs(Number(t.montant)) : 0);
@@ -1457,6 +1500,69 @@ const GrandLivre = ({ transactionsGlobales }) => {
               <button onClick={handleSaveNewCompteFromModal} disabled={pendingCompte.code.length < 6 || !pendingCompte.libelle.trim()} className={`px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all flex items-center gap-2 ${pendingCompte.code.length >= 6 && pendingCompte.libelle.trim() ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-purple-200 cursor-pointer' : 'bg-purple-300 cursor-not-allowed shadow-none'}`}>
                 <CheckCircle2 size={16} /> Créer & Affecter
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL SUPPRESSION SÉLECTIVE DU GRAND LIVRE */}
+      {showResetModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl border border-rose-100 w-full max-w-md overflow-hidden transition-all scale-100">
+            <div className="bg-gradient-to-r from-rose-600 to-rose-800 p-6 text-white flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 backdrop-blur-md rounded-2xl">
+                  <Trash2 size={22} className="text-rose-100" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg leading-tight">Vider le Grand Livre</h3>
+                  <p className="text-rose-200 text-xs mt-0.5">Purge sélective et sécurisée</p>
+                </div>
+              </div>
+              <button onClick={() => setShowResetModal(false)} className="text-white/70 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-colors">
+                <XCircle size={20} />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-5">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">1. Choisir la période</label>
+                <select 
+                  value={resetAnnee} 
+                  onChange={(e) => setResetAnnee(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-rose-500 font-bold text-slate-700"
+                >
+                  <option value="TOTAL">Toutes les années (Historique complet)</option>
+                  {[2021, 2022, 2023, 2024, 2025, 2026].map(year => (
+                    <option key={`reset-${year}`} value={year}>
+                      Exercice {year}-{year + 1} (01/09/{String(year).slice(-2)} au 31/08/{String(year + 1).slice(-2)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">2. Choisir la source à effacer</label>
+                <div className="space-y-2.5">
+                  <button onClick={() => handleResetPartiel('banque')} className="w-full text-left px-4 py-3 border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded-xl font-bold text-sm flex items-center justify-between transition-colors">
+                    <span>Journal de Banque</span>
+                    <Trash2 size={16} className="text-blue-500"/>
+                  </button>
+                  <button onClick={() => handleResetPartiel('paie')} className="w-full text-left px-4 py-3 border border-pink-200 bg-pink-50 hover:bg-pink-100 text-pink-900 rounded-xl font-bold text-sm flex items-center justify-between transition-colors">
+                    <span>Fiches de Paie</span>
+                    <Trash2 size={16} className="text-pink-500"/>
+                  </button>
+                  <button onClick={() => handleResetPartiel('od')} className="w-full text-left px-4 py-3 border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-900 rounded-xl font-bold text-sm flex items-center justify-between transition-colors">
+                    <span>Opérations Diverses (OD)</span>
+                    <Trash2 size={16} className="text-purple-500"/>
+                  </button>
+                  <div className="h-px bg-slate-200 my-4 w-full"></div>
+                  <button onClick={() => handleResetPartiel('tout')} className="w-full text-left px-4 py-3 border border-rose-300 bg-rose-100 hover:bg-rose-600 hover:text-white text-rose-900 rounded-xl font-black text-sm flex items-center justify-between transition-colors group">
+                    <span>⚠️ TOUTES LES SOURCES</span>
+                    <AlertTriangle size={18} className="text-rose-500 group-hover:text-white"/>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1732,6 +1838,11 @@ const GrandLivre = ({ transactionsGlobales }) => {
           </div>
 
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+            {/* BOUTON D'OUVERTURE DE LA MODALE DE SUPPRESSION SÉLECTIVE */}
+            <button onClick={() => setShowResetModal(true)} className="text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-2 active:scale-95" title="Vider le Grand Livre de manière sélective">
+              <Trash2 size={14} /> Vider le Grand Livre (Filtre)
+            </button>
+
             {/* NOUVEAU FILTRE PAR ANNÉE SCOLAIRE */}
             <select 
               value={anneeFiltre} 
@@ -1745,10 +1856,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
                 </option>
               ))}
             </select>
-
-            <button onClick={handleResetGrandLivre} className="text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-2 active:scale-95" title="Vider entièrement le Grand Livre">
-              <Trash2 size={14} /> Vider le Grand Livre
-            </button>
 
             <select value={selectedCompteFilter} onChange={(e) => setSelectedCompteFilter(e.target.value)} className="border border-slate-200 rounded-xl px-3.5 py-2 text-xs bg-white outline-none focus:ring-2 focus:ring-indigo-600 font-mono font-bold text-slate-700 shadow-sm">
               <option value="">Tous les comptes (Filtre...)</option>
