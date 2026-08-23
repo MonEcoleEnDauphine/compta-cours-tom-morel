@@ -732,7 +732,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCompteFilter, setSelectedCompteFilter] = useState(''); 
-  const [selectedSourceFilter, setSelectedSourceFilter] = useState(''); // NOUVEAU : Filtre de source
+  const [selectedSourceFilter, setSelectedSourceFilter] = useState('');
   const [anneeFiltre, setAnneeFiltre] = useState('TOTAL');
   const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' });
 
@@ -1376,7 +1376,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
       });
     }
 
-    // NOUVEAU FILTRE PAR SOURCE
     if (selectedSourceFilter) {
       result = result.filter(t => {
         const source = t.type === 'od' ? (t.typeOp === 'PAIE' || (t.libelle && String(t.libelle).includes('(PAIE)')) ? 'paie' : 'od') : 'banque';
@@ -1455,11 +1454,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
     return acc + (Number(t.montant) > 0 ? Number(t.montant) : 0);
   }, 0);
 
-const totalGeneralCredit = filteredAndSortedTransactions.reduce((acc, t) => {
-    if (t.type === 'od') return acc + (t.compteCredit ? Number(t.montant) || 0 : 0);
-    return acc + (Number(t.montant) > 0 ? Number(t.montant) : 0);
-  }, 0);
-
   // --- NOUVELLE FONCTION D'EXPORT CSV ---
   const handleExportCSV = () => {
     if (filteredAndSortedTransactions.length === 0) {
@@ -1514,9 +1508,6 @@ const totalGeneralCredit = filteredAndSortedTransactions.reduce((acc, t) => {
   };
   // --------------------------------------
 
-  return (
-    <div className="space-y-6 w-full max-w-[1600px] mx-auto px-3 py-2 font-sans">
-  
   return (
     <div className="space-y-6 w-full max-w-[1600px] mx-auto px-3 py-2 font-sans">
 
@@ -1905,7 +1896,6 @@ const totalGeneralCredit = filteredAndSortedTransactions.reduce((acc, t) => {
           </div>
 
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
             
             {/* NOUVEAU BOUTON : EXPORT CSV */}
             <button onClick={handleExportCSV} className="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-2 active:scale-95" title="Exporter le tableau actuel sur Excel (CSV)">
@@ -1913,10 +1903,6 @@ const totalGeneralCredit = filteredAndSortedTransactions.reduce((acc, t) => {
             </button>
 
             {/* BOUTON D'OUVERTURE DE LA MODALE DE SUPPRESSION SÉLECTIVE */}
-            <button onClick={() => setShowResetModal(true)} className="text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-2 active:scale-95" title="Vider le Grand Livre de manière sélective">
-              <Trash2 size={14} /> Vider le Grand Livre (Filtre)
-            </button>
-              
             <button onClick={() => setShowResetModal(true)} className="text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-2 active:scale-95" title="Vider le Grand Livre de manière sélective">
               <Trash2 size={14} /> Vider le Grand Livre (Filtre)
             </button>
