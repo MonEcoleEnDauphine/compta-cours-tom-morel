@@ -1455,6 +1455,68 @@ const GrandLivre = ({ transactionsGlobales }) => {
     return acc + (Number(t.montant) > 0 ? Number(t.montant) : 0);
   }, 0);
 
+const totalGeneralCredit = filteredAndSortedTransactions.reduce((acc, t) => {
+    if (t.type === 'od') return acc + (t.compteCredit ? Number(t.montant) || 0 : 0);
+    return acc + (Number(t.montant) > 0 ? Number(t.montant) : 0);
+  }, 0);
+
+  // --- NOUVELLE FONCTION D'EXPORT CSV ---
+  const handleExportCSV = () => {
+    if (filteredAndSortedTransactions.length === 0) {
+      alert("Aucune écriture à exporter.");
+      return;
+    }
+
+    const headers = ["Date", "ID", "Source", "Libellé", "Référence", "Type Op.", "Commentaire", "Débit", "Crédit", "Compte"];
+
+    const rows = filteredAndSortedTransactions.map(t => {
+      let source = 'Banque';
+      if (t.type === 'od') {
+        source = (t.typeOp === 'PAIE' || (t.libelle && String(t.libelle).includes('(PAIE)'))) ? 'Paie' : 'OD';
+      }
+      
+      let debit = '';
+      let credit = '';
+      if (t.type === 'od') {
+        debit = t.compteDebit ? Math.abs(t.montant) : '';
+        credit = t.compteCredit ? Math.abs(t.montant) : '';
+      } else {
+        debit = t.montant < 0 ? Math.abs(t.montant) : '';
+        credit = t.montant > 0 ? Math.abs(t.montant) : '';
+      }
+
+      const compte = t.compte || t.compteDebit || t.compteCredit || '';
+
+      return [
+        normaliserDateFR(t.date),
+        t.id,
+        source,
+        `"${String(t.libelle || '').replace(/"/g, '""')}"`,
+        `"${String(t.reference || '').replace(/"/g, '""')}"`,
+        t.typeOp || '',
+        `"${String(t.commentaire || '').replace(/"/g, '""')}"`,
+        debit,
+        credit,
+        compte
+      ].join(';');
+    });
+
+    const csvContent = [headers.join(';'), ...rows].join('\n');
+    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Export_Grand_Livre_${anneeFiltre}_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+  // --------------------------------------
+
+  return (
+    <div className="space-y-6 w-full max-w-[1600px] mx-auto px-3 py-2 font-sans">
+  
   return (
     <div className="space-y-6 w-full max-w-[1600px] mx-auto px-3 py-2 font-sans">
 
@@ -1843,6 +1905,18 @@ const GrandLivre = ({ transactionsGlobales }) => {
           </div>
 
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+            
+            {/* NOUVEAU BOUTON : EXPORT CSV */}
+            <button onClick={handleExportCSV} className="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-2 active:scale-95" title="Exporter le tableau actuel sur Excel (CSV)">
+              <Download size={14} /> Exporter (.csv)
+            </button>
+
+            {/* BOUTON D'OUVERTURE DE LA MODALE DE SUPPRESSION SÉLECTIVE */}
+            <button onClick={() => setShowResetModal(true)} className="text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-2 active:scale-95" title="Vider le Grand Livre de manière sélective">
+              <Trash2 size={14} /> Vider le Grand Livre (Filtre)
+            </button>
+              
             <button onClick={() => setShowResetModal(true)} className="text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-2 active:scale-95" title="Vider le Grand Livre de manière sélective">
               <Trash2 size={14} /> Vider le Grand Livre (Filtre)
             </button>
