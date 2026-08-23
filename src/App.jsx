@@ -415,7 +415,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
   anterieures.forEach(t => processTx(t, true));
   exercice.forEach(t => processTx(t, false));
 
-  // Calcul du Résultat des années antérieures pour le Bilan
+  // Calcul du Résultat des années antérieures pour l'injection dans le Bilan
   let resultatAnterieur = 0;
   Object.keys(balancesResultatAnt).forEach(code => {
     const b = balancesResultatAnt[code];
@@ -437,7 +437,9 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     chExploitation: { label: "Charges d'Exploitation", total: 0, sousGroupes: {} },
     chFinancieres: { label: "Charges Financières", total: 0, sousGroupes: {} },
     chExceptionnelles: { label: "Charges Exceptionnelles", total: 0, sousGroupes: {} },
-    produits: { label: "Produits (Recettes)", total: 0, sousGroupes: {} }
+    prodExploitation: { label: "Produits d'Exploitation", total: 0, sousGroupes: {} },
+    prodFinanciers: { label: "Produits Financiers", total: 0, sousGroupes: {} },
+    prodExceptionnels: { label: "Produits Exceptionnels", total: 0, sousGroupes: {} }
   };
 
   const addToGroup = (categorieObj, code, val) => {
@@ -465,12 +467,12 @@ const EtatFinancier = ({ transactionsGlobales }) => {
 
     if (root === '1') {
       if (['15', '16'].includes(prefix2)) addToGroup(groupes.dettes, code, soldeCredit);
-      else addToGroup(groupes.fondsPropres, code, soldeCredit); // Inclut le Résultat Antérieur (12)
+      else addToGroup(groupes.fondsPropres, code, soldeCredit); 
     } else if (root === '2') {
       addToGroup(groupes.actifImmo, code, soldeDebit);
     } else if (['3', '4', '5'].includes(root)) {
       if (soldeDebit > 0) addToGroup(groupes.actifCirc, code, soldeDebit);
-      else addToGroup(groupes.dettes, code, soldeCredit); // Dettes bancaires ou fiscales
+      else addToGroup(groupes.dettes, code, soldeCredit); // Dettes (Ex: découvert bancaire, dettes fournisseurs)
     }
   });
 
@@ -491,11 +493,13 @@ const EtatFinancier = ({ transactionsGlobales }) => {
       else if (prefix2 === '67') addToGroup(groupes.chExceptionnelles, code, soldeDebit);
       else addToGroup(groupes.chExploitation, code, soldeDebit);
     } else if (root === '7') {
-      addToGroup(groupes.produits, code, soldeCredit);
+      if (prefix2 === '76') addToGroup(groupes.prodFinanciers, code, soldeCredit);
+      else if (prefix2 === '77') addToGroup(groupes.prodExceptionnels, code, soldeCredit);
+      else addToGroup(groupes.prodExploitation, code, soldeCredit);
     }
   });
 
-  // Tri alphabétique des items à l'intérieur
+  // Tri alphabétique des items
   Object.values(groupes).forEach(cat => {
     Object.values(cat.sousGroupes).forEach(sg => {
       sg.items.sort((a, b) => a.code.localeCompare(b.code));
@@ -504,26 +508,37 @@ const EtatFinancier = ({ transactionsGlobales }) => {
 
   const sortedKeys = (obj) => Object.keys(obj).sort();
 
-  // Calcul du Résultat de l'exercice pour affichage ET insertion propre dans les Fonds Propres
+  // --- CALCULS TOTAUX & FUSION DU RÉSULTAT ---
   const totalCharges = groupes.chExploitation.total + groupes.chFinancieres.total + groupes.chExceptionnelles.total;
-  const totalProduits = groupes.produits.total;
+  const totalProduits = groupes.prodExploitation.total + groupes.prodFinanciers.total + groupes.prodExceptionnels.total;
   const resultatExercice = totalProduits - totalCharges;
 
-  // L'insertion STRICTE du Résultat dans les Fonds Propres
   if (Math.abs(resultatExercice) > 0.01) {
-    const resLabel = anneeDebut === 'TOTAL' ? 'Résultat Global (Cumulé)' : "Résultat de l'exercice";
-    const groupName = `12 - ${resLabel}`;
+    const groupName = `12 - ${PREFIXES['12']}`;
     if (!groupes.fondsPropres.sousGroupes[groupName]) {
       groupes.fondsPropres.sousGroupes[groupName] = { total: 0, items: [] };
     }
-    // Un résultat positif est un crédit (augmente les fonds propres). Un résultat négatif les diminue.
-    groupes.fondsPropres.sousGroupes[groupName].items.push({ code: '120000', libelle: resLabel, net: resultatExercice });
+    
+    const existingItem = groupes.fondsPropres.sousGroupes[groupName].items.find(i => i.code === '120000');
+    
+    // Fusion intelligente du résultat pour éviter les doublons de lignes "12"
+    if (anneeDebut === 'TOTAL') {
+      if (existingItem) {
+        existingItem.net += resultatExercice;
+        existingItem.libelle = 'Résultat Global (Cumulé)';
+      } else {
+        groupes.fondsPropres.sousGroupes[groupName].items.push({ code: '120000', libelle: 'Résultat Global (Cumulé)', net: resultatExercice });
+      }
+    } else {
+      groupes.fondsPropres.sousGroupes[groupName].items.push({ code: '120000', libelle: "Résultat de l'exercice (En cours)", net: resultatExercice });
+    }
+    
     groupes.fondsPropres.sousGroupes[groupName].total += resultatExercice;
     groupes.fondsPropres.total += resultatExercice;
   }
 
   const totalActif = groupes.actifImmo.total + groupes.actifCirc.total;
-  const totalPassif = groupes.fondsPropres.total + groupes.dettes.total; // Le Résultat est DEDANS !
+  const totalPassif = groupes.fondsPropres.total + groupes.dettes.total; // Le Résultat est désormais logé DANS les Fonds Propres !
   
   const ecartBilan = Math.abs(totalActif - totalPassif);
   const isBilanDesequilibre = ecartBilan > 0.01;
@@ -531,7 +546,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
   // Composant de rendu pour une sous-catégorie
   const renderSousGroupes = (categorieObj) => {
     if (Object.keys(categorieObj.sousGroupes).length === 0) {
-      return <div className="text-center text-slate-400 text-sm py-4">Aucune donnée</div>;
+      return <div className="text-center text-slate-400 text-sm py-3 italic">Aucune donnée</div>;
     }
     return sortedKeys(categorieObj.sousGroupes).map(groupKey => {
       const grp = categorieObj.sousGroupes[groupKey];
@@ -613,22 +628,31 @@ const EtatFinancier = ({ transactionsGlobales }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200">
             {/* COLONNE CHARGES */}
             <div className="bg-slate-50/50">
-              <div className="bg-red-50 text-red-700 font-bold p-3 text-center text-sm border-b border-red-100 uppercase tracking-wider flex justify-between px-4">
-                <span>Charges (Dépenses)</span>
+              <div className="bg-red-50 text-red-700 font-bold p-3 text-center text-sm border-b border-red-100 uppercase tracking-wider flex justify-between px-4 shadow-sm z-10 relative">
+                <span>Total des Charges</span>
                 <span>{formatMontant(totalCharges)} €</span>
               </div>
               
-              <div className="p-2 space-y-4">
+              <div className="p-3 space-y-4">
                 <div>
-                  <div className="text-xs font-bold text-slate-400 uppercase tracking-widest px-2 mb-1 border-b border-slate-200 pb-1">Charges d'Exploitation</div>
+                  <div className="text-xs font-bold text-slate-400 uppercase tracking-widest px-2 mb-1 border-b border-slate-200 pb-1 flex justify-between">
+                    <span>Charges d'Exploitation</span>
+                    <span className="text-slate-600">{formatMontant(groupes.chExploitation.total)} €</span>
+                  </div>
                   {renderSousGroupes(groupes.chExploitation)}
                 </div>
                 <div>
-                  <div className="text-xs font-bold text-slate-400 uppercase tracking-widest px-2 mb-1 border-b border-slate-200 pb-1">Charges Financières</div>
+                  <div className="text-xs font-bold text-slate-400 uppercase tracking-widest px-2 mb-1 border-b border-slate-200 pb-1 flex justify-between">
+                    <span>Charges Financières</span>
+                    <span className="text-slate-600">{formatMontant(groupes.chFinancieres.total)} €</span>
+                  </div>
                   {renderSousGroupes(groupes.chFinancieres)}
                 </div>
                 <div>
-                  <div className="text-xs font-bold text-slate-400 uppercase tracking-widest px-2 mb-1 border-b border-slate-200 pb-1">Charges Exceptionnelles</div>
+                  <div className="text-xs font-bold text-slate-400 uppercase tracking-widest px-2 mb-1 border-b border-slate-200 pb-1 flex justify-between">
+                    <span>Charges Exceptionnelles</span>
+                    <span className="text-slate-600">{formatMontant(groupes.chExceptionnelles.total)} €</span>
+                  </div>
                   {renderSousGroupes(groupes.chExceptionnelles)}
                 </div>
               </div>
@@ -636,14 +660,33 @@ const EtatFinancier = ({ transactionsGlobales }) => {
 
             {/* COLONNE PRODUITS */}
             <div className="bg-slate-50/50">
-              <div className="bg-emerald-50 text-emerald-700 font-bold p-3 text-center text-sm border-b border-emerald-100 uppercase tracking-wider flex justify-between px-4">
-                <span>Produits (Recettes)</span>
+              <div className="bg-emerald-50 text-emerald-700 font-bold p-3 text-center text-sm border-b border-emerald-100 uppercase tracking-wider flex justify-between px-4 shadow-sm z-10 relative">
+                <span>Total des Produits</span>
                 <span>{formatMontant(totalProduits)} €</span>
               </div>
               
-              <div className="p-2">
-                <div className="text-xs font-bold text-slate-400 uppercase tracking-widest px-2 mb-1 border-b border-slate-200 pb-1">Produits d'Exploitation & Divers</div>
-                {renderSousGroupes(groupes.produits)}
+              <div className="p-3 space-y-4">
+                <div>
+                  <div className="text-xs font-bold text-slate-400 uppercase tracking-widest px-2 mb-1 border-b border-slate-200 pb-1 flex justify-between">
+                    <span>Produits d'Exploitation</span>
+                    <span className="text-slate-600">{formatMontant(groupes.prodExploitation.total)} €</span>
+                  </div>
+                  {renderSousGroupes(groupes.prodExploitation)}
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-slate-400 uppercase tracking-widest px-2 mb-1 border-b border-slate-200 pb-1 flex justify-between">
+                    <span>Produits Financiers</span>
+                    <span className="text-slate-600">{formatMontant(groupes.prodFinanciers.total)} €</span>
+                  </div>
+                  {renderSousGroupes(groupes.prodFinanciers)}
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-slate-400 uppercase tracking-widest px-2 mb-1 border-b border-slate-200 pb-1 flex justify-between">
+                    <span>Produits Exceptionnels</span>
+                    <span className="text-slate-600">{formatMontant(groupes.prodExceptionnels.total)} €</span>
+                  </div>
+                  {renderSousGroupes(groupes.prodExceptionnels)}
+                </div>
               </div>
             </div>
           </div>
@@ -694,11 +737,11 @@ const EtatFinancier = ({ transactionsGlobales }) => {
           
           {/* COLONNE ACTIF */}
           <div className="bg-slate-50/50">
-            <div className="bg-blue-50 text-blue-700 font-bold p-3 text-center text-sm border-b border-blue-100 uppercase tracking-wider flex justify-between px-4">
-              <span>Actif (Emplois)</span>
+            <div className="bg-blue-50 text-blue-700 font-bold p-3 text-center text-sm border-b border-blue-100 uppercase tracking-wider flex justify-between px-4 shadow-sm z-10 relative">
+              <span>Total Actif (Emplois)</span>
               <span>{formatMontant(totalActif)} €</span>
             </div>
-            <div className="p-2 space-y-4">
+            <div className="p-3 space-y-4">
               <div>
                 <div className="text-xs font-bold text-slate-400 uppercase tracking-widest px-2 mb-1 border-b border-slate-200 pb-1 flex justify-between">
                   <span>Actif Immobilisé</span>
@@ -718,14 +761,14 @@ const EtatFinancier = ({ transactionsGlobales }) => {
 
           {/* COLONNE PASSIF */}
           <div className="bg-slate-50/50">
-            <div className="bg-orange-50 text-orange-700 font-bold p-3 text-center text-sm border-b border-orange-100 uppercase tracking-wider flex justify-between px-4">
-              <span>Passif (Ressources)</span>
+            <div className="bg-orange-50 text-orange-700 font-bold p-3 text-center text-sm border-b border-orange-100 uppercase tracking-wider flex justify-between px-4 shadow-sm z-10 relative">
+              <span>Total Passif (Ressources)</span>
               <span>{formatMontant(totalPassif)} €</span>
             </div>
-            <div className="p-2 space-y-4">
+            <div className="p-3 space-y-4">
               <div>
                 <div className="text-xs font-bold text-slate-400 uppercase tracking-widest px-2 mb-1 border-b border-slate-200 pb-1 flex justify-between">
-                  <span>Capitaux Propres (Fonds propres)</span>
+                  <span>Fonds Propres</span>
                   <span className="text-slate-600">{formatMontant(groupes.fondsPropres.total)} €</span>
                 </div>
                 {renderSousGroupes(groupes.fondsPropres)}
@@ -743,7 +786,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
         </div>
 
         <div className={`p-4 border-t flex justify-between items-center text-sm ${isBilanDesequilibre ? 'bg-rose-100 border-rose-300' : 'bg-slate-100 border-slate-200'}`}>
-          <span className={`font-black uppercase ${isBilanDesequilibre ? 'text-rose-700' : 'text-slate-500'}`}>TOTAL GÉNÉRAL</span>
+          <span className={`font-black uppercase ${isBilanDesequilibre ? 'text-rose-700' : 'text-slate-500'}`}>ÉQUILIBRE DU BILAN</span>
           <div className="flex gap-8">
             <span className="font-bold text-blue-700">Actif : {formatMontant(totalActif)} €</span>
             <span className="font-bold text-orange-700">Passif : {formatMontant(totalPassif)} €</span>
