@@ -720,7 +720,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
   const [activeTab, setActiveTab] = useState(null);
   const [showResetModal, setShowResetModal] = useState(false);
-  const [resetAnnee, setResetAnnee] = useState('TOTAL'); // NOUVEAU : Période sélectionnée pour la suppression
+  const [resetAnnee, setResetAnnee] = useState('TOTAL');
 
   const [odFormDate, setOdFormDate] = useState('');
   const [odFormLibelle, setOdFormLibelle] = useState('');
@@ -732,6 +732,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCompteFilter, setSelectedCompteFilter] = useState(''); 
+  const [selectedSourceFilter, setSelectedSourceFilter] = useState(''); // NOUVEAU : Filtre de source
   const [anneeFiltre, setAnneeFiltre] = useState('TOTAL');
   const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' });
 
@@ -767,7 +768,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
     return map[root] || 'Compte Général';
   };
 
-  // NOUVEAU : Fonction parseDateForSort déplacée en haut pour être utilisable partout (filtre ET suppression)
   const parseDateForSort = (dStr) => {
     if (!dStr) return 0;
     const str = String(dStr).trim();
@@ -862,10 +862,8 @@ const GrandLivre = ({ transactionsGlobales }) => {
     reader.readAsDataURL(file);
   };
 
-  // NOUVELLE FONCTION DE SUPPRESSION SÉLECTIVE (PAR SOURCE + PÉRIODE)
   const handleResetPartiel = async (sourceToDelete) => {
     const txToDelete = transactionsGlobales.filter(tx => {
-      // 1. Filtre par Source
       let matchSource = false;
       if (sourceToDelete === 'tout') {
         matchSource = true;
@@ -874,7 +872,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
         matchSource = (source === sourceToDelete);
       }
 
-      // 2. Filtre par Période
       let matchPeriod = true;
       if (resetAnnee !== 'TOTAL') {
         const start = new Date(Number(resetAnnee), 8, 1, 0, 0, 0).getTime();
@@ -1379,6 +1376,14 @@ const GrandLivre = ({ transactionsGlobales }) => {
       });
     }
 
+    // NOUVEAU FILTRE PAR SOURCE
+    if (selectedSourceFilter) {
+      result = result.filter(t => {
+        const source = t.type === 'od' ? (t.typeOp === 'PAIE' || (t.libelle && String(t.libelle).includes('(PAIE)')) ? 'paie' : 'od') : 'banque';
+        return source === selectedSourceFilter;
+      });
+    }
+
     if (searchTerm) {
       const lowerTerm = searchTerm.toLowerCase();
       result = result.filter(t => 
@@ -1429,7 +1434,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
     });
 
     return result;
-  }, [transactionsGlobales, searchTerm, selectedCompteFilter, sortConfig, anneeFiltre]);
+  }, [transactionsGlobales, searchTerm, selectedCompteFilter, sortConfig, anneeFiltre, selectedSourceFilter]);
 
   const formatMontantTableau = (montant) => {
     return new Intl.NumberFormat('fr-FR', { 
@@ -1838,7 +1843,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
           </div>
 
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-            {/* BOUTON D'OUVERTURE DE LA MODALE DE SUPPRESSION SÉLECTIVE */}
             <button onClick={() => setShowResetModal(true)} className="text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-2 active:scale-95" title="Vider le Grand Livre de manière sélective">
               <Trash2 size={14} /> Vider le Grand Livre (Filtre)
             </button>
@@ -1849,12 +1853,24 @@ const GrandLivre = ({ transactionsGlobales }) => {
               onChange={(e) => setAnneeFiltre(e.target.value)}
               className="border border-slate-200 rounded-xl px-3.5 py-2 text-xs bg-white outline-none focus:ring-2 focus:ring-indigo-600 font-bold text-slate-700 shadow-sm"
             >
-              <option value="TOTAL">Toutes les périodes</option>
+              <option value="TOTAL">Toutes les années</option>
               {[2021, 2022, 2023, 2024, 2025, 2026].map(year => (
                 <option key={year} value={year}>
-                  01/09/{String(year).slice(-2)} au 31/08/{String(year + 1).slice(-2)}
+                  01/09/{String(year).slice(-2)} - 31/08/{String(year + 1).slice(-2)}
                 </option>
               ))}
+            </select>
+
+            {/* NOUVEAU FILTRE PAR SOURCE */}
+            <select 
+              value={selectedSourceFilter} 
+              onChange={(e) => setSelectedSourceFilter(e.target.value)}
+              className="border border-slate-200 rounded-xl px-3.5 py-2 text-xs bg-white outline-none focus:ring-2 focus:ring-indigo-600 font-bold text-slate-700 shadow-sm"
+            >
+              <option value="">Toutes les sources</option>
+              <option value="banque">🏦 Banque</option>
+              <option value="paie">👥 Paie</option>
+              <option value="od">📝 OD</option>
             </select>
 
             <select value={selectedCompteFilter} onChange={(e) => setSelectedCompteFilter(e.target.value)} className="border border-slate-200 rounded-xl px-3.5 py-2 text-xs bg-white outline-none focus:ring-2 focus:ring-indigo-600 font-mono font-bold text-slate-700 shadow-sm">
@@ -1862,8 +1878,11 @@ const GrandLivre = ({ transactionsGlobales }) => {
               {comptesList.map(c => <option key={`filter-${c.id}`} value={c.code}>{c.code} - {c.libelle}</option>)}
             </select>
 
-            {selectedCompteFilter && (
-              <button onClick={() => setSelectedCompteFilter('')} className="text-xs text-indigo-600 font-bold hover:underline">Réinitialiser</button>
+            {/* BOUTON DE RÉINITIALISATION DYNAMIQUE DES FILTRES */}
+            {(selectedCompteFilter !== '' || selectedSourceFilter !== '' || anneeFiltre !== 'TOTAL') && (
+              <button onClick={() => { setSelectedCompteFilter(''); setSelectedSourceFilter(''); setAnneeFiltre('TOTAL'); }} className="text-xs text-indigo-600 font-bold hover:underline">
+                Réinitialiser
+              </button>
             )}
 
             <div className="relative flex-1 md:w-64">
