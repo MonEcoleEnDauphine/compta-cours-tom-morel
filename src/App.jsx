@@ -94,45 +94,43 @@ const InfosContact = () => (
 const normaliserDateFR = (rawVal) => {
   if (!rawVal) return '';
 
-  // 1. Si la date arrive sous forme d'objet Date (cas du XLSX)
+  // 1. Si c'est un objet Date (Import Excel XLSX)
   if (rawVal instanceof Date && !isNaN(rawVal)) {
-    // On utilise la date locale (getDate) et non plus UTC
-    const d = String(rawVal.getDate()).padStart(2, '0');
-    const m = String(rawVal.getMonth() + 1).padStart(2, '0');
-    const y = rawVal.getFullYear();
-    return `${d}/${m}/${y}`;
+    // SÉCURITÉ ABSOLUE : On se place à MIDI pour éviter tout décalage J-1 ou J+1
+    const d = new Date(rawVal.getTime());
+    d.setHours(12, 0, 0, 0); 
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
   }
 
-  // 2. Si la date arrive sous forme de Numéro de série Excel pur
+  // 2. Si c'est un Numéro de série pur (Autre format Excel)
   if (typeof rawVal === 'number') {
     const jsDate = new Date(Math.round((rawVal - 25569) * 86400 * 1000));
-    const offset = jsDate.getTimezoneOffset() * 60000;
-    const finalDate = new Date(jsDate.getTime() + offset);
-    const d = String(finalDate.getDate()).padStart(2, '0');
-    const m = String(finalDate.getMonth() + 1).padStart(2, '0');
-    const y = finalDate.getFullYear();
-    return `${d}/${m}/${y}`;
+    jsDate.setUTCHours(12); // Sécurité MIDI
+    const day = String(jsDate.getUTCDate()).padStart(2, '0');
+    const month = String(jsDate.getUTCMonth() + 1).padStart(2, '0');
+    const year = jsDate.getUTCFullYear();
+    return `${day}/${month}/${year}`;
   }
 
-  // 3. Si c'est du texte pur (CSV / TXT pour la Paie)
-  const str = String(rawVal).trim();
-  if (!str) return '';
-  if (str.includes('-')) {
-    const parts = str.split('T')[0].split('-');
-    if (parts.length === 3 && parts[0].length === 4) {
-      const [y, m, d] = parts;
-      return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
-    }
-  }
+  // 3. Si c'est du Texte (Fichiers Paie TXT, OD CSV, ou saisie)
+  let str = String(rawVal).trim();
+  str = str.split('T')[0]; // Enlève l'heure si elle traîne
+  str = str.replace(/-/g, '/'); // Transforme les tirets 31-08-2025 en 31/08/2025
+
   if (str.includes('/')) {
     const parts = str.split('/');
     if (parts.length === 3) {
-      if (parts[0].length === 4) { 
+      if (parts[0].length === 4) {
+        // Format YYYY/MM/DD
         const [y, m, d] = parts;
         return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
-      } else { 
+      } else {
+        // Format DD/MM/YYYY ou DD/MM/YY
         let [d, m, y] = parts;
-        if (y.length === 2) y = '20' + y;
+        if (y.length === 2) y = '20' + y; // Corrige les années "25" en "2025"
         return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
       }
     }
