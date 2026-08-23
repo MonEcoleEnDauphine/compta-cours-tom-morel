@@ -1175,6 +1175,8 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
     const processRows = async (rows) => {
       let count = 0;
+      let doublonsCount = 0; // NOUVEAU : Compteur de doublons
+      
       for (let i = 1; i < rows.length; i++) {
         const cols = rows[i];
         if (cols && cols.length >= 9) {
@@ -1201,11 +1203,25 @@ const GrandLivre = ({ transactionsGlobales }) => {
             const isDebit = debitVal > 0;
             const montantFinal = isDebit ? debitVal : creditVal;
             const prefix = journal === 'PAIE' ? '(PAIE)' : '(OD)';
+            const libelleFinal = `${prefix} ${libelle}`;
+
+            // --- NOUVEAU : SÉCURITÉ ANTI-DOUBLONS ---
+            const isDuplicate = transactionsGlobales.some(t => 
+              t.date === formattedDate && 
+              t.libelle === libelleFinal && 
+              Math.abs(t.montant) === Math.abs(montantFinal)
+            );
+
+            if (isDuplicate) {
+              doublonsCount++;
+              continue; // On zappe cette ligne et on passe à la suivante !
+            }
+            // ----------------------------------------
 
             const newTx = {
               batchId: batchId,
               date: formattedDate,
-              libelle: `${prefix} ${libelle}`,
+              libelle: libelleFinal,
               montant: montantFinal,
               type: 'od',
               compteDebit: isDebit ? compteNum : '',
@@ -1226,7 +1242,10 @@ const GrandLivre = ({ transactionsGlobales }) => {
         }
       }
       if (count > 0) setLastImportBatch({ batchId, target: 'firestore', source: 'Opérations Diverses', count });
-      alert(`${count} lignes importées avec succès dans le Grand Livre !`);
+      
+      // On affiche le bilan (lignes importées + doublons évités)
+      alert(`${count} lignes importées avec succès dans le Grand Livre !${doublonsCount > 0 ? `\n(Sécurité : ${doublonsCount} doublon(s) ignoré(s))` : ''}`);
+      
       if (fileInputODRef.current) fileInputODRef.current.value = '';
       setActiveTab(null);
     };
