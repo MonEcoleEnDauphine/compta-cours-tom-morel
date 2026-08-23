@@ -1168,21 +1168,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
     reader.readAsText(file, 'UTF-8');
   };
 
-  // ==========================================
-    // LIGNES JUSTE AU-DESSUS (Fin de l'import Paie)
-    // ==========================================
-      if (count > 0) setLastImportBatch({ batchId, target: 'firestore', source: 'Fiches de Paie', count });
-      alert(`${count} ligne(s) de paie intégrée(s) !${doublonsCount > 0 ? `\n(Sécurité : ${doublonsCount} doublon(s) existant(s) ignoré(s))` : ''}`);
-      if (fileInputPaieRef.current) fileInputPaieRef.current.value = '';
-      setActiveTab(null);
-    };
-    reader.readAsText(file, 'UTF-8');
-  };
-
-
-  // ==========================================
-  // LE NOUVEAU CODE À COLLER ICI (Avec anti-doublon)
-  // ==========================================
   const handleImportODMass = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -1190,7 +1175,8 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
     const processRows = async (rows) => {
       let count = 0;
-      let doublonsCount = 0; // NOUVEAU : Compteur de doublons
+      let doublonsCount = 0; 
+      const transactionsToInsert = []; 
       
       for (let i = 1; i < rows.length; i++) {
         const cols = rows[i];
@@ -1220,7 +1206,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
             const prefix = journal === 'PAIE' ? '(PAIE)' : '(OD)';
             const libelleFinal = `${prefix} ${libelle}`;
 
-            // --- NOUVEAU : SÉCURITÉ ANTI-DOUBLONS ---
             const isDuplicate = transactionsGlobales.some(t => 
               t.date === formattedDate && 
               t.libelle === libelleFinal && 
@@ -1229,9 +1214,8 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
             if (isDuplicate) {
               doublonsCount++;
-              continue; // On zappe cette ligne et on passe à la suivante !
+              continue; 
             }
-            // ----------------------------------------
 
             const newTx = {
               batchId: batchId,
@@ -1247,18 +1231,21 @@ const GrandLivre = ({ transactionsGlobales }) => {
               date_creation: new Date().toISOString()
             };
 
-            try {
-              await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), newTx);
-              count++;
-            } catch(err) {
-              console.error(err);
-            }
+            transactionsToInsert.push(newTx); 
           }
         }
       }
+
+      const chunkSize = 100;
+      for (let i = 0; i < transactionsToInsert.length; i += chunkSize) {
+        const chunk = transactionsToInsert.slice(i, i + chunkSize);
+        const promises = chunk.map(tx => addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), tx));
+        await Promise.all(promises); 
+        count += chunk.length;
+      }
+
       if (count > 0) setLastImportBatch({ batchId, target: 'firestore', source: 'Opérations Diverses', count });
       
-      // Message de bilan avec les doublons ignorés
       alert(`${count} lignes importées avec succès dans le Grand Livre !${doublonsCount > 0 ? `\n(Sécurité : ${doublonsCount} doublon(s) ignoré(s))` : ''}`);
       
       if (fileInputODRef.current) fileInputODRef.current.value = '';
@@ -1287,17 +1274,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
     }
   };
 
-
-  // ==========================================
-  // LIGNES JUSTE EN-DESSOUS (Début de la validation Banque)
-  // ==========================================
-  const validerLigneBank = async (ligneId, compteCode, commentaireTxt) => {
-    const ligne = lignesEnAttente.find(l => l.id === ligneId);
-    if (!ligne || !compteCode) {
-      alert("Veuillez sélectionner un compte avant de valider.");
-      return;
-    }
-  
   const validerLigneBank = async (ligneId, compteCode, commentaireTxt) => {
     const ligne = lignesEnAttente.find(l => l.id === ligneId);
     if (!ligne || !compteCode) {
@@ -1511,7 +1487,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
     return acc + (Number(t.montant) > 0 ? Number(t.montant) : 0);
   }, 0);
 
-  // --- NOUVELLE FONCTION D'EXPORT CSV ---
+  // --- FONCTION D'EXPORT CSV ---
   const handleExportCSV = () => {
     if (filteredAndSortedTransactions.length === 0) {
       alert("Aucune écriture à exporter.");
@@ -1563,7 +1539,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
     link.click();
     document.body.removeChild(link);
   };
-  // --------------------------------------
 
   return (
     <div className="space-y-6 w-full max-w-[1600px] mx-auto px-3 py-2 font-sans">
