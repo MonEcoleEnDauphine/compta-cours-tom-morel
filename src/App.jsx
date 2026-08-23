@@ -1168,6 +1168,21 @@ const GrandLivre = ({ transactionsGlobales }) => {
     reader.readAsText(file, 'UTF-8');
   };
 
+  // ==========================================
+    // LIGNES JUSTE AU-DESSUS (Fin de l'import Paie)
+    // ==========================================
+      if (count > 0) setLastImportBatch({ batchId, target: 'firestore', source: 'Fiches de Paie', count });
+      alert(`${count} ligne(s) de paie intégrée(s) !${doublonsCount > 0 ? `\n(Sécurité : ${doublonsCount} doublon(s) existant(s) ignoré(s))` : ''}`);
+      if (fileInputPaieRef.current) fileInputPaieRef.current.value = '';
+      setActiveTab(null);
+    };
+    reader.readAsText(file, 'UTF-8');
+  };
+
+
+  // ==========================================
+  // LE NOUVEAU CODE À COLLER ICI (Avec anti-doublon)
+  // ==========================================
   const handleImportODMass = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -1243,7 +1258,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
       }
       if (count > 0) setLastImportBatch({ batchId, target: 'firestore', source: 'Opérations Diverses', count });
       
-      // On affiche le bilan (lignes importées + doublons évités)
+      // Message de bilan avec les doublons ignorés
       alert(`${count} lignes importées avec succès dans le Grand Livre !${doublonsCount > 0 ? `\n(Sécurité : ${doublonsCount} doublon(s) ignoré(s))` : ''}`);
       
       if (fileInputODRef.current) fileInputODRef.current.value = '';
@@ -1272,6 +1287,17 @@ const GrandLivre = ({ transactionsGlobales }) => {
     }
   };
 
+
+  // ==========================================
+  // LIGNES JUSTE EN-DESSOUS (Début de la validation Banque)
+  // ==========================================
+  const validerLigneBank = async (ligneId, compteCode, commentaireTxt) => {
+    const ligne = lignesEnAttente.find(l => l.id === ligneId);
+    if (!ligne || !compteCode) {
+      alert("Veuillez sélectionner un compte avant de valider.");
+      return;
+    }
+  
   const validerLigneBank = async (ligneId, compteCode, commentaireTxt) => {
     const ligne = lignesEnAttente.find(l => l.id === ligneId);
     if (!ligne || !compteCode) {
