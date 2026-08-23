@@ -232,7 +232,6 @@ const SearchableCompteSelect = ({ value, onChange, comptesList, placeholder = "S
 // --- ÉTAT FINANCIER (Bilan & Résultat Groupés) ---
 const EtatFinancier = ({ transactionsGlobales }) => {
   
-  // SÉCURITÉ : Formatage monétaire rapatrié à l'intérieur
   const formatMontant = (valeur) => {
     const num = Number(valeur);
     if (isNaN(num)) return "0,00";
@@ -387,18 +386,12 @@ const EtatFinancier = ({ transactionsGlobales }) => {
       const cCode = t.compteCredit ? String(t.compteCredit).trim() : '';
 
       if (dCode) {
-        if (dCode.startsWith('6') || dCode.startsWith('7')) {
-          addAmount(resObj, dCode, absM, 0);
-        } else {
-          addAmount(balancesBilan, dCode, absM, 0);
-        }
+        if (dCode.startsWith('6') || dCode.startsWith('7')) addAmount(resObj, dCode, absM, 0);
+        else addAmount(balancesBilan, dCode, absM, 0);
       }
       if (cCode) {
-        if (cCode.startsWith('6') || cCode.startsWith('7')) {
-          addAmount(resObj, cCode, 0, absM);
-        } else {
-          addAmount(balancesBilan, cCode, 0, absM);
-        }
+        if (cCode.startsWith('6') || cCode.startsWith('7')) addAmount(resObj, cCode, 0, absM);
+        else addAmount(balancesBilan, cCode, 0, absM);
       }
     } else {
       const compteStr = t.compte ? String(t.compte).trim() : '';
@@ -413,7 +406,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
         else addAmount(balancesBilan, compteStr, 0, absM);
       }
 
-      // Génération de la contrepartie en Banque 512 automatique
+      // Contrepartie Banque automatique
       if (m < 0) addAmount(balancesBilan, '512000', 0, absM); 
       else addAmount(balancesBilan, '512000', absM, 0); 
     }
@@ -422,7 +415,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
   anterieures.forEach(t => processTx(t, true));
   exercice.forEach(t => processTx(t, false));
 
-  // Calcul du Résultat N-1 et injection
+  // Calcul du Résultat des années antérieures pour le Bilan
   let resultatAnterieur = 0;
   Object.keys(balancesResultatAnt).forEach(code => {
     const b = balancesResultatAnt[code];
@@ -435,52 +428,53 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     else addAmount(balancesBilan, '120000', Math.abs(resultatAnterieur), 0); 
   }
 
-  const actif = {};
-  const passif = {};
-  const charges = {};
-  const produits = {};
-
-  let totalActif = 0;
-  let totalPassif = 0;
-  let totalCharges = 0;
-  let totalProduits = 0;
-
-  const addToGroup = (category, code, val) => {
-    const prefix2 = code.substring(0, 2);
-    const groupName = `${prefix2} - ${PREFIXES[prefix2] || 'Autres comptes'}`;
-    if (!category[groupName]) category[groupName] = { total: 0, items: [] };
-    category[groupName].items.push({ code, libelle: getCompteLibelle(code), net: val });
-    category[groupName].total += val;
+  // --- STRUCTURE COMPTABLE ---
+  const groupes = {
+    actifImmo: { label: "Actif Immobilisé", total: 0, sousGroupes: {} },
+    actifCirc: { label: "Actif Circulant", total: 0, sousGroupes: {} },
+    fondsPropres: { label: "Fonds Propres", total: 0, sousGroupes: {} },
+    dettes: { label: "Dettes", total: 0, sousGroupes: {} },
+    chExploitation: { label: "Charges d'Exploitation", total: 0, sousGroupes: {} },
+    chFinancieres: { label: "Charges Financières", total: 0, sousGroupes: {} },
+    chExceptionnelles: { label: "Charges Exceptionnelles", total: 0, sousGroupes: {} },
+    produits: { label: "Produits (Recettes)", total: 0, sousGroupes: {} }
   };
 
-  // Traitement strict des soldes comptables
+  const addToGroup = (categorieObj, code, val) => {
+    const prefix2 = code.substring(0, 2);
+    const groupName = `${prefix2} - ${PREFIXES[prefix2] || 'Autres comptes'}`;
+    if (!categorieObj.sousGroupes[groupName]) {
+      categorieObj.sousGroupes[groupName] = { total: 0, items: [] };
+    }
+    categorieObj.sousGroupes[groupName].items.push({ code, libelle: getCompteLibelle(code), net: val });
+    categorieObj.sousGroupes[groupName].total += val;
+    categorieObj.total += val;
+  };
+
+  // Traitement du Bilan
   Object.keys(balancesBilan).forEach(code => {
     if (!code || code.length < 2) return;
     const b = balancesBilan[code];
-    
     const soldeDebit = b.debit - b.credit;
     const soldeCredit = b.credit - b.debit;
     
     if (Math.abs(soldeDebit) < 0.01) return;
 
     const root = code[0];
-    if (['1'].includes(root)) {
-      addToGroup(passif, code, soldeCredit); 
-      totalPassif += soldeCredit;
-    } else if (['2', '3'].includes(root)) {
-      addToGroup(actif, code, soldeDebit);
-      totalActif += soldeDebit;
-    } else if (['4', '5'].includes(root)) {
-      if (soldeDebit > 0) {
-        addToGroup(actif, code, soldeDebit);
-        totalActif += soldeDebit;
-      } else {
-        addToGroup(passif, code, soldeCredit);
-        totalPassif += soldeCredit;
-      }
+    const prefix2 = code.substring(0, 2);
+
+    if (root === '1') {
+      if (['15', '16'].includes(prefix2)) addToGroup(groupes.dettes, code, soldeCredit);
+      else addToGroup(groupes.fondsPropres, code, soldeCredit); // Inclut le Résultat Antérieur (12)
+    } else if (root === '2') {
+      addToGroup(groupes.actifImmo, code, soldeDebit);
+    } else if (['3', '4', '5'].includes(root)) {
+      if (soldeDebit > 0) addToGroup(groupes.actifCirc, code, soldeDebit);
+      else addToGroup(groupes.dettes, code, soldeCredit); // Dettes bancaires ou fiscales
     }
   });
 
+  // Traitement du Résultat
   Object.keys(balancesResultat).forEach(code => {
     if (!code || code.length < 2) return;
     const b = balancesResultat[code];
@@ -490,67 +484,92 @@ const EtatFinancier = ({ transactionsGlobales }) => {
     if (Math.abs(soldeDebit) < 0.01) return;
 
     const root = code[0];
+    const prefix2 = code.substring(0, 2);
+
     if (root === '6') {
-      addToGroup(charges, code, soldeDebit);
-      totalCharges += soldeDebit;
+      if (prefix2 === '66') addToGroup(groupes.chFinancieres, code, soldeDebit);
+      else if (prefix2 === '67') addToGroup(groupes.chExceptionnelles, code, soldeDebit);
+      else addToGroup(groupes.chExploitation, code, soldeDebit);
     } else if (root === '7') {
-      addToGroup(produits, code, soldeCredit);
-      totalProduits += soldeCredit;
+      addToGroup(groupes.produits, code, soldeCredit);
     }
   });
 
-  const sortGroupItems = (groupObj) => {
-    Object.keys(groupObj).forEach(key => {
-      groupObj[key].items.sort((a, b) => a.code.localeCompare(b.code));
+  // Tri alphabétique des items à l'intérieur
+  Object.values(groupes).forEach(cat => {
+    Object.values(cat.sousGroupes).forEach(sg => {
+      sg.items.sort((a, b) => a.code.localeCompare(b.code));
     });
-  };
-  sortGroupItems(actif);
-  sortGroupItems(passif);
-  sortGroupItems(charges);
-  sortGroupItems(produits);
+  });
 
-  const resultat = totalProduits - totalCharges;
   const sortedKeys = (obj) => Object.keys(obj).sort();
 
-  const totalPassifPlusResultat = totalPassif + resultat;
-  const ecartBilan = Math.abs(totalActif - totalPassifPlusResultat);
+  // Calcul du Résultat de l'exercice pour affichage ET insertion propre dans les Fonds Propres
+  const totalCharges = groupes.chExploitation.total + groupes.chFinancieres.total + groupes.chExceptionnelles.total;
+  const totalProduits = groupes.produits.total;
+  const resultatExercice = totalProduits - totalCharges;
+
+  // L'insertion STRICTE du Résultat dans les Fonds Propres
+  if (Math.abs(resultatExercice) > 0.01) {
+    const resLabel = anneeDebut === 'TOTAL' ? 'Résultat Global (Cumulé)' : "Résultat de l'exercice";
+    const groupName = `12 - ${resLabel}`;
+    if (!groupes.fondsPropres.sousGroupes[groupName]) {
+      groupes.fondsPropres.sousGroupes[groupName] = { total: 0, items: [] };
+    }
+    // Un résultat positif est un crédit (augmente les fonds propres). Un résultat négatif les diminue.
+    groupes.fondsPropres.sousGroupes[groupName].items.push({ code: '120000', libelle: resLabel, net: resultatExercice });
+    groupes.fondsPropres.sousGroupes[groupName].total += resultatExercice;
+    groupes.fondsPropres.total += resultatExercice;
+  }
+
+  const totalActif = groupes.actifImmo.total + groupes.actifCirc.total;
+  const totalPassif = groupes.fondsPropres.total + groupes.dettes.total; // Le Résultat est DEDANS !
+  
+  const ecartBilan = Math.abs(totalActif - totalPassif);
   const isBilanDesequilibre = ecartBilan > 0.01;
 
-  const renderGroup = (category, groupKey) => {
-    const grp = category[groupKey];
-    if (!grp) return null;
-    const isExpanded = detailsOuverts[groupKey];
-    return (
-      <div key={groupKey} className="border-b border-slate-100 last:border-0">
-        <div 
-          className="flex justify-between items-center p-3 hover:bg-slate-50 cursor-pointer transition-colors"
-          onClick={() => toggleDetail(groupKey)}
-        >
-          <div className="flex items-center gap-2">
-            {isExpanded ? <ChevronDown size={14} className="text-slate-400 shrink-0" /> : <ChevronRight size={14} className="text-slate-400 shrink-0" />}
-            <span className="text-sm font-semibold text-slate-700">{groupKey}</span>
+  // Composant de rendu pour une sous-catégorie
+  const renderSousGroupes = (categorieObj) => {
+    if (Object.keys(categorieObj.sousGroupes).length === 0) {
+      return <div className="text-center text-slate-400 text-sm py-4">Aucune donnée</div>;
+    }
+    return sortedKeys(categorieObj.sousGroupes).map(groupKey => {
+      const grp = categorieObj.sousGroupes[groupKey];
+      const isExpanded = detailsOuverts[groupKey];
+      return (
+        <div key={groupKey} className="border-b border-slate-100 last:border-0">
+          <div 
+            className="flex justify-between items-center p-2.5 hover:bg-slate-100 cursor-pointer transition-colors"
+            onClick={() => toggleDetail(groupKey)}
+          >
+            <div className="flex items-center gap-2">
+              {isExpanded ? <ChevronDown size={14} className="text-slate-400 shrink-0" /> : <ChevronRight size={14} className="text-slate-400 shrink-0" />}
+              <span className="text-xs font-semibold text-slate-700">{groupKey}</span>
+            </div>
+            <span className={`text-xs font-bold whitespace-nowrap ml-2 ${grp.total < 0 ? 'text-rose-600' : 'text-slate-800'}`}>
+              {formatMontant(grp.total)} €
+            </span>
           </div>
-          <span className="text-sm font-bold text-slate-800 whitespace-nowrap ml-2">{formatMontant(grp.total)} €</span>
-        </div>
-        {isExpanded && (
-          <div className="bg-slate-50 pb-2">
-            {grp.items.map(item => (
-              <div key={item.code} className="flex justify-between items-center px-8 py-1.5 hover:bg-slate-100 transition-colors">
-                <div className="flex items-center gap-2 overflow-hidden pr-2">
-                  <span className="text-[11px] font-mono bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-600 shrink-0">{item.code}</span>
-                  <span className="text-xs text-slate-600 truncate" title={item.libelle}>
-                    {item.libelle || <span className="italic text-slate-400">Sans libellé</span>}
+          {isExpanded && (
+            <div className="bg-white pb-2">
+              {grp.items.map(item => (
+                <div key={item.code} className="flex justify-between items-center px-8 py-1.5 hover:bg-slate-50 transition-colors">
+                  <div className="flex items-center gap-2 overflow-hidden pr-2">
+                    <span className="text-[10px] font-mono bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded text-slate-500 shrink-0">{item.code}</span>
+                    <span className="text-xs text-slate-500 truncate" title={item.libelle}>
+                      {item.libelle || <span className="italic text-slate-300">Sans libellé</span>}
+                    </span>
+                  </div>
+                  <span className={`text-[11px] font-medium shrink-0 ${item.net < 0 ? 'text-rose-500' : 'text-slate-500'}`}>
+                    {formatMontant(item.net)} €
                   </span>
                 </div>
-                <span className={`text-xs font-medium shrink-0 ${item.net < 0 ? 'text-rose-600' : 'text-slate-600'}`}>
-                  {formatMontant(item.net)} €
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    });
   };
 
   return (
@@ -561,7 +580,7 @@ const EtatFinancier = ({ transactionsGlobales }) => {
             <PieChart className="text-indigo-600" /> États Financiers
           </h2>
           <p className="text-slate-500 text-sm mt-1">
-            {anneeDebut === 'TOTAL' ? 'Bilan consolidé de toutes les écritures enregistrées.' : 'Bilan et Compte de Résultat groupés par familles comptables.'}
+            {anneeDebut === 'TOTAL' ? 'Bilan consolidé et Compte de Résultat de toutes les écritures.' : 'Bilan et Compte de Résultat structurés selon le PCG.'}
           </p>
         </div>
 
@@ -589,40 +608,50 @@ const EtatFinancier = ({ transactionsGlobales }) => {
             <h3 className="text-white font-bold flex items-center gap-2 text-lg">
               Compte de Résultat (Classe 6 & 7)
             </h3>
-            <p className="text-slate-400 text-xs mt-1">Compare les produits et les charges pour déterminer le bénéfice ou la perte.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200">
-            <div>
-              <div className="bg-red-50 text-red-700 font-bold p-3 text-center text-sm border-b border-red-100 uppercase tracking-wider">
-                Charges (Dépenses)
+            {/* COLONNE CHARGES */}
+            <div className="bg-slate-50/50">
+              <div className="bg-red-50 text-red-700 font-bold p-3 text-center text-sm border-b border-red-100 uppercase tracking-wider flex justify-between px-4">
+                <span>Charges (Dépenses)</span>
+                <span>{formatMontant(totalCharges)} €</span>
               </div>
-              <div className="p-2">
-                {sortedKeys(charges).length > 0 ? (
-                  sortedKeys(charges).map(key => renderGroup(charges, key))
-                ) : (
-                  <div className="text-center text-slate-400 text-sm py-8">Aucune donnée sur cette période</div>
-                )}
+              
+              <div className="p-2 space-y-4">
+                <div>
+                  <div className="text-xs font-bold text-slate-400 uppercase tracking-widest px-2 mb-1 border-b border-slate-200 pb-1">Charges d'Exploitation</div>
+                  {renderSousGroupes(groupes.chExploitation)}
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-slate-400 uppercase tracking-widest px-2 mb-1 border-b border-slate-200 pb-1">Charges Financières</div>
+                  {renderSousGroupes(groupes.chFinancieres)}
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-slate-400 uppercase tracking-widest px-2 mb-1 border-b border-slate-200 pb-1">Charges Exceptionnelles</div>
+                  {renderSousGroupes(groupes.chExceptionnelles)}
+                </div>
               </div>
             </div>
-            <div>
-              <div className="bg-emerald-50 text-emerald-700 font-bold p-3 text-center text-sm border-b border-emerald-100 uppercase tracking-wider">
-                Produits (Recettes)
+
+            {/* COLONNE PRODUITS */}
+            <div className="bg-slate-50/50">
+              <div className="bg-emerald-50 text-emerald-700 font-bold p-3 text-center text-sm border-b border-emerald-100 uppercase tracking-wider flex justify-between px-4">
+                <span>Produits (Recettes)</span>
+                <span>{formatMontant(totalProduits)} €</span>
               </div>
+              
               <div className="p-2">
-                {sortedKeys(produits).length > 0 ? (
-                  sortedKeys(produits).map(key => renderGroup(produits, key))
-                ) : (
-                  <div className="text-center text-slate-400 text-sm py-8">Aucune donnée sur cette période</div>
-                )}
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-widest px-2 mb-1 border-b border-slate-200 pb-1">Produits d'Exploitation & Divers</div>
+                {renderSousGroupes(groupes.produits)}
               </div>
             </div>
           </div>
 
-          <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-between items-center">
+          <div className="bg-slate-100 p-4 border-t border-slate-200 flex justify-between items-center">
             <span className="font-bold text-slate-700 uppercase">Résultat de l'exercice</span>
-            <span className={`text-xl font-black ${resultat >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-              {resultat > 0 ? '+' : ''}{formatMontant(Math.abs(resultat))} €
+            <span className={`text-xl font-black ${resultatExercice >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+              {resultatExercice > 0 ? '+' : ''}{formatMontant(resultatExercice)} €
             </span>
           </div>
         </div>
@@ -636,18 +665,13 @@ const EtatFinancier = ({ transactionsGlobales }) => {
           <div>
             <h4 className="font-black text-rose-900 text-lg uppercase tracking-tight">Déséquilibre du Bilan Détecté</h4>
             <p className="text-sm text-rose-800 mt-1 leading-relaxed">
-              En comptabilité, l'Actif doit toujours être égal au Passif (incluant le Résultat). 
+              En comptabilité, l'Actif doit toujours être égal au Passif (qui inclut le Résultat). 
               Écart actuel : <strong className="bg-rose-200 px-1.5 py-0.5 rounded">{formatMontant(ecartBilan)} €</strong>.
             </p>
-            <div className="bg-white/60 border border-rose-100 p-3 rounded-xl mt-3 flex items-start gap-2">
-              <span className="text-rose-600 font-bold">💡 Solution :</span>
-              <span className="text-xs text-rose-900 font-medium">Vérifiez que toutes vos écritures bancaires sont imputées ou que vos Opérations Diverses sont parfaitement équilibrées.</span>
-            </div>
           </div>
         </div>
       )}
 
-      {/* ICI LE BUG ÉTAIT PRÉSENT : Le nom de la variable a été corrigé en safeTransactions */}
       {!isBilanDesequilibre && safeTransactions.length > 0 && anneeDebut === 'TOTAL' && (
         <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl shadow-sm flex items-center gap-3">
           <div className="p-2 bg-emerald-500 text-white rounded-lg shadow-md shrink-0">
@@ -664,51 +688,65 @@ const EtatFinancier = ({ transactionsGlobales }) => {
           <h3 className="text-white font-bold flex items-center gap-2 text-lg">
             Bilan Comptable (Classe 1 à 5)
           </h3>
-          <p className="text-slate-400 text-xs mt-1">Photographie du patrimoine : L'Actif (ce qu'on possède) et le Passif (ce qu'on doit).</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200">
-          <div>
-            <div className="bg-blue-50 text-blue-700 font-bold p-3 text-center text-sm border-b border-blue-100 uppercase tracking-wider">
-              Actif (Emplois)
+          
+          {/* COLONNE ACTIF */}
+          <div className="bg-slate-50/50">
+            <div className="bg-blue-50 text-blue-700 font-bold p-3 text-center text-sm border-b border-blue-100 uppercase tracking-wider flex justify-between px-4">
+              <span>Actif (Emplois)</span>
+              <span>{formatMontant(totalActif)} €</span>
             </div>
-            <div className="p-2">
-              {sortedKeys(actif).length > 0 ? (
-                sortedKeys(actif).map(key => renderGroup(actif, key))
-              ) : (
-                <div className="text-center text-slate-400 text-sm py-8">Aucune donnée sur cette période</div>
-              )}
-            </div>
-          </div>
-          <div>
-            <div className="bg-orange-50 text-orange-700 font-bold p-3 text-center text-sm border-b border-orange-100 uppercase tracking-wider">
-              Passif (Ressources)
-            </div>
-            <div className="p-2">
-              {sortedKeys(passif).length > 0 ? (
-                sortedKeys(passif).map(key => renderGroup(passif, key))
-              ) : (
-                <div className="text-center text-slate-400 text-sm py-8">Aucune donnée sur cette période</div>
-              )}
-              <div className="border-t border-slate-200 mt-2 pt-2">
-                <div className="flex justify-between items-center px-4 py-2 bg-slate-50 rounded-lg">
-                  <span className="text-sm font-bold text-slate-700">
-                    12 - {anneeDebut === 'TOTAL' ? 'Résultat Global (Cumulé)' : "Résultat de l'exercice"}
-                  </span>
-                  <span className={`text-sm font-black ${resultat >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                    {resultat > 0 ? '+' : ''}{formatMontant(Math.abs(resultat))} €
-                  </span>
+            <div className="p-2 space-y-4">
+              <div>
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-widest px-2 mb-1 border-b border-slate-200 pb-1 flex justify-between">
+                  <span>Actif Immobilisé</span>
+                  <span className="text-slate-600">{formatMontant(groupes.actifImmo.total)} €</span>
                 </div>
+                {renderSousGroupes(groupes.actifImmo)}
+              </div>
+              <div>
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-widest px-2 mb-1 border-b border-slate-200 pb-1 flex justify-between">
+                  <span>Actif Circulant</span>
+                  <span className="text-slate-600">{formatMontant(groupes.actifCirc.total)} €</span>
+                </div>
+                {renderSousGroupes(groupes.actifCirc)}
               </div>
             </div>
           </div>
+
+          {/* COLONNE PASSIF */}
+          <div className="bg-slate-50/50">
+            <div className="bg-orange-50 text-orange-700 font-bold p-3 text-center text-sm border-b border-orange-100 uppercase tracking-wider flex justify-between px-4">
+              <span>Passif (Ressources)</span>
+              <span>{formatMontant(totalPassif)} €</span>
+            </div>
+            <div className="p-2 space-y-4">
+              <div>
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-widest px-2 mb-1 border-b border-slate-200 pb-1 flex justify-between">
+                  <span>Capitaux Propres (Fonds propres)</span>
+                  <span className="text-slate-600">{formatMontant(groupes.fondsPropres.total)} €</span>
+                </div>
+                {renderSousGroupes(groupes.fondsPropres)}
+              </div>
+              <div>
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-widest px-2 mb-1 border-b border-slate-200 pb-1 flex justify-between">
+                  <span>Dettes</span>
+                  <span className="text-slate-600">{formatMontant(groupes.dettes.total)} €</span>
+                </div>
+                {renderSousGroupes(groupes.dettes)}
+              </div>
+            </div>
+          </div>
+
         </div>
 
-        <div className={`p-4 border-t flex justify-between items-center text-sm ${isBilanDesequilibre ? 'bg-rose-100 border-rose-300' : 'bg-slate-50 border-slate-200'}`}>
+        <div className={`p-4 border-t flex justify-between items-center text-sm ${isBilanDesequilibre ? 'bg-rose-100 border-rose-300' : 'bg-slate-100 border-slate-200'}`}>
           <span className={`font-black uppercase ${isBilanDesequilibre ? 'text-rose-700' : 'text-slate-500'}`}>TOTAL GÉNÉRAL</span>
           <div className="flex gap-8">
             <span className="font-bold text-blue-700">Actif : {formatMontant(totalActif)} €</span>
-            <span className="font-bold text-orange-700">Passif + Résultat : {formatMontant(totalPassifPlusResultat)} €</span>
+            <span className="font-bold text-orange-700">Passif : {formatMontant(totalPassif)} €</span>
           </div>
         </div>
       </div>
