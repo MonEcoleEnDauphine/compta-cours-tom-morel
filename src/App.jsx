@@ -94,32 +94,31 @@ const InfosContact = () => (
 const normaliserDateFR = (rawVal) => {
   if (!rawVal) return '';
 
-  // 1. Si c'est un objet Date (Import Excel XLSX)
+  // 1. Si la date arrive sous forme d'objet Date (cas du XLSX)
   if (rawVal instanceof Date && !isNaN(rawVal)) {
-    // SÉCURITÉ ABSOLUE : On place l'heure artificielle à MIDI (12h).
-    // Ainsi, aucun décalage de fuseau horaire ne fera basculer la date à la veille (J-1).
-    const safeDate = new Date(rawVal.getTime());
-    safeDate.setUTCHours(12);
+    // SÉCURITÉ ABSOLUE : On ajoute +12 heures (en millisecondes) au temps d'origine.
+    // Cela fait basculer le 22h00 de la veille sur le bon jour à 10h00 du matin.
+    const safeDate = new Date(rawVal.getTime() + (12 * 60 * 60 * 1000));
     const d = String(safeDate.getUTCDate()).padStart(2, '0');
     const m = String(safeDate.getUTCMonth() + 1).padStart(2, '0');
     const y = safeDate.getUTCFullYear();
     return `${d}/${m}/${y}`;
   }
 
-  // 2. Si la date arrive sous forme de Numéro de série pur (Autre format Excel)
+  // 2. Si la date arrive sous forme de Numéro de série Excel pur
   if (typeof rawVal === 'number') {
     const jsDate = new Date(Math.round((rawVal - 25569) * 86400 * 1000));
-    jsDate.setUTCHours(12); // Sécurité Midi
-    const d = String(jsDate.getUTCDate()).padStart(2, '0');
-    const m = String(jsDate.getUTCMonth() + 1).padStart(2, '0');
-    const y = jsDate.getUTCFullYear();
+    const safeDate = new Date(jsDate.getTime() + (12 * 60 * 60 * 1000));
+    const d = String(safeDate.getUTCDate()).padStart(2, '0');
+    const m = String(safeDate.getUTCMonth() + 1).padStart(2, '0');
+    const y = safeDate.getUTCFullYear();
     return `${d}/${m}/${y}`;
   }
 
-  // 3. Si c'est du Texte pur (Fichiers CSV / TXT)
+  // 3. Si c'est du texte pur (CSV / TXT pour la Paie)
   let str = String(rawVal).trim();
-  str = str.split('T')[0]; // Coupe l'heure si elle est écrite dans le texte
-  str = str.replace(/-/g, '/'); // Transforme les tirets en slashs
+  str = str.split('T')[0];
+  str = str.replace(/-/g, '/');
 
   if (str.includes('/')) {
     const parts = str.split('/');
@@ -136,6 +135,7 @@ const normaliserDateFR = (rawVal) => {
   }
   return str;
 };
+
 
 const formatMontant = (montant) => {
   return new Intl.NumberFormat('fr-FR', { 
