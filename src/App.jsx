@@ -229,6 +229,264 @@ const SearchableCompteSelect = ({ value, onChange, comptesList, placeholder = "S
   );
 };
 
+// --- MODULE : NOTES DE FRAIS ---
+const NotesFrais = () => {
+  const [activeView, setActiveView] = useState('saisie'); // 'saisie' ou 'suivi'
+  const [notes, setNotes] = useState([]);
+  
+  // États du formulaire
+  const [formData, setFormData] = useState({
+    demandeur: '',
+    date: '',
+    description: '',
+    categorie: 'Pédagogie',
+    montant: ''
+  });
+
+  // Emails de validation
+  const EMAIL_PRESIDENT = "l.fauvain@gmail.com";
+  const EMAIL_TRESORIER = "lvlelezec@gmail.com"; // J'ai corrigé le "gmial.com" en "gmail.com" au cas où !
+
+  // Chargement des données
+  useEffect(() => {
+    const q = collection(db, 'artifacts', appId, 'public', 'data', 'notes_frais');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const liste = [];
+      snapshot.forEach((doc) => {
+        liste.push({ id: doc.id, ...doc.data() });
+      });
+      // Tri par date de création (les plus récentes en premier)
+      liste.sort((a, b) => new Date(b.date_creation) - new Date(a.date_creation));
+      setNotes(liste);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.demandeur || !formData.date || !formData.montant || !formData.description) {
+      alert("Veuillez remplir tous les champs obligatoires.");
+      return;
+    }
+
+    const newNote = {
+      ...formData,
+      montant: parseFloat(formData.montant),
+      statut: 'attente_president', // Statut initial
+      date_creation: new Date().toISOString()
+    };
+
+    try {
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'notes_frais'), newNote);
+      alert("Note de frais soumise avec succès ! Le président va être notifié.");
+      
+      // Préparation du mail pour le président
+      const subject = encodeURIComponent(`Nouvelle note de frais à valider - ${formData.demandeur}`);
+      const body = encodeURIComponent(`Bonjour Laurent,\n\nUne nouvelle note de frais a été soumise et nécessite ta validation en tant que Président.\n\nDemandeur : ${formData.demandeur}\nDate : ${normaliserDateFR(formData.date)}\nMontant : ${formData.montant} €\nDescription : ${formData.description}\n\nMerci de te connecter sur l'ERP pour la valider.`);
+      window.location.href = `mailto:${EMAIL_PRESIDENT}?subject=${subject}&body=${body}`;
+
+      setFormData({ demandeur: '', date: '', description: '', categorie: 'Pédagogie', montant: '' });
+      setActiveView('suivi');
+    } catch (err) {
+      alert("Erreur lors de la soumission.");
+    }
+  };
+
+  const handleValiderPresident = async (note) => {
+    try {
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notes_frais', note.id), {
+        statut: 'attente_tresorier'
+      });
+      
+      const subject = encodeURIComponent(`Note de frais validée (Président) - À payer - ${note.demandeur}`);
+      const body = encodeURIComponent(`Bonjour,\n\nJ'ai validé la note de frais de ${note.demandeur} d'un montant de ${note.montant} € pour "${note.description}".\n\nMerci de procéder au paiement et de la marquer comme "Payée" dans l'ERP.`);
+      window.location.href = `mailto:${EMAIL_TRESORIER}?subject=${subject}&body=${body}`;
+    } catch (err) {
+      alert("Erreur lors de la validation.");
+    }
+  };
+
+  const handleValiderTresorier = async (note) => {
+    if (window.confirm(`Confirmez-vous le paiement de ${note.montant} € à ${note.demandeur} ?`)) {
+      try {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notes_frais', note.id), {
+          statut: 'payee',
+          date_paiement: new Date().toISOString()
+        });
+        alert("La note de frais a été marquée comme payée !");
+        // Optionnel plus tard : Créer l'écriture comptable automatiquement dans le Grand Livre ici !
+      } catch (err) {
+        alert("Erreur lors du paiement.");
+      }
+    }
+  };
+
+  const handleRefuser = async (noteId) => {
+    const motif = window.prompt("Motif du refus :");
+    if (motif !== null) {
+      try {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notes_frais', noteId), {
+          statut: 'refusee',
+          motif_refus: motif
+        });
+      } catch (err) {
+        alert("Erreur lors du refus.");
+      }
+    }
+  };
+
+  const handleDelete = async (noteId) => {
+    if (window.confirm("Supprimer définitivement cette note de frais ?")) {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notes_frais', noteId));
+    }
+  };
+
+  const getStatusBadge = (statut) => {
+    switch (statut) {
+      case 'attente_president': return <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded-md text-[10px] font-bold uppercase flex items-center gap-1"><Clock size={12}/> Attente Président</span>;
+      case 'attente_tresorier': return <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-md text-[10px] font-bold uppercase flex items-center gap-1"><Clock size={12}/> Attente Trésorier</span>;
+      case 'payee': return <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md text-[10px] font-bold uppercase flex items-center gap-1"><CheckCircle2 size={12}/> Payée</span>;
+      case 'refusee': return <span className="bg-red-100 text-red-700 px-2 py-1 rounded-md text-[10px] font-bold uppercase flex items-center gap-1"><XCircle size={12}/> Refusée</span>;
+      default: return null;
+    }
+  };
+
+  return (
+    <div className="space-y-6 max-w-6xl mx-auto pb-10 font-sans">
+      
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+            <FileText className="text-indigo-600" /> Gestion des Notes de Frais
+          </h2>
+          <p className="text-slate-500 text-sm mt-1">Saisie des dépenses, circuit de validation et remboursements.</p>
+        </div>
+        <div className="flex bg-slate-100 p-1 rounded-xl">
+          <button onClick={() => setActiveView('saisie')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'saisie' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Saisir une dépense</button>
+          <button onClick={() => setActiveView('suivi')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'suivi' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Suivi & Validations</button>
+        </div>
+      </div>
+
+      {activeView === 'saisie' && (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8 max-w-3xl mx-auto animate-fade-in">
+          <h3 className="font-black text-lg text-slate-800 mb-6 border-b border-slate-100 pb-4">Nouvelle demande de remboursement</h3>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Demandeur *</label>
+                <input type="text" required value={formData.demandeur} onChange={e => setFormData({...formData, demandeur: e.target.value})} placeholder="Ex: Cécile Sublet" className="w-full border border-slate-200 rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500 font-medium" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Date de la dépense *</label>
+                <input type="date" required value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="w-full border border-slate-200 rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500 font-medium" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Description / Motif *</label>
+              <input type="text" required value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="Ex: Achats Cultura (Cahiers, feutres...)" className="w-full border border-slate-200 rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500 font-medium" />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Catégorie</label>
+                <select value={formData.categorie} onChange={e => setFormData({...formData, categorie: e.target.value})} className="w-full border border-slate-200 rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
+                  <option value="Pédagogie">Matériel Pédagogique</option>
+                  <option value="Fonctionnement">Frais de fonctionnement (Timbres, etc.)</option>
+                  <option value="Déplacement">Frais de déplacement / Péage</option>
+                  <option value="Repas">Repas / Réception</option>
+                  <option value="Autre">Autre</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Montant TTC (€) *</label>
+                <input type="number" step="0.01" required value={formData.montant} onChange={e => setFormData({...formData, montant: e.target.value})} placeholder="0.00" className="w-full border border-slate-200 rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-700" />
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-100 flex justify-end">
+              <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-bold transition-all shadow-md shadow-indigo-200 flex items-center gap-2 active:scale-95">
+                <Send size={18} /> Soumettre au Président
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {activeView === 'suivi' && (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden animate-fade-in">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200">
+                <tr>
+                  <th className="p-4">Date</th>
+                  <th className="p-4">Demandeur</th>
+                  <th className="p-4 min-w-[200px]">Description & Catégorie</th>
+                  <th className="p-4 text-right">Montant</th>
+                  <th className="p-4 text-center">Statut</th>
+                  <th className="p-4 text-center">Actions (Workflow)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {notes.map(note => (
+                  <tr key={note.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="p-4 font-mono font-medium text-slate-600 whitespace-nowrap">{normaliserDateFR(note.date)}</td>
+                    <td className="p-4 font-bold text-slate-800">{note.demandeur}</td>
+                    <td className="p-4">
+                      <div className="font-semibold text-slate-700">{note.description}</div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">{note.categorie}</div>
+                      {note.motif_refus && <div className="text-[10px] text-red-500 mt-1 font-bold">Motif refus : {note.motif_refus}</div>}
+                    </td>
+                    <td className="p-4 text-right font-black text-indigo-700 whitespace-nowrap">{formatMontant(note.montant)} €</td>
+                    <td className="p-4">
+                      <div className="flex justify-center">{getStatusBadge(note.statut)}</div>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex justify-center items-center gap-2">
+                        
+                        {/* Action Président */}
+                        {note.statut === 'attente_president' && (
+                          <>
+                            <button onClick={() => handleValiderPresident(note)} className="bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white border border-blue-200 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors flex items-center gap-1" title="Approuver et envoyer au Trésorier">
+                              <CheckCircle2 size={14}/> Accord Président
+                            </button>
+                            <button onClick={() => handleRefuser(note.id)} className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition-colors"><XCircle size={16}/></button>
+                          </>
+                        )}
+
+                        {/* Action Trésorier */}
+                        {note.statut === 'attente_tresorier' && (
+                          <>
+                            <button onClick={() => handleValiderTresorier(note)} className="bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors flex items-center gap-1" title="Marquer comme payée en banque">
+                              <Euro size={14}/> Marquer Payée
+                            </button>
+                            <button onClick={() => handleRefuser(note.id)} className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition-colors"><XCircle size={16}/></button>
+                          </>
+                        )}
+
+                        {/* Bouton de suppression global (Admin) */}
+                        <button onClick={() => handleDelete(note.id)} className="text-slate-300 hover:text-rose-600 p-1.5 rounded-lg transition-colors ml-2" title="Supprimer la note">
+                          <Trash2 size={14}/>
+                        </button>
+                        
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {notes.length === 0 && (
+                  <tr>
+                    <td colSpan="6" className="p-10 text-center text-slate-400 italic">Aucune note de frais enregistrée.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // --- TABLEAU DE BORD (DASHBOARD) ---
 const TableauBord = ({ transactionsGlobales }) => {
   const [anneeFiltre, setAnneeFiltre] = useState('TOTAL');
@@ -2820,7 +3078,7 @@ export default function App() {
       case 'menage_weekend': return <PlaceholderPage title="Planning : Ménage Week-end" />;
       case 'garde_cantine': return <PlaceholderPage title="Planning : Garde Cantine / Cour" />;
       case 'budget': return <PlaceholderPage title="Budget Prévisionnel" />;
-      case 'notes_frais': return <PlaceholderPage title="Notes de Frais" />;
+      case 'notes_frais': return <NotesFrais />;
       case 'dons_recus': return <PlaceholderPage title="Dons et reçus fiscaux" />;
       case 'evenements_ecole': return <PlaceholderPage title="Liste des Évènements" />;
       case 'evenements_rentabilite': return <PlaceholderPage title="Rentabilité des Évènements" />;
