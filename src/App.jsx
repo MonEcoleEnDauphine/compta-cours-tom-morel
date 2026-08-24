@@ -253,7 +253,7 @@ const TableauBord = ({ transactionsGlobales }) => {
     return null;
   };
 
-  const data = useMemo(() => {
+const data = useMemo(() => {
     let totalRecettes = 0;
     let totalDepenses = 0;
     let tresorerieGlobale = 0;
@@ -287,7 +287,7 @@ const TableauBord = ({ transactionsGlobales }) => {
       const m = Number(t.montant) || 0;
       const absM = Math.abs(m);
 
-      // 1. Trésorerie Globale (Indépendante du filtre de date)
+      // 1. Trésorerie Globale
       if (!isOD) {
         tresorerieGlobale += m; 
       } else {
@@ -295,7 +295,7 @@ const TableauBord = ({ transactionsGlobales }) => {
         if (String(t.compteCredit).startsWith('5')) tresorerieGlobale -= absM;
       }
 
-      // 2. Extraction de la date pour ventiler
+      // 2. Extraction de la date
       const dateInfo = extractDateInfo(t.date);
       if (!dateInfo) return; 
 
@@ -309,22 +309,28 @@ const TableauBord = ({ transactionsGlobales }) => {
         const cCode = String(t.compteCredit || '');
         
         if (dCode.startsWith('6')) { valDepense += absM; catDepense = dCode; }
-        if (cCode.startsWith('6')) { valDepense -= absM; catDepense = cCode; } 
+        if (cCode.startsWith('6')) { valDepense -= absM; catDepense = cCode; } // Annulation de charge
         if (cCode.startsWith('7')) { valRecette += absM; catRecette = cCode; }
-        if (dCode.startsWith('7')) { valRecette -= absM; catRecette = dCode; } 
+        if (dCode.startsWith('7')) { valRecette -= absM; catRecette = dCode; } // Annulation de produit
       } else {
         const compte = String(t.compte || '');
-        if (m < 0 && compte.startsWith('6')) { valDepense += absM; catDepense = compte; }
-        else if (m > 0 && compte.startsWith('7')) { valRecette += absM; catRecette = compte; }
+        // LA CORRECTION EST ICI : Gestion des remboursements (signe inversé)
+        if (compte.startsWith('6')) {
+          if (m < 0) { valDepense += absM; catDepense = compte; } // Dépense normale
+          else { valDepense -= absM; catDepense = compte; } // Remboursement d'une charge
+        } else if (compte.startsWith('7')) {
+          if (m > 0) { valRecette += absM; catRecette = compte; } // Recette normale
+          else { valRecette -= absM; catRecette = compte; } // Annulation d'une recette
+        }
       }
 
-      // 3. Ventilation par Année (Toujours calculée pour le graphique global)
+      // 3. Ventilation par Année (Graphique global)
       if (statsParAnnee[dateInfo.exercice]) {
         statsParAnnee[dateInfo.exercice].recettes += valRecette;
         statsParAnnee[dateInfo.exercice].depenses += valDepense;
       }
 
-      // 4. Application du Filtre Actuel (Total ou Année spécifique)
+      // 4. Application du Filtre Actuel
       const isDansFiltre = anneeFiltre === 'TOTAL' || Number(anneeFiltre) === dateInfo.exercice;
 
       if (isDansFiltre) {
@@ -333,7 +339,6 @@ const TableauBord = ({ transactionsGlobales }) => {
         if (catDepense) addCat(depensesParCategorie, catDepense, valDepense);
         if (catRecette) addCat(recettesParCategorie, catRecette, valRecette);
 
-        // Si on est sur une année spécifique, on ventile dans le tableau mensuel
         if (anneeFiltre !== 'TOTAL') {
           const moisRef = moisScolaires.find(ms => ms.id === dateInfo.month);
           if (moisRef) {
@@ -354,7 +359,7 @@ const TableauBord = ({ transactionsGlobales }) => {
       .map(([k, v]) => ({ nom: categoriesNoms[k] || `Classe ${k}`, montant: v }))
       .filter(item => item.montant > 0)
       .sort((a, b) => b.montant - a.montant)
-      .slice(0, 6); // Les 6 plus importants pour plus de granularité
+      .slice(0, 6);
 
     return {
       totalRecettes,
