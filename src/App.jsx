@@ -67,7 +67,7 @@ const InfosContact = () => (
         <div className="w-full border border-slate-200 rounded-lg py-2 mb-3 flex items-center justify-center gap-2 text-slate-600 text-sm font-medium">
           <Phone size={16} /> 06 67 90 95 76
         </div>
-        <a href="mailto:direction@courstommorel.fr" className="w-full inline-flex items-center justify-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 px-4 py-2.5 rounded-lg transition-colors font-medium text-sm">
+        <a href="mailto:direction.tom.morel@gmail.com" className="w-full inline-flex items-center justify-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 px-4 py-2.5 rounded-lg transition-colors font-medium text-sm">
           <Mail size={18} /> Écrire
         </a>
       </div>
@@ -79,10 +79,10 @@ const InfosContact = () => (
         <h3 className="text-lg font-bold text-slate-800 mb-1">Association (Bureau)</h3>
         <p className="text-purple-500 text-sm mb-6">Mon École en Dauphiné</p>
         <div className="flex-1"></div>
-        <div className="w-full border border-slate-200 rounded-lg py-2 mb-3 flex items-center justify-center gap-2 text-slate-600 text-sm font-medium">
-          <Phone size={16} /> 06 60 20 29 80
+        <div className="w-full border border-slate-200 rounded-lg py-2 mb-3 flex items-center justify-center gap-2 text-slate-400 text-sm font-medium">
+          <Phone size={16} /> -
         </div>
-        <a href="mailto:association@courstommorel.fr" className="w-full inline-flex items-center justify-center gap-2 bg-purple-50 hover:bg-purple-100 text-purple-600 px-4 py-2.5 rounded-lg transition-colors font-medium text-sm">
+        <a href="mailto:monecoleendauphine@gmail.com" className="w-full inline-flex items-center justify-center gap-2 bg-purple-50 hover:bg-purple-100 text-purple-600 px-4 py-2.5 rounded-lg transition-colors font-medium text-sm">
           <Mail size={18} /> Écrire
         </a>
       </div>
