@@ -234,6 +234,9 @@ const TableauBord = ({ transactionsGlobales }) => {
   const [anneeFiltre, setAnneeFiltre] = useState('TOTAL');
 
   const formatMontant = (val) => new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val || 0);
+  
+  // Fonction sécurisée pour calculer les pourcentages sans erreur (division par zéro)
+  const calcPct = (valeur, total) => total > 0 ? ((valeur / total) * 100).toFixed(1) : "0.0";
 
   // Extracteur de date ultra-sécurisé basé sur le format texte JJ/MM/AAAA
   const extractDateInfo = (dateStr) => {
@@ -243,8 +246,7 @@ const TableauBord = ({ transactionsGlobales }) => {
       const m = parseInt(parts[1], 10);
       let y = parseInt(parts[2], 10);
       if (y < 100) y += 2000;
-      // Si on est en Septembre (9) ou après, c'est l'année scolaire de cette année-là.
-      // Sinon (Janvier à Août), c'est la continuité de l'année scolaire précédente.
+      // Année scolaire : Septembre (9) et plus = année en cours. Janvier à Août = continuité de l'année précédente.
       const exercice = m >= 9 ? y : y - 1;
       return { month: m, year: y, exercice };
     }
@@ -295,7 +297,7 @@ const TableauBord = ({ transactionsGlobales }) => {
 
       // 2. Extraction de la date pour ventiler
       const dateInfo = extractDateInfo(t.date);
-      if (!dateInfo) return; // Si la date est invalide, on ignore pour les stats de rentabilité
+      if (!dateInfo) return; 
 
       let valDepense = 0;
       let valRecette = 0;
@@ -307,9 +309,9 @@ const TableauBord = ({ transactionsGlobales }) => {
         const cCode = String(t.compteCredit || '');
         
         if (dCode.startsWith('6')) { valDepense += absM; catDepense = dCode; }
-        if (cCode.startsWith('6')) { valDepense -= absM; catDepense = cCode; } // Annulation de charge
+        if (cCode.startsWith('6')) { valDepense -= absM; catDepense = cCode; } 
         if (cCode.startsWith('7')) { valRecette += absM; catRecette = cCode; }
-        if (dCode.startsWith('7')) { valRecette -= absM; catRecette = dCode; } // Annulation de produit
+        if (dCode.startsWith('7')) { valRecette -= absM; catRecette = dCode; } 
       } else {
         const compte = String(t.compte || '');
         if (m < 0 && compte.startsWith('6')) { valDepense += absM; catDepense = compte; }
@@ -352,7 +354,7 @@ const TableauBord = ({ transactionsGlobales }) => {
       .map(([k, v]) => ({ nom: categoriesNoms[k] || `Classe ${k}`, montant: v }))
       .filter(item => item.montant > 0)
       .sort((a, b) => b.montant - a.montant)
-      .slice(0, 5); // Les 5 plus importants
+      .slice(0, 6); // Les 6 plus importants pour plus de granularité
 
     return {
       totalRecettes,
@@ -360,7 +362,7 @@ const TableauBord = ({ transactionsGlobales }) => {
       resultat: totalRecettes - totalDepenses,
       tresorerieGlobale,
       moisScolaires,
-      anneesStats: anneesListe.map(y => statsParAnnee[y]), // Array ordonné des années
+      anneesStats: anneesListe.map(y => statsParAnnee[y]),
       topDepenses: formatTop(depensesParCategorie),
       topRecettes: formatTop(recettesParCategorie)
     };
@@ -368,20 +370,24 @@ const TableauBord = ({ transactionsGlobales }) => {
 
   const isVueGlobale = anneeFiltre === 'TOTAL';
   const dataGraphique = isVueGlobale ? data.anneesStats : data.moisScolaires;
-  const maxGraphValue = Math.max(...dataGraphique.map(d => Math.max(d.recettes, d.depenses)), 1000); // Base minimum 1000€ pour le ratio
+  const maxGraphValue = Math.max(...dataGraphique.map(d => Math.max(d.recettes, d.depenses)), 1000);
+
+  // Ratios financiers
+  const margeNette = calcPct(data.resultat, data.totalRecettes);
+  const tauxAbsorption = calcPct(data.totalDepenses, data.totalRecettes);
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-10">
+    <div className="space-y-6 max-w-7xl mx-auto pb-10 font-sans">
       
       {/* HEADER DASHBOARD */}
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <LayoutDashboard className="text-indigo-600" /> Vue d'ensemble
+            <LayoutDashboard className="text-indigo-600" /> Direction Financière
           </h2>
-          <p className="text-slate-500 text-sm mt-1">Analyse financière et indicateurs de performance de l'école.</p>
+          <p className="text-slate-500 text-sm mt-1">Analyse des flux, ratios de gestion et répartition budgétaire.</p>
         </div>
-        <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
+        <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200 shadow-inner">
           <Calendar size={18} className="text-slate-500" />
           <select 
             value={anneeFiltre} 
@@ -397,35 +403,52 @@ const TableauBord = ({ transactionsGlobales }) => {
         </div>
       </div>
 
-      {/* 4 CARTES KPI (Indicateurs de Performance) */}
+      {/* 4 CARTES KPI (Indicateurs de Performance Pro) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 border-l-4 border-l-blue-500 flex items-center gap-4 group hover:shadow-md transition-shadow">
-          <div className="p-3 bg-blue-50 text-blue-600 rounded-xl group-hover:scale-110 transition-transform"><Building size={24} /></div>
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between group hover:border-blue-300 transition-colors">
+          <div className="flex justify-between items-start mb-2">
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Trésorerie Actuelle</p>
+            <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><Building size={16} /></div>
+          </div>
           <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tréso. Globale (Banque)</p>
-            <p className="text-xl font-black text-slate-800">{formatMontant(data.tresorerieGlobale)} €</p>
+            <p className="text-2xl font-black text-slate-800">{formatMontant(data.tresorerieGlobale)} €</p>
+            <p className="text-[10px] font-medium text-slate-400 mt-1">Liquidités disponibles (Banque/Caisse)</p>
           </div>
         </div>
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 border-l-4 border-l-emerald-500 flex items-center gap-4 group hover:shadow-md transition-shadow">
-          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl group-hover:scale-110 transition-transform"><TrendingUp size={24} /></div>
+
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between group hover:border-emerald-300 transition-colors">
+          <div className="flex justify-between items-start mb-2">
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Produits (Recettes)</p>
+            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><TrendingUp size={16} /></div>
+          </div>
           <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Encaissements</p>
-            <p className="text-xl font-black text-slate-800">{formatMontant(data.totalRecettes)} €</p>
+            <p className="text-2xl font-black text-slate-800">{formatMontant(data.totalRecettes)} €</p>
+            <p className="text-[10px] font-medium text-emerald-600 mt-1 bg-emerald-50 w-fit px-2 py-0.5 rounded">Base de calcul : 100%</p>
           </div>
         </div>
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 border-l-4 border-l-rose-500 flex items-center gap-4 group hover:shadow-md transition-shadow">
-          <div className="p-3 bg-rose-50 text-rose-600 rounded-xl group-hover:scale-110 transition-transform"><TrendingUp size={24} className="rotate-180" /></div>
+
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between group hover:border-rose-300 transition-colors">
+          <div className="flex justify-between items-start mb-2">
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Charges (Dépenses)</p>
+            <div className="p-2 bg-rose-50 text-rose-600 rounded-lg"><TrendingUp size={16} className="rotate-180" /></div>
+          </div>
           <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Décaissements</p>
-            <p className="text-xl font-black text-slate-800">{formatMontant(data.totalDepenses)} €</p>
+            <p className="text-2xl font-black text-slate-800">{formatMontant(data.totalDepenses)} €</p>
+            <p className="text-[10px] font-bold text-rose-600 mt-1 bg-rose-50 w-fit px-2 py-0.5 rounded">Absorbe {tauxAbsorption}% des recettes</p>
           </div>
         </div>
-        <div className={`bg-white p-5 rounded-2xl shadow-sm border border-slate-200 border-l-4 flex items-center gap-4 group hover:shadow-md transition-shadow ${data.resultat >= 0 ? 'border-l-indigo-500' : 'border-l-orange-500'}`}>
-          <div className={`p-3 rounded-xl group-hover:scale-110 transition-transform ${data.resultat >= 0 ? 'bg-indigo-50 text-indigo-600' : 'bg-orange-50 text-orange-600'}`}><PieChart size={24} /></div>
+
+        <div className={`bg-white p-5 rounded-2xl shadow-sm border flex flex-col justify-between group transition-colors ${data.resultat >= 0 ? 'border-indigo-200 hover:border-indigo-400' : 'border-orange-200 hover:border-orange-400'}`}>
+          <div className="flex justify-between items-start mb-2">
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Résultat Net</p>
+            <div className={`p-2 rounded-lg ${data.resultat >= 0 ? 'bg-indigo-50 text-indigo-600' : 'bg-orange-50 text-orange-600'}`}><PieChart size={16} /></div>
+          </div>
           <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Résultat Net (Période)</p>
-            <p className={`text-xl font-black ${data.resultat >= 0 ? 'text-indigo-600' : 'text-orange-600'}`}>
+            <p className={`text-2xl font-black ${data.resultat >= 0 ? 'text-indigo-600' : 'text-orange-600'}`}>
               {data.resultat > 0 ? '+' : ''}{formatMontant(data.resultat)} €
+            </p>
+            <p className={`text-[10px] font-bold mt-1 w-fit px-2 py-0.5 rounded ${data.resultat >= 0 ? 'bg-indigo-50 text-indigo-700' : 'bg-orange-50 text-orange-700'}`}>
+              Marge Nette : {margeNette}%
             </p>
           </div>
         </div>
@@ -436,14 +459,16 @@ const TableauBord = ({ transactionsGlobales }) => {
         {/* GRAPHIQUE INTELLIGENT (Mensuel ou Annuel) */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 lg:col-span-2 p-6 flex flex-col">
           <div className="flex justify-between items-center mb-6">
-            <h3 className="font-bold text-slate-800 flex items-center gap-2">
-              <Calendar className="text-indigo-600" size={20} /> 
-              {isVueGlobale ? "Comparatif Annuel des Exercices" : `Évolution mensuelle (Saison ${anneeFiltre}-${Number(anneeFiltre)+1})`}
-            </h3>
-            {isVueGlobale && <span className="text-[10px] font-bold uppercase bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md">Vue Globale</span>}
+            <div>
+              <h3 className="font-bold text-slate-800 text-sm">
+                {isVueGlobale ? "Comparatif Annuel des Exercices" : `Évolution mensuelle (Saison ${anneeFiltre}-${Number(anneeFiltre)+1})`}
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">Mise en relation des produits et des charges par période.</p>
+            </div>
+            {isVueGlobale && <span className="text-[10px] font-bold uppercase bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md border border-indigo-100">Vue Globale</span>}
           </div>
           
-          <div className="flex-1 flex items-end justify-between gap-1 h-64 mt-2 border-b border-slate-100 pb-2">
+          <div className="flex-1 flex items-end justify-between gap-2 h-64 mt-2 border-b border-slate-100 pb-2">
             {dataGraphique.map(item => {
               const hRec = Math.max((item.recettes / maxGraphValue) * 100, 0);
               const hDep = Math.max((item.depenses / maxGraphValue) * 100, 0);
@@ -451,23 +476,29 @@ const TableauBord = ({ transactionsGlobales }) => {
               const resultValue = Math.abs(item.recettes - item.depenses);
               
               return (
-                <div key={item.nom} className="flex flex-col items-center flex-1 group">
+                <div key={item.nom} className="flex flex-col items-center flex-1 group relative">
                   {/* Tooltip Hover Pro */}
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -mt-24 bg-slate-800 text-white text-[11px] p-3 rounded-xl pointer-events-none z-10 whitespace-nowrap shadow-xl border border-slate-700">
-                    <p className="text-slate-400 font-bold mb-1 border-b border-slate-600 pb-1">{isVueGlobale ? `Exercice ${item.nom}` : `Mois de ${item.nom}`}</p>
-                    <p className="text-emerald-400 font-bold flex justify-between gap-4"><span>Recettes:</span> <span>+ {formatMontant(item.recettes)} €</span></p>
-                    <p className="text-rose-400 font-bold flex justify-between gap-4"><span>Dépenses:</span> <span>- {formatMontant(item.depenses)} €</span></p>
-                    <p className={`font-black mt-1.5 pt-1 border-t border-slate-600 flex justify-between gap-4 ${isBenefice ? 'text-indigo-300' : 'text-orange-400'}`}>
-                      <span>Résultat:</span> <span>{isBenefice ? '+' : '-'}{formatMontant(resultValue)} €</span>
-                    </p>
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full mb-2 bg-slate-800 text-white text-[11px] p-3 rounded-xl pointer-events-none z-10 whitespace-nowrap shadow-xl border border-slate-700">
+                    <p className="text-slate-400 font-bold mb-1.5 border-b border-slate-600 pb-1.5">{isVueGlobale ? `Exercice ${item.nom}` : `Mois de ${item.nom}`}</p>
+                    <div className="flex justify-between gap-6 items-center mb-1">
+                      <span className="text-emerald-400">Produits</span>
+                      <span className="font-mono font-bold">+ {formatMontant(item.recettes)} €</span>
+                    </div>
+                    <div className="flex justify-between gap-6 items-center">
+                      <span className="text-rose-400">Charges</span>
+                      <span className="font-mono font-bold">- {formatMontant(item.depenses)} €</span>
+                    </div>
+                    <div className={`mt-2 pt-2 border-t border-slate-600 flex justify-between gap-6 items-center ${isBenefice ? 'text-indigo-300' : 'text-orange-400'}`}>
+                      <span className="font-bold">Résultat</span>
+                      <span className="font-mono font-black">{isBenefice ? '+' : '-'}{formatMontant(resultValue)} €</span>
+                    </div>
                   </div>
                   
                   {/* Barres Visuelles */}
                   <div className="flex gap-1 w-full justify-center h-48 items-end relative">
-                    {/* Les barres grises en fond pour faire chic */}
                     <div className="absolute inset-0 bg-slate-50/50 -z-10 rounded-t-md opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                    <div className="w-[40%] bg-emerald-400 rounded-t-sm transition-all duration-500 shadow-sm" style={{ height: `${hRec}%`, minHeight: item.recettes > 0 ? '4px' : '0' }}></div>
-                    <div className="w-[40%] bg-rose-400 rounded-t-sm transition-all duration-500 shadow-sm" style={{ height: `${hDep}%`, minHeight: item.depenses > 0 ? '4px' : '0' }}></div>
+                    <div className="w-[35%] bg-emerald-400 rounded-t-sm transition-all duration-500 shadow-sm" style={{ height: `${hRec}%`, minHeight: item.recettes > 0 ? '4px' : '0' }}></div>
+                    <div className="w-[35%] bg-rose-400 rounded-t-sm transition-all duration-500 shadow-sm" style={{ height: `${hDep}%`, minHeight: item.depenses > 0 ? '4px' : '0' }}></div>
                   </div>
                   <span className={`text-[10px] font-bold mt-2 uppercase ${isVueGlobale ? 'text-slate-600 bg-slate-100 px-2 py-0.5 rounded' : 'text-slate-400'}`}>
                     {item.nom}
@@ -477,52 +508,68 @@ const TableauBord = ({ transactionsGlobales }) => {
             })}
           </div>
           <div className="flex justify-center gap-8 mt-6 text-xs font-bold text-slate-500">
-            <div className="flex items-center gap-2"><div className="w-3 h-3 bg-emerald-400 rounded-sm shadow-sm"></div> Recettes</div>
-            <div className="flex items-center gap-2"><div className="w-3 h-3 bg-rose-400 rounded-sm shadow-sm"></div> Dépenses</div>
+            <div className="flex items-center gap-2"><div className="w-3 h-3 bg-emerald-400 rounded-sm shadow-sm"></div> Produits (Recettes)</div>
+            <div className="flex items-center gap-2"><div className="w-3 h-3 bg-rose-400 rounded-sm shadow-sm"></div> Charges (Dépenses)</div>
           </div>
         </div>
 
-        {/* TOP DÉPENSES & RECETTES (Sur le côté) */}
+        {/* TOP DÉPENSES & RECETTES AVEC POURCENTAGES */}
         <div className="space-y-6">
+          
+          {/* Répartition des Dépenses */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col">
             <h3 className="font-bold text-slate-800 mb-5 flex items-center gap-2 text-sm border-b border-slate-100 pb-3">
-              <TrendingUp className="text-rose-500 rotate-180" size={18} /> Top Postes de Dépenses
+              <PieChart className="text-rose-500" size={18} /> Répartition des Charges
             </h3>
-            <div className="space-y-4 flex-1">
-              {data.topDepenses.length === 0 ? <div className="h-full flex items-center justify-center text-xs text-slate-400 italic">Aucune dépense enregistrée</div> : null}
-              {data.topDepenses.map((item, idx) => (
-                <div key={idx} className="group">
-                  <div className="flex justify-between text-[11px] font-bold mb-1.5">
-                    <span className="text-slate-600 truncate mr-2">{item.nom}</span>
-                    <span className="text-rose-600 whitespace-nowrap">{formatMontant(item.montant)} €</span>
+            <div className="space-y-4.5 flex-1">
+              {data.topDepenses.length === 0 ? <div className="h-full flex items-center justify-center text-xs text-slate-400 italic">Aucune donnée</div> : null}
+              {data.topDepenses.map((item, idx) => {
+                const pct = calcPct(item.montant, data.totalDepenses);
+                return (
+                  <div key={idx} className="group">
+                    <div className="flex justify-between items-center text-[11px] font-bold mb-1.5">
+                      <span className="text-slate-600 truncate mr-2">{item.nom}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded-md text-[9px] w-10 text-center">{pct}%</span>
+                        <span className="text-rose-600 font-mono whitespace-nowrap w-16 text-right">{formatMontant(item.montant)} €</span>
+                      </div>
+                    </div>
+                    <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                      <div className="bg-rose-400 h-full rounded-full transition-all duration-1000" style={{ width: `${pct}%` }}></div>
+                    </div>
                   </div>
-                  <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden shadow-inner">
-                    <div className="bg-gradient-to-r from-rose-400 to-rose-500 h-full rounded-full transition-all duration-1000" style={{ width: `${(item.montant / data.totalDepenses) * 100}%` }}></div>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
 
+          {/* Répartition des Recettes */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col">
             <h3 className="font-bold text-slate-800 mb-5 flex items-center gap-2 text-sm border-b border-slate-100 pb-3">
-              <TrendingUp className="text-emerald-500" size={18} /> Principales Recettes
+              <PieChart className="text-emerald-500" size={18} /> Répartition des Produits
             </h3>
-            <div className="space-y-4 flex-1">
-              {data.topRecettes.length === 0 ? <div className="h-full flex items-center justify-center text-xs text-slate-400 italic">Aucune recette enregistrée</div> : null}
-              {data.topRecettes.map((item, idx) => (
-                <div key={idx} className="group">
-                  <div className="flex justify-between text-[11px] font-bold mb-1.5">
-                    <span className="text-slate-600 truncate mr-2">{item.nom}</span>
-                    <span className="text-emerald-600 whitespace-nowrap">{formatMontant(item.montant)} €</span>
+            <div className="space-y-4.5 flex-1">
+              {data.topRecettes.length === 0 ? <div className="h-full flex items-center justify-center text-xs text-slate-400 italic">Aucune donnée</div> : null}
+              {data.topRecettes.map((item, idx) => {
+                const pct = calcPct(item.montant, data.totalRecettes);
+                return (
+                  <div key={idx} className="group">
+                    <div className="flex justify-between items-center text-[11px] font-bold mb-1.5">
+                      <span className="text-slate-600 truncate mr-2">{item.nom}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-md text-[9px] w-10 text-center">{pct}%</span>
+                        <span className="text-emerald-600 font-mono whitespace-nowrap w-16 text-right">{formatMontant(item.montant)} €</span>
+                      </div>
+                    </div>
+                    <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                      <div className="bg-emerald-400 h-full rounded-full transition-all duration-1000" style={{ width: `${pct}%` }}></div>
+                    </div>
                   </div>
-                  <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden shadow-inner">
-                    <div className="bg-gradient-to-r from-emerald-400 to-emerald-500 h-full rounded-full transition-all duration-1000" style={{ width: `${(item.montant / data.totalRecettes) * 100}%` }}></div>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
+
         </div>
       </div>
     </div>
