@@ -3358,8 +3358,7 @@ const DonsRecus = ({ transactionsGlobales }) => {
   const [tempGoal, setTempGoal] = useState(58724);
 
   const [formData, setFormData] = useState({
-    nom: '', prenom: '', type: 'Privé', frequence: 'Ponctuel', mail: '', adresse: '', date: '', montant: '', provenance: 'Virement', commentaire: '',
-    apporteur: '' // NOUVEAU : Champ pour identifier la famille ou le parent
+    nom: '', prenom: '', type: 'Privé', frequence: 'Ponctuel', mail: '', adresse: '', date: '', montant: '', provenance: 'Virement', commentaire: '', apporteur: ''
   });
 
   const fileInputExcelRef = useRef(null);
@@ -3387,13 +3386,10 @@ const DonsRecus = ({ transactionsGlobales }) => {
 
   // --- STATISTIQUES ET CLASSEMENT DES APPORTEURS ---
   const stats = useMemo(() => {
-    let priveTotal = 0;
-    let proTotal = 0;
-    const priveDonors = new Set();
-    const proDonors = new Set();
-    const regPriveDonors = new Set();
-    const regProDonors = new Set();
-    const apporteursMap = {}; // Pour le classement des apporteurs
+    let priveTotal = 0; let proTotal = 0;
+    const priveDonors = new Set(); const proDonors = new Set();
+    const regPriveDonors = new Set(); const regProDonors = new Set();
+    const apporteursMap = {};
 
     dons.forEach(d => {
       const mt = Number(d.montant) || 0;
@@ -3403,44 +3399,29 @@ const DonsRecus = ({ transactionsGlobales }) => {
       const apporteurNom = String(d.apporteur || '').trim();
 
       if (isPro) {
-        proTotal += mt;
-        proDonors.add(identifier);
+        proTotal += mt; proDonors.add(identifier);
         if (isRegulier) regProDonors.add(identifier);
       } else {
-        priveTotal += mt;
-        priveDonors.add(identifier);
+        priveTotal += mt; priveDonors.add(identifier);
         if (isRegulier) regPriveDonors.add(identifier);
       }
 
-      // Calcul pour le Top Ambassadeurs
       if (apporteurNom && apporteurNom.toLowerCase() !== 'non') {
         apporteursMap[apporteurNom] = (apporteursMap[apporteurNom] || 0) + mt;
       }
     });
 
-    // Transformation en tableau et tri des meilleurs apporteurs
     const topApporteurs = Object.entries(apporteursMap)
-      .map(([nom, montant]) => ({ nom, montant }))
-      .sort((a, b) => b.montant - a.montant)
-      .slice(0, 4); // On garde les 4 meilleurs pour l'affichage
+      .map(([nom, montant]) => ({ nom, montant })).sort((a, b) => b.montant - a.montant).slice(0, 3); // Top 3 pour affichage compact
 
     const total = priveTotal + proTotal;
-    return {
-      total,
-      priveTotal,
-      proTotal,
-      priveCount: priveDonors.size,
-      proCount: proDonors.size,
-      priveReguliers: regPriveDonors.size,
-      proReguliers: regProDonors.size,
-      topApporteurs
-    };
+    return { total, priveTotal, proTotal, priveCount: priveDonors.size, proCount: proDonors.size, priveReguliers: regPriveDonors.size, proReguliers: regProDonors.size, topApporteurs };
   }, [dons]);
 
-  const pctProgression = budgetGoal > 0 ? Math.min((stats.total / budgetGoal) * 100, 100).toFixed(2) : 0;
+  const pctProgression = budgetGoal > 0 ? Math.min((stats.total / budgetGoal) * 100, 100).toFixed(1) : 0;
   const resteCollecter = Math.max(0, budgetGoal - stats.total);
-  const pctPrive = stats.total > 0 ? ((stats.priveTotal / stats.total) * 100).toFixed(2) : 0;
-  const pctPro = stats.total > 0 ? ((stats.proTotal / stats.total) * 100).toFixed(2) : 0;
+  const pctPrive = stats.total > 0 ? ((stats.priveTotal / stats.total) * 100).toFixed(0) : 0;
+  const pctPro = stats.total > 0 ? ((stats.proTotal / stats.total) * 100).toFixed(0) : 0;
 
   // --- RAPPROCHEMENT COMPTABLE (Compte 754000) ---
   const totalGL754 = transactionsGlobales.reduce((acc, t) => {
@@ -3460,25 +3441,16 @@ const DonsRecus = ({ transactionsGlobales }) => {
     if (!formData.nom || !formData.date || !formData.montant) return alert("Nom, Date et Montant requis.");
     try {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'dons'), {
-        ...formData, 
-        apporteur: formData.apporteur.trim(),
-        montant: parseFloat(formData.montant), 
-        recu_emis: false, 
-        date_creation: new Date().toISOString()
+        ...formData, apporteur: formData.apporteur.trim(), montant: parseFloat(formData.montant), recu_emis: false, date_creation: new Date().toISOString()
       });
       alert("Don ajouté avec succès !");
       setFormData({ nom: '', prenom: '', type: 'Privé', frequence: 'Ponctuel', mail: '', adresse: '', date: '', montant: '', provenance: 'Virement', commentaire: '', apporteur: '' });
-      setActiveView('base');
+      setActiveView('dashboard');
     } catch (err) { alert("Erreur lors de l'ajout."); }
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm("Supprimer ce don de la base ?")) {
-      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'dons', id));
-    }
-  };
+  const handleDelete = async (id) => { if (window.confirm("Supprimer ce don de la base ?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'dons', id)); };
 
-  // --- MOTEUR D'IMPORTATION HYBRIDE (XLSX HISTORIQUE & CSV HELLOASSO) ---
   const handleImport = async (e, isHelloAsso) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -3487,7 +3459,6 @@ const DonsRecus = ({ transactionsGlobales }) => {
       const workbook = XLSX.read(data, { type: 'array', cellDates: true });
       const opts = isHelloAsso ? { defval: '' } : { header: 1, raw: true, defval: '' };
       const rawRows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], opts);
-      
       let count = 0; let doublons = 0;
 
       if (isHelloAsso) {
@@ -3503,10 +3474,8 @@ const DonsRecus = ({ transactionsGlobales }) => {
             
             if (mt > 0 && !dons.some(d => d.nom === nom && d.date === dateF && d.montant === mt)) {
                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'dons'), {
-                 nom, prenom: r['Prénom payeur'] || '', mail: r['Email payeur'] || '', date: dateF, montant: mt,
-                 provenance: 'HelloAsso', type: 'Privé', frequence: freq, apporteur: '', // HelloAsso n'a pas d'apporteur natif
-                 adresse: `${r['Adresse payeur'] || ''} ${r['Code Postal payeur'] || ''} ${r['Ville payeur'] || ''}`.trim(), 
-                 recu_emis: true, date_creation: new Date().toISOString()
+                 nom, prenom: r['Prénom payeur'] || '', mail: r['Email payeur'] || '', date: dateF, montant: mt, provenance: 'HelloAsso', type: 'Privé', frequence: freq, apporteur: '',
+                 adresse: `${r['Adresse payeur'] || ''} ${r['Code Postal payeur'] || ''} ${r['Ville payeur'] || ''}`.trim(), recu_emis: true, date_creation: new Date().toISOString()
                });
                count++;
             } else { doublons++; }
@@ -3515,11 +3484,7 @@ const DonsRecus = ({ transactionsGlobales }) => {
       } else {
         const headers = rawRows[0];
         const iNom = headers.indexOf('Nom'); const iSoc = headers.indexOf('Société'); const iMt = headers.indexOf('Montant'); const iDate = headers.indexOf('Date versement');
-        const iFreq = headers.indexOf('Fréquence');
-        
-        // Détection de la colonne Famille (ou Apporteur) pour Excel
-        const idxFamille = headers.indexOf('Famille');
-        const iApporteur = idxFamille !== -1 ? idxFamille : headers.indexOf('Apporteur');
+        const iFreq = headers.indexOf('Fréquence'); const iApporteur = headers.indexOf('Famille') !== -1 ? headers.indexOf('Famille') : headers.indexOf('Apporteur');
 
         for (let i = 1; i < rawRows.length; i++) {
           const r = rawRows[i];
@@ -3534,8 +3499,7 @@ const DonsRecus = ({ transactionsGlobales }) => {
              if (!dons.some(d => d.nom === nom && d.date === dateF && d.montant === mt)) {
                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'dons'), {
                  nom, prenom: r[headers.indexOf('Prénom')] || '', mail: r[headers.indexOf('Mail')] || '', date: dateF, montant: mt,
-                 provenance: r[headers.indexOf('Provenance')] || 'Autre', type: r[headers.indexOf('Type')] || 'Privé', 
-                 frequence: freq, apporteur: apporteurVal,
+                 provenance: r[headers.indexOf('Provenance')] || 'Autre', type: r[headers.indexOf('Type')] || 'Privé', frequence: freq, apporteur: apporteurVal,
                  adresse: `${r[headers.indexOf('Adresse')] || ''} ${r[headers.indexOf('CP')] || ''} ${r[headers.indexOf('Ville')] || ''}`.trim(), 
                  recu_emis: r[headers.indexOf('N° Reçu fiscal')] ? true : false, date_creation: new Date().toISOString()
                });
@@ -3550,16 +3514,13 @@ const DonsRecus = ({ transactionsGlobales }) => {
     } catch(e) { alert("Erreur d'importation du fichier."); }
   };
 
-  const markAsSent = async (id) => {
-    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'dons', id), { recu_emis: true });
-  };
+  const markAsSent = async (id) => { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'dons', id), { recu_emis: true }); };
 
   const generateCerfaDon = (don) => {
     if (!don.adresse || don.adresse.length < 5) return alert("L'adresse postale est obligatoire pour générer un Cerfa.");
     const win = window.open('', '_blank');
     const sigPresident = localStorage.getItem('sig_president') || '';
     const sigTresorier = localStorage.getItem('sig_tresorier') || '';
-
     const isAbandon = don.provenance === 'Abandon de frais';
     const natureCheck = isAbandon ? `<div class="checkbox">X</div><div>Autres (frais engagés par les bénévoles)</div>` : `<div class="checkbox">X</div><div>Numéraire</div>`;
 
@@ -3637,151 +3598,111 @@ const DonsRecus = ({ transactionsGlobales }) => {
       <input type="file" accept=".xlsx,.xls" className="hidden" ref={fileInputExcelRef} onChange={(e) => handleImport(e, false)} />
       <input type="file" accept=".csv" className="hidden" ref={fileInputHelloAssoRef} onChange={(e) => handleImport(e, true)} />
 
-      {/* EN-TÊTE ET MENUS */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Heart className="text-rose-500" /> Dons & Mécénat
-          </h2>
-          <p className="text-slate-500 text-sm mt-1">Suivi de la collecte, reçus fiscaux et rapprochement comptable.</p>
-        </div>
-        <div className="flex bg-slate-100 p-1 rounded-xl">
-          <button onClick={() => setActiveView('dashboard')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'dashboard' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Tableau de Bord & Base</button>
-          <button onClick={() => setActiveView('saisie')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'saisie' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Saisie Manuelle (+)</button>
-        </div>
+      <div className="flex bg-slate-100 p-1 rounded-xl w-fit mt-4">
+        <button onClick={() => setActiveView('dashboard')} className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'dashboard' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Tableau de bord & Base</button>
+        <button onClick={() => setActiveView('saisie')} className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'saisie' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Saisie Manuelle (+)</button>
       </div>
 
       {activeView === 'dashboard' && (
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-4 animate-fade-in">
           
-          {/* NOUVEAU TABLEAU DE BORD ÉPURÉ AVEC TOP AMBASSADEURS */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8">
-            <div className="flex justify-between items-end border-b border-slate-100 pb-4 mb-6">
-              <div>
-                <h3 className="text-lg font-black text-slate-800">Tableau de bord des donateurs</h3>
-                <p className="text-xs text-slate-500 italic mt-1">Dernière mise à jour : {normaliserDateFR(new Date())}</p>
-              </div>
-            </div>
-
-            {/* KPI PRINCIPAUX */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              
-              <div className="bg-indigo-50/50 p-5 rounded-xl border border-indigo-100 flex flex-col justify-center relative group">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-xs font-bold text-indigo-800 uppercase tracking-wider">Objectif de collecte</span>
-                  <Target size={20} className="text-indigo-400" />
-                </div>
-                {isEditingGoal ? (
-                  <div className="flex items-center gap-2">
-                    <input type="number" value={tempGoal} onChange={(e) => setTempGoal(Number(e.target.value))} className="w-24 border rounded p-1 text-lg font-black text-indigo-900 outline-none" autoFocus />
-                    <button onClick={saveGoal} className="text-xs bg-indigo-600 text-white px-2 py-1 rounded font-bold">OK</button>
+          {/* MINI DASHBOARD COMPACT DONS */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-4 border-b border-slate-100 pb-4">
+               <div className="flex flex-wrap items-center gap-4 md:gap-6">
+                  <div>
+                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1"><Target size={12}/> Objectif</p>
+                     {isEditingGoal ? (
+                        <div className="flex items-center gap-2">
+                          <input type="number" value={tempGoal} onChange={(e) => setTempGoal(Number(e.target.value))} className="w-24 border border-indigo-200 rounded px-2 py-0.5 text-sm font-black text-indigo-900 outline-none" autoFocus />
+                          <button onClick={saveGoal} className="text-[10px] bg-indigo-600 text-white px-2 py-1 rounded font-bold hover:bg-indigo-700">OK</button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <p className="text-xl font-black text-indigo-900">{formatMontant(budgetGoal)} €</p>
+                          <button onClick={() => setIsEditingGoal(true)} className="text-indigo-300 hover:text-indigo-600 transition-colors"><Edit2 size={12}/></button>
+                        </div>
+                      )}
                   </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <p className="text-3xl font-black text-indigo-900">{formatMontant(budgetGoal)} €</p>
-                    <button onClick={() => setIsEditingGoal(true)} className="opacity-0 group-hover:opacity-100 text-indigo-400 hover:text-indigo-600 transition-opacity"><Edit2 size={14}/></button>
+                  <div className="hidden md:block h-8 w-px bg-slate-200"></div>
+                  <div>
+                     <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1 flex items-center gap-1"><Euro size={12}/> Collectés</p>
+                     <p className="text-xl font-black text-emerald-700">{formatMontant(stats.total)} €</p>
                   </div>
-                )}
-              </div>
-
-              <div className="bg-emerald-50/50 p-5 rounded-xl border border-emerald-100 flex flex-col justify-center">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Dons Actuels</span>
-                  <Euro size={20} className="text-emerald-400" />
-                </div>
-                <p className="text-3xl font-black text-emerald-700">{formatMontant(stats.total)} €</p>
-              </div>
-
-              <div className="bg-rose-50/50 p-5 rounded-xl border border-rose-100 flex flex-col justify-center">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-xs font-bold text-rose-800 uppercase tracking-wider">Reste à collecter</span>
-                  <Clock size={20} className="text-rose-400" />
-                </div>
-                <p className="text-3xl font-black text-rose-700">{formatMontant(resteCollecter)} €</p>
-              </div>
-
+                  <div className="hidden md:block h-8 w-px bg-slate-200"></div>
+                  <div>
+                     <p className="text-[10px] font-bold text-rose-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Clock size={12}/> Reste</p>
+                     <p className="text-xl font-black text-rose-600">{formatMontant(resteCollecter)} €</p>
+                  </div>
+               </div>
+               
+               <div className="flex gap-6 text-right border-t md:border-t-0 pt-3 md:pt-0 border-slate-100 w-full md:w-auto justify-end">
+                  <div className="bg-blue-50/50 px-3 py-1.5 rounded-lg border border-blue-100/50">
+                     <p className="text-[9px] font-bold text-blue-600 uppercase">Privé ({pctPrive}%)</p>
+                     <p className="text-sm font-black text-slate-800">{formatMontant(stats.priveTotal)} €</p>
+                  </div>
+                  <div className="bg-emerald-50/50 px-3 py-1.5 rounded-lg border border-emerald-100/50">
+                     <p className="text-[9px] font-bold text-emerald-600 uppercase">Pro ({pctPro}%)</p>
+                     <p className="text-sm font-black text-slate-800">{formatMontant(stats.proTotal)} €</p>
+                  </div>
+               </div>
             </div>
-
-            {/* BARRE DE PROGRESSION */}
-            <div className="mb-8">
-              <div className="flex justify-between items-end mb-2">
-                <span className="text-sm font-bold text-slate-700">Progression de l'Objectif :</span>
-                <span className="text-2xl font-black text-indigo-600">{pctProgression}%</span>
+            
+            {/* Barre de progression fine */}
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-black text-indigo-600 w-12 text-right">{pctProgression}%</span>
+              <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden shadow-inner">
+                <div className="bg-gradient-to-r from-indigo-400 to-indigo-600 h-full rounded-full transition-all duration-1000" style={{ width: `${pctProgression}%` }}></div>
               </div>
-              <div className="w-full bg-slate-100 rounded-full h-4 overflow-hidden shadow-inner">
-                <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 h-full rounded-full transition-all duration-1000" style={{ width: `${pctProgression}%` }}></div>
-              </div>
-              <div className="flex justify-between items-center mt-2 text-xs font-bold text-slate-400">
-                <span>0 €</span>
-                <span>{formatMontant(budgetGoal)} €</span>
-              </div>
-            </div>
-
-            {/* RÉPARTITION DÉTAILLÉE + NOUVEAU TOP AMBASSADEURS */}
-            <h4 className="text-sm font-bold text-slate-700 mb-4 border-b border-slate-100 pb-2">Répartition et Impact (Actuel : {formatMontant(stats.total)} €)</h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              
-              <div className="bg-blue-50/40 p-6 rounded-xl border border-blue-100/60 text-center flex flex-col items-center justify-center">
-                <span className="text-3xl font-black text-blue-700 mb-1">{pctPrive}%</span>
-                <span className="text-sm font-bold text-blue-800 mb-2">Privé ({stats.priveCount} donateurs)</span>
-                <span className="text-[10px] italic text-blue-600/70 mb-4">Inclut {stats.priveReguliers} dons réguliers</span>
-                <span className="text-xl font-black text-slate-800 bg-white px-4 py-1.5 rounded-lg shadow-sm border border-blue-50">{formatMontant(stats.priveTotal)} €</span>
-              </div>
-
-              <div className="bg-emerald-50/40 p-6 rounded-xl border border-emerald-100/60 text-center flex flex-col items-center justify-center">
-                <span className="text-3xl font-black text-emerald-700 mb-1">{pctPro}%</span>
-                <span className="text-sm font-bold text-emerald-800 mb-2">Professionnel ({stats.proCount} donateurs)</span>
-                <span className="text-[10px] italic text-emerald-600/70 mb-4">Inclut {stats.proReguliers} dons réguliers</span>
-                <span className="text-xl font-black text-slate-800 bg-white px-4 py-1.5 rounded-lg shadow-sm border border-emerald-50">{formatMontant(stats.proTotal)} €</span>
-              </div>
-
-              {/* NOUVEAU : TOP AMBASSADEURS */}
-              <div className="bg-amber-50/40 p-6 rounded-xl border border-amber-200/60 flex flex-col justify-start">
-                <h4 className="text-sm font-black text-amber-800 mb-4 flex items-center gap-2">
-                  <Sparkles className="text-amber-500" size={18} /> Top Ambassadeurs
-                </h4>
-                <div className="space-y-3.5">
-                  {stats.topApporteurs.length === 0 ? <p className="text-xs text-amber-600/70 italic text-center mt-4">Aucun apporteur renseigné.</p> : null}
-                  {stats.topApporteurs.map((app, idx) => (
-                    <div key={idx} className="flex justify-between items-center text-sm border-b border-amber-100/50 pb-1.5 last:border-0">
-                      <span className="font-bold text-amber-900 truncate pr-2"><span className="text-amber-500 mr-1">#{idx + 1}</span> {app.nom}</span>
-                      <span className="font-black text-amber-700 whitespace-nowrap">{formatMontant(app.montant)} €</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
             </div>
           </div>
 
-          {/* ZONE DE CONTRÔLE COMPTABLE ET IMPORT */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className={`p-6 rounded-2xl shadow-sm border flex flex-col justify-center bg-white ${ecartComptable === 0 ? 'border-l-4 border-l-emerald-500' : 'border-l-4 border-l-rose-500 animate-pulse'}`}>
-              <div className="flex justify-between items-start mb-2">
-                <h3 className={`text-xs font-bold uppercase tracking-wider ${ecartComptable === 0 ? 'text-emerald-700' : 'text-rose-700'}`}>Contrôle Comptable (Compte 754)</h3>
-                {ecartComptable === 0 ? <CheckCircle2 size={20} className="text-emerald-500"/> : <AlertTriangle size={20} className="text-rose-500"/>}
+          {/* WIDGETS D'ADMINISTRATION COMPACTS */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            
+            {/* Contrôle Comptable (Rapprochement) */}
+            <div className={`p-4 rounded-2xl shadow-sm border flex items-center gap-4 bg-white ${ecartComptable === 0 ? 'border-l-4 border-l-emerald-500' : 'border-l-4 border-l-rose-500 animate-pulse'}`}>
+              <div className={`p-3 rounded-xl ${ecartComptable === 0 ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
+                {ecartComptable === 0 ? <CheckCircle2 size={24}/> : <AlertTriangle size={24}/>}
               </div>
-              <p className={`text-2xl font-black ${ecartComptable === 0 ? 'text-slate-800' : 'text-rose-800'}`}>Écart : {formatMontant(ecartComptable)} €</p>
-              <p className={`text-xs mt-3 font-medium leading-relaxed ${ecartComptable === 0 ? 'text-slate-500' : 'text-rose-600'}`}>
-                {ecartComptable === 0 ? "Félicitations, la somme de vos reçus correspond exactement aux saisies du Grand Livre (754000)." : `Attention ! La base de dons affiche ${formatMontant(stats.total)}€ et le Grand Livre affiche ${formatMontant(totalGL754)}€. Vérifiez vos pointages.`}
-              </p>
+              <div>
+                <h3 className={`text-[10px] font-bold uppercase tracking-wider ${ecartComptable === 0 ? 'text-emerald-700' : 'text-rose-700'}`}>Écart Cpt. 754000</h3>
+                <p className={`text-xl font-black leading-none mt-1 ${ecartComptable === 0 ? 'text-slate-800' : 'text-rose-800'}`}>{formatMontant(ecartComptable)} €</p>
+              </div>
             </div>
 
-            <div className="bg-slate-900 p-6 rounded-2xl shadow-lg border border-slate-800 flex flex-col justify-center text-white">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Actions d'Importation Rapide</h3>
-              <div className="space-y-3">
-                <button onClick={() => fileInputExcelRef.current.click()} className="w-full bg-white/10 hover:bg-white/20 border border-white/20 px-4 py-2.5 rounded-xl text-sm font-bold flex items-center justify-between transition-colors">
-                  <span>Importer Historique (Excel)</span> <FileSpreadsheet size={16}/>
+            {/* Top Ambassadeurs Compact */}
+            <div className="bg-amber-50/50 p-4 rounded-2xl border border-amber-200/60 flex flex-col justify-center">
+              <h4 className="text-[10px] font-black text-amber-800 mb-2 flex items-center gap-1.5 uppercase tracking-wider">
+                <Sparkles className="text-amber-500" size={14} /> Top Ambassadeurs
+              </h4>
+              <div className="space-y-1.5">
+                {stats.topApporteurs.length === 0 ? <p className="text-[10px] text-amber-600/70 italic">Aucun apporteur renseigné.</p> : null}
+                {stats.topApporteurs.map((app, idx) => (
+                  <div key={idx} className="flex justify-between items-center text-xs border-b border-amber-100/50 pb-1 last:border-0 last:pb-0">
+                    <span className="font-bold text-amber-900 truncate pr-2"><span className="text-amber-500 mr-1">#{idx + 1}</span> {app.nom}</span>
+                    <span className="font-black text-amber-700 whitespace-nowrap">{formatMontant(app.montant)} €</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Imports */}
+            <div className="bg-slate-900 p-4 rounded-2xl shadow-lg border border-slate-800 flex flex-col justify-center text-white">
+              <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Importations</h3>
+              <div className="space-y-2">
+                <button onClick={() => fileInputExcelRef.current.click()} className="w-full bg-white/10 hover:bg-white/20 border border-white/20 px-3 py-1.5 rounded-lg text-[11px] font-bold flex items-center justify-between transition-colors">
+                  <span>Excel (Historique)</span> <FileSpreadsheet size={14}/>
                 </button>
-                <button onClick={() => fileInputHelloAssoRef.current.click()} className="w-full bg-emerald-500/20 hover:bg-emerald-500/40 border border-emerald-500/30 text-emerald-100 px-4 py-2.5 rounded-xl text-sm font-bold flex items-center justify-between transition-colors">
-                  <span>Import HelloAsso (CSV)</span> <Download size={16}/>
+                <button onClick={() => fileInputHelloAssoRef.current.click()} className="w-full bg-emerald-500/20 hover:bg-emerald-500/40 border border-emerald-500/30 text-emerald-100 px-3 py-1.5 rounded-lg text-[11px] font-bold flex items-center justify-between transition-colors">
+                  <span>HelloAsso (CSV)</span> <Download size={14}/>
                 </button>
               </div>
             </div>
           </div>
 
           {/* TABLEAU BASE DE DONNÉES */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-4">
             <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[10px] sticky top-0 border-b border-slate-200 shadow-sm z-10">
@@ -3892,7 +3813,6 @@ const DonsRecus = ({ transactionsGlobales }) => {
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">E-mail</label>
                 <input type="email" value={formData.mail} onChange={e => setFormData({...formData, mail: e.target.value})} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
               </div>
-              {/* NOUVEAU CHAMP APPORTEUR */}
               <div>
                 <label className="block text-xs font-bold text-amber-600 uppercase mb-2">Apporteur (Famille)</label>
                 <input type="text" placeholder="Ex: DUPONT" value={formData.apporteur} onChange={e => setFormData({...formData, apporteur: e.target.value})} className="w-full border border-amber-200 bg-amber-50/50 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-amber-500" />
