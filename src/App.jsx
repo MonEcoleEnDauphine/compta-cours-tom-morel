@@ -2788,8 +2788,7 @@ const nombreEnLettres = (n) => {
   
   const convert = (num) => {
     if (num < 20) return unites[num];
-    let d = Math.floor(num/10);
-    let u = num%10;
+    let d = Math.floor(num/10); let u = num%10;
     if (d === 7 || d === 9) {
       if (u === 1 && d === 7) return dizaines[d-1] + ' et onze';
       return dizaines[d-1] + '-' + unites[10+u];
@@ -2800,21 +2799,15 @@ const nombreEnLettres = (n) => {
   };
 
   const convert100 = (num) => {
-    let c = Math.floor(num/100);
-    let r = num%100;
-    let res = '';
-    if (c === 1) res = 'cent';
-    else if (c > 1) res = unites[c] + ' cent' + (r === 0 ? 's' : '');
+    let c = Math.floor(num/100); let r = num%100; let res = '';
+    if (c === 1) res = 'cent'; else if (c > 1) res = unites[c] + ' cent' + (r === 0 ? 's' : '');
     if (r > 0) res += (res ? ' ' : '') + convert(r);
     return res;
   };
 
   const convert1000 = (num) => {
-    let m = Math.floor(num/1000);
-    let r = num%1000;
-    let res = '';
-    if (m === 1) res = 'mille';
-    else if (m > 1) res = convert100(m) + ' mille';
+    let m = Math.floor(num/1000); let r = num%1000; let res = '';
+    if (m === 1) res = 'mille'; else if (m > 1) res = convert100(m) + ' mille';
     if (r > 0) res += (res ? ' ' : '') + convert100(r);
     return res;
   };
@@ -2822,9 +2815,7 @@ const nombreEnLettres = (n) => {
   let intPart = Math.floor(n);
   let decPart = Math.round((n - intPart) * 100);
   let str = convert1000(intPart) + ' euro' + (intPart > 1 ? 's' : '');
-  if (decPart > 0) {
-    str += ' et ' + convert(decPart) + ' centime' + (decPart > 1 ? 's' : '');
-  }
+  if (decPart > 0) str += ' et ' + convert(decPart) + ' centime' + (decPart > 1 ? 's' : '');
   return str;
 };
 
@@ -2835,17 +2826,16 @@ const NotesFrais = ({ transactionsGlobales }) => {
   
   const [modal, setModal] = useState({ isOpen: false, type: '', payload: null });
   const [promptValue, setPromptValue] = useState('');
+  
+  // NOUVEAU : État pour le modal des signatures
+  const [showSigModal, setShowSigModal] = useState(false);
+  const [signatures, setSignatures] = useState({
+    president: localStorage.getItem('sig_president') || '',
+    tresorier: localStorage.getItem('sig_tresorier') || ''
+  });
 
   const [formData, setFormData] = useState({
-    demandeur: '',
-    adresse: '',
-    date: '',
-    description: '',
-    categorie: 'Pédagogie',
-    typeFrais: 'remboursement',
-    montant: '',
-    justificatifFile: null,
-    ribFile: null
+    demandeur: '', adresse: '', date: '', description: '', categorie: 'Pédagogie', typeFrais: 'remboursement', montant: '', justificatifFile: null, ribFile: null
   });
 
   const EMAIL_PRESIDENT = "l.fauvain@gmail.com";
@@ -2855,83 +2845,58 @@ const NotesFrais = ({ transactionsGlobales }) => {
     const q = collection(db, 'artifacts', appId, 'public', 'data', 'notes_frais');
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const liste = [];
-      snapshot.forEach((doc) => {
-        liste.push({ id: doc.id, ...doc.data() });
-      });
+      snapshot.forEach((doc) => { liste.push({ id: doc.id, ...doc.data() }); });
       liste.sort((a, b) => new Date(b.date_creation) - new Date(a.date_creation));
       setNotes(liste);
     });
     return () => unsubscribe();
   }, []);
 
-  const closeCustomModal = () => {
-    setModal({ isOpen: false, type: '', payload: null });
-    setPromptValue('');
-  };
-
-  const showAlert = (title, message, isError = false) => {
-    setModal({ isOpen: true, type: 'alert', payload: { title, message, isError } });
-  };
+  const closeCustomModal = () => { setModal({ isOpen: false, type: '', payload: null }); setPromptValue(''); };
+  const showAlert = (title, message, isError = false) => { setModal({ isOpen: true, type: 'alert', payload: { title, message, isError } }); };
 
   const handleFileChange = (e, field) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      showAlert("Fichier trop lourd", "Le fichier dépasse la limite autorisée de 2 Mo. Veuillez le compresser.", true);
-      return;
-    }
+    if (file.size > 2 * 1024 * 1024) return showAlert("Fichier trop lourd", "Le fichier dépasse la limite autorisée de 2 Mo.", true);
+    const reader = new FileReader();
+    reader.onload = (event) => { setFormData(prev => ({ ...prev, [field]: event.target.result })); };
+    reader.readAsDataURL(file);
+  };
+
+  // NOUVEAU : Sauvegarde des signatures
+  const handleSignatureUpload = (e, role) => {
+    const file = e.target.files[0];
+    if (!file) return;
     const reader = new FileReader();
     reader.onload = (event) => {
-      setFormData(prev => ({ ...prev, [field]: event.target.result }));
+      const base64 = event.target.result;
+      setSignatures(prev => ({ ...prev, [role]: base64 }));
+      localStorage.setItem(`sig_${role}`, base64);
     };
     reader.readAsDataURL(file);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.demandeur || !formData.date || !formData.montant || !formData.description) {
-      showAlert("Champs manquants", "Veuillez remplir tous les champs obligatoires marqués d'un astérisque (*).", true);
-      return;
-    }
-    if (formData.typeFrais === 'abandon' && !formData.adresse) {
-      showAlert("Adresse requise", "L'adresse postale est strictement obligatoire pour émettre un reçu fiscal (Cerfa).", true);
-      return;
-    }
-    if (formData.typeFrais === 'remboursement' && !formData.ribFile) {
-      showAlert("RIB manquant", "Le RIB est obligatoire pour que le trésorier puisse procéder au remboursement.", true);
-      return;
-    }
-    if (!formData.justificatifFile) {
-      showAlert("Justificatif manquant", "La facture ou le ticket de caisse est obligatoire pour la comptabilité.", true);
-      return;
-    }
-
-    const newNote = {
-      ...formData,
-      montant: parseFloat(formData.montant),
-      statut: 'attente_president', 
-      date_creation: new Date().toISOString()
-    };
+    if (!formData.demandeur || !formData.date || !formData.montant || !formData.description) return showAlert("Champs manquants", "Veuillez remplir tous les champs obligatoires (*).", true);
+    if (formData.typeFrais === 'abandon' && !formData.adresse) return showAlert("Adresse requise", "L'adresse postale est obligatoire pour émettre un reçu fiscal.", true);
+    if (formData.typeFrais === 'remboursement' && !formData.ribFile) return showAlert("RIB manquant", "Le RIB est obligatoire pour le remboursement.", true);
+    if (!formData.justificatifFile) return showAlert("Justificatif manquant", "La facture/ticket est obligatoire.", true);
 
     try {
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'notes_frais'), newNote);
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'notes_frais'), { ...formData, montant: parseFloat(formData.montant), statut: 'attente_president', date_creation: new Date().toISOString() });
       showAlert("Succès", "Votre note de frais a été soumise avec succès ! Elle va être examinée par la direction.");
       setFormData({ demandeur: '', adresse: '', date: '', description: '', categorie: 'Pédagogie', typeFrais: 'remboursement', montant: '', justificatifFile: null, ribFile: null });
       setActiveView('suivi');
-    } catch (err) {
-      showAlert("Erreur", "Une erreur est survenue lors de l'enregistrement de votre demande.", true);
-    }
+    } catch (err) { showAlert("Erreur", "Erreur lors de l'enregistrement.", true); }
   };
 
   const handleValiderPresident = async (note) => {
     try {
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notes_frais', note.id), {
-        statut: 'attente_tresorier'
-      });
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notes_frais', note.id), { statut: 'attente_tresorier' });
       showAlert("Validation réussie", "La note a bien été validée et transmise au trésorier.");
-    } catch (err) {
-      showAlert("Erreur", "Une erreur est survenue lors de la validation.", true);
-    }
+    } catch (err) { showAlert("Erreur", "Erreur lors de la validation.", true); }
   };
 
   const executeTresorier = async (note) => {
@@ -2945,44 +2910,23 @@ const NotesFrais = ({ transactionsGlobales }) => {
         if (note.categorie === 'Déplacement') compteCharge = '625100';
         if (note.categorie === 'Repas') compteCharge = '625600';
 
-        const newTx = {
-          batchId: 'NDF_' + Date.now(),
-          date: normaliserDateFR(new Date()),
-          libelle: `(NDF) Abandon de frais - ${note.demandeur}`,
-          montant: note.montant,
-          type: 'od',
-          compteDebit: compteCharge,
-          compteCredit: '754000', 
-          reference: `NDF-${note.id.substring(0, 4).toUpperCase()}`,
-          typeOp: 'NDF',
-          commentaire: note.description,
-          date_creation: new Date().toISOString()
-        };
-        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), newTx);
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), {
+          batchId: 'NDF_' + Date.now(), date: normaliserDateFR(new Date()), libelle: `(NDF) Abandon de frais - ${note.demandeur}`,
+          montant: note.montant, type: 'od', compteDebit: compteCharge, compteCredit: '754000', 
+          reference: `NDF-${note.id.substring(0, 4).toUpperCase()}`, typeOp: 'NDF', commentaire: note.description, date_creation: new Date().toISOString()
+        });
       }
-
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notes_frais', note.id), {
-        statut: isAbandon ? 'traitee_abandon' : 'payee',
-        date_paiement: new Date().toISOString()
-      });
-
-      showAlert("Opération validée", isAbandon ? "Le don a été comptabilisé avec succès dans le Grand Livre !" : "La note est marquée payée. Le lettrage se fera lors du prochain import bancaire.");
-    } catch (err) {
-      showAlert("Erreur", "Une erreur comptable est survenue.", true);
-    }
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notes_frais', note.id), { statut: isAbandon ? 'traitee_abandon' : 'payee', date_paiement: new Date().toISOString() });
+      showAlert("Opération validée", isAbandon ? "Le don a été comptabilisé dans le Grand Livre !" : "La note est marquée payée.");
+    } catch (err) { showAlert("Erreur", "Une erreur comptable est survenue.", true); }
   };
 
   const executeRefus = async (noteId, motif) => {
     closeCustomModal();
     try {
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notes_frais', noteId), {
-        statut: 'refusee',
-        motif_refus: motif
-      });
-      showAlert("Note refusée", "La demande a été rejetée et le motif a été enregistré.");
-    } catch (err) {
-      showAlert("Erreur", "Impossible de rejeter la note.", true);
-    }
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notes_frais', noteId), { statut: 'refusee', motif_refus: motif });
+      showAlert("Note refusée", "La demande a été rejetée.");
+    } catch (err) { showAlert("Erreur", "Impossible de rejeter la note.", true); }
   };
 
   const executeDelete = async (noteId) => {
@@ -2992,15 +2936,11 @@ const NotesFrais = ({ transactionsGlobales }) => {
       if (noteToDelete && noteToDelete.statut === 'traitee_abandon') {
         const refString = `NDF-${noteId.substring(0, 4).toUpperCase()}`;
         const linkedTxs = (transactionsGlobales || []).filter(tx => tx.reference === refString && tx.typeOp === 'NDF');
-        for (const tx of linkedTxs) {
-          await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', tx.id));
-        }
+        for (const tx of linkedTxs) { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', tx.id)); }
       }
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notes_frais', noteId));
-      showAlert("Suppression réussie", "La note de frais a été effacée. Si une écriture comptable y était liée, elle a été automatiquement retirée du Grand Livre.");
-    } catch (err) {
-      showAlert("Erreur", "Impossible de supprimer la ligne.", true);
-    }
+      showAlert("Suppression réussie", "Note de frais et OD associées supprimées.");
+    } catch (err) { showAlert("Erreur", "Impossible de supprimer la ligne.", true); }
   };
 
   const openDocument = (base64) => {
@@ -3010,10 +2950,10 @@ const NotesFrais = ({ transactionsGlobales }) => {
 
   const generateRecuFiscal = (note) => {
     const win = window.open('', '_blank');
-    if (!win) {
-      showAlert("Pop-up bloqué", "Veuillez autoriser les pop-ups de votre navigateur pour générer le reçu Cerfa.", true);
-      return;
-    }
+    if (!win) return showAlert("Pop-up bloqué", "Veuillez autoriser les pop-ups pour générer le reçu.", true);
+
+    const sigPresident = localStorage.getItem('sig_president');
+    const sigTresorier = localStorage.getItem('sig_tresorier');
 
     const htmlContent = `
       <html>
@@ -3039,20 +2979,14 @@ const NotesFrais = ({ transactionsGlobales }) => {
         </head>
         <body>
           <div class="header">
-            <div>
-              <div class="cerfa-logo">cerfa</div>
-              <div style="font-weight: bold; margin-top: 5px;">N° 11580*03</div>
-              <div style="margin-top: 5px; font-weight: bold;">DGFIP</div>
-            </div>
+            <div><div class="cerfa-logo">cerfa</div><div style="font-weight: bold; margin-top: 5px;">N° 11580*03</div><div style="margin-top: 5px; font-weight: bold;">DGFIP</div></div>
             <div style="text-align: center; max-width: 400px;">
-              <h1>Reçu au titre des dons</h1>
-              <p style="font-weight: bold; margin: 5px 0;">à certains organismes d'intérêt général</p>
+              <h1>Reçu au titre des dons</h1><p style="font-weight: bold; margin: 5px 0;">à certains organismes d'intérêt général</p>
               <p style="margin: 0; font-size: 11px;">Articles 200, 238 bis et 885-0 V bis A du code général des impôts (CGI)</p>
             </div>
             <div>
               <div style="border: 1px solid #000; padding: 10px; text-align: center;">
-                Numéro d'ordre du reçu<br/>
-                <strong>${new Date().getFullYear()}-${note.id.substring(0,6).toUpperCase()}</strong>
+                Numéro d'ordre du reçu<br/><strong>${new Date().getFullYear()}-${note.id.substring(0,6).toUpperCase()}</strong>
               </div>
             </div>
           </div>
@@ -3063,9 +2997,7 @@ const NotesFrais = ({ transactionsGlobales }) => {
             <div class="row"><div class="label">Adresse :</div><div class="value">689 AV GENERAL DE GAULLE, 38110 LA TOUR-DU-PIN</div></div>
             <div class="row"><div class="label">Objet :</div><div class="value">Enseignement primaire (SIRET: 923 490 411 00017)</div></div>
             <div style="margin-top: 15px; font-weight: bold;">Cochez la case concernée (1) :</div>
-            <div class="checkbox-group">
-              <div class="checkbox-item"><div class="checkbox">X</div><div>Oeuvre ou organisme d'intérêt général</div></div>
-            </div>
+            <div class="checkbox-group"><div class="checkbox-item"><div class="checkbox">X</div><div>Oeuvre ou organisme d'intérêt général</div></div></div>
           </div>
 
           <h2>Donateur</h2>
@@ -3116,27 +3048,25 @@ const NotesFrais = ({ transactionsGlobales }) => {
 
           <div style="display: flex; justify-content: space-between; margin-top: 30px;">
             <div style="width: 45%; text-align: center;">
-              <strong>Date et signature</strong><br/>
-              <span style="font-size: 10px;">(Le Trésorier)</span><br/><br/>
+              <strong>Date et signature</strong><br/><span style="font-size: 10px;">(Le Trésorier)</span><br/><br/>
               Le ${normaliserDateFR(new Date())}
-              <div style="height: 80px; border: 1px dashed #ccc; margin-top: 10px;"></div>
+              <div style="height: 100px; margin-top: 10px; display: flex; align-items: center; justify-content: center;">
+                ${sigTresorier ? `<img src="${sigTresorier}" style="max-height: 90px; max-width: 100%;" />` : '<span style="color:#ccc">Aucune signature paramétrée</span>'}
+              </div>
             </div>
             <div style="width: 45%; text-align: center;">
-              <strong>Date et signature</strong><br/>
-              <span style="font-size: 10px;">(Le Président)</span><br/><br/>
+              <strong>Date et signature</strong><br/><span style="font-size: 10px;">(Le Président)</span><br/><br/>
               Le ${normaliserDateFR(new Date())}
-              <div style="height: 80px; border: 1px dashed #ccc; margin-top: 10px;"></div>
+              <div style="height: 100px; margin-top: 10px; display: flex; align-items: center; justify-content: center;">
+                ${sigPresident ? `<img src="${sigPresident}" style="max-height: 90px; max-width: 100%;" />` : '<span style="color:#ccc">Aucune signature paramétrée</span>'}
+              </div>
             </div>
           </div>
 
           <div class="footer-text">
-            (1) ou n'indiquez que les renseignements concernant l'organisme<br/>
-            (2) dons effectués par les entreprises<br/>
-            (3) L'organisme bénéficiaire peut cocher une ou plusieurs cases.<br/>
-            L'organisme bénéficiaire peut, en application de l'article L. 80 C du livre des procédures fiscales, demander à l'administration s'il relève de l'une des catégories d'organismes mentionnées aux articles 200 et 238 bis du code général des impôts.<br/>
-            Il est rappelé que la délivrance irrégulière de reçus fiscaux par l'organisme bénéficiaire est susceptible de donner lieu, en application des dispositions de l'article 1740 A du code général des impôts, à une amende fiscale égale à 25% des sommes indûment mentionnées sur ces documents.
+            (1) ou n'indiquez que les renseignements concernant l'organisme<br/>(2) dons effectués par les entreprises<br/>(3) L'organisme bénéficiaire peut cocher une ou plusieurs cases.<br/>
+            Il est rappelé que la délivrance irrégulière de reçus fiscaux par l'organisme bénéficiaire est susceptible de donner lieu à une amende fiscale égale à 25% des sommes indûment mentionnées sur ces documents.
           </div>
-          
           <button class="print-btn" onclick="window.print()">🖨️ Imprimer / Sauvegarder en PDF</button>
         </body>
       </html>
@@ -3159,14 +3089,11 @@ const NotesFrais = ({ transactionsGlobales }) => {
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-10 font-sans">
       
+      {/* MODAL PERSONNALISÉ POUR LES VALIDATIONS */}
       {modal.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
           <div className={`bg-white rounded-3xl shadow-2xl border w-full max-w-md overflow-hidden transition-all scale-100 ${modal.payload?.isError ? 'border-rose-100' : 'border-slate-100'}`}>
-            <div className={`p-6 text-white flex justify-between items-center bg-gradient-to-r ${
-              modal.type === 'tresorier' ? 'from-emerald-600 to-emerald-800' :
-              modal.type === 'refus' || modal.type === 'delete' || modal.payload?.isError ? 'from-rose-600 to-rose-800' :
-              'from-indigo-600 to-indigo-800'
-            }`}>
+            <div className={`p-6 text-white flex justify-between items-center bg-gradient-to-r ${modal.type === 'tresorier' ? 'from-emerald-600 to-emerald-800' : modal.type === 'refus' || modal.type === 'delete' || modal.payload?.isError ? 'from-rose-600 to-rose-800' : 'from-indigo-600 to-indigo-800'}`}>
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-white/10 backdrop-blur-md rounded-2xl">
                   {modal.type === 'tresorier' && <Euro size={22} className="text-emerald-100" />}
@@ -3174,44 +3101,60 @@ const NotesFrais = ({ transactionsGlobales }) => {
                   {modal.type === 'delete' && <Trash2 size={22} className="text-rose-100" />}
                   {modal.type === 'alert' && <Info size={22} className="text-white" />}
                 </div>
-                <div>
-                  <h3 className="font-bold text-lg leading-tight">
-                    {modal.type === 'tresorier' && "Validation Trésorier"}
-                    {modal.type === 'refus' && "Refuser la demande"}
-                    {modal.type === 'delete' && "Suppression définitive"}
-                    {modal.type === 'alert' && (modal.payload?.title || "Information")}
-                  </h3>
-                </div>
+                <div><h3 className="font-bold text-lg leading-tight">{modal.type === 'tresorier' ? "Validation Trésorier" : modal.type === 'refus' ? "Refuser la demande" : modal.type === 'delete' ? "Suppression définitive" : modal.payload?.title || "Information"}</h3></div>
               </div>
-              <button onClick={closeCustomModal} className="text-white/70 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-colors">
-                <XCircle size={20} />
-              </button>
+              <button onClick={closeCustomModal} className="text-white/70 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-colors"><XCircle size={20} /></button>
             </div>
-
             <div className="p-6 space-y-5">
               {modal.type === 'alert' && <p className="text-slate-600 font-medium leading-relaxed">{modal.payload?.message}</p>}
               {modal.type === 'delete' && <p className="text-slate-600 font-medium leading-relaxed">Êtes-vous sûr de vouloir supprimer définitivement cette note de frais ? Cette action annulera l'écriture comptable si elle avait déjà été générée dans le Grand Livre.</p>}
-              {modal.type === 'refus' && (
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Motif du refus *</label>
-                  <textarea value={promptValue} onChange={e => setPromptValue(e.target.value)} placeholder="Expliquez brièvement pourquoi cette note est refusée..." className="w-full border border-slate-200 rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-rose-500 font-medium resize-none h-24" autoFocus />
-                </div>
-              )}
+              {modal.type === 'refus' && (<div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Motif du refus *</label><textarea value={promptValue} onChange={e => setPromptValue(e.target.value)} className="w-full border border-slate-200 rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-rose-500 font-medium resize-none h-24" autoFocus /></div>)}
               {modal.type === 'tresorier' && (
                 <div className="text-slate-600 font-medium leading-relaxed whitespace-pre-line">
-                  {modal.payload?.typeFrais === 'abandon' 
-                    ? `Souhaitez-vous valider l'abandon de frais (Don) de ${modal.payload?.montant} € pour ${modal.payload?.demandeur} ?\n\nUne Opération Diverse (OD) sera générée automatiquement dans le Grand Livre.` 
-                    : `Confirmez-vous avoir viré ${modal.payload?.montant} € à ${modal.payload?.demandeur} ?\n\nAucune écriture automatique ne sera générée (passez par l'import bancaire pour éviter les doublons).`}
+                  {modal.payload?.typeFrais === 'abandon' ? `Souhaitez-vous valider l'abandon de frais (Don) de ${modal.payload?.montant} € pour ${modal.payload?.demandeur} ?\n\nUne Opération Diverse (OD) sera générée automatiquement dans le Grand Livre.` : `Confirmez-vous avoir viré ${modal.payload?.montant} € à ${modal.payload?.demandeur} ?\n\nAucune écriture automatique ne sera générée (passez par l'import bancaire pour éviter les doublons).`}
                 </div>
               )}
             </div>
-
             <div className="p-4 bg-slate-50/80 border-t border-slate-100 flex justify-end gap-3">
               {modal.type !== 'alert' && <button onClick={closeCustomModal} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-200/60 transition-colors">Annuler</button>}
-              {modal.type === 'alert' && <button onClick={closeCustomModal} className={`px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all ${modal.payload?.isError ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-200' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200'}`}>OK, j'ai compris</button>}
-              {modal.type === 'delete' && <button onClick={() => executeDelete(modal.payload)} className="px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all flex items-center gap-2 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 shadow-rose-200"><Trash2 size={16} /> Supprimer</button>}
-              {modal.type === 'refus' && <button onClick={() => executeRefus(modal.payload, promptValue)} disabled={!promptValue.trim()} className={`px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all flex items-center gap-2 ${promptValue.trim() ? 'bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 shadow-rose-200' : 'bg-rose-300 cursor-not-allowed shadow-none'}`}><XCircle size={16} /> Confirmer le refus</button>}
-              {modal.type === 'tresorier' && <button onClick={() => executeTresorier(modal.payload)} className="px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 shadow-emerald-200"><CheckCircle2 size={16} /> Valider l'opération</button>}
+              {modal.type === 'alert' && <button onClick={closeCustomModal} className={`px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all ${modal.payload?.isError ? 'bg-rose-600 hover:bg-rose-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}>OK</button>}
+              {modal.type === 'delete' && <button onClick={() => executeDelete(modal.payload)} className="px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all flex items-center gap-2 bg-gradient-to-r from-rose-600 to-rose-700"><Trash2 size={16} /> Supprimer</button>}
+              {modal.type === 'refus' && <button onClick={() => executeRefus(modal.payload, promptValue)} disabled={!promptValue.trim()} className={`px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all flex items-center gap-2 ${promptValue.trim() ? 'bg-gradient-to-r from-rose-600 to-rose-700' : 'bg-rose-300 cursor-not-allowed'}`}><XCircle size={16} /> Confirmer le refus</button>}
+              {modal.type === 'tresorier' && <button onClick={() => executeTresorier(modal.payload)} className="px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-emerald-700"><CheckCircle2 size={16} /> Valider l'opération</button>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE GESTION DES SIGNATURES */}
+      {showSigModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl border border-indigo-100 w-full max-w-md overflow-hidden transition-all scale-100">
+            <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 p-6 text-white flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 backdrop-blur-md rounded-2xl"><FileSignature size={22} className="text-indigo-100" /></div>
+                <div><h3 className="font-bold text-lg leading-tight">Paramétrer les signatures</h3><p className="text-indigo-200 text-xs mt-0.5">Apparaîtront sur les Cerfas</p></div>
+              </div>
+              <button onClick={() => setShowSigModal(false)} className="text-white/70 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-colors"><XCircle size={20} /></button>
+            </div>
+            <div className="p-6 space-y-6">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Signature du Trésorier</label>
+                <div className="flex items-center gap-4">
+                  {signatures.tresorier ? <img src={signatures.tresorier} alt="Trésorier" className="h-12 w-auto border border-slate-200 rounded p-1" /> : <div className="h-12 w-24 border border-slate-200 rounded bg-slate-50 flex items-center justify-center text-xs text-slate-400">Aucune</div>}
+                  <input type="file" accept="image/*" onChange={(e) => handleSignatureUpload(e, 'tresorier')} className="text-xs" />
+                </div>
+              </div>
+              <div className="border-t border-slate-100 pt-4">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Signature du Président</label>
+                <div className="flex items-center gap-4">
+                  {signatures.president ? <img src={signatures.president} alt="Président" className="h-12 w-auto border border-slate-200 rounded p-1" /> : <div className="h-12 w-24 border border-slate-200 rounded bg-slate-50 flex items-center justify-center text-xs text-slate-400">Aucune</div>}
+                  <input type="file" accept="image/*" onChange={(e) => handleSignatureUpload(e, 'president')} className="text-xs" />
+                </div>
+              </div>
+            </div>
+            <div className="p-4 bg-slate-50/80 border-t border-slate-100 flex justify-end">
+              <button onClick={() => setShowSigModal(false)} className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md">Fermer</button>
             </div>
           </div>
         </div>
@@ -3224,9 +3167,14 @@ const NotesFrais = ({ transactionsGlobales }) => {
           </h2>
           <p className="text-slate-500 text-sm mt-1">Gérez les demandes de remboursement et les abandons de frais (Dons).</p>
         </div>
-        <div className="flex bg-slate-100 p-1 rounded-xl">
-          <button onClick={() => setActiveView('saisie')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'saisie' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Saisir une dépense</button>
-          <button onClick={() => setActiveView('suivi')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'suivi' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Suivi & Validations</button>
+        <div className="flex items-center gap-3">
+          <div className="flex bg-slate-100 p-1 rounded-xl">
+            <button onClick={() => setActiveView('saisie')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'saisie' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Saisie</button>
+            <button onClick={() => setActiveView('suivi')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'suivi' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Suivi & Validations</button>
+          </div>
+          <button onClick={() => setShowSigModal(true)} className="p-2.5 rounded-xl bg-slate-100 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors" title="Paramétrer les signatures Cerfa">
+            <FileSignature size={18} />
+          </button>
         </div>
       </div>
 
