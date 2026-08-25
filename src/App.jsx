@@ -3351,10 +3351,14 @@ const NotesFrais = ({ transactionsGlobales }) => {
 const DonsRecus = ({ transactionsGlobales }) => {
   const [activeView, setActiveView] = useState('dashboard');
   const [dons, setDons] = useState([]);
-  const [budgetGoal, setBudgetGoal] = useState(25000); 
+  
+  // Objectif de dons modifiable (initialisé avec votre chiffre)
+  const [budgetGoal, setBudgetGoal] = useState(58724);
+  const [isEditingGoal, setIsEditingGoal] = useState(false);
+  const [tempGoal, setTempGoal] = useState(58724);
 
   const [formData, setFormData] = useState({
-    nom: '', prenom: '', type: 'Privé', mail: '', adresse: '', date: '', montant: '', provenance: 'Virement', commentaire: ''
+    nom: '', prenom: '', type: 'Privé', frequence: 'Ponctuel', mail: '', adresse: '', date: '', montant: '', provenance: 'Virement', commentaire: ''
   });
 
   const fileInputExcelRef = useRef(null);
@@ -3380,8 +3384,50 @@ const DonsRecus = ({ transactionsGlobales }) => {
     return parseFloat(s) || 0;
   };
 
-  // --- RAPPROCHEMENT COMPTABLE (Vérifie l'équilibre avec le compte 754000) ---
-  const totalDonsModule = dons.reduce((acc, d) => acc + (Number(d.montant) || 0), 0);
+  // --- STATISTIQUES DU DASHBOARD DONATEURS ---
+  const stats = useMemo(() => {
+    let priveTotal = 0;
+    let proTotal = 0;
+    const priveDonors = new Set();
+    const proDonors = new Set();
+    const regPriveDonors = new Set();
+    const regProDonors = new Set();
+
+    dons.forEach(d => {
+      const mt = Number(d.montant) || 0;
+      const isPro = String(d.type).toLowerCase().includes('pro');
+      const identifier = (d.nom + (d.prenom || '') + (d.mail || '')).toLowerCase().trim();
+      const isRegulier = String(d.frequence).toLowerCase().includes('mensuel') || String(d.provenance).toLowerCase().includes('mensuel');
+
+      if (isPro) {
+        proTotal += mt;
+        proDonors.add(identifier);
+        if (isRegulier) regProDonors.add(identifier);
+      } else {
+        priveTotal += mt;
+        priveDonors.add(identifier);
+        if (isRegulier) regPriveDonors.add(identifier);
+      }
+    });
+
+    const total = priveTotal + proTotal;
+    return {
+      total,
+      priveTotal,
+      proTotal,
+      priveCount: priveDonors.size,
+      proCount: proDonors.size,
+      priveReguliers: regPriveDonors.size,
+      proReguliers: regProDonors.size
+    };
+  }, [dons]);
+
+  const pctProgression = budgetGoal > 0 ? Math.min((stats.total / budgetGoal) * 100, 100).toFixed(2) : 0;
+  const resteCollecter = Math.max(0, budgetGoal - stats.total);
+  const pctPrive = stats.total > 0 ? ((stats.priveTotal / stats.total) * 100).toFixed(2) : 0;
+  const pctPro = stats.total > 0 ? ((stats.proTotal / stats.total) * 100).toFixed(2) : 0;
+
+  // --- RAPPROCHEMENT COMPTABLE (Compte 754000) ---
   const totalGL754 = transactionsGlobales.reduce((acc, t) => {
     let mt = 0;
     if (t.type === 'od') {
@@ -3392,7 +3438,7 @@ const DonsRecus = ({ transactionsGlobales }) => {
     }
     return acc + mt;
   }, 0);
-  const ecartComptable = Math.abs(totalDonsModule - totalGL754);
+  const ecartComptable = Math.abs(stats.total - totalGL754);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -3402,8 +3448,8 @@ const DonsRecus = ({ transactionsGlobales }) => {
         ...formData, montant: parseFloat(formData.montant), recu_emis: false, date_creation: new Date().toISOString()
       });
       alert("Don manuel ajouté avec succès !");
-      setFormData({ nom: '', prenom: '', type: 'Privé', mail: '', adresse: '', date: '', montant: '', provenance: 'Virement', commentaire: '' });
-      setActiveView('base');
+      setFormData({ nom: '', prenom: '', type: 'Privé', frequence: 'Ponctuel', mail: '', adresse: '', date: '', montant: '', provenance: 'Virement', commentaire: '' });
+      setActiveView('dashboard');
     } catch (err) { alert("Erreur lors de l'ajout."); }
   };
 
@@ -3413,33 +3459,34 @@ const DonsRecus = ({ transactionsGlobales }) => {
     }
   };
 
-  // --- MOTEUR D'IMPORTATION HYBRIDE (XLSX HISTORIQUE & CSV HELLOASSO) ---
+  // --- MOTEUR D'IMPORTATION HYBRIDE INTELLIGENT ---
   const handleImport = async (e, isHelloAsso) => {
     const file = e.target.files[0];
     if (!file) return;
     try {
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data, { type: 'array', cellDates: true });
-      // L'historique démarre à la ligne 2 (header: 1 ignore la ligne 0 fusionnée)
       const opts = isHelloAsso ? { defval: '' } : { header: 1, raw: true, defval: '' };
       const rawRows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], opts);
       
-      let count = 0;
-      let doublons = 0;
+      let count = 0; let doublons = 0;
 
       if (isHelloAsso) {
         for (const r of rawRows) {
           const statut = String(r['Statut du paiement'] || '').trim();
-          const type = String(r['Type'] || '').trim();
-          if (statut === 'Payé' && type.includes('Don')) {
+          const typeCampagne = String(r['Type'] || '').trim();
+          if (statut === 'Payé' && typeCampagne.includes('Don')) {
             const mt = parseAmt(r['Montant total']);
             const dateStr = r['Date du paiement'] instanceof Date ? r['Date du paiement'].toISOString().split('T')[0] : r['Date du paiement'];
             const dateF = normaliserDateFR(dateStr);
             const nom = String(r['Nom payeur'] || '').trim();
+            const freq = typeCampagne.toLowerCase().includes('mensuel') ? 'Mensuel' : 'Ponctuel';
+            
             if (mt > 0 && !dons.some(d => d.nom === nom && d.date === dateF && d.montant === mt)) {
                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'dons'), {
                  nom, prenom: r['Prénom payeur'] || '', mail: r['Email payeur'] || '', date: dateF, montant: mt,
-                 provenance: 'HelloAsso', type: 'Privé', adresse: `${r['Adresse payeur'] || ''} ${r['Code Postal payeur'] || ''} ${r['Ville payeur'] || ''}`.trim(), 
+                 provenance: 'HelloAsso', type: 'Privé', frequence: freq,
+                 adresse: `${r['Adresse payeur'] || ''} ${r['Code Postal payeur'] || ''} ${r['Ville payeur'] || ''}`.trim(), 
                  recu_emis: true, date_creation: new Date().toISOString()
                });
                count++;
@@ -3447,9 +3494,10 @@ const DonsRecus = ({ transactionsGlobales }) => {
           }
         }
       } else {
-        // Traitement du format Historique (on enlève la première ligne de headers si indexée avec header: 1)
         const headers = rawRows[0];
         const iNom = headers.indexOf('Nom'); const iSoc = headers.indexOf('Société'); const iMt = headers.indexOf('Montant'); const iDate = headers.indexOf('Date versement');
+        const iFreq = headers.indexOf('Fréquence');
+        
         for (let i = 1; i < rawRows.length; i++) {
           const r = rawRows[i];
           const mt = parseAmt(r[iMt]);
@@ -3457,10 +3505,13 @@ const DonsRecus = ({ transactionsGlobales }) => {
           if (mt > 0 && nom) {
              const dateStr = r[iDate] instanceof Date ? r[iDate].toISOString().split('T')[0] : r[iDate];
              const dateF = normaliserDateFR(dateStr);
+             const freq = iFreq !== -1 && r[iFreq] ? r[iFreq] : 'Ponctuel';
+
              if (!dons.some(d => d.nom === nom && d.date === dateF && d.montant === mt)) {
                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'dons'), {
                  nom, prenom: r[headers.indexOf('Prénom')] || '', mail: r[headers.indexOf('Mail')] || '', date: dateF, montant: mt,
-                 provenance: r[headers.indexOf('Provenance')] || 'Autre', type: r[headers.indexOf('Type')] || 'Privé', adresse: `${r[headers.indexOf('Adresse')] || ''} ${r[headers.indexOf('CP')] || ''} ${r[headers.indexOf('Ville')] || ''}`.trim(), 
+                 provenance: r[headers.indexOf('Provenance')] || 'Autre', type: r[headers.indexOf('Type')] || 'Privé', frequence: freq,
+                 adresse: `${r[headers.indexOf('Adresse')] || ''} ${r[headers.indexOf('CP')] || ''} ${r[headers.indexOf('Ville')] || ''}`.trim(), 
                  recu_emis: r[headers.indexOf('N° Reçu fiscal')] ? true : false, date_creation: new Date().toISOString()
                });
                count++;
@@ -3483,7 +3534,6 @@ const DonsRecus = ({ transactionsGlobales }) => {
     const win = window.open('', '_blank');
     const sigPresident = localStorage.getItem('sig_president') || '';
     const sigTresorier = localStorage.getItem('sig_tresorier') || '';
-
     const isAbandon = don.provenance === 'Abandon de frais';
     const natureCheck = isAbandon ? `<div class="checkbox">X</div><div>Autres (frais engagés par les bénévoles)</div>` : `<div class="checkbox">X</div><div>Numéraire</div>`;
 
@@ -3554,57 +3604,195 @@ const DonsRecus = ({ transactionsGlobales }) => {
     markAsSent(don.id);
   };
 
+  const saveGoal = () => { setBudgetGoal(tempGoal); setIsEditingGoal(false); };
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-10 font-sans">
       <input type="file" accept=".xlsx,.xls" className="hidden" ref={fileInputExcelRef} onChange={(e) => handleImport(e, false)} />
       <input type="file" accept=".csv" className="hidden" ref={fileInputHelloAssoRef} onChange={(e) => handleImport(e, true)} />
 
-      {/* DASHBOARD DONS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-center">
-          <div className="flex justify-between items-start mb-2">
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Objectif Budget {new Date().getFullYear()}</h3>
-            <Target size={20} className="text-indigo-400" />
-          </div>
-          <p className="text-3xl font-black text-slate-800">{formatMontant(totalDonsModule)} €</p>
-          <div className="w-full bg-slate-100 rounded-full h-2 mt-4 overflow-hidden">
-            <div className="bg-indigo-500 h-full rounded-full transition-all duration-1000" style={{ width: `${Math.min((totalDonsModule / budgetGoal) * 100, 100)}%` }}></div>
-          </div>
-          <p className="text-xs text-slate-400 mt-2 font-medium text-right">{((totalDonsModule / budgetGoal) * 100).toFixed(1)}% de {formatMontant(budgetGoal)}€</p>
+      {/* EN-TÊTE ET MENUS */}
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+            <Heart className="text-rose-500" /> Dons & Mécénat
+          </h2>
+          <p className="text-slate-500 text-sm mt-1">Suivi de la collecte, reçus fiscaux et rapprochement comptable.</p>
         </div>
-
-        {/* WIDGET RAPPROCHEMENT COMPTABLE (VITAL) */}
-        <div className={`p-6 rounded-2xl shadow-sm border flex flex-col justify-center ${ecartComptable === 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200 animate-pulse'}`}>
-          <div className="flex justify-between items-start mb-2">
-            <h3 className={`text-xs font-bold uppercase tracking-wider ${ecartComptable === 0 ? 'text-emerald-700' : 'text-rose-700'}`}>Rapprochement (Compte 754)</h3>
-            {ecartComptable === 0 ? <CheckCircle2 size={20} className="text-emerald-500"/> : <AlertTriangle size={20} className="text-rose-500"/>}
-          </div>
-          <p className={`text-2xl font-black ${ecartComptable === 0 ? 'text-emerald-800' : 'text-rose-800'}`}>Écart : {formatMontant(ecartComptable)} €</p>
-          <p className={`text-xs mt-3 font-medium leading-relaxed ${ecartComptable === 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-            {ecartComptable === 0 ? "Félicitations, la somme de vos reçus correspond exactement aux saisies bancaires du Grand Livre." : `Attention ! La base de dons affiche ${formatMontant(totalDonsModule)}€ et le Grand Livre affiche ${formatMontant(totalGL754)}€. Vérifiez vos pointages bancaires.`}
-          </p>
-        </div>
-
-        <div className="bg-slate-900 p-6 rounded-2xl shadow-lg border border-slate-800 flex flex-col justify-center text-white">
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Actions d'Importation</h3>
-          <div className="space-y-3 mt-2">
-            <button onClick={() => fileInputExcelRef.current.click()} className="w-full bg-white/10 hover:bg-white/20 border border-white/20 px-4 py-2.5 rounded-xl text-sm font-bold flex items-center justify-between transition-colors">
-              <span>Importer Historique (Excel)</span> <FileSpreadsheet size={16}/>
-            </button>
-            <button onClick={() => fileInputHelloAssoRef.current.click()} className="w-full bg-emerald-500/20 hover:bg-emerald-500/40 border border-emerald-500/30 text-emerald-100 px-4 py-2.5 rounded-xl text-sm font-bold flex items-center justify-between transition-colors">
-              <span>Import HelloAsso (CSV)</span> <Download size={16}/>
-            </button>
-          </div>
+        <div className="flex bg-slate-100 p-1 rounded-xl">
+          <button onClick={() => setActiveView('dashboard')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'dashboard' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Tableau de Bord & Base</button>
+          <button onClick={() => setActiveView('saisie')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'saisie' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Saisie Manuelle (+)</button>
         </div>
       </div>
 
-      <div className="flex bg-slate-100 p-1 rounded-xl w-fit mx-auto mt-4">
-        <button onClick={() => setActiveView('dashboard')} className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'dashboard' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Base de Données & Reçus</button>
-        <button onClick={() => setActiveView('saisie')} className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'saisie' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Saisie Manuelle (+)</button>
-      </div>
+      {activeView === 'dashboard' && (
+        <div className="space-y-6 animate-fade-in">
+          
+          {/* NOUVEAU TABLEAU DE BORD ÉPURÉ */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8">
+            <div className="flex justify-between items-end border-b border-slate-100 pb-4 mb-6">
+              <div>
+                <h3 className="text-lg font-black text-slate-800">Tableau de bord des donateurs</h3>
+                <p className="text-xs text-slate-500 italic mt-1">Dernière mise à jour : {normaliserDateFR(new Date())}</p>
+              </div>
+            </div>
+
+            {/* KPI PRINCIPAUX */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              
+              <div className="bg-indigo-50/50 p-5 rounded-xl border border-indigo-100 flex flex-col justify-center relative group">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-xs font-bold text-indigo-800 uppercase tracking-wider">Objectif de collecte</span>
+                  <Target size={20} className="text-indigo-400" />
+                </div>
+                {isEditingGoal ? (
+                  <div className="flex items-center gap-2">
+                    <input type="number" value={tempGoal} onChange={(e) => setTempGoal(Number(e.target.value))} className="w-24 border rounded p-1 text-lg font-black text-indigo-900 outline-none" autoFocus />
+                    <button onClick={saveGoal} className="text-xs bg-indigo-600 text-white px-2 py-1 rounded font-bold">OK</button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <p className="text-3xl font-black text-indigo-900">{formatMontant(budgetGoal)} €</p>
+                    <button onClick={() => setIsEditingGoal(true)} className="opacity-0 group-hover:opacity-100 text-indigo-400 hover:text-indigo-600 transition-opacity"><Edit2 size={14}/></button>
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-emerald-50/50 p-5 rounded-xl border border-emerald-100 flex flex-col justify-center">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Dons Actuels</span>
+                  <Euro size={20} className="text-emerald-400" />
+                </div>
+                <p className="text-3xl font-black text-emerald-700">{formatMontant(stats.total)} €</p>
+              </div>
+
+              <div className="bg-rose-50/50 p-5 rounded-xl border border-rose-100 flex flex-col justify-center">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-xs font-bold text-rose-800 uppercase tracking-wider">Reste à collecter</span>
+                  <Clock size={20} className="text-rose-400" />
+                </div>
+                <p className="text-3xl font-black text-rose-700">{formatMontant(resteCollecter)} €</p>
+              </div>
+
+            </div>
+
+            {/* BARRE DE PROGRESSION */}
+            <div className="mb-8">
+              <div className="flex justify-between items-end mb-2">
+                <span className="text-sm font-bold text-slate-700">Progression de l'Objectif :</span>
+                <span className="text-2xl font-black text-indigo-600">{pctProgression}%</span>
+              </div>
+              <div className="w-full bg-slate-100 rounded-full h-4 overflow-hidden shadow-inner">
+                <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 h-full rounded-full transition-all duration-1000" style={{ width: `${pctProgression}%` }}></div>
+              </div>
+              <div className="flex justify-between items-center mt-2 text-xs font-bold text-slate-400">
+                <span>0 €</span>
+                <span>{formatMontant(budgetGoal)} €</span>
+              </div>
+            </div>
+
+            {/* RÉPARTITION DÉTAILLÉE */}
+            <h4 className="text-sm font-bold text-slate-700 mb-4 border-b border-slate-100 pb-2">Répartition des Dons (Actuel : {formatMontant(stats.total)} €)</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              
+              <div className="bg-blue-50/40 p-6 rounded-xl border border-blue-100/60 text-center flex flex-col items-center justify-center">
+                <span className="text-3xl font-black text-blue-700 mb-1">{pctPrive}%</span>
+                <span className="text-sm font-bold text-blue-800 mb-2">Privé ({stats.priveCount} donateurs)</span>
+                <span className="text-[10px] italic text-blue-600/70 mb-4">Inclut {stats.priveReguliers} donateurs réguliers (Mensuel)</span>
+                <span className="text-xl font-black text-slate-800 bg-white px-4 py-1.5 rounded-lg shadow-sm border border-blue-50">{formatMontant(stats.priveTotal)} €</span>
+              </div>
+
+              <div className="bg-emerald-50/40 p-6 rounded-xl border border-emerald-100/60 text-center flex flex-col items-center justify-center">
+                <span className="text-3xl font-black text-emerald-700 mb-1">{pctPro}%</span>
+                <span className="text-sm font-bold text-emerald-800 mb-2">Professionnel ({stats.proCount} donateurs)</span>
+                <span className="text-[10px] italic text-emerald-600/70 mb-4">Inclut {stats.proReguliers} donateur(s) régulier(s) (Mensuel)</span>
+                <span className="text-xl font-black text-slate-800 bg-white px-4 py-1.5 rounded-lg shadow-sm border border-emerald-50">{formatMontant(stats.proTotal)} €</span>
+              </div>
+
+            </div>
+          </div>
+
+          {/* ZONE DE CONTRÔLE COMPTABLE ET IMPORT */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className={`p-6 rounded-2xl shadow-sm border flex flex-col justify-center bg-white ${ecartComptable === 0 ? 'border-l-4 border-l-emerald-500' : 'border-l-4 border-l-rose-500 animate-pulse'}`}>
+              <div className="flex justify-between items-start mb-2">
+                <h3 className={`text-xs font-bold uppercase tracking-wider ${ecartComptable === 0 ? 'text-emerald-700' : 'text-rose-700'}`}>Contrôle Comptable (Compte 754)</h3>
+                {ecartComptable === 0 ? <CheckCircle2 size={20} className="text-emerald-500"/> : <AlertTriangle size={20} className="text-rose-500"/>}
+              </div>
+              <p className={`text-2xl font-black ${ecartComptable === 0 ? 'text-slate-800' : 'text-rose-800'}`}>Écart : {formatMontant(ecartComptable)} €</p>
+              <p className={`text-xs mt-3 font-medium leading-relaxed ${ecartComptable === 0 ? 'text-slate-500' : 'text-rose-600'}`}>
+                {ecartComptable === 0 ? "Félicitations, la somme de vos reçus correspond exactement aux saisies du Grand Livre (754000)." : `Attention ! La base de dons affiche ${formatMontant(stats.total)}€ et le Grand Livre affiche ${formatMontant(totalGL754)}€. Vérifiez vos pointages.`}
+              </p>
+            </div>
+
+            <div className="bg-slate-900 p-6 rounded-2xl shadow-lg border border-slate-800 flex flex-col justify-center text-white">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Actions d'Importation Rapide</h3>
+              <div className="space-y-3">
+                <button onClick={() => fileInputExcelRef.current.click()} className="w-full bg-white/10 hover:bg-white/20 border border-white/20 px-4 py-2.5 rounded-xl text-sm font-bold flex items-center justify-between transition-colors">
+                  <span>Importer Historique (Excel)</span> <FileSpreadsheet size={16}/>
+                </button>
+                <button onClick={() => fileInputHelloAssoRef.current.click()} className="w-full bg-emerald-500/20 hover:bg-emerald-500/40 border border-emerald-500/30 text-emerald-100 px-4 py-2.5 rounded-xl text-sm font-bold flex items-center justify-between transition-colors">
+                  <span>Import HelloAsso (CSV)</span> <Download size={16}/>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* TABLEAU BASE DE DONNÉES */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[10px] sticky top-0 border-b border-slate-200 shadow-sm z-10">
+                  <tr>
+                    <th className="p-4">Date</th>
+                    <th className="p-4">Donateur</th>
+                    <th className="p-4 min-w-[200px]">Coordonnées (Cerfa)</th>
+                    <th className="p-4">Provenance</th>
+                    <th className="p-4 text-right">Montant</th>
+                    <th className="p-4 text-center">Reçu Fiscal</th>
+                    <th className="p-4 text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {dons.map(don => (
+                    <tr key={don.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="p-4 font-mono font-medium text-slate-600 whitespace-nowrap">{normaliserDateFR(don.date)}</td>
+                      <td className="p-4 font-bold text-slate-800">
+                        {don.nom} {don.prenom}
+                        <span className="block mt-1 text-[9px] text-slate-400 font-medium">{don.type} - {don.frequence || 'Ponctuel'}</span>
+                      </td>
+                      <td className="p-4 text-slate-600">
+                        <div className="truncate max-w-[250px]" title={don.adresse}>{don.adresse || <span className="italic text-rose-500 text-[10px]">Adresse manquante</span>}</div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">{don.mail}</div>
+                      </td>
+                      <td className="p-4"><span className="bg-slate-100 px-2 py-1 rounded text-[10px] font-bold text-slate-600 border border-slate-200">{don.provenance}</span></td>
+                      <td className="p-4 text-right font-black text-indigo-700 whitespace-nowrap">{formatMontant(don.montant)} €</td>
+                      <td className="p-4 text-center">
+                        {don.provenance === 'HelloAsso' ? (
+                          <span className="bg-emerald-50 text-emerald-600 px-2 py-1 rounded text-[10px] font-bold border border-emerald-100">Géré par HelloAsso</span>
+                        ) : don.recu_emis ? (
+                          <span className="bg-purple-50 text-purple-700 px-2 py-1 rounded text-[10px] font-bold flex items-center justify-center gap-1 w-fit mx-auto border border-purple-100"><CheckCircle2 size={12}/> Émis</span>
+                        ) : (
+                          <button onClick={() => generateCerfaDon(don)} className="bg-indigo-600 text-white hover:bg-indigo-700 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors shadow-sm flex items-center justify-center gap-1 mx-auto active:scale-95">
+                            <FileSignature size={12}/> Créer Cerfa
+                          </button>
+                        )}
+                      </td>
+                      <td className="p-4 text-center">
+                        <button onClick={() => handleDelete(don.id)} className="text-slate-300 hover:text-rose-600 p-1.5 rounded-lg transition-colors"><Trash2 size={16}/></button>
+                      </td>
+                    </tr>
+                  ))}
+                  {dons.length === 0 && <tr><td colSpan="7" className="p-10 text-center text-slate-400 italic">Aucun don enregistré. Importez un fichier ou saisissez manuellement.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {activeView === 'saisie' && (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 max-w-2xl mx-auto animate-fade-in">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 max-w-2xl mx-auto animate-fade-in mt-4">
           <h3 className="font-black text-lg text-slate-800 mb-6 border-b border-slate-100 pb-4">Enregistrer un nouveau don (Chèque/Virement/Espèces)</h3>
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="grid grid-cols-2 gap-4">
@@ -3617,10 +3805,27 @@ const DonsRecus = ({ transactionsGlobales }) => {
                 <input type="text" value={formData.prenom} onChange={e => setFormData({...formData, prenom: e.target.value})} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
               </div>
             </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Type</label>
+                <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option value="Privé">Privé</option><option value="Professionnel">Professionnel</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Fréquence</label>
+                <select value={formData.frequence} onChange={e => setFormData({...formData, frequence: e.target.value})} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option value="Ponctuel">Ponctuel</option><option value="Mensuel">Mensuel</option>
+                </select>
+              </div>
+            </div>
+
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Adresse Postale * (Pour le Cerfa)</label>
               <input type="text" required value={formData.adresse} onChange={e => setFormData({...formData, adresse: e.target.value})} placeholder="Ex: 12 rue de la Paix, 38110 La Tour-du-Pin" className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
             </div>
+            
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Montant (€) *</label>
@@ -3631,6 +3836,7 @@ const DonsRecus = ({ transactionsGlobales }) => {
                 <input type="date" required value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
               </div>
             </div>
+            
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Provenance</label>
@@ -3643,62 +3849,11 @@ const DonsRecus = ({ transactionsGlobales }) => {
                 <input type="email" value={formData.mail} onChange={e => setFormData({...formData, mail: e.target.value})} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
               </div>
             </div>
+            
             <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 rounded-xl font-bold transition-all shadow-md active:scale-95 flex items-center justify-center gap-2">
               <PlusCircle size={18}/> Enregistrer dans la base
             </button>
           </form>
-        </div>
-      )}
-
-      {activeView === 'dashboard' && (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden animate-fade-in">
-          <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[10px] sticky top-0 border-b border-slate-200 shadow-sm z-10">
-                <tr>
-                  <th className="p-4">Date</th>
-                  <th className="p-4">Donateur</th>
-                  <th className="p-4 min-w-[200px]">Coordonnées (Cerfa)</th>
-                  <th className="p-4">Provenance</th>
-                  <th className="p-4 text-right">Montant</th>
-                  <th className="p-4 text-center">Reçu Fiscal</th>
-                  <th className="p-4 text-center">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {dons.map(don => (
-                  <tr key={don.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="p-4 font-mono font-medium text-slate-600 whitespace-nowrap">{normaliserDateFR(don.date)}</td>
-                    <td className="p-4 font-bold text-slate-800">
-                      {don.nom} {don.prenom}
-                      <span className="block mt-1 text-[9px] text-slate-400 font-medium">{don.type}</span>
-                    </td>
-                    <td className="p-4 text-slate-600">
-                      <div className="truncate max-w-[250px]" title={don.adresse}>{don.adresse || <span className="italic text-rose-500 text-[10px]">Adresse manquante</span>}</div>
-                      <div className="text-[10px] text-slate-400 mt-0.5">{don.mail}</div>
-                    </td>
-                    <td className="p-4"><span className="bg-slate-100 px-2 py-1 rounded text-[10px] font-bold text-slate-600 border border-slate-200">{don.provenance}</span></td>
-                    <td className="p-4 text-right font-black text-indigo-700 whitespace-nowrap">{formatMontant(don.montant)} €</td>
-                    <td className="p-4 text-center">
-                      {don.provenance === 'HelloAsso' ? (
-                        <span className="bg-emerald-50 text-emerald-600 px-2 py-1 rounded text-[10px] font-bold border border-emerald-100">Géré par HelloAsso</span>
-                      ) : don.recu_emis ? (
-                        <span className="bg-purple-50 text-purple-700 px-2 py-1 rounded text-[10px] font-bold flex items-center justify-center gap-1 w-fit mx-auto border border-purple-100"><CheckCircle2 size={12}/> Émis</span>
-                      ) : (
-                        <button onClick={() => generateCerfaDon(don)} className="bg-indigo-600 text-white hover:bg-indigo-700 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors shadow-sm flex items-center justify-center gap-1 mx-auto active:scale-95">
-                          <FileSignature size={12}/> Créer Cerfa
-                        </button>
-                      )}
-                    </td>
-                    <td className="p-4 text-center">
-                      <button onClick={() => handleDelete(don.id)} className="text-slate-300 hover:text-rose-600 p-1.5 rounded-lg transition-colors"><Trash2 size={16}/></button>
-                    </td>
-                  </tr>
-                ))}
-                {dons.length === 0 && <tr><td colSpan="7" className="p-10 text-center text-slate-400 italic">Aucun don enregistré.</td></tr>}
-              </tbody>
-            </table>
-          </div>
         </div>
       )}
     </div>
