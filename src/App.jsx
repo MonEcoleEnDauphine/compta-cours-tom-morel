@@ -5,7 +5,7 @@ import {
   Download, Trash2, XCircle, Search, ChevronRight, CheckCircle2, 
   Paperclip, Plus, Sparkles, Receipt, Heart, FileSpreadsheet, 
   Package, Target, TrendingUp, Info, Euro, ChevronDown, 
-  Globe, Mail, Phone, PlusCircle, Edit2, Send, Clock, Hammer, Menu
+  Globe, Mail, Phone, PlusCircle, Edit2, Send, Clock, Hammer, Menu, Megaphone, Bell
 } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
@@ -3860,11 +3860,191 @@ const DonsRecus = ({ transactionsGlobales }) => {
   );
 };
 
+// --- MODULE : ACCUEIL FAMILLE (Tableau de Bord Parents) ---
+const AccueilFamille = () => {
+  const [dons, setDons] = useState([]);
+  const budgetGoal = 58724; // L'objectif que vous aviez fixé
+
+  // Récupération des dons en temps réel pour la jauge
+  useEffect(() => {
+    const q = collection(db, 'artifacts', appId, 'public', 'data', 'dons');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const liste = [];
+      snapshot.forEach((doc) => { liste.push({ id: doc.id, ...doc.data() }); });
+      setDons(liste);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Calculs pour la jauge
+  const totalDons = dons.reduce((acc, d) => acc + (Number(d.montant) || 0), 0);
+  const pctProgression = budgetGoal > 0 ? Math.min((totalDons / budgetGoal) * 100, 100).toFixed(2) : 0;
+  const resteCollecter = Math.max(0, budgetGoal - totalDons);
+  const formatMontant = (val) => new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val || 0);
+
+  // Données fictives (Trombinoscope)
+  const equipe = [
+    { nom: "Laurence Gérard", role: "Direction", img: "https://ui-avatars.com/api/?name=Laurence+Gérard&background=4f46e5&color=fff&size=128" },
+    { nom: "Cécile Sublet", role: "Enseignante", img: "https://ui-avatars.com/api/?name=Cécile+Sublet&background=0ea5e9&color=fff&size=128" },
+    { nom: "Florence", role: "Enseignante", img: "https://ui-avatars.com/api/?name=Florence&background=10b981&color=fff&size=128" },
+    { nom: "Laurent Fauvain", role: "Président Asso.", img: "https://ui-avatars.com/api/?name=Laurent+Fauvain&background=8b5cf6&color=fff&size=128" },
+    { nom: "L. Le Lezec", role: "Trésorier", img: "https://ui-avatars.com/api/?name=Le+Lezec&background=f59e0b&color=fff&size=128" },
+  ];
+
+  return (
+    <div className="space-y-6 max-w-7xl mx-auto pb-10 font-sans animate-fade-in">
+      
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-8 rounded-2xl shadow-md text-white flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-black mb-2">Bienvenue sur le portail Familles</h1>
+          <p className="text-blue-100 text-sm">Toutes les informations, plannings et actualités du Cours Tom Morel centralisées ici.</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* COLONNE GAUCHE (Plus large) */}
+        <div className="lg:col-span-2 space-y-6">
+          
+          {/* ACTUALITÉS */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
+              <Megaphone className="text-indigo-500" size={20} /> Le mot de l'équipe
+            </h2>
+            <div className="bg-indigo-50/50 border border-indigo-100 p-4 rounded-xl">
+              <h3 className="font-bold text-indigo-900 mb-2">Préparation de la rentrée 2026/2027</h3>
+              <p className="text-sm text-slate-600 leading-relaxed">
+                Chers parents, nous sommes impatients de retrouver vos enfants. N'oubliez pas de vérifier vos plannings de ménage et de cantine dans le menu de gauche. Les fournitures scolaires ont été commandées.
+              </p>
+              <p className="text-xs text-slate-400 mt-3 text-right">Publié par La Direction, hier à 14:30</p>
+            </div>
+          </div>
+
+          {/* JAUGE DES DONS (Design type HelloAsso/Dashboard) */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
+              <Target className="text-rose-500" size={20} /> Objectif de la Période 2025/2026
+            </h2>
+            
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-center">
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Objectif</span>
+                <p className="text-xl font-black text-indigo-600">{formatMontant(budgetGoal)} €</p>
+              </div>
+              <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 text-center">
+                <span className="text-[10px] font-bold text-emerald-600 uppercase">Dons Actuels</span>
+                <p className="text-xl font-black text-emerald-700">{formatMontant(totalDons)} €</p>
+              </div>
+              <div className="bg-rose-50 p-4 rounded-xl border border-rose-100 text-center">
+                <span className="text-[10px] font-bold text-rose-600 uppercase">Reste à collecter</span>
+                <p className="text-xl font-black text-rose-700">{formatMontant(resteCollecter)} €</p>
+              </div>
+            </div>
+
+            <div className="mb-2 flex justify-between items-end">
+              <span className="text-xs font-bold text-slate-500">Progression de l'Objectif :</span>
+              <span className="text-xl font-black text-indigo-600">{pctProgression}%</span>
+            </div>
+            <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden shadow-inner">
+              <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 h-full rounded-full transition-all duration-1000" style={{ width: `${pctProgression}%` }}></div>
+            </div>
+            <div className="flex justify-between items-center mt-2 text-[10px] font-bold text-slate-400">
+              <span>0 €</span>
+              <span>{formatMontant(budgetGoal)} €</span>
+            </div>
+          </div>
+
+          {/* TROMBINOSCOPE */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
+              <Users className="text-emerald-500" size={20} /> L'équipe (Trombinoscope)
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+              {equipe.map((membre, idx) => (
+                <div key={idx} className="flex flex-col items-center p-3 hover:bg-slate-50 rounded-xl transition-colors text-center border border-transparent hover:border-slate-100">
+                  <img src={membre.img} alt={membre.nom} className="w-16 h-16 rounded-full shadow-sm mb-3 border-2 border-white" />
+                  <span className="text-sm font-bold text-slate-800 leading-tight">{membre.nom}</span>
+                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mt-1">{membre.role}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+        </div>
+
+        {/* COLONNE DROITE (Plus fine) */}
+        <div className="space-y-6">
+          
+          {/* RAPPELS RAPIDES */}
+          <div className="bg-white rounded-2xl shadow-sm border border-rose-100 p-6 bg-gradient-to-b from-white to-rose-50/30">
+            <h2 className="text-sm font-bold text-rose-800 flex items-center gap-2 mb-4 border-b border-rose-100 pb-3">
+              <Bell className="text-rose-500" size={18} /> Rappels importants
+            </h2>
+            <ul className="space-y-3">
+              <li className="flex items-start gap-2 text-sm text-slate-600 bg-white p-3 rounded-xl border border-rose-100 shadow-sm">
+                <div className="w-1.5 h-1.5 rounded-full bg-rose-500 mt-1.5 shrink-0"></div>
+                <span>Merci de remplir les <b>fiches travaux</b> avant le 15 Septembre.</span>
+              </li>
+              <li className="flex items-start gap-2 text-sm text-slate-600 bg-white p-3 rounded-xl border border-rose-100 shadow-sm">
+                <div className="w-1.5 h-1.5 rounded-full bg-rose-500 mt-1.5 shrink-0"></div>
+                <span>Pensez à vérifier vos créneaux pour le <b>ménage du week-end</b>.</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* ÉVÉNEMENTS */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
+              <Calendar className="text-blue-500" size={18} /> Prochains événements
+            </h2>
+            <div className="space-y-4">
+              <div className="flex gap-4 items-center group">
+                <div className="bg-blue-50 text-blue-700 px-3 py-2 rounded-xl text-center min-w-[50px] group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                  <span className="block text-xs font-bold uppercase">Sep</span>
+                  <span className="block text-lg font-black">12</span>
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-800">Réunion de Rentrée</h4>
+                  <p className="text-xs text-slate-500 mt-0.5">18h30 - Salles de classe</p>
+                </div>
+              </div>
+              <div className="flex gap-4 items-center group">
+                <div className="bg-blue-50 text-blue-700 px-3 py-2 rounded-xl text-center min-w-[50px] group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                  <span className="block text-xs font-bold uppercase">Oct</span>
+                  <span className="block text-lg font-black">20</span>
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-800">Cross de l'école</h4>
+                  <p className="text-xs text-slate-500 mt-0.5">Matinée - Stade municipal</p>
+                </div>
+              </div>
+              <div className="flex gap-4 items-center group">
+                <div className="bg-blue-50 text-blue-700 px-3 py-2 rounded-xl text-center min-w-[50px] group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                  <span className="block text-xs font-bold uppercase">Déc</span>
+                  <span className="block text-lg font-black">15</span>
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-800">Fête de Noël</h4>
+                  <p className="text-xs text-slate-500 mt-0.5">16h00 - Cour de récréation</p>
+                </div>
+              </div>
+            </div>
+            <button className="w-full mt-5 bg-slate-50 hover:bg-slate-100 text-slate-600 py-2 rounded-xl text-xs font-bold transition-colors">
+              Voir tout l'agenda
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function App() {
   // 1. On lit l'URL pour voir si on ouvre un nouvel onglet sur un module précis
-  const [activeTab, setActiveTab] = useState(() => {
+const [activeTab, setActiveTab] = useState(() => {
     const hash = window.location.hash.replace('#', '');
-    return hash || 'tableau_bord'; // Par défaut, on ouvre le tableau de bord
+    return hash || 'accueil_famille'; 
   });
   
   const [transactionsGlobales, setTransactionsGlobales] = useState([]);
@@ -3903,12 +4083,12 @@ export default function App() {
 
   const renderContent = () => {
     switch (activeTab) {
+      case 'accueil_famille': return <AccueilFamille />;
       case 'contact': return <InfosContact />;
       case 'etat_financier': return <EtatFinancier transactionsGlobales={transactionsGlobales} />;
       case 'grand_livre': return <GrandLivre transactionsGlobales={transactionsGlobales} />;
       case 'plan_comptable': return <PlanComptable />;
       case 'tableau_bord': return <TableauBord transactionsGlobales={transactionsGlobales} />;
-        
       case 'scolarite': return <PlaceholderPage title="Scolarité" />;
       case 'factures_parents': return <PlaceholderPage title="Mes Factures (Parents)" />;
       case 'menage_weekend': return <PlaceholderPage title="Planning : Ménage Week-end" />;
@@ -3950,6 +4130,9 @@ export default function App() {
         <nav className="flex-1 overflow-y-auto py-4 px-3 custom-scrollbar">
           <div className="mb-6">
             <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Espace Famille</h3>
+            <a href="#accueil_famille" onClick={() => handleNavigation('accueil_famille')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'accueil_famille' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
+              <LayoutDashboard size={18} /> Accueil
+            </a>
             <a href="#contact" onClick={() => handleNavigation('contact')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'contact' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
               <Info size={18} /> Infos & Contact
             </a>
@@ -3960,7 +4143,7 @@ export default function App() {
               <Receipt size={18} /> Mes Factures
             </a>
           </div>
-
+          
           <div className="mb-6">
             <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Plannings Parents</h3>
             <a href="#menage_weekend" onClick={() => handleNavigation('menage_weekend')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'menage_weekend' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
