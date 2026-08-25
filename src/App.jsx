@@ -3352,10 +3352,10 @@ const DonsRecus = ({ transactionsGlobales }) => {
   const [activeView, setActiveView] = useState('dashboard');
   const [dons, setDons] = useState([]);
   
-  // NOUVEAU : Filtre de période
+  // Filtre de période
   const [anneeFiltre, setAnneeFiltre] = useState('TOTAL');
 
-  // Objectif de dons modifiable
+  // Objectif de dons modifiable (Appliqué comme référence annuelle)
   const [budgetGoal, setBudgetGoal] = useState(58724);
   const [isEditingGoal, setIsEditingGoal] = useState(false);
   const [tempGoal, setTempGoal] = useState(58724);
@@ -3387,7 +3387,6 @@ const DonsRecus = ({ transactionsGlobales }) => {
     return parseFloat(s) || 0;
   };
 
-  // NOUVEAU : Extracteur d'année scolaire robuste
   const extractExercice = (dateStr) => {
     if (!dateStr) return null;
     const str = String(dateStr).trim();
@@ -3404,24 +3403,35 @@ const DonsRecus = ({ transactionsGlobales }) => {
     }
     if (m && y) {
       if (y < 100) y += 2000;
-      return m >= 9 ? y : y - 1; // Septembre (9) bascule sur la nouvelle saison
+      return m >= 9 ? y : y - 1;
     }
     return null;
   };
 
-  // NOUVEAU : Application du filtre sur les Dons
   const filteredDons = useMemo(() => {
     if (anneeFiltre === 'TOTAL') return dons;
     return dons.filter(d => extractExercice(d.date) === Number(anneeFiltre));
   }, [dons, anneeFiltre]);
 
-  // NOUVEAU : Application du filtre sur le Grand Livre
   const filteredTx = useMemo(() => {
     if (anneeFiltre === 'TOTAL') return transactionsGlobales;
     return (transactionsGlobales || []).filter(t => extractExercice(t.date) === Number(anneeFiltre));
   }, [transactionsGlobales, anneeFiltre]);
 
-  // --- STATISTIQUES ET CLASSEMENT (Utilise les données filtrées) ---
+  // NOUVEAU : Statistiques annuelles (Pour la vue TOTAL)
+  const yearlyStats = useMemo(() => {
+    const statsObj = { 2021: 0, 2022: 0, 2023: 0, 2024: 0, 2025: 0, 2026: 0 };
+    dons.forEach(d => {
+      const ex = extractExercice(d.date);
+      if (ex && statsObj[ex] !== undefined) {
+        statsObj[ex] += (Number(d.montant) || 0);
+      }
+    });
+    return Object.entries(statsObj)
+      .map(([year, total]) => ({ year: Number(year), total }))
+      .sort((a, b) => b.year - a.year); // Du plus récent au plus ancien
+  }, [dons]);
+
   const stats = useMemo(() => {
     let priveTotal = 0; let proTotal = 0;
     const priveDonors = new Set(); const proDonors = new Set();
@@ -3460,7 +3470,7 @@ const DonsRecus = ({ transactionsGlobales }) => {
   const pctPrive = stats.total > 0 ? ((stats.priveTotal / stats.total) * 100).toFixed(0) : 0;
   const pctPro = stats.total > 0 ? ((stats.proTotal / stats.total) * 100).toFixed(0) : 0;
 
-  // --- RAPPROCHEMENT COMPTABLE (Compte 754000 filtré) ---
+  // --- RAPPROCHEMENT COMPTABLE (Compte 754000) ---
   const totalGL754 = filteredTx.reduce((acc, t) => {
     let mt = 0;
     if (t.type === 'od') {
@@ -3509,7 +3519,6 @@ const DonsRecus = ({ transactionsGlobales }) => {
             const nom = String(r['Nom payeur'] || '').trim();
             const freq = typeCampagne.toLowerCase().includes('mensuel') ? 'Mensuel' : 'Ponctuel';
             
-            // On vérifie les doublons dans TOUTE la base (dons), pas seulement filtrée
             if (mt > 0 && !dons.some(d => d.nom === nom && d.date === dateF && d.montant === mt)) {
                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'dons'), {
                  nom, prenom: r['Prénom payeur'] || '', mail: r['Email payeur'] || '', date: dateF, montant: mt, provenance: 'HelloAsso', type: 'Privé', frequence: freq, apporteur: '',
@@ -3662,56 +3671,88 @@ const DonsRecus = ({ transactionsGlobales }) => {
       {activeView === 'dashboard' && (
         <div className="space-y-4 animate-fade-in">
           
-          {/* MINI DASHBOARD COMPACT DONS */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-4 border-b border-slate-100 pb-4">
-               <div className="flex flex-wrap items-center gap-4 md:gap-6">
-                  <div>
-                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1"><Target size={12}/> Objectif</p>
-                     {isEditingGoal ? (
-                        <div className="flex items-center gap-2">
-                          <input type="number" value={tempGoal} onChange={(e) => setTempGoal(Number(e.target.value))} className="w-24 border border-indigo-200 rounded px-2 py-0.5 text-sm font-black text-indigo-900 outline-none" autoFocus />
-                          <button onClick={saveGoal} className="text-[10px] bg-indigo-600 text-white px-2 py-1 rounded font-bold hover:bg-indigo-700">OK</button>
+          {/* AFFICHAGE CONDITIONNEL : HISTORIQUE vs ANNÉE SPÉCIFIQUE */}
+          {anneeFiltre === 'TOTAL' ? (
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8">
+              <div className="flex justify-between items-end border-b border-slate-100 pb-4 mb-6">
+                <div>
+                  <h3 className="text-lg font-black text-slate-800">Historique des collectes par saison</h3>
+                  <p className="text-xs text-slate-500 italic mt-1">Comparaison des dons reçus année par année</p>
+                </div>
+              </div>
+              <div className="space-y-6">
+                {yearlyStats.map(stat => {
+                  const pct = budgetGoal > 0 ? Math.min((stat.total / budgetGoal) * 100, 100).toFixed(1) : 0;
+                  return (
+                    <div key={stat.year} className="group">
+                      <div className="flex justify-between items-end mb-1">
+                        <span className="text-sm font-bold text-slate-700 group-hover:text-indigo-600 transition-colors">Saison {stat.year}-{stat.year + 1}</span>
+                        <div className="text-right">
+                          <span className="text-lg font-black text-emerald-600">{formatMontant(stat.total)} €</span>
+                          <span className="text-xs text-slate-400 ml-1">/ obj. {formatMontant(budgetGoal)} €</span>
                         </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <p className="text-xl font-black text-indigo-900">{formatMontant(budgetGoal)} €</p>
-                          <button onClick={() => setIsEditingGoal(true)} className="text-indigo-300 hover:text-indigo-600 transition-colors"><Edit2 size={12}/></button>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-black text-indigo-600 w-12 text-right">{pct}%</span>
+                        <div className="flex-1 bg-slate-100 rounded-full h-3 overflow-hidden shadow-inner">
+                          <div className="bg-gradient-to-r from-indigo-400 to-indigo-600 h-full rounded-full transition-all duration-1000" style={{ width: `${pct}%` }}></div>
                         </div>
-                      )}
-                  </div>
-                  <div className="hidden md:block h-8 w-px bg-slate-200"></div>
-                  <div>
-                     <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1 flex items-center gap-1"><Euro size={12}/> Collectés</p>
-                     <p className="text-xl font-black text-emerald-700">{formatMontant(stats.total)} €</p>
-                  </div>
-                  <div className="hidden md:block h-8 w-px bg-slate-200"></div>
-                  <div>
-                     <p className="text-[10px] font-bold text-rose-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Clock size={12}/> Reste</p>
-                     <p className="text-xl font-black text-rose-600">{formatMontant(resteCollecter)} €</p>
-                  </div>
-               </div>
-               
-               <div className="flex gap-6 text-right border-t md:border-t-0 pt-3 md:pt-0 border-slate-100 w-full md:w-auto justify-end">
-                  <div className="bg-blue-50/50 px-3 py-1.5 rounded-lg border border-blue-100/50">
-                     <p className="text-[9px] font-bold text-blue-600 uppercase">Privé ({pctPrive}%)</p>
-                     <p className="text-sm font-black text-slate-800">{formatMontant(stats.priveTotal)} €</p>
-                  </div>
-                  <div className="bg-emerald-50/50 px-3 py-1.5 rounded-lg border border-emerald-100/50">
-                     <p className="text-[9px] font-bold text-emerald-600 uppercase">Pro ({pctPro}%)</p>
-                     <p className="text-sm font-black text-slate-800">{formatMontant(stats.proTotal)} €</p>
-                  </div>
-               </div>
-            </div>
-            
-            {/* Barre de progression */}
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-black text-indigo-600 w-12 text-right">{pctProgression}%</span>
-              <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden shadow-inner">
-                <div className="bg-gradient-to-r from-indigo-400 to-indigo-600 h-full rounded-full transition-all duration-1000" style={{ width: `${pctProgression}%` }}></div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+              <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-4 border-b border-slate-100 pb-4">
+                 <div className="flex flex-wrap items-center gap-4 md:gap-6">
+                    <div>
+                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1"><Target size={12}/> Objectif</p>
+                       {isEditingGoal ? (
+                          <div className="flex items-center gap-2">
+                            <input type="number" value={tempGoal} onChange={(e) => setTempGoal(Number(e.target.value))} className="w-24 border border-indigo-200 rounded px-2 py-0.5 text-sm font-black text-indigo-900 outline-none" autoFocus />
+                            <button onClick={saveGoal} className="text-[10px] bg-indigo-600 text-white px-2 py-1 rounded font-bold hover:bg-indigo-700">OK</button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <p className="text-xl font-black text-indigo-900">{formatMontant(budgetGoal)} €</p>
+                            <button onClick={() => setIsEditingGoal(true)} className="text-indigo-300 hover:text-indigo-600 transition-colors"><Edit2 size={12}/></button>
+                          </div>
+                        )}
+                    </div>
+                    <div className="hidden md:block h-8 w-px bg-slate-200"></div>
+                    <div>
+                       <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1 flex items-center gap-1"><Euro size={12}/> Collectés</p>
+                       <p className="text-xl font-black text-emerald-700">{formatMontant(stats.total)} €</p>
+                    </div>
+                    <div className="hidden md:block h-8 w-px bg-slate-200"></div>
+                    <div>
+                       <p className="text-[10px] font-bold text-rose-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Clock size={12}/> Reste</p>
+                       <p className="text-xl font-black text-rose-600">{formatMontant(resteCollecter)} €</p>
+                    </div>
+                 </div>
+                 
+                 <div className="flex gap-6 text-right border-t md:border-t-0 pt-3 md:pt-0 border-slate-100 w-full md:w-auto justify-end">
+                    <div className="bg-blue-50/50 px-3 py-1.5 rounded-lg border border-blue-100/50">
+                       <p className="text-[9px] font-bold text-blue-600 uppercase">Privé ({pctPrive}%)</p>
+                       <p className="text-sm font-black text-slate-800">{formatMontant(stats.priveTotal)} €</p>
+                    </div>
+                    <div className="bg-emerald-50/50 px-3 py-1.5 rounded-lg border border-emerald-100/50">
+                       <p className="text-[9px] font-bold text-emerald-600 uppercase">Pro ({pctPro}%)</p>
+                       <p className="text-sm font-black text-slate-800">{formatMontant(stats.proTotal)} €</p>
+                    </div>
+                 </div>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-black text-indigo-600 w-12 text-right">{pctProgression}%</span>
+                <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden shadow-inner">
+                  <div className="bg-gradient-to-r from-indigo-400 to-indigo-600 h-full rounded-full transition-all duration-1000" style={{ width: `${pctProgression}%` }}></div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* WIDGETS D'ADMINISTRATION COMPACTS */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
