@@ -3347,6 +3347,364 @@ const NotesFrais = ({ transactionsGlobales }) => {
   );
 };
 
+// --- MODULE : DONS & REÇUS FISCAUX ---
+const DonsRecus = ({ transactionsGlobales }) => {
+  const [activeView, setActiveView] = useState('dashboard');
+  const [dons, setDons] = useState([]);
+  const [budgetGoal, setBudgetGoal] = useState(25000); 
+
+  const [formData, setFormData] = useState({
+    nom: '', prenom: '', type: 'Privé', mail: '', adresse: '', date: '', montant: '', provenance: 'Virement', commentaire: ''
+  });
+
+  const fileInputExcelRef = useRef(null);
+  const fileInputHelloAssoRef = useRef(null);
+
+  useEffect(() => {
+    const q = collection(db, 'artifacts', appId, 'public', 'data', 'dons');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const liste = [];
+      snapshot.forEach((doc) => { liste.push({ id: doc.id, ...doc.data() }); });
+      liste.sort((a, b) => new Date(b.date_creation) - new Date(a.date_creation));
+      setDons(liste);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const parseAmt = (rawVal) => {
+    if (!rawVal) return 0;
+    if (typeof rawVal === 'number') return rawVal;
+    let s = String(rawVal).replace(/[\s\u00A0\u202F€]/g, '');
+    if (s.includes(',') && s.includes('.')) s = s.indexOf(',') < s.indexOf('.') ? s.replace(/,/g, '') : s.replace(/\./g, '').replace(',', '.');
+    else if (s.includes(',')) s = s.replace(/,/g, '.');
+    return parseFloat(s) || 0;
+  };
+
+  // --- RAPPROCHEMENT COMPTABLE (Vérifie l'équilibre avec le compte 754000) ---
+  const totalDonsModule = dons.reduce((acc, d) => acc + (Number(d.montant) || 0), 0);
+  const totalGL754 = transactionsGlobales.reduce((acc, t) => {
+    let mt = 0;
+    if (t.type === 'od') {
+      if (t.compteCredit && String(t.compteCredit).startsWith('754')) mt += Math.abs(t.montant);
+      if (t.compteDebit && String(t.compteDebit).startsWith('754')) mt -= Math.abs(t.montant);
+    } else {
+      if (String(t.compte).startsWith('754')) mt += (t.montant > 0 ? Math.abs(t.montant) : -Math.abs(t.montant));
+    }
+    return acc + mt;
+  }, 0);
+  const ecartComptable = Math.abs(totalDonsModule - totalGL754);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.nom || !formData.date || !formData.montant) return alert("Nom, Date et Montant requis.");
+    try {
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'dons'), {
+        ...formData, montant: parseFloat(formData.montant), recu_emis: false, date_creation: new Date().toISOString()
+      });
+      alert("Don manuel ajouté avec succès !");
+      setFormData({ nom: '', prenom: '', type: 'Privé', mail: '', adresse: '', date: '', montant: '', provenance: 'Virement', commentaire: '' });
+      setActiveView('base');
+    } catch (err) { alert("Erreur lors de l'ajout."); }
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm("Supprimer ce don de la base ?")) {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'dons', id));
+    }
+  };
+
+  // --- MOTEUR D'IMPORTATION HYBRIDE (XLSX HISTORIQUE & CSV HELLOASSO) ---
+  const handleImport = async (e, isHelloAsso) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+      // L'historique démarre à la ligne 2 (header: 1 ignore la ligne 0 fusionnée)
+      const opts = isHelloAsso ? { defval: '' } : { header: 1, raw: true, defval: '' };
+      const rawRows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], opts);
+      
+      let count = 0;
+      let doublons = 0;
+
+      if (isHelloAsso) {
+        for (const r of rawRows) {
+          const statut = String(r['Statut du paiement'] || '').trim();
+          const type = String(r['Type'] || '').trim();
+          if (statut === 'Payé' && type.includes('Don')) {
+            const mt = parseAmt(r['Montant total']);
+            const dateStr = r['Date du paiement'] instanceof Date ? r['Date du paiement'].toISOString().split('T')[0] : r['Date du paiement'];
+            const dateF = normaliserDateFR(dateStr);
+            const nom = String(r['Nom payeur'] || '').trim();
+            if (mt > 0 && !dons.some(d => d.nom === nom && d.date === dateF && d.montant === mt)) {
+               await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'dons'), {
+                 nom, prenom: r['Prénom payeur'] || '', mail: r['Email payeur'] || '', date: dateF, montant: mt,
+                 provenance: 'HelloAsso', type: 'Privé', adresse: `${r['Adresse payeur'] || ''} ${r['Code Postal payeur'] || ''} ${r['Ville payeur'] || ''}`.trim(), 
+                 recu_emis: true, date_creation: new Date().toISOString()
+               });
+               count++;
+            } else { doublons++; }
+          }
+        }
+      } else {
+        // Traitement du format Historique (on enlève la première ligne de headers si indexée avec header: 1)
+        const headers = rawRows[0];
+        const iNom = headers.indexOf('Nom'); const iSoc = headers.indexOf('Société'); const iMt = headers.indexOf('Montant'); const iDate = headers.indexOf('Date versement');
+        for (let i = 1; i < rawRows.length; i++) {
+          const r = rawRows[i];
+          const mt = parseAmt(r[iMt]);
+          const nom = String(r[iNom] || r[iSoc] || '').trim();
+          if (mt > 0 && nom) {
+             const dateStr = r[iDate] instanceof Date ? r[iDate].toISOString().split('T')[0] : r[iDate];
+             const dateF = normaliserDateFR(dateStr);
+             if (!dons.some(d => d.nom === nom && d.date === dateF && d.montant === mt)) {
+               await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'dons'), {
+                 nom, prenom: r[headers.indexOf('Prénom')] || '', mail: r[headers.indexOf('Mail')] || '', date: dateF, montant: mt,
+                 provenance: r[headers.indexOf('Provenance')] || 'Autre', type: r[headers.indexOf('Type')] || 'Privé', adresse: `${r[headers.indexOf('Adresse')] || ''} ${r[headers.indexOf('CP')] || ''} ${r[headers.indexOf('Ville')] || ''}`.trim(), 
+                 recu_emis: r[headers.indexOf('N° Reçu fiscal')] ? true : false, date_creation: new Date().toISOString()
+               });
+               count++;
+             } else { doublons++; }
+          }
+        }
+      }
+      alert(`${count} dons importés avec succès ! (${doublons} doublons ignorés)`);
+      if (fileInputExcelRef.current) fileInputExcelRef.current.value = '';
+      if (fileInputHelloAssoRef.current) fileInputHelloAssoRef.current.value = '';
+    } catch(e) { alert("Erreur d'importation du fichier."); }
+  };
+
+  const markAsSent = async (id) => {
+    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'dons', id), { recu_emis: true });
+  };
+
+  const generateCerfaDon = (don) => {
+    if (!don.adresse || don.adresse.length < 5) return alert("L'adresse postale est obligatoire pour générer un Cerfa.");
+    const win = window.open('', '_blank');
+    const sigPresident = localStorage.getItem('sig_president') || '';
+    const sigTresorier = localStorage.getItem('sig_tresorier') || '';
+
+    const isAbandon = don.provenance === 'Abandon de frais';
+    const natureCheck = isAbandon ? `<div class="checkbox">X</div><div>Autres (frais engagés par les bénévoles)</div>` : `<div class="checkbox">X</div><div>Numéraire</div>`;
+
+    const html = `
+      <html>
+        <head>
+          <title>Cerfa - ${don.nom}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; color: #000; font-size: 13px; max-width: 800px; margin: 0 auto; }
+            .box { border: 1px solid #000; padding: 15px; margin-bottom: 15px; }
+            h1 { font-size: 16px; text-align: center; font-weight: bold; }
+            .header-cerfa { display: flex; justify-content: space-between; margin-bottom: 20px; }
+            .cerfa-logo { font-weight: bold; font-size: 18px; border: 1px solid #000; padding: 5px 10px; }
+            .row { display: flex; margin-bottom: 8px; }
+            .label { width: 180px; font-weight: bold; }
+            .val { flex-grow: 1; border-bottom: 1px dotted #000; padding-left: 5px; }
+            .checkbox { width: 14px; height: 14px; border: 1px solid #000; display: inline-block; text-align: center; line-height: 14px; font-size: 12px; font-weight: bold; margin-right:5px; }
+            @media print { .btn { display: none; } }
+          </style>
+        </head>
+        <body>
+          <div class="header-cerfa">
+            <div><div class="cerfa-logo">cerfa</div><b>N° 11580*03</b><br/>DGFIP</div>
+            <div style="text-align:center;"><h1>Reçu au titre des dons</h1><p>Articles 200, 238 bis et 885-0 V bis A du CGI</p></div>
+            <div class="box">N° Ordre<br/><b>${new Date().getFullYear()}-${don.id.substring(0,6).toUpperCase()}</b></div>
+          </div>
+          <div class="box">
+            <b>1. Bénéficiaire</b><br/><br/>
+            <div class="row"><div class="label">Dénomination :</div><div class="val"><b>MON ECOLE EN DAUPHINE</b></div></div>
+            <div class="row"><div class="label">Adresse :</div><div class="val">689 AV GENERAL DE GAULLE, 38110 LA TOUR-DU-PIN</div></div>
+            <div class="row"><div class="label">N° RNA / SIRET :</div><div class="val">W382010595 / 923 490 411 00017</div></div>
+            <div class="row"><div class="label">Objet :</div><div class="val">Enseignement primaire</div></div>
+            <div style="margin-top:10px; display:flex; align-items:center;"><div class="checkbox">X</div>Oeuvre ou organisme d'intérêt général</div>
+          </div>
+          <div class="box">
+            <b>2. Donateur</b><br/><br/>
+            <div class="row"><div class="label">Nom et Prénom :</div><div class="val"><b>${don.nom} ${don.prenom}</b></div></div>
+            <div class="row"><div class="label">Adresse :</div><div class="val">${don.adresse}</div></div>
+          </div>
+          <div style="margin:20px 0;">
+            Le bénéficiaire reconnaît avoir reçu la somme de :<br/>
+            <div class="row" style="margin-top:10px;"><div class="label">Chiffres :</div><div class="val"><b>*** ${formatMontant(don.montant)} euros ***</b></div></div>
+            <div class="row" style="margin-top:10px;"><div class="label">Toutes lettres :</div><div class="val"><b>${nombreEnLettres(don.montant)}</b></div></div>
+            <div class="row" style="margin-top:10px;"><div class="label">Date du don :</div><div class="val"><b>${normaliserDateFR(don.date)}</b></div></div>
+          </div>
+          <div class="box">
+            <div style="display:flex; justify-content: space-between;">
+              <div><b>Nature du don :</b><br/><br/><div style="display:flex; align-items:center;">${natureCheck}</div></div>
+              <div><b>Forme :</b><br/><br/><div style="display:flex; align-items:center;"><div class="checkbox">X</div>Déclaration don manuel / Autres</div></div>
+            </div>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-top: 30px;">
+            <div style="width: 45%; text-align: center;">
+              <b>Le Trésorier</b><br/><br/>Le ${normaliserDateFR(new Date())}
+              <div style="height: 80px; margin-top: 10px;">${sigTresorier ? `<img src="${sigTresorier}" style="max-height:100%; max-width:100%;" />` : ''}</div>
+            </div>
+            <div style="width: 45%; text-align: center;">
+              <b>Le Président</b><br/><br/>Le ${normaliserDateFR(new Date())}
+              <div style="height: 80px; margin-top: 10px;">${sigPresident ? `<img src="${sigPresident}" style="max-height:100%; max-width:100%;" />` : ''}</div>
+            </div>
+          </div>
+          <button class="btn" style="display:block; width:200px; margin:30px auto; padding:10px; background:#4f46e5; color:#fff; text-align:center; border:none; border-radius:5px; cursor:pointer;" onclick="window.print()">Imprimer PDF</button>
+        </body>
+      </html>
+    `;
+    win.document.write(html);
+    win.document.close();
+    markAsSent(don.id);
+  };
+
+  return (
+    <div className="space-y-6 max-w-7xl mx-auto pb-10 font-sans">
+      <input type="file" accept=".xlsx,.xls" className="hidden" ref={fileInputExcelRef} onChange={(e) => handleImport(e, false)} />
+      <input type="file" accept=".csv" className="hidden" ref={fileInputHelloAssoRef} onChange={(e) => handleImport(e, true)} />
+
+      {/* DASHBOARD DONS */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-center">
+          <div className="flex justify-between items-start mb-2">
+            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Objectif Budget {new Date().getFullYear()}</h3>
+            <Target size={20} className="text-indigo-400" />
+          </div>
+          <p className="text-3xl font-black text-slate-800">{formatMontant(totalDonsModule)} €</p>
+          <div className="w-full bg-slate-100 rounded-full h-2 mt-4 overflow-hidden">
+            <div className="bg-indigo-500 h-full rounded-full transition-all duration-1000" style={{ width: `${Math.min((totalDonsModule / budgetGoal) * 100, 100)}%` }}></div>
+          </div>
+          <p className="text-xs text-slate-400 mt-2 font-medium text-right">{((totalDonsModule / budgetGoal) * 100).toFixed(1)}% de {formatMontant(budgetGoal)}€</p>
+        </div>
+
+        {/* WIDGET RAPPROCHEMENT COMPTABLE (VITAL) */}
+        <div className={`p-6 rounded-2xl shadow-sm border flex flex-col justify-center ${ecartComptable === 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200 animate-pulse'}`}>
+          <div className="flex justify-between items-start mb-2">
+            <h3 className={`text-xs font-bold uppercase tracking-wider ${ecartComptable === 0 ? 'text-emerald-700' : 'text-rose-700'}`}>Rapprochement (Compte 754)</h3>
+            {ecartComptable === 0 ? <CheckCircle2 size={20} className="text-emerald-500"/> : <AlertTriangle size={20} className="text-rose-500"/>}
+          </div>
+          <p className={`text-2xl font-black ${ecartComptable === 0 ? 'text-emerald-800' : 'text-rose-800'}`}>Écart : {formatMontant(ecartComptable)} €</p>
+          <p className={`text-xs mt-3 font-medium leading-relaxed ${ecartComptable === 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+            {ecartComptable === 0 ? "Félicitations, la somme de vos reçus correspond exactement aux saisies bancaires du Grand Livre." : `Attention ! La base de dons affiche ${formatMontant(totalDonsModule)}€ et le Grand Livre affiche ${formatMontant(totalGL754)}€. Vérifiez vos pointages bancaires.`}
+          </p>
+        </div>
+
+        <div className="bg-slate-900 p-6 rounded-2xl shadow-lg border border-slate-800 flex flex-col justify-center text-white">
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Actions d'Importation</h3>
+          <div className="space-y-3 mt-2">
+            <button onClick={() => fileInputExcelRef.current.click()} className="w-full bg-white/10 hover:bg-white/20 border border-white/20 px-4 py-2.5 rounded-xl text-sm font-bold flex items-center justify-between transition-colors">
+              <span>Importer Historique (Excel)</span> <FileSpreadsheet size={16}/>
+            </button>
+            <button onClick={() => fileInputHelloAssoRef.current.click()} className="w-full bg-emerald-500/20 hover:bg-emerald-500/40 border border-emerald-500/30 text-emerald-100 px-4 py-2.5 rounded-xl text-sm font-bold flex items-center justify-between transition-colors">
+              <span>Import HelloAsso (CSV)</span> <Download size={16}/>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex bg-slate-100 p-1 rounded-xl w-fit mx-auto mt-4">
+        <button onClick={() => setActiveView('dashboard')} className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'dashboard' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Base de Données & Reçus</button>
+        <button onClick={() => setActiveView('saisie')} className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'saisie' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Saisie Manuelle (+)</button>
+      </div>
+
+      {activeView === 'saisie' && (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 max-w-2xl mx-auto animate-fade-in">
+          <h3 className="font-black text-lg text-slate-800 mb-6 border-b border-slate-100 pb-4">Enregistrer un nouveau don (Chèque/Virement/Espèces)</h3>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Nom *</label>
+                <input type="text" required value={formData.nom} onChange={e => setFormData({...formData, nom: e.target.value})} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Prénom</label>
+                <input type="text" value={formData.prenom} onChange={e => setFormData({...formData, prenom: e.target.value})} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Adresse Postale * (Pour le Cerfa)</label>
+              <input type="text" required value={formData.adresse} onChange={e => setFormData({...formData, adresse: e.target.value})} placeholder="Ex: 12 rue de la Paix, 38110 La Tour-du-Pin" className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Montant (€) *</label>
+                <input type="number" step="0.01" required value={formData.montant} onChange={e => setFormData({...formData, montant: e.target.value})} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-700" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Date *</label>
+                <input type="date" required value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Provenance</label>
+                <select value={formData.provenance} onChange={e => setFormData({...formData, provenance: e.target.value})} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option value="Virement">Virement Bancaire</option><option value="Chèque">Chèque</option><option value="Espèces">Espèces</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">E-mail</label>
+                <input type="email" value={formData.mail} onChange={e => setFormData({...formData, mail: e.target.value})} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+            </div>
+            <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 rounded-xl font-bold transition-all shadow-md active:scale-95 flex items-center justify-center gap-2">
+              <PlusCircle size={18}/> Enregistrer dans la base
+            </button>
+          </form>
+        </div>
+      )}
+
+      {activeView === 'dashboard' && (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden animate-fade-in">
+          <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[10px] sticky top-0 border-b border-slate-200 shadow-sm z-10">
+                <tr>
+                  <th className="p-4">Date</th>
+                  <th className="p-4">Donateur</th>
+                  <th className="p-4 min-w-[200px]">Coordonnées (Cerfa)</th>
+                  <th className="p-4">Provenance</th>
+                  <th className="p-4 text-right">Montant</th>
+                  <th className="p-4 text-center">Reçu Fiscal</th>
+                  <th className="p-4 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {dons.map(don => (
+                  <tr key={don.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="p-4 font-mono font-medium text-slate-600 whitespace-nowrap">{normaliserDateFR(don.date)}</td>
+                    <td className="p-4 font-bold text-slate-800">
+                      {don.nom} {don.prenom}
+                      <span className="block mt-1 text-[9px] text-slate-400 font-medium">{don.type}</span>
+                    </td>
+                    <td className="p-4 text-slate-600">
+                      <div className="truncate max-w-[250px]" title={don.adresse}>{don.adresse || <span className="italic text-rose-500 text-[10px]">Adresse manquante</span>}</div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">{don.mail}</div>
+                    </td>
+                    <td className="p-4"><span className="bg-slate-100 px-2 py-1 rounded text-[10px] font-bold text-slate-600 border border-slate-200">{don.provenance}</span></td>
+                    <td className="p-4 text-right font-black text-indigo-700 whitespace-nowrap">{formatMontant(don.montant)} €</td>
+                    <td className="p-4 text-center">
+                      {don.provenance === 'HelloAsso' ? (
+                        <span className="bg-emerald-50 text-emerald-600 px-2 py-1 rounded text-[10px] font-bold border border-emerald-100">Géré par HelloAsso</span>
+                      ) : don.recu_emis ? (
+                        <span className="bg-purple-50 text-purple-700 px-2 py-1 rounded text-[10px] font-bold flex items-center justify-center gap-1 w-fit mx-auto border border-purple-100"><CheckCircle2 size={12}/> Émis</span>
+                      ) : (
+                        <button onClick={() => generateCerfaDon(don)} className="bg-indigo-600 text-white hover:bg-indigo-700 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors shadow-sm flex items-center justify-center gap-1 mx-auto active:scale-95">
+                          <FileSignature size={12}/> Créer Cerfa
+                        </button>
+                      )}
+                    </td>
+                    <td className="p-4 text-center">
+                      <button onClick={() => handleDelete(don.id)} className="text-slate-300 hover:text-rose-600 p-1.5 rounded-lg transition-colors"><Trash2 size={16}/></button>
+                    </td>
+                  </tr>
+                ))}
+                {dons.length === 0 && <tr><td colSpan="7" className="p-10 text-center text-slate-400 italic">Aucun don enregistré.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function App() {
   // 1. On lit l'URL pour voir si on ouvre un nouvel onglet sur un module précis
   const [activeTab, setActiveTab] = useState(() => {
@@ -3403,7 +3761,7 @@ export default function App() {
       case 'fiche_travaux': return <FicheTravaux />;
       case 'budget': return <PlaceholderPage title="Budget Prévisionnel" />;
       case 'notes_frais': return <NotesFrais transactionsGlobales={transactionsGlobales} />;
-      case 'dons_recus': return <PlaceholderPage title="Dons et reçus fiscaux" />;
+      case 'dons_recus': return <DonsRecus transactionsGlobales={transactionsGlobales} />;
       case 'evenements_ecole': return <PlaceholderPage title="Liste des Évènements" />;
       case 'evenements_rentabilite': return <PlaceholderPage title="Rentabilité des Évènements" />;
       case 'gestion_acces': return <PlaceholderPage title="Gestion des Accès" />;
