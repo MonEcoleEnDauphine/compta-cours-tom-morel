@@ -2780,12 +2780,59 @@ const PlanComptable = () => {
   );
 };
 
+// Utilitaire de conversion en toutes lettres pour le Cerfa
+const nombreEnLettres = (n) => {
+  if (n === 0) return 'zéro';
+  const unites = ['','un','deux','trois','quatre','cinq','six','sept','huit','neuf','dix','onze','douze','treize','quatorze','quinze','seize','dix-sept','dix-huit','dix-neuf'];
+  const dizaines = ['','dix','vingt','trente','quarante','cinquante','soixante','soixante-dix','quatre-vingt','quatre-vingt-dix'];
+  
+  const convert = (num) => {
+    if (num < 20) return unites[num];
+    let d = Math.floor(num/10);
+    let u = num%10;
+    if (d === 7 || d === 9) {
+      if (u === 1 && d === 7) return dizaines[d-1] + ' et onze';
+      return dizaines[d-1] + '-' + unites[10+u];
+    }
+    if (u === 0) return dizaines[d] + (d===8 ? 's' : '');
+    if (u === 1) return dizaines[d] + (d===8 ? '-un' : ' et un');
+    return dizaines[d] + '-' + unites[u];
+  };
+
+  const convert100 = (num) => {
+    let c = Math.floor(num/100);
+    let r = num%100;
+    let res = '';
+    if (c === 1) res = 'cent';
+    else if (c > 1) res = unites[c] + ' cent' + (r === 0 ? 's' : '');
+    if (r > 0) res += (res ? ' ' : '') + convert(r);
+    return res;
+  };
+
+  const convert1000 = (num) => {
+    let m = Math.floor(num/1000);
+    let r = num%1000;
+    let res = '';
+    if (m === 1) res = 'mille';
+    else if (m > 1) res = convert100(m) + ' mille';
+    if (r > 0) res += (res ? ' ' : '') + convert100(r);
+    return res;
+  };
+
+  let intPart = Math.floor(n);
+  let decPart = Math.round((n - intPart) * 100);
+  let str = convert1000(intPart) + ' euro' + (intPart > 1 ? 's' : '');
+  if (decPart > 0) {
+    str += ' et ' + convert(decPart) + ' centime' + (decPart > 1 ? 's' : '');
+  }
+  return str;
+};
+
 // --- MODULE : NOTES DE FRAIS ---
-const NotesFrais = () => {
+const NotesFrais = ({ transactionsGlobales }) => {
   const [activeView, setActiveView] = useState('saisie');
   const [notes, setNotes] = useState([]);
   
-  // NOUVEAU : État pour gérer nos jolis pop-ups personnalisés
   const [modal, setModal] = useState({ isOpen: false, type: '', payload: null });
   const [promptValue, setPromptValue] = useState('');
 
@@ -2817,7 +2864,6 @@ const NotesFrais = () => {
     return () => unsubscribe();
   }, []);
 
-  // Helpers pour les Modales
   const closeCustomModal = () => {
     setModal({ isOpen: false, type: '', payload: null });
     setPromptValue('');
@@ -2870,9 +2916,6 @@ const NotesFrais = () => {
     try {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'notes_frais'), newNote);
       showAlert("Succès", "Votre note de frais a été soumise avec succès ! Elle va être examinée par la direction.");
-      
-      console.log("MODE TEST : Email Président désactivé");
-
       setFormData({ demandeur: '', adresse: '', date: '', description: '', categorie: 'Pédagogie', typeFrais: 'remboursement', montant: '', justificatifFile: null, ribFile: null });
       setActiveView('suivi');
     } catch (err) {
@@ -2885,7 +2928,6 @@ const NotesFrais = () => {
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notes_frais', note.id), {
         statut: 'attente_tresorier'
       });
-      console.log("MODE TEST : Email Trésorier désactivé");
       showAlert("Validation réussie", "La note a bien été validée et transmise au trésorier.");
     } catch (err) {
       showAlert("Erreur", "Une erreur est survenue lors de la validation.", true);
@@ -2946,8 +2988,16 @@ const NotesFrais = () => {
   const executeDelete = async (noteId) => {
     closeCustomModal();
     try {
+      const noteToDelete = notes.find(n => n.id === noteId);
+      if (noteToDelete && noteToDelete.statut === 'traitee_abandon') {
+        const refString = `NDF-${noteId.substring(0, 4).toUpperCase()}`;
+        const linkedTxs = (transactionsGlobales || []).filter(tx => tx.reference === refString && tx.typeOp === 'NDF');
+        for (const tx of linkedTxs) {
+          await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', tx.id));
+        }
+      }
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notes_frais', noteId));
-      showAlert("Suppression réussie", "La note de frais a été effacée définitivement.");
+      showAlert("Suppression réussie", "La note de frais a été effacée. Si une écriture comptable y était liée, elle a été automatiquement retirée du Grand Livre.");
     } catch (err) {
       showAlert("Erreur", "Impossible de supprimer la ligne.", true);
     }
@@ -3027,7 +3077,7 @@ const NotesFrais = () => {
           <div style="margin: 20px 0;">
             Le bénéficiaire reconnaît avoir reçu au titre des dons et versements ouvrant droit à réduction d'impôt, la somme de :<br/>
             <div class="row" style="margin-top: 10px;"><div class="label">Somme (en chiffres) :</div><div class="value"><strong>*** ${formatMontant(note.montant)} euros ***</strong></div></div>
-            <div class="row" style="margin-top: 10px;"><div class="label">Somme en toutes lettres :</div><div class="value">.................................................................................................................. euros</div></div>
+            <div class="row" style="margin-top: 10px;"><div class="label">Somme en toutes lettres :</div><div class="value"><strong>${nombreEnLettres(note.montant)}</strong></div></div>
             <div class="row" style="margin-top: 10px;"><div class="label">Date du don (jj/mm/aaaa) :</div><div class="value"><strong>${normaliserDateFR(note.date)}</strong></div></div>
           </div>
 
@@ -3064,10 +3114,16 @@ const NotesFrais = () => {
              (4) notamment abandon de revenus ou de produits ; <strong>frais engagés par les bénévoles, dont ils renoncent expressément au remboursement</strong>
           </div>
 
-          <div style="display: flex; justify-content: flex-end; margin-top: 30px;">
-            <div style="width: 300px; text-align: center;">
+          <div style="display: flex; justify-content: space-between; margin-top: 30px;">
+            <div style="width: 45%; text-align: center;">
               <strong>Date et signature</strong><br/>
-              <span style="font-size: 10px;">(Le Président / Le Trésorier)</span><br/><br/>
+              <span style="font-size: 10px;">(Le Trésorier)</span><br/><br/>
+              Le ${normaliserDateFR(new Date())}
+              <div style="height: 80px; border: 1px dashed #ccc; margin-top: 10px;"></div>
+            </div>
+            <div style="width: 45%; text-align: center;">
+              <strong>Date et signature</strong><br/>
+              <span style="font-size: 10px;">(Le Président)</span><br/><br/>
               Le ${normaliserDateFR(new Date())}
               <div style="height: 80px; border: 1px dashed #ccc; margin-top: 10px;"></div>
             </div>
@@ -3103,7 +3159,6 @@ const NotesFrais = () => {
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-10 font-sans">
       
-      {/* --- NOUVEAU : LE COMPOSANT MODAL PERSONNALISÉ --- */}
       {modal.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
           <div className={`bg-white rounded-3xl shadow-2xl border w-full max-w-md overflow-hidden transition-all scale-100 ${modal.payload?.isError ? 'border-rose-100' : 'border-slate-100'}`}>
@@ -3134,27 +3189,14 @@ const NotesFrais = () => {
             </div>
 
             <div className="p-6 space-y-5">
-              {modal.type === 'alert' && (
-                <p className="text-slate-600 font-medium leading-relaxed">{modal.payload?.message}</p>
-              )}
-
-              {modal.type === 'delete' && (
-                <p className="text-slate-600 font-medium leading-relaxed">Êtes-vous sûr de vouloir supprimer définitivement cette note de frais ? Cette action effacera également les pièces jointes.</p>
-              )}
-
+              {modal.type === 'alert' && <p className="text-slate-600 font-medium leading-relaxed">{modal.payload?.message}</p>}
+              {modal.type === 'delete' && <p className="text-slate-600 font-medium leading-relaxed">Êtes-vous sûr de vouloir supprimer définitivement cette note de frais ? Cette action annulera l'écriture comptable si elle avait déjà été générée dans le Grand Livre.</p>}
               {modal.type === 'refus' && (
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Motif du refus *</label>
-                  <textarea 
-                    value={promptValue} 
-                    onChange={e => setPromptValue(e.target.value)} 
-                    placeholder="Expliquez brièvement pourquoi cette note est refusée..." 
-                    className="w-full border border-slate-200 rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-rose-500 font-medium resize-none h-24" 
-                    autoFocus
-                  />
+                  <textarea value={promptValue} onChange={e => setPromptValue(e.target.value)} placeholder="Expliquez brièvement pourquoi cette note est refusée..." className="w-full border border-slate-200 rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-rose-500 font-medium resize-none h-24" autoFocus />
                 </div>
               )}
-
               {modal.type === 'tresorier' && (
                 <div className="text-slate-600 font-medium leading-relaxed whitespace-pre-line">
                   {modal.payload?.typeFrais === 'abandon' 
@@ -3165,35 +3207,11 @@ const NotesFrais = () => {
             </div>
 
             <div className="p-4 bg-slate-50/80 border-t border-slate-100 flex justify-end gap-3">
-              {modal.type !== 'alert' && (
-                <button onClick={closeCustomModal} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-200/60 transition-colors">
-                  Annuler
-                </button>
-              )}
-              
-              {modal.type === 'alert' && (
-                <button onClick={closeCustomModal} className={`px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all ${modal.payload?.isError ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-200' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200'}`}>
-                  OK, j'ai compris
-                </button>
-              )}
-
-              {modal.type === 'delete' && (
-                <button onClick={() => executeDelete(modal.payload)} className="px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all flex items-center gap-2 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 shadow-rose-200">
-                  <Trash2 size={16} /> Supprimer
-                </button>
-              )}
-
-              {modal.type === 'refus' && (
-                <button onClick={() => executeRefus(modal.payload, promptValue)} disabled={!promptValue.trim()} className={`px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all flex items-center gap-2 ${promptValue.trim() ? 'bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 shadow-rose-200' : 'bg-rose-300 cursor-not-allowed shadow-none'}`}>
-                  <XCircle size={16} /> Confirmer le refus
-                </button>
-              )}
-
-              {modal.type === 'tresorier' && (
-                <button onClick={() => executeTresorier(modal.payload)} className="px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 shadow-emerald-200">
-                  <CheckCircle2 size={16} /> Valider l'opération
-                </button>
-              )}
+              {modal.type !== 'alert' && <button onClick={closeCustomModal} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-200/60 transition-colors">Annuler</button>}
+              {modal.type === 'alert' && <button onClick={closeCustomModal} className={`px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all ${modal.payload?.isError ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-200' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200'}`}>OK, j'ai compris</button>}
+              {modal.type === 'delete' && <button onClick={() => executeDelete(modal.payload)} className="px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all flex items-center gap-2 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 shadow-rose-200"><Trash2 size={16} /> Supprimer</button>}
+              {modal.type === 'refus' && <button onClick={() => executeRefus(modal.payload, promptValue)} disabled={!promptValue.trim()} className={`px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all flex items-center gap-2 ${promptValue.trim() ? 'bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 shadow-rose-200' : 'bg-rose-300 cursor-not-allowed shadow-none'}`}><XCircle size={16} /> Confirmer le refus</button>}
+              {modal.type === 'tresorier' && <button onClick={() => executeTresorier(modal.payload)} className="px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 shadow-emerald-200"><CheckCircle2 size={16} /> Valider l'opération</button>}
             </div>
           </div>
         </div>
