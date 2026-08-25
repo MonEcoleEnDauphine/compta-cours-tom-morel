@@ -3352,6 +3352,9 @@ const DonsRecus = ({ transactionsGlobales }) => {
   const [activeView, setActiveView] = useState('dashboard');
   const [dons, setDons] = useState([]);
   
+  // NOUVEAU : Filtre de période
+  const [anneeFiltre, setAnneeFiltre] = useState('TOTAL');
+
   // Objectif de dons modifiable
   const [budgetGoal, setBudgetGoal] = useState(58724);
   const [isEditingGoal, setIsEditingGoal] = useState(false);
@@ -3384,14 +3387,48 @@ const DonsRecus = ({ transactionsGlobales }) => {
     return parseFloat(s) || 0;
   };
 
-  // --- STATISTIQUES ET CLASSEMENT DES APPORTEURS ---
+  // NOUVEAU : Extracteur d'année scolaire robuste
+  const extractExercice = (dateStr) => {
+    if (!dateStr) return null;
+    const str = String(dateStr).trim();
+    let m, y;
+    if (str.includes('/')) {
+      const parts = str.split('/');
+      if (parts.length === 3) { m = parseInt(parts[1], 10); y = parseInt(parts[2], 10); }
+    } else if (str.includes('-')) {
+      const parts = str.split('-');
+      if (parts.length === 3) {
+        if (parts[0].length === 4) { y = parseInt(parts[0], 10); m = parseInt(parts[1], 10); }
+        else { y = parseInt(parts[2], 10); m = parseInt(parts[1], 10); }
+      }
+    }
+    if (m && y) {
+      if (y < 100) y += 2000;
+      return m >= 9 ? y : y - 1; // Septembre (9) bascule sur la nouvelle saison
+    }
+    return null;
+  };
+
+  // NOUVEAU : Application du filtre sur les Dons
+  const filteredDons = useMemo(() => {
+    if (anneeFiltre === 'TOTAL') return dons;
+    return dons.filter(d => extractExercice(d.date) === Number(anneeFiltre));
+  }, [dons, anneeFiltre]);
+
+  // NOUVEAU : Application du filtre sur le Grand Livre
+  const filteredTx = useMemo(() => {
+    if (anneeFiltre === 'TOTAL') return transactionsGlobales;
+    return (transactionsGlobales || []).filter(t => extractExercice(t.date) === Number(anneeFiltre));
+  }, [transactionsGlobales, anneeFiltre]);
+
+  // --- STATISTIQUES ET CLASSEMENT (Utilise les données filtrées) ---
   const stats = useMemo(() => {
     let priveTotal = 0; let proTotal = 0;
     const priveDonors = new Set(); const proDonors = new Set();
     const regPriveDonors = new Set(); const regProDonors = new Set();
     const apporteursMap = {};
 
-    dons.forEach(d => {
+    filteredDons.forEach(d => {
       const mt = Number(d.montant) || 0;
       const isPro = String(d.type).toLowerCase().includes('pro');
       const identifier = (d.nom + (d.prenom || '') + (d.mail || '')).toLowerCase().trim();
@@ -3412,19 +3449,19 @@ const DonsRecus = ({ transactionsGlobales }) => {
     });
 
     const topApporteurs = Object.entries(apporteursMap)
-      .map(([nom, montant]) => ({ nom, montant })).sort((a, b) => b.montant - a.montant).slice(0, 3); // Top 3 pour affichage compact
+      .map(([nom, montant]) => ({ nom, montant })).sort((a, b) => b.montant - a.montant).slice(0, 3);
 
     const total = priveTotal + proTotal;
     return { total, priveTotal, proTotal, priveCount: priveDonors.size, proCount: proDonors.size, priveReguliers: regPriveDonors.size, proReguliers: regProDonors.size, topApporteurs };
-  }, [dons]);
+  }, [filteredDons]);
 
   const pctProgression = budgetGoal > 0 ? Math.min((stats.total / budgetGoal) * 100, 100).toFixed(1) : 0;
   const resteCollecter = Math.max(0, budgetGoal - stats.total);
   const pctPrive = stats.total > 0 ? ((stats.priveTotal / stats.total) * 100).toFixed(0) : 0;
   const pctPro = stats.total > 0 ? ((stats.proTotal / stats.total) * 100).toFixed(0) : 0;
 
-  // --- RAPPROCHEMENT COMPTABLE (Compte 754000) ---
-  const totalGL754 = transactionsGlobales.reduce((acc, t) => {
+  // --- RAPPROCHEMENT COMPTABLE (Compte 754000 filtré) ---
+  const totalGL754 = filteredTx.reduce((acc, t) => {
     let mt = 0;
     if (t.type === 'od') {
       if (t.compteCredit && String(t.compteCredit).startsWith('754')) mt += Math.abs(t.montant);
@@ -3472,6 +3509,7 @@ const DonsRecus = ({ transactionsGlobales }) => {
             const nom = String(r['Nom payeur'] || '').trim();
             const freq = typeCampagne.toLowerCase().includes('mensuel') ? 'Mensuel' : 'Ponctuel';
             
+            // On vérifie les doublons dans TOUTE la base (dons), pas seulement filtrée
             if (mt > 0 && !dons.some(d => d.nom === nom && d.date === dateF && d.montant === mt)) {
                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'dons'), {
                  nom, prenom: r['Prénom payeur'] || '', mail: r['Email payeur'] || '', date: dateF, montant: mt, provenance: 'HelloAsso', type: 'Privé', frequence: freq, apporteur: '',
@@ -3598,9 +3636,27 @@ const DonsRecus = ({ transactionsGlobales }) => {
       <input type="file" accept=".xlsx,.xls" className="hidden" ref={fileInputExcelRef} onChange={(e) => handleImport(e, false)} />
       <input type="file" accept=".csv" className="hidden" ref={fileInputHelloAssoRef} onChange={(e) => handleImport(e, true)} />
 
-      <div className="flex bg-slate-100 p-1 rounded-xl w-fit mt-4">
+      {/* NOUVEAU : ZONE DES ONGLETS ET FILTRE */}
+      <div className="flex flex-col sm:flex-row bg-slate-100 p-1 rounded-xl w-fit mt-4 items-center gap-2 mx-auto sm:mx-0">
         <button onClick={() => setActiveView('dashboard')} className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'dashboard' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Tableau de bord & Base</button>
         <button onClick={() => setActiveView('saisie')} className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'saisie' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Saisie Manuelle (+)</button>
+        
+        <div className="hidden sm:block h-6 w-px bg-slate-300 mx-1"></div>
+        
+        <div className="flex items-center gap-2 px-2 py-1">
+          <Calendar size={16} className="text-slate-500" />
+          <select 
+            value={anneeFiltre} 
+            onChange={(e) => setAnneeFiltre(e.target.value)}
+            className="bg-transparent border-none text-sm font-bold text-slate-700 outline-none cursor-pointer"
+          >
+            <option value="TOTAL" className="font-bold text-indigo-700">⭐ Toutes les années</option>
+            <option disabled>──────────────</option>
+            {[2021, 2022, 2023, 2024, 2025, 2026].map(year => (
+              <option key={year} value={year}>Saison {year}-{year + 1}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {activeView === 'dashboard' && (
@@ -3648,7 +3704,7 @@ const DonsRecus = ({ transactionsGlobales }) => {
                </div>
             </div>
             
-            {/* Barre de progression fine */}
+            {/* Barre de progression */}
             <div className="flex items-center gap-3">
               <span className="text-xs font-black text-indigo-600 w-12 text-right">{pctProgression}%</span>
               <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden shadow-inner">
@@ -3660,7 +3716,7 @@ const DonsRecus = ({ transactionsGlobales }) => {
           {/* WIDGETS D'ADMINISTRATION COMPACTS */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             
-            {/* Contrôle Comptable (Rapprochement) */}
+            {/* Contrôle Comptable (Rapprochement Filtré) */}
             <div className={`p-4 rounded-2xl shadow-sm border flex items-center gap-4 bg-white ${ecartComptable === 0 ? 'border-l-4 border-l-emerald-500' : 'border-l-4 border-l-rose-500 animate-pulse'}`}>
               <div className={`p-3 rounded-xl ${ecartComptable === 0 ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
                 {ecartComptable === 0 ? <CheckCircle2 size={24}/> : <AlertTriangle size={24}/>}
@@ -3701,7 +3757,7 @@ const DonsRecus = ({ transactionsGlobales }) => {
             </div>
           </div>
 
-          {/* TABLEAU BASE DE DONNÉES */}
+          {/* TABLEAU BASE DE DONNÉES FILTRÉ */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-4">
             <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
               <table className="w-full text-left text-xs">
@@ -3718,7 +3774,7 @@ const DonsRecus = ({ transactionsGlobales }) => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {dons.map(don => (
+                  {filteredDons.map(don => (
                     <tr key={don.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="p-4 font-mono font-medium text-slate-600 whitespace-nowrap">{normaliserDateFR(don.date)}</td>
                       <td className="p-4 font-bold text-slate-800">
@@ -3748,7 +3804,7 @@ const DonsRecus = ({ transactionsGlobales }) => {
                       </td>
                     </tr>
                   ))}
-                  {dons.length === 0 && <tr><td colSpan="8" className="p-10 text-center text-slate-400 italic">Aucun don enregistré. Importez un fichier ou saisissez manuellement.</td></tr>}
+                  {filteredDons.length === 0 && <tr><td colSpan="8" className="p-10 text-center text-slate-400 italic">Aucun don enregistré pour cette période.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -3855,9 +3911,9 @@ const AccueilFamille = () => {
   const equipe = [
     { nom: "Laurence Gérard", role: "Direction", img: "https://ui-avatars.com/api/?name=Laurence+Gérard&background=4f46e5&color=fff&size=128" },
     { nom: "Cécile Sublet", role: "Enseignante", img: "https://ui-avatars.com/api/?name=Cécile+Sublet&background=0ea5e9&color=fff&size=128" },
-    { nom: "Florence", role: "Enseignante", img: "https://ui-avatars.com/api/?name=Florence&background=10b981&color=fff&size=128" },
+    { nom: "Florence Hervet", role: "Enseignante", img: "https://ui-avatars.com/api/?name=Florence+ Hervet&background=10b981&color=fff&size=128" },
     { nom: "Laurent Fauvain", role: "Président Asso.", img: "https://ui-avatars.com/api/?name=Laurent+Fauvain&background=8b5cf6&color=fff&size=128" },
-    { nom: "L. Le Lezec", role: "Trésorier", img: "https://ui-avatars.com/api/?name=Le+Lezec&background=f59e0b&color=fff&size=128" },
+    { nom: "Louis-Vianney Le Lézec", role: "Trésorier", img: "https://ui-avatars.com/api/?name=Le+Lezec&background=f59e0b&color=fff&size=128" },
   ];
 
   return (
