@@ -3136,6 +3136,9 @@ export default function App() {
             <button onClick={() => setActiveTab('garde_cantine')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'garde_cantine' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
               <CheckCircle2 size={18} /> Garde Cantine / Cour
             </button>
+            <button onClick={() => setActiveTab('fiche_travaux')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'fiche_travaux' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
+              <Hammer size={18} /> Fiche Travaux
+            </button>
           </div>
 
           <div className="mb-6">
