@@ -3352,13 +3352,14 @@ const DonsRecus = ({ transactionsGlobales }) => {
   const [activeView, setActiveView] = useState('dashboard');
   const [dons, setDons] = useState([]);
   
-  // Objectif de dons modifiable (initialisé avec votre chiffre)
+  // Objectif de dons modifiable
   const [budgetGoal, setBudgetGoal] = useState(58724);
   const [isEditingGoal, setIsEditingGoal] = useState(false);
   const [tempGoal, setTempGoal] = useState(58724);
 
   const [formData, setFormData] = useState({
-    nom: '', prenom: '', type: 'Privé', frequence: 'Ponctuel', mail: '', adresse: '', date: '', montant: '', provenance: 'Virement', commentaire: ''
+    nom: '', prenom: '', type: 'Privé', frequence: 'Ponctuel', mail: '', adresse: '', date: '', montant: '', provenance: 'Virement', commentaire: '',
+    apporteur: '' // NOUVEAU : Champ pour identifier la famille ou le parent
   });
 
   const fileInputExcelRef = useRef(null);
@@ -3384,7 +3385,7 @@ const DonsRecus = ({ transactionsGlobales }) => {
     return parseFloat(s) || 0;
   };
 
-  // --- STATISTIQUES DU DASHBOARD DONATEURS ---
+  // --- STATISTIQUES ET CLASSEMENT DES APPORTEURS ---
   const stats = useMemo(() => {
     let priveTotal = 0;
     let proTotal = 0;
@@ -3392,12 +3393,14 @@ const DonsRecus = ({ transactionsGlobales }) => {
     const proDonors = new Set();
     const regPriveDonors = new Set();
     const regProDonors = new Set();
+    const apporteursMap = {}; // Pour le classement des apporteurs
 
     dons.forEach(d => {
       const mt = Number(d.montant) || 0;
       const isPro = String(d.type).toLowerCase().includes('pro');
       const identifier = (d.nom + (d.prenom || '') + (d.mail || '')).toLowerCase().trim();
       const isRegulier = String(d.frequence).toLowerCase().includes('mensuel') || String(d.provenance).toLowerCase().includes('mensuel');
+      const apporteurNom = String(d.apporteur || '').trim();
 
       if (isPro) {
         proTotal += mt;
@@ -3408,7 +3411,18 @@ const DonsRecus = ({ transactionsGlobales }) => {
         priveDonors.add(identifier);
         if (isRegulier) regPriveDonors.add(identifier);
       }
+
+      // Calcul pour le Top Ambassadeurs
+      if (apporteurNom && apporteurNom.toLowerCase() !== 'non') {
+        apporteursMap[apporteurNom] = (apporteursMap[apporteurNom] || 0) + mt;
+      }
     });
+
+    // Transformation en tableau et tri des meilleurs apporteurs
+    const topApporteurs = Object.entries(apporteursMap)
+      .map(([nom, montant]) => ({ nom, montant }))
+      .sort((a, b) => b.montant - a.montant)
+      .slice(0, 4); // On garde les 4 meilleurs pour l'affichage
 
     const total = priveTotal + proTotal;
     return {
@@ -3418,7 +3432,8 @@ const DonsRecus = ({ transactionsGlobales }) => {
       priveCount: priveDonors.size,
       proCount: proDonors.size,
       priveReguliers: regPriveDonors.size,
-      proReguliers: regProDonors.size
+      proReguliers: regProDonors.size,
+      topApporteurs
     };
   }, [dons]);
 
@@ -3445,11 +3460,15 @@ const DonsRecus = ({ transactionsGlobales }) => {
     if (!formData.nom || !formData.date || !formData.montant) return alert("Nom, Date et Montant requis.");
     try {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'dons'), {
-        ...formData, montant: parseFloat(formData.montant), recu_emis: false, date_creation: new Date().toISOString()
+        ...formData, 
+        apporteur: formData.apporteur.trim(),
+        montant: parseFloat(formData.montant), 
+        recu_emis: false, 
+        date_creation: new Date().toISOString()
       });
-      alert("Don manuel ajouté avec succès !");
-      setFormData({ nom: '', prenom: '', type: 'Privé', frequence: 'Ponctuel', mail: '', adresse: '', date: '', montant: '', provenance: 'Virement', commentaire: '' });
-      setActiveView('dashboard');
+      alert("Don ajouté avec succès !");
+      setFormData({ nom: '', prenom: '', type: 'Privé', frequence: 'Ponctuel', mail: '', adresse: '', date: '', montant: '', provenance: 'Virement', commentaire: '', apporteur: '' });
+      setActiveView('base');
     } catch (err) { alert("Erreur lors de l'ajout."); }
   };
 
@@ -3459,7 +3478,7 @@ const DonsRecus = ({ transactionsGlobales }) => {
     }
   };
 
-  // --- MOTEUR D'IMPORTATION HYBRIDE INTELLIGENT ---
+  // --- MOTEUR D'IMPORTATION HYBRIDE (XLSX HISTORIQUE & CSV HELLOASSO) ---
   const handleImport = async (e, isHelloAsso) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -3485,7 +3504,7 @@ const DonsRecus = ({ transactionsGlobales }) => {
             if (mt > 0 && !dons.some(d => d.nom === nom && d.date === dateF && d.montant === mt)) {
                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'dons'), {
                  nom, prenom: r['Prénom payeur'] || '', mail: r['Email payeur'] || '', date: dateF, montant: mt,
-                 provenance: 'HelloAsso', type: 'Privé', frequence: freq,
+                 provenance: 'HelloAsso', type: 'Privé', frequence: freq, apporteur: '', // HelloAsso n'a pas d'apporteur natif
                  adresse: `${r['Adresse payeur'] || ''} ${r['Code Postal payeur'] || ''} ${r['Ville payeur'] || ''}`.trim(), 
                  recu_emis: true, date_creation: new Date().toISOString()
                });
@@ -3498,6 +3517,10 @@ const DonsRecus = ({ transactionsGlobales }) => {
         const iNom = headers.indexOf('Nom'); const iSoc = headers.indexOf('Société'); const iMt = headers.indexOf('Montant'); const iDate = headers.indexOf('Date versement');
         const iFreq = headers.indexOf('Fréquence');
         
+        // Détection de la colonne Famille (ou Apporteur) pour Excel
+        const idxFamille = headers.indexOf('Famille');
+        const iApporteur = idxFamille !== -1 ? idxFamille : headers.indexOf('Apporteur');
+
         for (let i = 1; i < rawRows.length; i++) {
           const r = rawRows[i];
           const mt = parseAmt(r[iMt]);
@@ -3506,11 +3529,13 @@ const DonsRecus = ({ transactionsGlobales }) => {
              const dateStr = r[iDate] instanceof Date ? r[iDate].toISOString().split('T')[0] : r[iDate];
              const dateF = normaliserDateFR(dateStr);
              const freq = iFreq !== -1 && r[iFreq] ? r[iFreq] : 'Ponctuel';
+             const apporteurVal = iApporteur !== -1 && r[iApporteur] ? String(r[iApporteur]).trim() : '';
 
              if (!dons.some(d => d.nom === nom && d.date === dateF && d.montant === mt)) {
                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'dons'), {
                  nom, prenom: r[headers.indexOf('Prénom')] || '', mail: r[headers.indexOf('Mail')] || '', date: dateF, montant: mt,
-                 provenance: r[headers.indexOf('Provenance')] || 'Autre', type: r[headers.indexOf('Type')] || 'Privé', frequence: freq,
+                 provenance: r[headers.indexOf('Provenance')] || 'Autre', type: r[headers.indexOf('Type')] || 'Privé', 
+                 frequence: freq, apporteur: apporteurVal,
                  adresse: `${r[headers.indexOf('Adresse')] || ''} ${r[headers.indexOf('CP')] || ''} ${r[headers.indexOf('Ville')] || ''}`.trim(), 
                  recu_emis: r[headers.indexOf('N° Reçu fiscal')] ? true : false, date_creation: new Date().toISOString()
                });
@@ -3534,6 +3559,7 @@ const DonsRecus = ({ transactionsGlobales }) => {
     const win = window.open('', '_blank');
     const sigPresident = localStorage.getItem('sig_president') || '';
     const sigTresorier = localStorage.getItem('sig_tresorier') || '';
+
     const isAbandon = don.provenance === 'Abandon de frais';
     const natureCheck = isAbandon ? `<div class="checkbox">X</div><div>Autres (frais engagés par les bénévoles)</div>` : `<div class="checkbox">X</div><div>Numéraire</div>`;
 
@@ -3628,7 +3654,7 @@ const DonsRecus = ({ transactionsGlobales }) => {
       {activeView === 'dashboard' && (
         <div className="space-y-6 animate-fade-in">
           
-          {/* NOUVEAU TABLEAU DE BORD ÉPURÉ */}
+          {/* NOUVEAU TABLEAU DE BORD ÉPURÉ AVEC TOP AMBASSADEURS */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8">
             <div className="flex justify-between items-end border-b border-slate-100 pb-4 mb-6">
               <div>
@@ -3691,22 +3717,38 @@ const DonsRecus = ({ transactionsGlobales }) => {
               </div>
             </div>
 
-            {/* RÉPARTITION DÉTAILLÉE */}
-            <h4 className="text-sm font-bold text-slate-700 mb-4 border-b border-slate-100 pb-2">Répartition des Dons (Actuel : {formatMontant(stats.total)} €)</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* RÉPARTITION DÉTAILLÉE + NOUVEAU TOP AMBASSADEURS */}
+            <h4 className="text-sm font-bold text-slate-700 mb-4 border-b border-slate-100 pb-2">Répartition et Impact (Actuel : {formatMontant(stats.total)} €)</h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               
               <div className="bg-blue-50/40 p-6 rounded-xl border border-blue-100/60 text-center flex flex-col items-center justify-center">
                 <span className="text-3xl font-black text-blue-700 mb-1">{pctPrive}%</span>
                 <span className="text-sm font-bold text-blue-800 mb-2">Privé ({stats.priveCount} donateurs)</span>
-                <span className="text-[10px] italic text-blue-600/70 mb-4">Inclut {stats.priveReguliers} donateurs réguliers (Mensuel)</span>
+                <span className="text-[10px] italic text-blue-600/70 mb-4">Inclut {stats.priveReguliers} dons réguliers</span>
                 <span className="text-xl font-black text-slate-800 bg-white px-4 py-1.5 rounded-lg shadow-sm border border-blue-50">{formatMontant(stats.priveTotal)} €</span>
               </div>
 
               <div className="bg-emerald-50/40 p-6 rounded-xl border border-emerald-100/60 text-center flex flex-col items-center justify-center">
                 <span className="text-3xl font-black text-emerald-700 mb-1">{pctPro}%</span>
                 <span className="text-sm font-bold text-emerald-800 mb-2">Professionnel ({stats.proCount} donateurs)</span>
-                <span className="text-[10px] italic text-emerald-600/70 mb-4">Inclut {stats.proReguliers} donateur(s) régulier(s) (Mensuel)</span>
+                <span className="text-[10px] italic text-emerald-600/70 mb-4">Inclut {stats.proReguliers} dons réguliers</span>
                 <span className="text-xl font-black text-slate-800 bg-white px-4 py-1.5 rounded-lg shadow-sm border border-emerald-50">{formatMontant(stats.proTotal)} €</span>
+              </div>
+
+              {/* NOUVEAU : TOP AMBASSADEURS */}
+              <div className="bg-amber-50/40 p-6 rounded-xl border border-amber-200/60 flex flex-col justify-start">
+                <h4 className="text-sm font-black text-amber-800 mb-4 flex items-center gap-2">
+                  <Sparkles className="text-amber-500" size={18} /> Top Ambassadeurs
+                </h4>
+                <div className="space-y-3.5">
+                  {stats.topApporteurs.length === 0 ? <p className="text-xs text-amber-600/70 italic text-center mt-4">Aucun apporteur renseigné.</p> : null}
+                  {stats.topApporteurs.map((app, idx) => (
+                    <div key={idx} className="flex justify-between items-center text-sm border-b border-amber-100/50 pb-1.5 last:border-0">
+                      <span className="font-bold text-amber-900 truncate pr-2"><span className="text-amber-500 mr-1">#{idx + 1}</span> {app.nom}</span>
+                      <span className="font-black text-amber-700 whitespace-nowrap">{formatMontant(app.montant)} €</span>
+                    </div>
+                  ))}
+                </div>
               </div>
 
             </div>
@@ -3746,6 +3788,7 @@ const DonsRecus = ({ transactionsGlobales }) => {
                   <tr>
                     <th className="p-4">Date</th>
                     <th className="p-4">Donateur</th>
+                    <th className="p-4">Apporteur</th>
                     <th className="p-4 min-w-[200px]">Coordonnées (Cerfa)</th>
                     <th className="p-4">Provenance</th>
                     <th className="p-4 text-right">Montant</th>
@@ -3761,8 +3804,9 @@ const DonsRecus = ({ transactionsGlobales }) => {
                         {don.nom} {don.prenom}
                         <span className="block mt-1 text-[9px] text-slate-400 font-medium">{don.type} - {don.frequence || 'Ponctuel'}</span>
                       </td>
+                      <td className="p-4 font-semibold text-amber-600 truncate max-w-[120px]" title={don.apporteur}>{don.apporteur || '-'}</td>
                       <td className="p-4 text-slate-600">
-                        <div className="truncate max-w-[250px]" title={don.adresse}>{don.adresse || <span className="italic text-rose-500 text-[10px]">Adresse manquante</span>}</div>
+                        <div className="truncate max-w-[200px]" title={don.adresse}>{don.adresse || <span className="italic text-rose-500 text-[10px]">Adresse manquante</span>}</div>
                         <div className="text-[10px] text-slate-400 mt-0.5">{don.mail}</div>
                       </td>
                       <td className="p-4"><span className="bg-slate-100 px-2 py-1 rounded text-[10px] font-bold text-slate-600 border border-slate-200">{don.provenance}</span></td>
@@ -3783,7 +3827,7 @@ const DonsRecus = ({ transactionsGlobales }) => {
                       </td>
                     </tr>
                   ))}
-                  {dons.length === 0 && <tr><td colSpan="7" className="p-10 text-center text-slate-400 italic">Aucun don enregistré. Importez un fichier ou saisissez manuellement.</td></tr>}
+                  {dons.length === 0 && <tr><td colSpan="8" className="p-10 text-center text-slate-400 italic">Aucun don enregistré. Importez un fichier ou saisissez manuellement.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -3793,7 +3837,7 @@ const DonsRecus = ({ transactionsGlobales }) => {
 
       {activeView === 'saisie' && (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 max-w-2xl mx-auto animate-fade-in mt-4">
-          <h3 className="font-black text-lg text-slate-800 mb-6 border-b border-slate-100 pb-4">Enregistrer un nouveau don (Chèque/Virement/Espèces)</h3>
+          <h3 className="font-black text-lg text-slate-800 mb-6 border-b border-slate-100 pb-4">Enregistrer un nouveau don</h3>
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -3837,7 +3881,7 @@ const DonsRecus = ({ transactionsGlobales }) => {
               </div>
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Provenance</label>
                 <select value={formData.provenance} onChange={e => setFormData({...formData, provenance: e.target.value})} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500">
@@ -3847,6 +3891,11 @@ const DonsRecus = ({ transactionsGlobales }) => {
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">E-mail</label>
                 <input type="email" value={formData.mail} onChange={e => setFormData({...formData, mail: e.target.value})} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+              {/* NOUVEAU CHAMP APPORTEUR */}
+              <div>
+                <label className="block text-xs font-bold text-amber-600 uppercase mb-2">Apporteur (Famille)</label>
+                <input type="text" placeholder="Ex: DUPONT" value={formData.apporteur} onChange={e => setFormData({...formData, apporteur: e.target.value})} className="w-full border border-amber-200 bg-amber-50/50 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-amber-500" />
               </div>
             </div>
             
