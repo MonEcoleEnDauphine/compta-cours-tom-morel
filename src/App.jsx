@@ -5,7 +5,7 @@ import {
   Download, Trash2, XCircle, Search, ChevronRight, CheckCircle2, 
   Paperclip, Plus, Sparkles, Receipt, Heart, FileSpreadsheet, 
   Package, Target, TrendingUp, Info, Euro, ChevronDown, 
-  Globe, Mail, Phone, PlusCircle, Edit2 
+  Globe, Mail, Phone, PlusCircle, Edit2, Send, Clock, Hammer
 } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "firebase/auth";
@@ -87,6 +87,18 @@ const InfosContact = () => (
         </a>
       </div>
     </div>
+  </div>
+);
+
+// --- NOUVEAU MODULE : FICHE TRAVAUX ---
+const FicheTravaux = () => (
+  <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-4xl mx-auto mt-6">
+    <h2 className="text-2xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+      <Hammer className="text-indigo-600" /> Fiche Travaux
+    </h2>
+    <p className="text-slate-500">
+      Ceci est l'espace dédié aux fiches de travaux pour les parents d'élèves. Le module complet (formulaire et suivi) sera développé très prochainement.
+    </p>
   </div>
 );
 
@@ -3077,6 +3089,7 @@ export default function App() {
       case 'factures_parents': return <PlaceholderPage title="Mes Factures (Parents)" />;
       case 'menage_weekend': return <PlaceholderPage title="Planning : Ménage Week-end" />;
       case 'garde_cantine': return <PlaceholderPage title="Planning : Garde Cantine / Cour" />;
+      case 'fiche_travaux': return <FicheTravaux />;
       case 'budget': return <PlaceholderPage title="Budget Prévisionnel" />;
       case 'notes_frais': return <NotesFrais />;
       case 'dons_recus': return <PlaceholderPage title="Dons et reçus fiscaux" />;
