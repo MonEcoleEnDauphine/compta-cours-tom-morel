@@ -2785,6 +2785,10 @@ const NotesFrais = () => {
   const [activeView, setActiveView] = useState('saisie');
   const [notes, setNotes] = useState([]);
   
+  // NOUVEAU : État pour gérer nos jolis pop-ups personnalisés
+  const [modal, setModal] = useState({ isOpen: false, type: '', payload: null });
+  const [promptValue, setPromptValue] = useState('');
+
   const [formData, setFormData] = useState({
     demandeur: '',
     adresse: '',
@@ -2813,11 +2817,21 @@ const NotesFrais = () => {
     return () => unsubscribe();
   }, []);
 
+  // Helpers pour les Modales
+  const closeCustomModal = () => {
+    setModal({ isOpen: false, type: '', payload: null });
+    setPromptValue('');
+  };
+
+  const showAlert = (title, message, isError = false) => {
+    setModal({ isOpen: true, type: 'alert', payload: { title, message, isError } });
+  };
+
   const handleFileChange = (e, field) => {
     const file = e.target.files[0];
     if (!file) return;
     if (file.size > 2 * 1024 * 1024) {
-      alert("Le fichier est trop lourd (max 2 Mo).");
+      showAlert("Fichier trop lourd", "Le fichier dépasse la limite autorisée de 2 Mo. Veuillez le compresser.", true);
       return;
     }
     const reader = new FileReader();
@@ -2830,19 +2844,19 @@ const NotesFrais = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.demandeur || !formData.date || !formData.montant || !formData.description) {
-      alert("Veuillez remplir tous les champs obligatoires.");
+      showAlert("Champs manquants", "Veuillez remplir tous les champs obligatoires marqués d'un astérisque (*).", true);
       return;
     }
     if (formData.typeFrais === 'abandon' && !formData.adresse) {
-      alert("L'adresse postale est obligatoire pour émettre un reçu fiscal.");
+      showAlert("Adresse requise", "L'adresse postale est strictement obligatoire pour émettre un reçu fiscal (Cerfa).", true);
       return;
     }
     if (formData.typeFrais === 'remboursement' && !formData.ribFile) {
-      alert("Le RIB est obligatoire pour un remboursement.");
+      showAlert("RIB manquant", "Le RIB est obligatoire pour que le trésorier puisse procéder au remboursement.", true);
       return;
     }
     if (!formData.justificatifFile) {
-      alert("La facture/justificatif est obligatoire.");
+      showAlert("Justificatif manquant", "La facture ou le ticket de caisse est obligatoire pour la comptabilité.", true);
       return;
     }
 
@@ -2855,18 +2869,14 @@ const NotesFrais = () => {
 
     try {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'notes_frais'), newNote);
-      alert("Note de frais soumise avec succès !");
+      showAlert("Succès", "Votre note de frais a été soumise avec succès ! Elle va être examinée par la direction.");
       
       console.log("MODE TEST : Email Président désactivé");
-      // const typeTxt = formData.typeFrais === 'abandon' ? 'ABANDON DE FRAIS (Don)' : 'DEMANDE DE REMBOURSEMENT';
-      // const subject = encodeURIComponent(`Nouvelle note de frais - ${formData.demandeur} - ${typeTxt}`);
-      // const body = encodeURIComponent(`Bonjour Laurent,\n\nUne nouvelle note de frais nécessite ta validation.\n\nType : ${typeTxt}\nDemandeur : ${formData.demandeur}\nDate : ${normaliserDateFR(formData.date)}\nMontant : ${formData.montant} €\nDescription : ${formData.description}\n\nMerci de te connecter sur l'ERP pour vérifier le justificatif et valider.`);
-      // window.location.href = `mailto:${EMAIL_PRESIDENT}?subject=${subject}&body=${body}`;
 
       setFormData({ demandeur: '', adresse: '', date: '', description: '', categorie: 'Pédagogie', typeFrais: 'remboursement', montant: '', justificatifFile: null, ribFile: null });
       setActiveView('suivi');
     } catch (err) {
-      alert("Erreur lors de la soumission.");
+      showAlert("Erreur", "Une erreur est survenue lors de l'enregistrement de votre demande.", true);
     }
   };
 
@@ -2875,74 +2885,71 @@ const NotesFrais = () => {
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notes_frais', note.id), {
         statut: 'attente_tresorier'
       });
-      
       console.log("MODE TEST : Email Trésorier désactivé");
-      // const actionTresorier = note.typeFrais === 'abandon' ? "enregistrer l'abandon de frais et émettre le reçu fiscal" : "procéder au virement bancaire";
-      // const subject = encodeURIComponent(`Note de frais validée (Président) - ${note.demandeur}`);
-      // const body = encodeURIComponent(`Bonjour,\n\nJ'ai validé la note de frais de ${note.demandeur} d'un montant de ${note.montant} €.\nType : ${note.typeFrais.toUpperCase()}.\n\nMerci de ${actionTresorier} via l'ERP.`);
-      // window.location.href = `mailto:${EMAIL_TRESORIER}?subject=${subject}&body=${body}`;
+      showAlert("Validation réussie", "La note a bien été validée et transmise au trésorier.");
     } catch (err) {
-      alert("Erreur lors de la validation.");
+      showAlert("Erreur", "Une erreur est survenue lors de la validation.", true);
     }
   };
 
-  const handleValiderTresorier = async (note) => {
+  const executeTresorier = async (note) => {
+    closeCustomModal();
     const isAbandon = note.typeFrais === 'abandon';
-    
-    const actionTxt = isAbandon 
-      ? `Valider l'abandon de frais (Don) de ${note.montant} € pour ${note.demandeur} ?\n\nUne OD sera générée automatiquement dans le Grand Livre (Charge vs Compte 754).` 
-      : `Confirmez-vous avoir viré ${note.montant} € à ${note.demandeur} ?\n\nIMPORTANT : Aucune écriture ne sera générée pour éviter les doublons. L'écriture comptable viendra de votre prochain import du Journal de Banque.`;
-    
-    if (window.confirm(actionTxt)) {
-      try {
-        if (isAbandon) {
-          let compteCharge = '658000';
-          if (note.categorie === 'Pédagogie') compteCharge = '606400';
-          if (note.categorie === 'Fonctionnement') compteCharge = '606800';
-          if (note.categorie === 'Déplacement') compteCharge = '625100';
-          if (note.categorie === 'Repas') compteCharge = '625600';
+    try {
+      if (isAbandon) {
+        let compteCharge = '658000';
+        if (note.categorie === 'Pédagogie') compteCharge = '606400';
+        if (note.categorie === 'Fonctionnement') compteCharge = '606800';
+        if (note.categorie === 'Déplacement') compteCharge = '625100';
+        if (note.categorie === 'Repas') compteCharge = '625600';
 
-          const newTx = {
-            batchId: 'NDF_' + Date.now(),
-            date: normaliserDateFR(new Date()),
-            libelle: `(NDF) Abandon de frais - ${note.demandeur}`,
-            montant: note.montant,
-            type: 'od',
-            compteDebit: compteCharge,
-            compteCredit: '754000', 
-            reference: `NDF-${note.id.substring(0, 4).toUpperCase()}`,
-            typeOp: 'NDF',
-            commentaire: note.description,
-            date_creation: new Date().toISOString()
-          };
-          await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), newTx);
-        }
-
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notes_frais', note.id), {
-          statut: isAbandon ? 'traitee_abandon' : 'payee',
-          date_paiement: new Date().toISOString()
-        });
-
-        alert(isAbandon ? "Opération comptabilisée avec succès dans le Grand Livre !" : "La note est marquée payée. N'oubliez pas de faire le lettrage lors du prochain import bancaire !");
-      } catch (err) {
-        alert("Erreur lors de l'opération.");
+        const newTx = {
+          batchId: 'NDF_' + Date.now(),
+          date: normaliserDateFR(new Date()),
+          libelle: `(NDF) Abandon de frais - ${note.demandeur}`,
+          montant: note.montant,
+          type: 'od',
+          compteDebit: compteCharge,
+          compteCredit: '754000', 
+          reference: `NDF-${note.id.substring(0, 4).toUpperCase()}`,
+          typeOp: 'NDF',
+          commentaire: note.description,
+          date_creation: new Date().toISOString()
+        };
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), newTx);
       }
+
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notes_frais', note.id), {
+        statut: isAbandon ? 'traitee_abandon' : 'payee',
+        date_paiement: new Date().toISOString()
+      });
+
+      showAlert("Opération validée", isAbandon ? "Le don a été comptabilisé avec succès dans le Grand Livre !" : "La note est marquée payée. Le lettrage se fera lors du prochain import bancaire.");
+    } catch (err) {
+      showAlert("Erreur", "Une erreur comptable est survenue.", true);
     }
   };
 
-  const handleRefuser = async (noteId) => {
-    const motif = window.prompt("Motif du refus :");
-    if (motif !== null) {
+  const executeRefus = async (noteId, motif) => {
+    closeCustomModal();
+    try {
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notes_frais', noteId), {
         statut: 'refusee',
         motif_refus: motif
       });
+      showAlert("Note refusée", "La demande a été rejetée et le motif a été enregistré.");
+    } catch (err) {
+      showAlert("Erreur", "Impossible de rejeter la note.", true);
     }
   };
 
-  const handleDelete = async (noteId) => {
-    if (window.confirm("Supprimer définitivement cette note de frais ?")) {
+  const executeDelete = async (noteId) => {
+    closeCustomModal();
+    try {
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notes_frais', noteId));
+      showAlert("Suppression réussie", "La note de frais a été effacée définitivement.");
+    } catch (err) {
+      showAlert("Erreur", "Impossible de supprimer la ligne.", true);
     }
   };
 
@@ -2954,67 +2961,124 @@ const NotesFrais = () => {
   const generateRecuFiscal = (note) => {
     const win = window.open('', '_blank');
     if (!win) {
-      alert("Veuillez autoriser les pop-ups de votre navigateur pour générer le reçu.");
+      showAlert("Pop-up bloqué", "Veuillez autoriser les pop-ups de votre navigateur pour générer le reçu Cerfa.", true);
       return;
     }
 
     const htmlContent = `
       <html>
         <head>
-          <title>Reçu Fiscal - ${note.demandeur}</title>
+          <title>Cerfa 11580*03 - ${note.demandeur}</title>
           <style>
-            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 40px; color: #1e293b; line-height: 1.6; max-width: 800px; margin: 0 auto; }
-            .header { text-align: center; border-bottom: 2px solid #1e293b; padding-bottom: 20px; margin-bottom: 30px; position: relative; }
-            .cerfa { font-size: 13px; font-weight: bold; position: absolute; top: 0; right: 0; border: 1px solid #1e293b; padding: 6px 12px; }
-            h1 { font-size: 22px; color: #0f172a; margin-bottom: 5px; text-transform: uppercase; }
-            h2 { font-size: 16px; margin-top: 30px; border-bottom: 1px solid #cbd5e1; padding-bottom: 5px; color: #334155; }
-            .box { border: 1px solid #cbd5e1; padding: 20px; border-radius: 4px; margin-bottom: 20px; background-color: #f8fafc; }
-            .row { display: flex; margin-bottom: 12px; }
-            .label { font-weight: bold; width: 220px; flex-shrink: 0; color: #475569; }
-            .value { font-weight: 500; }
-            .footer { margin-top: 50px; font-size: 11px; text-align: justify; color: #64748b; border-top: 1px solid #cbd5e1; padding-top: 10px; }
-            .signature { margin-top: 50px; text-align: right; font-weight: bold; }
-            .print-btn { display: block; width: 200px; margin: 30px auto; padding: 10px; background: #4f46e5; color: white; text-align: center; text-decoration: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+            body { font-family: Arial, sans-serif; padding: 20px; color: #000; line-height: 1.4; max-width: 800px; margin: 0 auto; font-size: 13px; }
+            .border-box { border: 1px solid #000; padding: 15px; margin-bottom: 15px; }
+            .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+            .cerfa-logo { font-weight: bold; font-size: 18px; border: 1px solid #000; padding: 5px 10px; display: inline-block; }
+            h1 { font-size: 16px; text-align: center; margin: 10px 0; text-transform: uppercase; font-weight: bold; }
+            h2 { font-size: 14px; background-color: #f0f0f0; padding: 5px; margin: 0 0 10px 0; border: 1px solid #000; }
+            .row { display: flex; margin-bottom: 8px; }
+            .label { width: 180px; font-weight: bold; flex-shrink: 0; }
+            .value { flex-grow: 1; border-bottom: 1px dotted #000; padding-left: 5px; }
+            .checkbox-group { display: flex; flex-direction: column; gap: 5px; margin-top: 10px; }
+            .checkbox-item { display: flex; align-items: flex-start; gap: 5px; }
+            .checkbox { width: 14px; height: 14px; border: 1px solid #000; display: inline-block; text-align: center; line-height: 14px; font-size: 12px; font-weight: bold; }
+            .footer-text { font-size: 10px; text-align: justify; margin-top: 20px; color: #333; }
+            .print-btn { display: block; width: 200px; margin: 30px auto; padding: 10px; background: #4f46e5; color: white; text-align: center; text-decoration: none; border-radius: 8px; cursor: pointer; font-weight: bold; border: none; }
             @media print { .print-btn { display: none; } body { padding: 0; } }
           </style>
         </head>
         <body>
           <div class="header">
-            <div class="cerfa">Cerfa N° 11580*03</div>
-            <h1>Reçu au titre des dons</h1>
-            <p>à certains organismes d'intérêt général</p>
-            <p style="font-size: 12px; color: #64748b;">Articles 200, 238 bis et 978 du code général des impôts (CGI)</p>
+            <div>
+              <div class="cerfa-logo">cerfa</div>
+              <div style="font-weight: bold; margin-top: 5px;">N° 11580*03</div>
+              <div style="margin-top: 5px; font-weight: bold;">DGFIP</div>
+            </div>
+            <div style="text-align: center; max-width: 400px;">
+              <h1>Reçu au titre des dons</h1>
+              <p style="font-weight: bold; margin: 5px 0;">à certains organismes d'intérêt général</p>
+              <p style="margin: 0; font-size: 11px;">Articles 200, 238 bis et 885-0 V bis A du code général des impôts (CGI)</p>
+            </div>
+            <div>
+              <div style="border: 1px solid #000; padding: 10px; text-align: center;">
+                Numéro d'ordre du reçu<br/>
+                <strong>${new Date().getFullYear()}-${note.id.substring(0,6).toUpperCase()}</strong>
+              </div>
+            </div>
           </div>
           
-          <h2>1. Bénéficiaire des versements</h2>
-          <div class="box">
-            <div class="row"><div class="label">Nom de l'organisme :</div><div class="value">MON ECOLE EN DAUPHINE</div></div>
-            <div class="row"><div class="label">N° RNA :</div><div class="value">W382010595</div></div>
-            <div class="row"><div class="label">N° SIRET :</div><div class="value">923 490 411 00017</div></div>
-            <div class="row"><div class="label">Adresse :</div><div class="value">689 AV GENERAL DE GAULLE<br/>38110 LA TOUR-DU-PIN</div></div>
-            <div class="row"><div class="label">Objet :</div><div class="value">Enseignement primaire (85.20Z)</div></div>
+          <h2>Bénéficiaire des versements</h2>
+          <div class="border-box">
+            <div class="row"><div class="label">Nom ou dénomination :</div><div class="value"><strong>MON ECOLE EN DAUPHINE</strong></div></div>
+            <div class="row"><div class="label">Adresse :</div><div class="value">689 AV GENERAL DE GAULLE, 38110 LA TOUR-DU-PIN</div></div>
+            <div class="row"><div class="label">Objet :</div><div class="value">Enseignement primaire (SIRET: 923 490 411 00017)</div></div>
+            <div style="margin-top: 15px; font-weight: bold;">Cochez la case concernée (1) :</div>
+            <div class="checkbox-group">
+              <div class="checkbox-item"><div class="checkbox">X</div><div>Oeuvre ou organisme d'intérêt général</div></div>
+            </div>
           </div>
 
-          <h2>2. Donateur (Demandeur)</h2>
-          <div class="box">
-            <div class="row"><div class="label">Nom et Prénom :</div><div class="value">${note.demandeur}</div></div>
-            <div class="row"><div class="label">Adresse postale :</div><div class="value">${note.adresse || 'Non renseignée'}</div></div>
+          <h2>Donateur</h2>
+          <div class="border-box">
+            <div class="row"><div class="label">Nom et Prénoms :</div><div class="value"><strong>${note.demandeur}</strong></div></div>
+            <div class="row"><div class="label">Adresse :</div><div class="value">${note.adresse || '.............................................................................................'}</div></div>
           </div>
 
-          <h2>3. Versement (Abandon de frais)</h2>
-          <div class="box">
-            <div class="row"><div class="label">Montant de l'abandon :</div><div class="value" style="font-size: 18px;"><strong>${formatMontant(note.montant)} €</strong></div></div>
-            <div class="row"><div class="label">Date de la dépense :</div><div class="value">${normaliserDateFR(note.date)}</div></div>
-            <div class="row"><div class="label">Nature des frais :</div><div class="value">${note.description} (${note.categorie})</div></div>
+          <div style="margin: 20px 0;">
+            Le bénéficiaire reconnaît avoir reçu au titre des dons et versements ouvrant droit à réduction d'impôt, la somme de :<br/>
+            <div class="row" style="margin-top: 10px;"><div class="label">Somme (en chiffres) :</div><div class="value"><strong>*** ${formatMontant(note.montant)} euros ***</strong></div></div>
+            <div class="row" style="margin-top: 10px;"><div class="label">Somme en toutes lettres :</div><div class="value">.................................................................................................................. euros</div></div>
+            <div class="row" style="margin-top: 10px;"><div class="label">Date du don (jj/mm/aaaa) :</div><div class="value"><strong>${normaliserDateFR(note.date)}</strong></div></div>
           </div>
 
-          <div class="signature">
-            <p>Fait à La Tour-du-Pin, le ${normaliserDateFR(new Date())}</p>
-            <p style="margin-top: 40px;"><em>Le Président / Le Trésorier</em></p>
+          <div class="border-box">
+            Le bénéficiaire certifie sur l'honneur que les dons et versements qu'il reçoit ouvrent droit à la réduction d'impôt prévue à l'article (3) :<br/>
+            <div style="display: flex; gap: 40px; margin-top: 10px; font-weight: bold;">
+              <div class="checkbox-item"><div class="checkbox">X</div><div>200 du CGI</div></div>
+              <div class="checkbox-item"><div class="checkbox">&nbsp;</div><div>238 bis du CGI</div></div>
+              <div class="checkbox-item"><div class="checkbox">&nbsp;</div><div>885-0 V bis A du CGI</div></div>
+            </div>
           </div>
 
-          <div class="footer">
-            La loi punit d'une amende égale à 25 % des sommes mentionnées sur le reçu le fait pour un organisme de délivrer sciemment des attestations comportant des indications inexactes (CGI, art. 1740 A). Ce document est valable en tant que reçu fiscal pour vos déclarations de revenus.
+          <div style="display: flex; gap: 20px;">
+            <div class="border-box" style="flex: 1;">
+              <strong>Forme du don :</strong>
+              <div class="checkbox-group">
+                <div class="checkbox-item"><div class="checkbox">&nbsp;</div><div>Acte authentique</div></div>
+                <div class="checkbox-item"><div class="checkbox">&nbsp;</div><div>Acte sous seing privé</div></div>
+                <div class="checkbox-item"><div class="checkbox">&nbsp;</div><div>Déclaration de don manuel</div></div>
+                <div class="checkbox-item"><div class="checkbox">X</div><div>Autres</div></div>
+              </div>
+            </div>
+            <div class="border-box" style="flex: 1;">
+              <strong>Nature du don :</strong>
+              <div class="checkbox-group">
+                <div class="checkbox-item"><div class="checkbox">&nbsp;</div><div>Numéraire</div></div>
+                <div class="checkbox-item"><div class="checkbox">&nbsp;</div><div>Titres de sociétés cotés</div></div>
+                <div class="checkbox-item"><div class="checkbox">X</div><div>Autres (4)</div></div>
+              </div>
+            </div>
+          </div>
+          
+          <div style="margin-bottom: 20px; font-size: 12px;">
+             (4) notamment abandon de revenus ou de produits ; <strong>frais engagés par les bénévoles, dont ils renoncent expressément au remboursement</strong>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; margin-top: 30px;">
+            <div style="width: 300px; text-align: center;">
+              <strong>Date et signature</strong><br/>
+              <span style="font-size: 10px;">(Le Président / Le Trésorier)</span><br/><br/>
+              Le ${normaliserDateFR(new Date())}
+              <div style="height: 80px; border: 1px dashed #ccc; margin-top: 10px;"></div>
+            </div>
+          </div>
+
+          <div class="footer-text">
+            (1) ou n'indiquez que les renseignements concernant l'organisme<br/>
+            (2) dons effectués par les entreprises<br/>
+            (3) L'organisme bénéficiaire peut cocher une ou plusieurs cases.<br/>
+            L'organisme bénéficiaire peut, en application de l'article L. 80 C du livre des procédures fiscales, demander à l'administration s'il relève de l'une des catégories d'organismes mentionnées aux articles 200 et 238 bis du code général des impôts.<br/>
+            Il est rappelé que la délivrance irrégulière de reçus fiscaux par l'organisme bénéficiaire est susceptible de donner lieu, en application des dispositions de l'article 1740 A du code général des impôts, à une amende fiscale égale à 25% des sommes indûment mentionnées sur ces documents.
           </div>
           
           <button class="print-btn" onclick="window.print()">🖨️ Imprimer / Sauvegarder en PDF</button>
@@ -3039,6 +3103,102 @@ const NotesFrais = () => {
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-10 font-sans">
       
+      {/* --- NOUVEAU : LE COMPOSANT MODAL PERSONNALISÉ --- */}
+      {modal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
+          <div className={`bg-white rounded-3xl shadow-2xl border w-full max-w-md overflow-hidden transition-all scale-100 ${modal.payload?.isError ? 'border-rose-100' : 'border-slate-100'}`}>
+            <div className={`p-6 text-white flex justify-between items-center bg-gradient-to-r ${
+              modal.type === 'tresorier' ? 'from-emerald-600 to-emerald-800' :
+              modal.type === 'refus' || modal.type === 'delete' || modal.payload?.isError ? 'from-rose-600 to-rose-800' :
+              'from-indigo-600 to-indigo-800'
+            }`}>
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 backdrop-blur-md rounded-2xl">
+                  {modal.type === 'tresorier' && <Euro size={22} className="text-emerald-100" />}
+                  {modal.type === 'refus' && <XCircle size={22} className="text-rose-100" />}
+                  {modal.type === 'delete' && <Trash2 size={22} className="text-rose-100" />}
+                  {modal.type === 'alert' && <Info size={22} className="text-white" />}
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg leading-tight">
+                    {modal.type === 'tresorier' && "Validation Trésorier"}
+                    {modal.type === 'refus' && "Refuser la demande"}
+                    {modal.type === 'delete' && "Suppression définitive"}
+                    {modal.type === 'alert' && (modal.payload?.title || "Information")}
+                  </h3>
+                </div>
+              </div>
+              <button onClick={closeCustomModal} className="text-white/70 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-colors">
+                <XCircle size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              {modal.type === 'alert' && (
+                <p className="text-slate-600 font-medium leading-relaxed">{modal.payload?.message}</p>
+              )}
+
+              {modal.type === 'delete' && (
+                <p className="text-slate-600 font-medium leading-relaxed">Êtes-vous sûr de vouloir supprimer définitivement cette note de frais ? Cette action effacera également les pièces jointes.</p>
+              )}
+
+              {modal.type === 'refus' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Motif du refus *</label>
+                  <textarea 
+                    value={promptValue} 
+                    onChange={e => setPromptValue(e.target.value)} 
+                    placeholder="Expliquez brièvement pourquoi cette note est refusée..." 
+                    className="w-full border border-slate-200 rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-rose-500 font-medium resize-none h-24" 
+                    autoFocus
+                  />
+                </div>
+              )}
+
+              {modal.type === 'tresorier' && (
+                <div className="text-slate-600 font-medium leading-relaxed whitespace-pre-line">
+                  {modal.payload?.typeFrais === 'abandon' 
+                    ? `Souhaitez-vous valider l'abandon de frais (Don) de ${modal.payload?.montant} € pour ${modal.payload?.demandeur} ?\n\nUne Opération Diverse (OD) sera générée automatiquement dans le Grand Livre.` 
+                    : `Confirmez-vous avoir viré ${modal.payload?.montant} € à ${modal.payload?.demandeur} ?\n\nAucune écriture automatique ne sera générée (passez par l'import bancaire pour éviter les doublons).`}
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 bg-slate-50/80 border-t border-slate-100 flex justify-end gap-3">
+              {modal.type !== 'alert' && (
+                <button onClick={closeCustomModal} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-200/60 transition-colors">
+                  Annuler
+                </button>
+              )}
+              
+              {modal.type === 'alert' && (
+                <button onClick={closeCustomModal} className={`px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all ${modal.payload?.isError ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-200' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200'}`}>
+                  OK, j'ai compris
+                </button>
+              )}
+
+              {modal.type === 'delete' && (
+                <button onClick={() => executeDelete(modal.payload)} className="px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all flex items-center gap-2 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 shadow-rose-200">
+                  <Trash2 size={16} /> Supprimer
+                </button>
+              )}
+
+              {modal.type === 'refus' && (
+                <button onClick={() => executeRefus(modal.payload, promptValue)} disabled={!promptValue.trim()} className={`px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all flex items-center gap-2 ${promptValue.trim() ? 'bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 shadow-rose-200' : 'bg-rose-300 cursor-not-allowed shadow-none'}`}>
+                  <XCircle size={16} /> Confirmer le refus
+                </button>
+              )}
+
+              {modal.type === 'tresorier' && (
+                <button onClick={() => executeTresorier(modal.payload)} className="px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 shadow-emerald-200">
+                  <CheckCircle2 size={16} /> Valider l'opération
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
@@ -3181,26 +3341,26 @@ const NotesFrais = () => {
                         {note.statut === 'attente_president' && (
                           <>
                             <button onClick={() => handleValiderPresident(note)} className="bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white border border-blue-200 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors w-full mb-1">Accord Président</button>
-                            <button onClick={() => handleRefuser(note.id)} className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg w-full text-[10px] font-bold">Refuser</button>
+                            <button onClick={() => setModal({ isOpen: true, type: 'refus', payload: note.id })} className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg w-full text-[10px] font-bold">Refuser</button>
                           </>
                         )}
 
                         {note.statut === 'attente_tresorier' && (
                           <>
-                            <button onClick={() => handleValiderTresorier(note)} className="bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors w-full mb-1">
-                              {note.typeFrais === 'abandon' ? 'Comptabiliser le Don' : 'Marquer Payée (Banque)'}
+                            <button onClick={() => setModal({ isOpen: true, type: 'tresorier', payload: note })} className="bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors w-full mb-1">
+                              {note.typeFrais === 'abandon' ? 'Comptabiliser le Don' : 'Marquer Payée'}
                             </button>
-                            <button onClick={() => handleRefuser(note.id)} className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg w-full text-[10px] font-bold">Refuser</button>
+                            <button onClick={() => setModal({ isOpen: true, type: 'refus', payload: note.id })} className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg w-full text-[10px] font-bold">Refuser</button>
                           </>
                         )}
 
                         {note.statut === 'traitee_abandon' && (
-                          <button onClick={() => generateRecuFiscal(note)} className="bg-purple-600 text-white hover:bg-purple-700 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors w-full flex items-center justify-center gap-1 mt-1">
+                          <button onClick={() => generateRecuFiscal(note)} className="bg-purple-600 text-white hover:bg-purple-700 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors w-full flex items-center justify-center gap-1 mt-1 shadow-sm">
                             <FileSignature size={12}/> Créer Reçu Fiscal
                           </button>
                         )}
 
-                        <button onClick={() => handleDelete(note.id)} className="text-slate-300 hover:text-rose-600 p-1.5 rounded-lg transition-colors mt-1" title="Supprimer la note">
+                        <button onClick={() => setModal({ isOpen: true, type: 'delete', payload: note.id })} className="text-slate-300 hover:text-rose-600 p-1.5 rounded-lg transition-colors mt-1" title="Supprimer la note">
                           <Trash2 size={14}/>
                         </button>
                       </div>
