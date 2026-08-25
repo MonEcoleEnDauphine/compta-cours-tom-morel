@@ -243,23 +243,24 @@ const SearchableCompteSelect = ({ value, onChange, comptesList, placeholder = "S
 
 // --- MODULE : NOTES DE FRAIS ---
 const NotesFrais = () => {
-  const [activeView, setActiveView] = useState('saisie'); // 'saisie' ou 'suivi'
+  const [activeView, setActiveView] = useState('saisie');
   const [notes, setNotes] = useState([]);
   
-  // États du formulaire
   const [formData, setFormData] = useState({
     demandeur: '',
+    adresse: '',
     date: '',
     description: '',
     categorie: 'Pédagogie',
-    montant: ''
+    typeFrais: 'remboursement',
+    montant: '',
+    justificatifFile: null,
+    ribFile: null
   });
 
-  // Emails de validation
   const EMAIL_PRESIDENT = "l.fauvain@gmail.com";
-  const EMAIL_TRESORIER = "lvlelezec@gmail.com"; // J'ai corrigé le "gmial.com" en "gmail.com" au cas où !
+  const EMAIL_TRESORIER = "lvlelezec@gmail.com";
 
-  // Chargement des données
   useEffect(() => {
     const q = collection(db, 'artifacts', appId, 'public', 'data', 'notes_frais');
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -267,12 +268,25 @@ const NotesFrais = () => {
       snapshot.forEach((doc) => {
         liste.push({ id: doc.id, ...doc.data() });
       });
-      // Tri par date de création (les plus récentes en premier)
       liste.sort((a, b) => new Date(b.date_creation) - new Date(a.date_creation));
       setNotes(liste);
     });
     return () => unsubscribe();
   }, []);
+
+  const handleFileChange = (e, field) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Le fichier est trop lourd (max 2 Mo).");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setFormData(prev => ({ ...prev, [field]: event.target.result }));
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -280,24 +294,36 @@ const NotesFrais = () => {
       alert("Veuillez remplir tous les champs obligatoires.");
       return;
     }
+    if (formData.typeFrais === 'abandon' && !formData.adresse) {
+      alert("L'adresse postale est obligatoire pour émettre un reçu fiscal.");
+      return;
+    }
+    if (formData.typeFrais === 'remboursement' && !formData.ribFile) {
+      alert("Le RIB est obligatoire pour un remboursement.");
+      return;
+    }
+    if (!formData.justificatifFile) {
+      alert("La facture/justificatif est obligatoire.");
+      return;
+    }
 
     const newNote = {
       ...formData,
       montant: parseFloat(formData.montant),
-      statut: 'attente_president', // Statut initial
+      statut: 'attente_president', 
       date_creation: new Date().toISOString()
     };
 
     try {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'notes_frais'), newNote);
-      alert("Note de frais soumise avec succès ! Le président va être notifié.");
+      alert("Note de frais soumise avec succès !");
       
-      // Préparation du mail pour le président
-      const subject = encodeURIComponent(`Nouvelle note de frais à valider - ${formData.demandeur}`);
-      const body = encodeURIComponent(`Bonjour Laurent,\n\nUne nouvelle note de frais a été soumise et nécessite ta validation en tant que Président.\n\nDemandeur : ${formData.demandeur}\nDate : ${normaliserDateFR(formData.date)}\nMontant : ${formData.montant} €\nDescription : ${formData.description}\n\nMerci de te connecter sur l'ERP pour la valider.`);
+      const typeTxt = formData.typeFrais === 'abandon' ? 'ABANDON DE FRAIS (Don)' : 'DEMANDE DE REMBOURSEMENT';
+      const subject = encodeURIComponent(`Nouvelle note de frais - ${formData.demandeur} - ${typeTxt}`);
+      const body = encodeURIComponent(`Bonjour Laurent,\n\nUne nouvelle note de frais nécessite ta validation.\n\nType : ${typeTxt}\nDemandeur : ${formData.demandeur}\nDate : ${normaliserDateFR(formData.date)}\nMontant : ${formData.montant} €\nDescription : ${formData.description}\n\nMerci de te connecter sur l'ERP pour vérifier le justificatif et valider.`);
       window.location.href = `mailto:${EMAIL_PRESIDENT}?subject=${subject}&body=${body}`;
 
-      setFormData({ demandeur: '', date: '', description: '', categorie: 'Pédagogie', montant: '' });
+      setFormData({ demandeur: '', adresse: '', date: '', description: '', categorie: 'Pédagogie', typeFrais: 'remboursement', montant: '', justificatifFile: null, ribFile: null });
       setActiveView('suivi');
     } catch (err) {
       alert("Erreur lors de la soumission.");
@@ -310,25 +336,59 @@ const NotesFrais = () => {
         statut: 'attente_tresorier'
       });
       
-      const subject = encodeURIComponent(`Note de frais validée (Président) - À payer - ${note.demandeur}`);
-      const body = encodeURIComponent(`Bonjour,\n\nJ'ai validé la note de frais de ${note.demandeur} d'un montant de ${note.montant} € pour "${note.description}".\n\nMerci de procéder au paiement et de la marquer comme "Payée" dans l'ERP.`);
+      const actionTresorier = note.typeFrais === 'abandon' ? "enregistrer l'abandon de frais et émettre le reçu fiscal" : "procéder au virement bancaire";
+      const subject = encodeURIComponent(`Note de frais validée (Président) - ${note.demandeur}`);
+      const body = encodeURIComponent(`Bonjour,\n\nJ'ai validé la note de frais de ${note.demandeur} d'un montant de ${note.montant} €.\nType : ${note.typeFrais.toUpperCase()}.\n\nMerci de ${actionTresorier} via l'ERP.`);
       window.location.href = `mailto:${EMAIL_TRESORIER}?subject=${subject}&body=${body}`;
     } catch (err) {
       alert("Erreur lors de la validation.");
     }
   };
 
+  // --- LOGIQUE COMPTABLE CORRIGÉE SANS DOUBLONS ---
   const handleValiderTresorier = async (note) => {
-    if (window.confirm(`Confirmez-vous le paiement de ${note.montant} € à ${note.demandeur} ?`)) {
+    const isAbandon = note.typeFrais === 'abandon';
+    
+    // Le texte d'explication s'adapte à votre logique comptable
+    const actionTxt = isAbandon 
+      ? `Valider l'abandon de frais (Don) de ${note.montant} € pour ${note.demandeur} ?\n\nUne OD sera générée automatiquement dans le Grand Livre (Charge vs Compte 754).` 
+      : `Confirmez-vous avoir viré ${note.montant} € à ${note.demandeur} ?\n\nIMPORTANT : Aucune écriture ne sera générée pour éviter les doublons. L'écriture comptable viendra de votre prochain import du Journal de Banque.`;
+    
+    if (window.confirm(actionTxt)) {
       try {
+        // ON NE GÉNÈRE L'OD QUE SI C'EST UN ABANDON DE FRAIS
+        if (isAbandon) {
+          let compteCharge = '658000';
+          if (note.categorie === 'Pédagogie') compteCharge = '606400';
+          if (note.categorie === 'Fonctionnement') compteCharge = '606800';
+          if (note.categorie === 'Déplacement') compteCharge = '625100';
+          if (note.categorie === 'Repas') compteCharge = '625600';
+
+          const newTx = {
+            batchId: 'NDF_' + Date.now(),
+            date: normaliserDateFR(new Date()),
+            libelle: `(OD) Abandon de frais - ${note.demandeur}`,
+            montant: note.montant,
+            type: 'od',
+            compteDebit: compteCharge,
+            compteCredit: '754000', // Dons
+            reference: `NDF-${note.id.substring(0, 4).toUpperCase()}`,
+            typeOp: 'OD',
+            commentaire: note.description,
+            date_creation: new Date().toISOString()
+          };
+          await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), newTx);
+        }
+
+        // On valide le statut quoiqu'il arrive
         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notes_frais', note.id), {
-          statut: 'payee',
+          statut: isAbandon ? 'traitee_abandon' : 'payee',
           date_paiement: new Date().toISOString()
         });
-        alert("La note de frais a été marquée comme payée !");
-        // Optionnel plus tard : Créer l'écriture comptable automatiquement dans le Grand Livre ici !
+
+        alert(isAbandon ? "Opération comptabilisée avec succès dans le Grand Livre !" : "La note est marquée payée. N'oubliez pas de faire le lettrage lors du prochain import bancaire !");
       } catch (err) {
-        alert("Erreur lors du paiement.");
+        alert("Erreur lors de l'opération.");
       }
     }
   };
@@ -336,14 +396,10 @@ const NotesFrais = () => {
   const handleRefuser = async (noteId) => {
     const motif = window.prompt("Motif du refus :");
     if (motif !== null) {
-      try {
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notes_frais', noteId), {
-          statut: 'refusee',
-          motif_refus: motif
-        });
-      } catch (err) {
-        alert("Erreur lors du refus.");
-      }
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notes_frais', noteId), {
+        statut: 'refusee',
+        motif_refus: motif
+      });
     }
   };
 
@@ -353,11 +409,92 @@ const NotesFrais = () => {
     }
   };
 
-  const getStatusBadge = (statut) => {
+  const openDocument = (base64) => {
+    const win = window.open();
+    if (win) win.document.write(`<iframe src="${base64}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+  };
+
+  // --- GÉNÉRATEUR DU REÇU FISCAL OFFICIEL (CERFA) ---
+  const generateRecuFiscal = (note) => {
+    const win = window.open('', '_blank');
+    if (!win) {
+      alert("Veuillez autoriser les pop-ups de votre navigateur pour générer le reçu.");
+      return;
+    }
+
+    const htmlContent = `
+      <html>
+        <head>
+          <title>Reçu Fiscal - ${note.demandeur}</title>
+          <style>
+            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 40px; color: #1e293b; line-height: 1.6; max-width: 800px; margin: 0 auto; }
+            .header { text-align: center; border-bottom: 2px solid #1e293b; padding-bottom: 20px; margin-bottom: 30px; position: relative; }
+            .cerfa { font-size: 13px; font-weight: bold; position: absolute; top: 0; right: 0; border: 1px solid #1e293b; padding: 6px 12px; }
+            h1 { font-size: 22px; color: #0f172a; margin-bottom: 5px; text-transform: uppercase; }
+            h2 { font-size: 16px; margin-top: 30px; border-bottom: 1px solid #cbd5e1; padding-bottom: 5px; color: #334155; }
+            .box { border: 1px solid #cbd5e1; padding: 20px; border-radius: 4px; margin-bottom: 20px; background-color: #f8fafc; }
+            .row { display: flex; margin-bottom: 12px; }
+            .label { font-weight: bold; width: 220px; flex-shrink: 0; color: #475569; }
+            .value { font-weight: 500; }
+            .footer { margin-top: 50px; font-size: 11px; text-align: justify; color: #64748b; border-top: 1px solid #cbd5e1; padding-top: 10px; }
+            .signature { margin-top: 50px; text-align: right; font-weight: bold; }
+            .print-btn { display: block; width: 200px; margin: 30px auto; padding: 10px; background: #4f46e5; color: white; text-align: center; text-decoration: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+            @media print { .print-btn { display: none; } body { padding: 0; } }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="cerfa">Cerfa N° 11580*03</div>
+            <h1>Reçu au titre des dons</h1>
+            <p>à certains organismes d'intérêt général</p>
+            <p style="font-size: 12px; color: #64748b;">Articles 200, 238 bis et 978 du code général des impôts (CGI)</p>
+          </div>
+          
+          <h2>1. Bénéficiaire des versements</h2>
+          <div class="box">
+            <div class="row"><div class="label">Nom de l'organisme :</div><div class="value">MON ECOLE EN DAUPHINE</div></div>
+            <div class="row"><div class="label">N° RNA :</div><div class="value">W382010595</div></div>
+            <div class="row"><div class="label">N° SIRET :</div><div class="value">923 490 411 00017</div></div>
+            <div class="row"><div class="label">Adresse :</div><div class="value">689 AV GENERAL DE GAULLE<br/>38110 LA TOUR-DU-PIN</div></div>
+            <div class="row"><div class="label">Objet :</div><div class="value">Enseignement primaire (85.20Z)</div></div>
+          </div>
+
+          <h2>2. Donateur (Demandeur)</h2>
+          <div class="box">
+            <div class="row"><div class="label">Nom et Prénom :</div><div class="value">${note.demandeur}</div></div>
+            <div class="row"><div class="label">Adresse postale :</div><div class="value">${note.adresse || 'Non renseignée'}</div></div>
+          </div>
+
+          <h2>3. Versement (Abandon de frais)</h2>
+          <div class="box">
+            <div class="row"><div class="label">Montant de l'abandon :</div><div class="value" style="font-size: 18px;"><strong>${formatMontant(note.montant)} €</strong></div></div>
+            <div class="row"><div class="label">Date de la dépense :</div><div class="value">${normaliserDateFR(note.date)}</div></div>
+            <div class="row"><div class="label">Nature des frais :</div><div class="value">${note.description} (${note.categorie})</div></div>
+          </div>
+
+          <div class="signature">
+            <p>Fait à La Tour-du-Pin, le ${normaliserDateFR(new Date())}</p>
+            <p style="margin-top: 40px;"><em>Le Président / Le Trésorier</em></p>
+          </div>
+
+          <div class="footer">
+            La loi punit d'une amende égale à 25 % des sommes mentionnées sur le reçu le fait pour un organisme de délivrer sciemment des attestations comportant des indications inexactes (CGI, art. 1740 A). Ce document est valable en tant que reçu fiscal pour vos déclarations de revenus.
+          </div>
+          
+          <button class="print-btn" onclick="window.print()">🖨️ Imprimer / Sauvegarder en PDF</button>
+        </body>
+      </html>
+    `;
+    win.document.write(htmlContent);
+    win.document.close();
+  };
+
+  const getStatusBadge = (statut, type) => {
     switch (statut) {
       case 'attente_president': return <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded-md text-[10px] font-bold uppercase flex items-center gap-1"><Clock size={12}/> Attente Président</span>;
       case 'attente_tresorier': return <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-md text-[10px] font-bold uppercase flex items-center gap-1"><Clock size={12}/> Attente Trésorier</span>;
       case 'payee': return <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md text-[10px] font-bold uppercase flex items-center gap-1"><CheckCircle2 size={12}/> Payée</span>;
+      case 'traitee_abandon': return <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded-md text-[10px] font-bold uppercase flex items-center gap-1"><Heart size={12}/> Don Comptabilisé</span>;
       case 'refusee': return <span className="bg-red-100 text-red-700 px-2 py-1 rounded-md text-[10px] font-bold uppercase flex items-center gap-1"><XCircle size={12}/> Refusée</span>;
       default: return null;
     }
@@ -369,9 +506,9 @@ const NotesFrais = () => {
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <FileText className="text-indigo-600" /> Gestion des Notes de Frais
+            <FileText className="text-indigo-600" /> Notes de Frais & Abandons
           </h2>
-          <p className="text-slate-500 text-sm mt-1">Saisie des dépenses, circuit de validation et remboursements.</p>
+          <p className="text-slate-500 text-sm mt-1">Gérez les demandes de remboursement et les abandons de frais (Dons).</p>
         </div>
         <div className="flex bg-slate-100 p-1 rounded-xl">
           <button onClick={() => setActiveView('saisie')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'saisie' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Saisir une dépense</button>
@@ -381,12 +518,25 @@ const NotesFrais = () => {
 
       {activeView === 'saisie' && (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8 max-w-3xl mx-auto animate-fade-in">
-          <h3 className="font-black text-lg text-slate-800 mb-6 border-b border-slate-100 pb-4">Nouvelle demande de remboursement</h3>
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <h3 className="font-black text-lg text-slate-800 mb-6 border-b border-slate-100 pb-4">Nouvelle déclaration de frais</h3>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            
+            {/* Typologie */}
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col sm:flex-row gap-6">
+              <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-700">
+                <input type="radio" name="typeFrais" value="remboursement" checked={formData.typeFrais === 'remboursement'} onChange={(e) => setFormData({...formData, typeFrais: e.target.value})} className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300" />
+                Demande de remboursement
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer font-bold text-purple-700">
+                <input type="radio" name="typeFrais" value="abandon" checked={formData.typeFrais === 'abandon'} onChange={(e) => setFormData({...formData, typeFrais: e.target.value})} className="w-4 h-4 text-purple-600 focus:ring-purple-500 border-gray-300" />
+                Abandon de frais (Don)
+              </label>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Demandeur *</label>
-                <input type="text" required value={formData.demandeur} onChange={e => setFormData({...formData, demandeur: e.target.value})} placeholder="Ex: Cécile Sublet" className="w-full border border-slate-200 rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500 font-medium" />
+                <input type="text" required value={formData.demandeur} onChange={e => setFormData({...formData, demandeur: e.target.value})} placeholder="Nom et Prénom" className="w-full border border-slate-200 rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500 font-medium" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Date de la dépense *</label>
@@ -394,20 +544,27 @@ const NotesFrais = () => {
               </div>
             </div>
 
+            {formData.typeFrais === 'abandon' && (
+              <div className="animate-fade-in">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Adresse Postale * (Pour le reçu fiscal)</label>
+                <input type="text" required={formData.typeFrais === 'abandon'} value={formData.adresse} onChange={e => setFormData({...formData, adresse: e.target.value})} placeholder="N° Rue, Code Postal, Ville" className="w-full border border-purple-200 bg-purple-50 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-purple-500 font-medium" />
+              </div>
+            )}
+
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Description / Motif *</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Description de la dépense *</label>
               <input type="text" required value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="Ex: Achats Cultura (Cahiers, feutres...)" className="w-full border border-slate-200 rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500 font-medium" />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Catégorie</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Catégorie Comptable</label>
                 <select value={formData.categorie} onChange={e => setFormData({...formData, categorie: e.target.value})} className="w-full border border-slate-200 rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
-                  <option value="Pédagogie">Matériel Pédagogique</option>
-                  <option value="Fonctionnement">Frais de fonctionnement (Timbres, etc.)</option>
-                  <option value="Déplacement">Frais de déplacement / Péage</option>
-                  <option value="Repas">Repas / Réception</option>
-                  <option value="Autre">Autre</option>
+                  <option value="Pédagogie">Matériel Pédagogique (606400)</option>
+                  <option value="Fonctionnement">Frais de fonctionnement (606800)</option>
+                  <option value="Déplacement">Déplacement / Péage (625100)</option>
+                  <option value="Repas">Repas / Réception (625600)</option>
+                  <option value="Autre">Autre (658000)</option>
                 </select>
               </div>
               <div>
@@ -416,9 +573,25 @@ const NotesFrais = () => {
               </div>
             </div>
 
+            {/* Pièces jointes */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Justificatif / Facture *</label>
+                <input type="file" accept="image/*,.pdf" required onChange={(e) => handleFileChange(e, 'justificatifFile')} className="text-xs w-full" />
+                {formData.justificatifFile && <span className="text-[10px] text-emerald-600 font-bold">✓ Fichier attaché</span>}
+              </div>
+              {formData.typeFrais === 'remboursement' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Votre RIB *</label>
+                  <input type="file" accept="image/*,.pdf" required onChange={(e) => handleFileChange(e, 'ribFile')} className="text-xs w-full" />
+                  {formData.ribFile && <span className="text-[10px] text-emerald-600 font-bold">✓ RIB attaché</span>}
+                </div>
+              )}
+            </div>
+
             <div className="pt-4 border-t border-slate-100 flex justify-end">
-              <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-bold transition-all shadow-md shadow-indigo-200 flex items-center gap-2 active:scale-95">
-                <Send size={18} /> Soumettre au Président
+              <button type="submit" className={`text-white px-8 py-3 rounded-xl font-bold transition-all shadow-md flex items-center gap-2 active:scale-95 ${formData.typeFrais === 'abandon' ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-200' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200'}`}>
+                <Send size={18} /> {formData.typeFrais === 'abandon' ? 'Soumettre le Don' : 'Demander le remboursement'}
               </button>
             </div>
           </form>
@@ -433,54 +606,70 @@ const NotesFrais = () => {
                 <tr>
                   <th className="p-4">Date</th>
                   <th className="p-4">Demandeur</th>
-                  <th className="p-4 min-w-[200px]">Description & Catégorie</th>
+                  <th className="p-4 min-w-[200px]">Description & PJ</th>
                   <th className="p-4 text-right">Montant</th>
                   <th className="p-4 text-center">Statut</th>
-                  <th className="p-4 text-center">Actions (Workflow)</th>
+                  <th className="p-4 text-center">Actions (Trésorerie)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {notes.map(note => (
                   <tr key={note.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="p-4 font-mono font-medium text-slate-600 whitespace-nowrap">{normaliserDateFR(note.date)}</td>
-                    <td className="p-4 font-bold text-slate-800">{note.demandeur}</td>
+                    <td className="p-4 font-bold text-slate-800">
+                      {note.demandeur}
+                      <span className={`block mt-1 text-[9px] px-1.5 py-0.5 rounded w-fit uppercase font-bold ${note.typeFrais === 'abandon' ? 'bg-purple-100 text-purple-700' : 'bg-indigo-100 text-indigo-700'}`}>
+                        {note.typeFrais}
+                      </span>
+                    </td>
                     <td className="p-4">
                       <div className="font-semibold text-slate-700">{note.description}</div>
-                      <div className="text-[10px] text-slate-400 mt-0.5">{note.categorie}</div>
-                      {note.motif_refus && <div className="text-[10px] text-red-500 mt-1 font-bold">Motif refus : {note.motif_refus}</div>}
+                      <div className="flex gap-2 mt-2">
+                        {note.justificatifFile && (
+                          <button onClick={() => openDocument(note.justificatifFile)} className="text-[10px] bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded text-slate-600 font-bold flex items-center gap-1">
+                            <Paperclip size={12}/> Facture
+                          </button>
+                        )}
+                        {note.ribFile && (
+                          <button onClick={() => openDocument(note.ribFile)} className="text-[10px] bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded text-indigo-600 font-bold flex items-center gap-1">
+                            <Building size={12}/> RIB
+                          </button>
+                        )}
+                      </div>
                     </td>
                     <td className="p-4 text-right font-black text-indigo-700 whitespace-nowrap">{formatMontant(note.montant)} €</td>
                     <td className="p-4">
-                      <div className="flex justify-center">{getStatusBadge(note.statut)}</div>
+                      <div className="flex justify-center">{getStatusBadge(note.statut, note.typeFrais)}</div>
                     </td>
                     <td className="p-4">
-                      <div className="flex justify-center items-center gap-2">
+                      <div className="flex justify-center items-center gap-2 flex-wrap max-w-[150px] mx-auto">
                         
-                        {/* Action Président */}
                         {note.statut === 'attente_president' && (
                           <>
-                            <button onClick={() => handleValiderPresident(note)} className="bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white border border-blue-200 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors flex items-center gap-1" title="Approuver et envoyer au Trésorier">
-                              <CheckCircle2 size={14}/> Accord Président
-                            </button>
-                            <button onClick={() => handleRefuser(note.id)} className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition-colors"><XCircle size={16}/></button>
+                            <button onClick={() => handleValiderPresident(note)} className="bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white border border-blue-200 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors w-full mb-1">Accord Président</button>
+                            <button onClick={() => handleRefuser(note.id)} className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg w-full text-[10px] font-bold">Refuser</button>
                           </>
                         )}
 
-                        {/* Action Trésorier */}
                         {note.statut === 'attente_tresorier' && (
                           <>
-                            <button onClick={() => handleValiderTresorier(note)} className="bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors flex items-center gap-1" title="Marquer comme payée en banque">
-                              <Euro size={14}/> Marquer Payée
+                            <button onClick={() => handleValiderTresorier(note)} className="bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors w-full mb-1">
+                              {note.typeFrais === 'abandon' ? 'Comptabiliser le Don' : 'Marquer Payée (Banque)'}
                             </button>
-                            <button onClick={() => handleRefuser(note.id)} className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition-colors"><XCircle size={16}/></button>
+                            <button onClick={() => handleRefuser(note.id)} className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg w-full text-[10px] font-bold">Refuser</button>
                           </>
                         )}
 
-                        {/* Bouton de suppression global (Admin) */}
-                        <button onClick={() => handleDelete(note.id)} className="text-slate-300 hover:text-rose-600 p-1.5 rounded-lg transition-colors ml-2" title="Supprimer la note">
+                        {/* NOUVEAU : Le bouton génère le reçu fiscal en HTML prêt à imprimer */}
+                        {note.statut === 'traitee_abandon' && (
+                          <button onClick={() => generateRecuFiscal(note)} className="bg-purple-600 text-white hover:bg-purple-700 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors w-full flex items-center justify-center gap-1 mt-1">
+                            <FileSignature size={12}/> Créer Reçu Fiscal
+                          </button>
+                        )}
+
+                        <button onClick={() => handleDelete(note.id)} className="text-slate-300 hover:text-rose-600 p-1.5 rounded-lg transition-colors mt-1" title="Supprimer la note">
                           <Trash2 size={14}/>
                         </button>
-                        
                       </div>
                     </td>
                   </tr>
