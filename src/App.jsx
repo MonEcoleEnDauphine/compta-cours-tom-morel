@@ -3439,7 +3439,7 @@ export default function App() {
       case 'garde_cantine': return <PlaceholderPage title="Planning : Garde Cantine / Cour" />;
       case 'fiche_travaux': return <FicheTravaux />;
       case 'budget': return <PlaceholderPage title="Budget Prévisionnel" />;
-      case 'notes_frais': return <NotesFrais />;
+      case 'notes_frais': return <NotesFrais transactionsGlobales={transactionsGlobales} />;
       case 'dons_recus': return <PlaceholderPage title="Dons et reçus fiscaux" />;
       case 'evenements_ecole': return <PlaceholderPage title="Liste des Évènements" />;
       case 'evenements_rentabilite': return <PlaceholderPage title="Rentabilité des Évènements" />;
