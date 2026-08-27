@@ -5,7 +5,7 @@ import {
   Download, Trash2, XCircle, Search, ChevronRight, CheckCircle2, 
   Paperclip, Plus, Sparkles, Receipt, Heart, FileSpreadsheet, 
   Package, Target, TrendingUp, Info, Euro, ChevronDown, 
-  Globe, Mail, Phone, PlusCircle, Edit2, Send, Clock, Hammer, Menu, Megaphone, Bell, Newspaper, Camera
+  Globe, Mail, Phone, PlusCircle, Edit2, Send, Clock, Hammer, Menu, Megaphone, Bell, Newspaper, Camera, MessageCircle
 } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
@@ -104,7 +104,7 @@ const FicheTravaux = () => (
 );
 
 const InfosContact = () => (
-  <div className="space-y-6 max-w-6xl mx-auto animate-fade-in">
+  <div className="space-y-6 max-w-6xl mx-auto animate-fade-in pb-10">
     <div className="bg-blue-600 p-8 rounded-xl shadow-md text-white">
       <h1 className="text-3xl font-bold mb-2">Bienvenue sur le portail du Cours Tom Morel</h1>
       <p className="text-blue-100">Retrouvez ici toutes les informations de scolarité.</p>
@@ -131,7 +131,6 @@ const InfosContact = () => (
         <p className="text-slate-600 text-sm font-medium mb-1">Mme Laurence Gérard</p>
         <p className="text-slate-400 text-xs mb-5">Équipe enseignante: Mme Cécile Sublet & Mme Florence Hervet</p>
         
-        {/* NOUVEAU : Lien cliquable pour déclencher un appel téléphonique sur mobile */}
         <a href="tel:0667909576" className="w-full border border-slate-200 hover:bg-slate-50 rounded-lg py-2 mb-3 flex items-center justify-center gap-2 text-slate-600 text-sm font-bold transition-colors">
           <Phone size={16} /> 06 67 90 95 76
         </a>
@@ -153,6 +152,31 @@ const InfosContact = () => (
         </div>
         <a href="mailto:monecoleendauphine@gmail.com" className="w-full inline-flex items-center justify-center gap-2 bg-purple-50 hover:bg-purple-100 text-purple-600 px-4 py-2.5 rounded-lg transition-colors font-medium text-sm">
           <Mail size={18} /> Écrire
+        </a>
+      </div>
+    </div>
+
+    {/* NOUVEAU : BLOC SUPPORT TECHNIQUE */}
+    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row items-center justify-between gap-6">
+      <div className="flex items-center gap-4 text-center md:text-left">
+        <div className="hidden md:flex w-12 h-12 rounded-full bg-amber-50 text-amber-500 items-center justify-center shrink-0">
+          <AlertTriangle size={24} />
+        </div>
+        <div>
+          <h3 className="text-lg font-bold text-slate-800">Support Technique ERP</h3>
+          <p className="text-slate-500 text-sm mt-1">Un souci avec l'application, un bug ou une erreur dans vos données ? Contactez l'administrateur (L. Le Lezec).</p>
+        </div>
+      </div>
+      
+      <div className="flex flex-wrap items-center justify-center md:justify-end gap-3 w-full md:w-auto shrink-0">
+        <a href="https://wa.me/33783424110" target="_blank" rel="noreferrer" className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-4 py-2.5 rounded-xl transition-colors font-bold text-sm">
+          <MessageCircle size={16} /> WhatsApp
+        </a>
+        <a href="sms:0783424110" className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl transition-colors font-bold text-sm">
+          <MessageCircle size={16} /> SMS
+        </a>
+        <a href="mailto:lvlelezec@gmail.com" className="w-full md:w-auto inline-flex items-center justify-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-4 py-2.5 rounded-xl transition-colors font-bold text-sm">
+          <Mail size={16} /> E-mail
         </a>
       </div>
     </div>
@@ -4296,14 +4320,15 @@ const [activeTab, setActiveTab] = useState(() => {
             <a href="#vie_ecole" onClick={() => handleNavigation('vie_ecole')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'vie_ecole' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
               <Newspaper size={18} /> Vie de l'école
             </a>
-            <a href="#contact" onClick={() => handleNavigation('contact')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'contact' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-              <Info size={18} /> Infos & Contact
-            </a>
             <a href="#scolarite" onClick={() => handleNavigation('scolarite')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'scolarite' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
               <GraduationCap size={18} /> Scolarité
             </a>
             <a href="#factures_parents" onClick={() => handleNavigation('factures_parents')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'factures_parents' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
               <Receipt size={18} /> Mes Factures
+            </a>
+            {/* Infos & Contact est maintenant en dernier */}
+            <a href="#contact" onClick={() => handleNavigation('contact')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'contact' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
+              <Info size={18} /> Infos & Contact
             </a>
           </div>
           
