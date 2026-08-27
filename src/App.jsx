@@ -40,6 +40,255 @@ const PlaceholderPage = ({ title }) => (
   </div>
 );
 
+// --- MODULE : BUDGET PRÉVISIONNEL ---
+const BudgetPrevisionnel = ({ transactionsGlobales }) => {
+  const [anneeFiltre, setAnneeFiltre] = useState('2025'); // Par défaut Saison 2025-2026
+  
+  // Simulation des saisies budgétaires (qui seraient sauvegardées en base de données)
+  const [budgets, setBudgets] = useState({
+    depenses: {
+      salaires: { prev: 62300, raf: 0, nom: "Salaires + URSAFF + Cotisations", comptes: ['64'] },
+      assurances: { prev: 3000, raf: 0, nom: "Fidem + Assurances + Téléphonie", comptes: ['616', '626', '628'] },
+      loyers: { prev: 13800, raf: 0, nom: "Loyers", comptes: ['613'] },
+      fonctionnement: { prev: 5000, raf: 0, nom: "Fonct. + Uniformes + Energie + Banque", comptes: ['606', '627'] },
+      travaux: { prev: 2000, raf: 0, nom: "Travaux", comptes: ['615'] }
+    },
+    recettes: {
+      inscriptions: { prev: 800, raf: 0, nom: "Inscriptions + Fournitures", comptes: ['706'] },
+      scolarite: { prev: 25740, raf: 0, nom: "Scolarité + Subvention", comptes: ['706', '74'] },
+      uniformes: { prev: 336, raf: 0, nom: "Uniformes", comptes: ['707'] },
+      dons: { prev: 58724, raf: 0, nom: "Dons", comptes: ['754'] },
+      manifestations: { prev: 500, raf: 0, nom: "Manifestation + Sortie", comptes: ['708'] }
+    }
+  });
+
+  const handleBudgetChange = (section, key, field, value) => {
+    setBudgets(prev => ({
+      ...prev,
+      [section]: { ...prev[section], [key]: { ...prev[section][key], [field]: Number(value) || 0 } }
+    }));
+  };
+
+  // Filtrer les transactions pour l'année sélectionnée
+  const extractExercice = (dateStr) => {
+    if (!dateStr) return null;
+    const str = String(dateStr).trim();
+    let m, y;
+    if (str.includes('/')) {
+      const parts = str.split('/');
+      if (parts.length === 3) { m = parseInt(parts[1], 10); y = parseInt(parts[2], 10); }
+    } else if (str.includes('-')) {
+      const parts = str.split('-');
+      if (parts.length === 3) {
+        if (parts[0].length === 4) { y = parseInt(parts[0], 10); m = parseInt(parts[1], 10); }
+        else { y = parseInt(parts[2], 10); m = parseInt(parts[1], 10); }
+      }
+    }
+    if (m && y) {
+      if (y < 100) y += 2000;
+      return m >= 9 ? y : y - 1;
+    }
+    return null;
+  };
+
+  const currentTxs = useMemo(() => {
+    if (anneeFiltre === 'TOTAL') return transactionsGlobales;
+    return (transactionsGlobales || []).filter(t => extractExercice(t.date) === Number(anneeFiltre));
+  }, [transactionsGlobales, anneeFiltre]);
+
+  // Calcul du Réel depuis le Grand Livre
+  const calcReel = (comptesPrefixes, isRecette) => {
+    return currentTxs.reduce((acc, t) => {
+      let mt = 0;
+      const tCompteD = String(t.compteDebit || '').trim();
+      const tCompteC = String(t.compteCredit || '').trim();
+      const tCompte = String(t.compte || '').trim();
+
+      const match = comptesPrefixes.some(prefix => 
+        tCompteD.startsWith(prefix) || tCompteC.startsWith(prefix) || tCompte.startsWith(prefix)
+      );
+
+      if (match) {
+        if (t.type === 'od') {
+          if (isRecette && tCompteC.startsWith(comptesPrefixes[0])) mt = Math.abs(t.montant);
+          if (!isRecette && tCompteD.startsWith(comptesPrefixes[0])) mt = Math.abs(t.montant);
+        } else {
+          if (isRecette && t.montant > 0) mt = Math.abs(t.montant);
+          if (!isRecette && t.montant < 0) mt = Math.abs(t.montant);
+        }
+      }
+      return acc + mt;
+    }, 0);
+  };
+
+  const formatMontant = (val) => new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val || 0);
+
+  const renderRow = (item, key, section) => {
+    const isRecette = section === 'recettes';
+    const reel = calcReel(item.comptes, isRecette);
+    const atterrissage = reel + item.raf;
+    const ecart = atterrissage - item.prev; // Pour dépenses : Positif = Dépassement (Rouge). Pour Recettes : Positif = Bonus (Vert)
+    
+    let isWarning = false;
+    if (!isRecette && ecart > 0) isWarning = true; // Dépense supérieure au budget
+    if (isRecette && ecart < 0) isWarning = true; // Recette inférieure au budget
+
+    const pct = item.prev > 0 ? Math.min((reel / item.prev) * 100, 100) : 0;
+
+    return (
+      <tr key={key} className="hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0 group">
+        <td className={`py-3 px-4 font-bold ${!isRecette ? 'text-rose-700' : 'text-emerald-700'}`}>{item.nom}</td>
+        <td className="py-3 px-4 bg-slate-100/50">
+          <div className="flex items-center gap-1 border border-slate-200 rounded px-2 py-1 bg-white focus-within:ring-2 ring-indigo-500">
+            <input type="number" value={item.prev} onChange={(e) => handleBudgetChange(section, key, 'prev', e.target.value)} className="w-full text-right outline-none text-slate-800 font-bold bg-transparent" />
+            <span className="text-slate-400 text-xs">€</span>
+          </div>
+        </td>
+        <td className="py-3 px-4 text-right font-black text-slate-700 relative">
+          <div className="flex flex-col items-end">
+            <span>{formatMontant(reel)} €</span>
+            <div className="w-24 h-1.5 bg-slate-200 rounded-full mt-1 overflow-hidden">
+              <div className={`h-full ${!isRecette ? 'bg-rose-500' : 'bg-emerald-500'}`} style={{ width: `${pct}%` }}></div>
+            </div>
+          </div>
+        </td>
+        <td className="py-3 px-4">
+          <div className="flex items-center gap-1 border border-slate-200 rounded px-2 py-1 bg-white focus-within:ring-2 ring-indigo-500">
+            <input type="number" value={item.raf} onChange={(e) => handleBudgetChange(section, key, 'raf', e.target.value)} className="w-full text-right outline-none text-slate-600 font-medium bg-transparent" />
+            <span className="text-slate-400 text-xs">€</span>
+          </div>
+        </td>
+        <td className="py-3 px-4 text-right font-black text-indigo-900 bg-indigo-50/30">{formatMontant(atterrissage)} €</td>
+        <td className={`py-3 px-4 text-right font-black ${isWarning ? 'text-rose-600' : 'text-slate-600'}`}>
+          {ecart > 0 ? '+' : ''}{formatMontant(ecart)} €
+        </td>
+        <td className="py-3 px-4">
+          <input type="text" placeholder="Commentaire..." className="w-full border-none outline-none text-xs text-slate-500 bg-transparent focus:ring-1 ring-slate-200 rounded px-1" />
+        </td>
+      </tr>
+    );
+  };
+
+  const totPrevDep = Object.values(budgets.depenses).reduce((acc, i) => acc + i.prev, 0);
+  const totReelDep = Object.values(budgets.depenses).reduce((acc, i) => acc + calcReel(i.comptes, false), 0);
+  const totRafDep = Object.values(budgets.depenses).reduce((acc, i) => acc + i.raf, 0);
+  const totAttDep = totReelDep + totRafDep;
+
+  const totPrevRec = Object.values(budgets.recettes).reduce((acc, i) => acc + i.prev, 0);
+  const totReelRec = Object.values(budgets.recettes).reduce((acc, i) => acc + calcReel(i.comptes, true), 0);
+  const totRafRec = Object.values(budgets.recettes).reduce((acc, i) => acc + i.raf, 0);
+  const totAttRec = totReelRec + totRafRec;
+
+  return (
+    <div className="space-y-6 max-w-7xl mx-auto pb-10 font-sans animate-fade-in">
+      
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+            <Target className="text-indigo-600" /> Budget Prévisionnel vs Réel
+          </h2>
+          <p className="text-slate-500 text-sm mt-1">Saisissez votre budget, la colonne "Réel" se remplit automatiquement depuis le Grand Livre.</p>
+        </div>
+        <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
+          <Calendar size={18} className="text-slate-500" />
+          <select value={anneeFiltre} onChange={(e) => setAnneeFiltre(e.target.value)} className="bg-transparent border-none text-sm font-bold text-slate-700 outline-none cursor-pointer">
+            {[2024, 2025, 2026, 2027].map(year => (
+              <option key={year} value={year}>Saison {year}-{year + 1}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* RÉSULTAT GLOBAL */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Budget Prévu (Résultat)</h3>
+          <p className={`text-3xl font-black ${totPrevRec - totPrevDep >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{formatMontant(totPrevRec - totPrevDep)} €</p>
+        </div>
+        <div className="bg-indigo-50/50 p-6 rounded-2xl shadow-sm border border-indigo-100">
+          <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2">Réel Actuel (Résultat)</h3>
+          <p className={`text-3xl font-black ${totReelRec - totReelDep >= 0 ? 'text-indigo-700' : 'text-rose-600'}`}>{formatMontant(totReelRec - totReelDep)} €</p>
+        </div>
+        <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-lg border border-slate-800">
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Atterrissage Projeté</h3>
+          <p className={`text-3xl font-black ${totAttRec - totAttDep >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatMontant(totAttRec - totAttDep)} €</p>
+        </div>
+      </div>
+
+      {/* TABLEAU DES DÉPENSES */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-rose-50 border-b border-rose-100 p-4">
+          <h3 className="font-black text-rose-800 text-lg flex items-center gap-2"><TrendingUp className="rotate-180" size={20}/> DÉPENSES</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200">
+              <tr>
+                <th className="py-3 px-4 min-w-[250px]">Postes</th>
+                <th className="py-3 px-4 w-40 bg-slate-100/50">Budget Prévisionnel</th>
+                <th className="py-3 px-4 w-32 text-right">Réel auto (GL)</th>
+                <th className="py-3 px-4 w-32">Reste à faire (RAF)</th>
+                <th className="py-3 px-4 w-32 text-right bg-indigo-50/30">Atterrissage</th>
+                <th className="py-3 px-4 w-32 text-right">Écart / Budget</th>
+                <th className="py-3 px-4 min-w-[200px]">Commentaire</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.keys(budgets.depenses).map(key => renderRow(budgets.depenses[key], key, 'depenses'))}
+              {/* TOTAL DÉPENSES */}
+              <tr className="bg-rose-50/50 border-t-2 border-rose-200">
+                <td className="py-3 px-4 font-black text-rose-900 uppercase">TOTAL DÉPENSES</td>
+                <td className="py-3 px-4 text-right font-black text-slate-800">{formatMontant(totPrevDep)} €</td>
+                <td className="py-3 px-4 text-right font-black text-slate-800">{formatMontant(totReelDep)} €</td>
+                <td className="py-3 px-4 text-right font-black text-slate-800">{formatMontant(totRafDep)} €</td>
+                <td className="py-3 px-4 text-right font-black text-indigo-900">{formatMontant(totAttDep)} €</td>
+                <td className="py-3 px-4"></td>
+                <td className="py-3 px-4"></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* TABLEAU DES RECETTES */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-emerald-50 border-b border-emerald-100 p-4">
+          <h3 className="font-black text-emerald-800 text-lg flex items-center gap-2"><TrendingUp size={20}/> RECETTES</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200">
+              <tr>
+                <th className="py-3 px-4 min-w-[250px]">Postes</th>
+                <th className="py-3 px-4 w-40 bg-slate-100/50">Budget Prévisionnel</th>
+                <th className="py-3 px-4 w-32 text-right">Réel auto (GL)</th>
+                <th className="py-3 px-4 w-32">Reste à faire (RAF)</th>
+                <th className="py-3 px-4 w-32 text-right bg-indigo-50/30">Atterrissage</th>
+                <th className="py-3 px-4 w-32 text-right">Écart / Budget</th>
+                <th className="py-3 px-4 min-w-[200px]">Commentaire</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.keys(budgets.recettes).map(key => renderRow(budgets.recettes[key], key, 'recettes'))}
+              {/* TOTAL RECETTES */}
+              <tr className="bg-emerald-50/50 border-t-2 border-emerald-200">
+                <td className="py-3 px-4 font-black text-emerald-900 uppercase">TOTAL RECETTES</td>
+                <td className="py-3 px-4 text-right font-black text-slate-800">{formatMontant(totPrevRec)} €</td>
+                <td className="py-3 px-4 text-right font-black text-slate-800">{formatMontant(totReelRec)} €</td>
+                <td className="py-3 px-4 text-right font-black text-slate-800">{formatMontant(totRafRec)} €</td>
+                <td className="py-3 px-4 text-right font-black text-indigo-900">{formatMontant(totAttRec)} €</td>
+                <td className="py-3 px-4"></td>
+                <td className="py-3 px-4"></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  );
+};
+
 // --- NOUVEAU MODULE : VIE DE L'ÉCOLE ---
 const VieEcole = () => (
   <div className="space-y-6 max-w-6xl mx-auto pb-10 font-sans animate-fade-in">
@@ -4136,7 +4385,7 @@ const [activeTab, setActiveTab] = useState(() => {
       case 'menage_weekend': return <PlaceholderPage title="Planning : Ménage Week-end" />;
       case 'garde_cantine': return <PlaceholderPage title="Planning : Garde Cantine / Cour" />;
       case 'fiche_travaux': return <FicheTravaux />;
-      case 'budget': return <PlaceholderPage title="Budget Prévisionnel" />;
+      case 'budget': return <BudgetPrevisionnel transactionsGlobales={transactionsGlobales} />;
       case 'notes_frais': return <NotesFrais transactionsGlobales={transactionsGlobales} />;
       case 'dons_recus': return <DonsRecus transactionsGlobales={transactionsGlobales} />;
       case 'evenements': return <GestionEvenements />;
