@@ -4159,6 +4159,44 @@ const AccueilFamille = () => {
   );
 };
 
+// --- MODULE : GESTION DES ÉVÉNEMENTS ---
+const GestionEvenements = () => {
+  const [activeView, setActiveView] = useState('organisation');
+
+  return (
+    <div className="space-y-6 max-w-6xl mx-auto pb-10 font-sans animate-fade-in">
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mt-4">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+            <Calendar className="text-indigo-600" /> Événements & Rentabilité
+          </h2>
+          <p className="text-slate-500 text-sm mt-1">Organisation des manifestations et suivi du bilan financier.</p>
+        </div>
+        <div className="flex bg-slate-100 p-1 rounded-xl">
+          <button onClick={() => setActiveView('organisation')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'organisation' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Organisation</button>
+          <button onClick={() => setActiveView('rentabilite')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'rentabilite' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Bilan Financier</button>
+        </div>
+      </div>
+
+      {activeView === 'organisation' && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 text-center py-16 animate-fade-in">
+          <Calendar className="mx-auto text-slate-300 mb-4" size={48} />
+          <h2 className="text-xl font-bold text-slate-800 mb-2">Calendrier des Événements</h2>
+          <p className="text-slate-500">Le module de création et de gestion des événements (Kermesse, Marché de Noël...) est en cours de développement.</p>
+        </div>
+      )}
+
+      {activeView === 'rentabilite' && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 text-center py-16 animate-fade-in">
+          <TrendingUp className="mx-auto text-slate-300 mb-4" size={48} />
+          <h2 className="text-xl font-bold text-slate-800 mb-2">Rentabilité de l'événement</h2>
+          <p className="text-slate-500">Le tableau de bord d'analyse financière (Dépenses vs Recettes liées à un événement) est en cours de développement.</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function App() {
   // 1. On lit l'URL pour voir si on ouvre un nouvel onglet sur un module précis
 const [activeTab, setActiveTab] = useState(() => {
@@ -4217,8 +4255,7 @@ const [activeTab, setActiveTab] = useState(() => {
       case 'budget': return <PlaceholderPage title="Budget Prévisionnel" />;
       case 'notes_frais': return <NotesFrais transactionsGlobales={transactionsGlobales} />;
       case 'dons_recus': return <DonsRecus transactionsGlobales={transactionsGlobales} />;
-      case 'evenements_ecole': return <PlaceholderPage title="Liste des Évènements" />;
-      case 'evenements_rentabilite': return <PlaceholderPage title="Rentabilité des Évènements" />;
+      case 'evenements': return <GestionEvenements />;
       case 'gestion_acces': return <PlaceholderPage title="Gestion des Accès" />;
       case 'factures_familles': return <PlaceholderPage title="Factures Familles (Admin)" />;
       case 'equipe_contrats': return <PlaceholderPage title="Équipe et Contrats" />;
@@ -4290,7 +4327,7 @@ const [activeTab, setActiveTab] = useState(() => {
             </a>
           </div>
 
-          <div className="mb-6">
+<div className="mb-6">
             <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Compta & Finances</h3>
             <a href="#grand_livre" onClick={() => handleNavigation('grand_livre')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'grand_livre' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
               <BookOpen size={18} /> Grand Livre
@@ -4307,15 +4344,9 @@ const [activeTab, setActiveTab] = useState(() => {
             <a href="#dons_recus" onClick={() => handleNavigation('dons_recus')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'dons_recus' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
               <Heart size={18} /> Dons et reçus fiscaux
             </a>
-          </div>
-
-          <div className="mb-6">
-            <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Évènements</h3>
-            <a href="#evenements_ecole" onClick={() => handleNavigation('evenements_ecole')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'evenements_ecole' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-              <Calendar size={18} /> Liste des Évènements
-            </a>
-            <a href="#evenements_rentabilite" onClick={() => handleNavigation('evenements_rentabilite')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'evenements_rentabilite' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-              <TrendingUp size={18} /> Rentabilité (Bilan)
+            {/* Le module unifié des Événements est maintenant ici : */}
+            <a href="#evenements" onClick={() => handleNavigation('evenements')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'evenements' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
+              <Calendar size={18} /> Événements
             </a>
           </div>
 
