@@ -5,7 +5,7 @@ import {
   Download, Trash2, XCircle, Search, ChevronRight, CheckCircle2, 
   Paperclip, Plus, Sparkles, Receipt, Heart, FileSpreadsheet, 
   Package, Target, TrendingUp, Info, Euro, ChevronDown, 
-  Globe, Mail, Phone, PlusCircle, Edit2, Send, Clock, Hammer, Menu, Megaphone, Bell
+  Globe, Mail, Phone, PlusCircle, Edit2, Send, Clock, Hammer, Menu, Megaphone, Bell, Newspaper, Camera
 } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
@@ -35,6 +35,59 @@ const PlaceholderPage = ({ title }) => (
   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
     <h2 className="text-xl font-bold text-slate-800 mb-4">{title}</h2>
     <p className="text-slate-500">Cette page est en cours de construction. Le module sera bientôt disponible.</p>
+  </div>
+);
+
+// --- NOUVEAU MODULE : VIE DE L'ÉCOLE ---
+const VieEcole = () => (
+  <div className="space-y-6 max-w-6xl mx-auto pb-10 font-sans animate-fade-in">
+    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mt-6">
+      <div>
+        <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+          <Newspaper className="text-indigo-600" /> Vie de l'école
+        </h2>
+        <p className="text-slate-500 text-sm mt-1">Retrouvez les dernières lettres aux parents, les photos et les actualités des classes.</p>
+      </div>
+    </div>
+
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Lettres aux parents */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+         <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
+          <FileText className="text-blue-500" size={20} /> Lettres aux parents
+         </h3>
+         <div className="space-y-3">
+           <div className="flex justify-between items-center p-3 hover:bg-slate-50 rounded-xl border border-slate-100 transition-colors cursor-pointer group">
+             <div className="flex items-center gap-3">
+               <div className="bg-blue-100 text-blue-600 p-2 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors"><FileText size={16} /></div>
+               <div>
+                 <p className="font-bold text-sm text-slate-700">Lettre de rentrée - Période 1</p>
+                 <p className="text-[10px] text-slate-400">Exemple de document</p>
+               </div>
+             </div>
+             <Download size={16} className="text-slate-400 group-hover:text-blue-600 transition-colors" />
+           </div>
+           <div className="text-center mt-4">
+             <p className="text-xs text-slate-400 italic">Espace d'administration à venir pour déposer vos PDF...</p>
+           </div>
+         </div>
+      </div>
+
+      {/* Photos */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+         <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
+          <Camera className="text-emerald-500" size={20} /> Galerie Photos
+         </h3>
+         <div className="grid grid-cols-2 gap-3">
+           <div className="aspect-video bg-slate-50 rounded-xl flex items-center justify-center border border-slate-200 border-dashed hover:bg-slate-100 cursor-pointer transition-colors">
+             <span className="text-xs text-slate-400 font-medium text-center px-2">Sortie Forêt<br/>(Album vide)</span>
+           </div>
+           <div className="aspect-video bg-slate-50 rounded-xl flex items-center justify-center border border-slate-200 border-dashed hover:bg-slate-100 cursor-pointer transition-colors">
+             <span className="text-xs text-slate-400 font-medium text-center px-2">Atelier Peinture<br/>(Album vide)</span>
+           </div>
+         </div>
+      </div>
+    </div>
   </div>
 );
 
@@ -4198,6 +4251,9 @@ const [activeTab, setActiveTab] = useState(() => {
             <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Espace Famille</h3>
             <a href="#accueil_famille" onClick={() => handleNavigation('accueil_famille')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'accueil_famille' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
               <LayoutDashboard size={18} /> Accueil
+            </a>
+            <a href="#vie_ecole" onClick={() => handleNavigation('vie_ecole')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'vie_ecole' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
+              <Newspaper size={18} /> Vie de l'école
             </a>
             <a href="#contact" onClick={() => handleNavigation('contact')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'contact' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
               <Info size={18} /> Infos & Contact
