@@ -10,6 +10,7 @@ import {
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore, collection, doc, deleteDoc, onSnapshot, addDoc, updateDoc } from "firebase/firestore";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import * as XLSX from 'xlsx';
 
 // Configuration Firebase Officielle
@@ -26,6 +27,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const storage = getStorage(app);
 const appId = "cours-tom-morel-erp";
 
 // ⚠️ N'OUBLIEZ PAS DE COLLER LA LONGUE LIGNE BASE64 DE VOTRE LOGO ICI
@@ -2903,23 +2905,14 @@ const nombreEnLettres = (n) => {
 const NotesFrais = ({ transactionsGlobales }) => {
   const [activeView, setActiveView] = useState('saisie');
   const [notes, setNotes] = useState([]);
+  const [isUploading, setIsUploading] = useState(false);
   
   const [modal, setModal] = useState({ isOpen: false, type: '', payload: null });
   const [promptValue, setPromptValue] = useState('');
-  
-  // NOUVEAU : État pour le modal des signatures
-  const [showSigModal, setShowSigModal] = useState(false);
-  const [signatures, setSignatures] = useState({
-    president: localStorage.getItem('sig_president') || '',
-    tresorier: localStorage.getItem('sig_tresorier') || ''
-  });
 
   const [formData, setFormData] = useState({
     demandeur: '', adresse: '', date: '', description: '', categorie: 'Pédagogie', typeFrais: 'remboursement', montant: '', justificatifFile: null, ribFile: null
   });
-
-  const EMAIL_PRESIDENT = "l.fauvain@gmail.com";
-  const EMAIL_TRESORIER = "lvlelezec@gmail.com";
 
   useEffect(() => {
     const q = collection(db, 'artifacts', appId, 'public', 'data', 'notes_frais');
@@ -2938,38 +2931,56 @@ const NotesFrais = ({ transactionsGlobales }) => {
   const handleFileChange = (e, field) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) return showAlert("Fichier trop lourd", "Le fichier dépasse la limite autorisée de 2 Mo.", true);
-    const reader = new FileReader();
-    reader.onload = (event) => { setFormData(prev => ({ ...prev, [field]: event.target.result })); };
-    reader.readAsDataURL(file);
-  };
-
-  // NOUVEAU : Sauvegarde des signatures
-  const handleSignatureUpload = (e, role) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target.result;
-      setSignatures(prev => ({ ...prev, [role]: base64 }));
-      localStorage.setItem(`sig_${role}`, base64);
-    };
-    reader.readAsDataURL(file);
+    // NOUVELLE LIMITE : 5 Mo
+    if (file.size > 5 * 1024 * 1024) {
+      showAlert("Fichier trop lourd", "Le fichier dépasse la limite autorisée de 5 Mo. Veuillez réduire sa taille.", true);
+      return;
+    }
+    // On sauvegarde le VRAI fichier en mémoire (et plus du texte Base64)
+    setFormData(prev => ({ ...prev, [field]: file }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.demandeur || !formData.date || !formData.montant || !formData.description) return showAlert("Champs manquants", "Veuillez remplir tous les champs obligatoires (*).", true);
-    if (formData.typeFrais === 'abandon' && !formData.adresse) return showAlert("Adresse requise", "L'adresse postale est obligatoire pour émettre un reçu fiscal.", true);
+    if (formData.typeFrais === 'abandon' && !formData.adresse) return showAlert("Adresse requise", "L'adresse postale est obligatoire pour le reçu fiscal.", true);
     if (formData.typeFrais === 'remboursement' && !formData.ribFile) return showAlert("RIB manquant", "Le RIB est obligatoire pour le remboursement.", true);
     if (!formData.justificatifFile) return showAlert("Justificatif manquant", "La facture/ticket est obligatoire.", true);
 
+    setIsUploading(true);
     try {
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'notes_frais'), { ...formData, montant: parseFloat(formData.montant), statut: 'attente_president', date_creation: new Date().toISOString() });
-      showAlert("Succès", "Votre note de frais a été soumise avec succès ! Elle va être examinée par la direction.");
+      // 1. Upload sur le Firebase Storage (Le vrai disque dur)
+      let justificatifUrl = null;
+      if (formData.justificatifFile) {
+        const justifRef = ref(storage, `notes_frais/${appId}_${Date.now()}_justif_${formData.justificatifFile.name}`);
+        await uploadBytes(justifRef, formData.justificatifFile);
+        justificatifUrl = await getDownloadURL(justifRef);
+      }
+
+      let ribUrl = null;
+      if (formData.ribFile && formData.typeFrais === 'remboursement') {
+        const ribRef = ref(storage, `notes_frais/${appId}_${Date.now()}_rib_${formData.ribFile.name}`);
+        await uploadBytes(ribRef, formData.ribFile);
+        ribUrl = await getDownloadURL(ribRef);
+      }
+
+      // 2. Enregistrement dans la base de données
+      const newNote = {
+        demandeur: formData.demandeur, adresse: formData.adresse, date: formData.date, description: formData.description,
+        categorie: formData.categorie, typeFrais: formData.typeFrais, montant: parseFloat(formData.montant),
+        justificatifFile: justificatifUrl, ribFile: ribUrl, statut: 'attente_president', date_creation: new Date().toISOString()
+      };
+
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'notes_frais'), newNote);
+      
+      showAlert("Succès", "Note de frais soumise avec succès !");
       setFormData({ demandeur: '', adresse: '', date: '', description: '', categorie: 'Pédagogie', typeFrais: 'remboursement', montant: '', justificatifFile: null, ribFile: null });
       setActiveView('suivi');
-    } catch (err) { showAlert("Erreur", "Erreur lors de l'enregistrement.", true); }
+    } catch (err) { 
+      showAlert("Erreur technique", "L'envoi des fichiers a échoué. Vérifiez que votre Firebase Storage est bien activé et configuré.", true); 
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleValiderPresident = async (note) => {
@@ -2996,6 +3007,7 @@ const NotesFrais = ({ transactionsGlobales }) => {
           reference: `NDF-${note.id.substring(0, 4).toUpperCase()}`, typeOp: 'NDF', commentaire: note.description, date_creation: new Date().toISOString()
         });
       }
+
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notes_frais', note.id), { statut: isAbandon ? 'traitee_abandon' : 'payee', date_paiement: new Date().toISOString() });
       showAlert("Opération validée", isAbandon ? "Le don a été comptabilisé dans le Grand Livre !" : "La note est marquée payée.");
     } catch (err) { showAlert("Erreur", "Une erreur comptable est survenue.", true); }
@@ -3019,143 +3031,16 @@ const NotesFrais = ({ transactionsGlobales }) => {
         for (const tx of linkedTxs) { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', tx.id)); }
       }
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notes_frais', noteId));
-      showAlert("Suppression réussie", "Note de frais et OD associées supprimées.");
+      showAlert("Suppression réussie", "Note de frais effacée (et son écriture comptable si existante).");
     } catch (err) { showAlert("Erreur", "Impossible de supprimer la ligne.", true); }
   };
 
-  const openDocument = (base64) => {
-    const win = window.open();
-    if (win) win.document.write(`<iframe src="${base64}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+  // NOUVEAU : Ouverture du lien Firebase Storage
+  const openDocument = (url) => {
+    if (url) window.open(url, '_blank');
   };
 
-  const generateRecuFiscal = (note) => {
-    const win = window.open('', '_blank');
-    if (!win) return showAlert("Pop-up bloqué", "Veuillez autoriser les pop-ups pour générer le reçu.", true);
-
-    const sigPresident = localStorage.getItem('sig_president');
-    const sigTresorier = localStorage.getItem('sig_tresorier');
-
-    const htmlContent = `
-      <html>
-        <head>
-          <title>Cerfa 11580*03 - ${note.demandeur}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; color: #000; line-height: 1.4; max-width: 800px; margin: 0 auto; font-size: 13px; }
-            .border-box { border: 1px solid #000; padding: 15px; margin-bottom: 15px; }
-            .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
-            .cerfa-logo { font-weight: bold; font-size: 18px; border: 1px solid #000; padding: 5px 10px; display: inline-block; }
-            h1 { font-size: 16px; text-align: center; margin: 10px 0; text-transform: uppercase; font-weight: bold; }
-            h2 { font-size: 14px; background-color: #f0f0f0; padding: 5px; margin: 0 0 10px 0; border: 1px solid #000; }
-            .row { display: flex; margin-bottom: 8px; }
-            .label { width: 180px; font-weight: bold; flex-shrink: 0; }
-            .value { flex-grow: 1; border-bottom: 1px dotted #000; padding-left: 5px; }
-            .checkbox-group { display: flex; flex-direction: column; gap: 5px; margin-top: 10px; }
-            .checkbox-item { display: flex; align-items: flex-start; gap: 5px; }
-            .checkbox { width: 14px; height: 14px; border: 1px solid #000; display: inline-block; text-align: center; line-height: 14px; font-size: 12px; font-weight: bold; }
-            .footer-text { font-size: 10px; text-align: justify; margin-top: 20px; color: #333; }
-            .print-btn { display: block; width: 200px; margin: 30px auto; padding: 10px; background: #4f46e5; color: white; text-align: center; text-decoration: none; border-radius: 8px; cursor: pointer; font-weight: bold; border: none; }
-            @media print { .print-btn { display: none; } body { padding: 0; } }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div><div class="cerfa-logo">cerfa</div><div style="font-weight: bold; margin-top: 5px;">N° 11580*03</div><div style="margin-top: 5px; font-weight: bold;">DGFIP</div></div>
-            <div style="text-align: center; max-width: 400px;">
-              <h1>Reçu au titre des dons</h1><p style="font-weight: bold; margin: 5px 0;">à certains organismes d'intérêt général</p>
-              <p style="margin: 0; font-size: 11px;">Articles 200, 238 bis et 885-0 V bis A du code général des impôts (CGI)</p>
-            </div>
-            <div>
-              <div style="border: 1px solid #000; padding: 10px; text-align: center;">
-                Numéro d'ordre du reçu<br/><strong>${new Date().getFullYear()}-${note.id.substring(0,6).toUpperCase()}</strong>
-              </div>
-            </div>
-          </div>
-          
-          <h2>Bénéficiaire des versements</h2>
-          <div class="border-box">
-            <div class="row"><div class="label">Nom ou dénomination :</div><div class="value"><strong>MON ECOLE EN DAUPHINE</strong></div></div>
-            <div class="row"><div class="label">Adresse :</div><div class="value">689 AV GENERAL DE GAULLE, 38110 LA TOUR-DU-PIN</div></div>
-            <div class="row"><div class="label">Objet :</div><div class="value">Enseignement primaire (SIRET: 923 490 411 00017)</div></div>
-            <div style="margin-top: 15px; font-weight: bold;">Cochez la case concernée (1) :</div>
-            <div class="checkbox-group"><div class="checkbox-item"><div class="checkbox">X</div><div>Oeuvre ou organisme d'intérêt général</div></div></div>
-          </div>
-
-          <h2>Donateur</h2>
-          <div class="border-box">
-            <div class="row"><div class="label">Nom et Prénoms :</div><div class="value"><strong>${note.demandeur}</strong></div></div>
-            <div class="row"><div class="label">Adresse :</div><div class="value">${note.adresse || '.............................................................................................'}</div></div>
-          </div>
-
-          <div style="margin: 20px 0;">
-            Le bénéficiaire reconnaît avoir reçu au titre des dons et versements ouvrant droit à réduction d'impôt, la somme de :<br/>
-            <div class="row" style="margin-top: 10px;"><div class="label">Somme (en chiffres) :</div><div class="value"><strong>*** ${formatMontant(note.montant)} euros ***</strong></div></div>
-            <div class="row" style="margin-top: 10px;"><div class="label">Somme en toutes lettres :</div><div class="value"><strong>${nombreEnLettres(note.montant)}</strong></div></div>
-            <div class="row" style="margin-top: 10px;"><div class="label">Date du don (jj/mm/aaaa) :</div><div class="value"><strong>${normaliserDateFR(note.date)}</strong></div></div>
-          </div>
-
-          <div class="border-box">
-            Le bénéficiaire certifie sur l'honneur que les dons et versements qu'il reçoit ouvrent droit à la réduction d'impôt prévue à l'article (3) :<br/>
-            <div style="display: flex; gap: 40px; margin-top: 10px; font-weight: bold;">
-              <div class="checkbox-item"><div class="checkbox">X</div><div>200 du CGI</div></div>
-              <div class="checkbox-item"><div class="checkbox">&nbsp;</div><div>238 bis du CGI</div></div>
-              <div class="checkbox-item"><div class="checkbox">&nbsp;</div><div>885-0 V bis A du CGI</div></div>
-            </div>
-          </div>
-
-          <div style="display: flex; gap: 20px;">
-            <div class="border-box" style="flex: 1;">
-              <strong>Forme du don :</strong>
-              <div class="checkbox-group">
-                <div class="checkbox-item"><div class="checkbox">&nbsp;</div><div>Acte authentique</div></div>
-                <div class="checkbox-item"><div class="checkbox">&nbsp;</div><div>Acte sous seing privé</div></div>
-                <div class="checkbox-item"><div class="checkbox">&nbsp;</div><div>Déclaration de don manuel</div></div>
-                <div class="checkbox-item"><div class="checkbox">X</div><div>Autres</div></div>
-              </div>
-            </div>
-            <div class="border-box" style="flex: 1;">
-              <strong>Nature du don :</strong>
-              <div class="checkbox-group">
-                <div class="checkbox-item"><div class="checkbox">&nbsp;</div><div>Numéraire</div></div>
-                <div class="checkbox-item"><div class="checkbox">&nbsp;</div><div>Titres de sociétés cotés</div></div>
-                <div class="checkbox-item"><div class="checkbox">X</div><div>Autres (4)</div></div>
-              </div>
-            </div>
-          </div>
-          
-          <div style="margin-bottom: 20px; font-size: 12px;">
-             (4) notamment abandon de revenus ou de produits ; <strong>frais engagés par les bénévoles, dont ils renoncent expressément au remboursement</strong>
-          </div>
-
-          <div style="display: flex; justify-content: space-between; margin-top: 30px;">
-            <div style="width: 45%; text-align: center;">
-              <strong>Date et signature</strong><br/><span style="font-size: 10px;">(Le Trésorier)</span><br/><br/>
-              Le ${normaliserDateFR(new Date())}
-              <div style="height: 100px; margin-top: 10px; display: flex; align-items: center; justify-content: center;">
-                ${sigTresorier ? `<img src="${sigTresorier}" style="max-height: 90px; max-width: 100%;" />` : '<span style="color:#ccc">Aucune signature paramétrée</span>'}
-              </div>
-            </div>
-            <div style="width: 45%; text-align: center;">
-              <strong>Date et signature</strong><br/><span style="font-size: 10px;">(Le Président)</span><br/><br/>
-              Le ${normaliserDateFR(new Date())}
-              <div style="height: 100px; margin-top: 10px; display: flex; align-items: center; justify-content: center;">
-                ${sigPresident ? `<img src="${sigPresident}" style="max-height: 90px; max-width: 100%;" />` : '<span style="color:#ccc">Aucune signature paramétrée</span>'}
-              </div>
-            </div>
-          </div>
-
-          <div class="footer-text">
-            (1) ou n'indiquez que les renseignements concernant l'organisme<br/>(2) dons effectués par les entreprises<br/>(3) L'organisme bénéficiaire peut cocher une ou plusieurs cases.<br/>
-            Il est rappelé que la délivrance irrégulière de reçus fiscaux par l'organisme bénéficiaire est susceptible de donner lieu à une amende fiscale égale à 25% des sommes indûment mentionnées sur ces documents.
-          </div>
-          <button class="print-btn" onclick="window.print()">🖨️ Imprimer / Sauvegarder en PDF</button>
-        </body>
-      </html>
-    `;
-    win.document.write(htmlContent);
-    win.document.close();
-  };
-
-  const getStatusBadge = (statut, type) => {
+  const getStatusBadge = (statut) => {
     switch (statut) {
       case 'attente_president': return <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded-md text-[10px] font-bold uppercase flex items-center gap-1"><Clock size={12}/> Attente Président</span>;
       case 'attente_tresorier': return <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-md text-[10px] font-bold uppercase flex items-center gap-1"><Clock size={12}/> Attente Trésorier</span>;
@@ -3206,40 +3091,6 @@ const NotesFrais = ({ transactionsGlobales }) => {
         </div>
       )}
 
-      {/* MODAL DE GESTION DES SIGNATURES */}
-      {showSigModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl border border-indigo-100 w-full max-w-md overflow-hidden transition-all scale-100">
-            <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 p-6 text-white flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-white/10 backdrop-blur-md rounded-2xl"><FileSignature size={22} className="text-indigo-100" /></div>
-                <div><h3 className="font-bold text-lg leading-tight">Paramétrer les signatures</h3><p className="text-indigo-200 text-xs mt-0.5">Apparaîtront sur les Cerfas</p></div>
-              </div>
-              <button onClick={() => setShowSigModal(false)} className="text-white/70 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-colors"><XCircle size={20} /></button>
-            </div>
-            <div className="p-6 space-y-6">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Signature du Trésorier</label>
-                <div className="flex items-center gap-4">
-                  {signatures.tresorier ? <img src={signatures.tresorier} alt="Trésorier" className="h-12 w-auto border border-slate-200 rounded p-1" /> : <div className="h-12 w-24 border border-slate-200 rounded bg-slate-50 flex items-center justify-center text-xs text-slate-400">Aucune</div>}
-                  <input type="file" accept="image/*" onChange={(e) => handleSignatureUpload(e, 'tresorier')} className="text-xs" />
-                </div>
-              </div>
-              <div className="border-t border-slate-100 pt-4">
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Signature du Président</label>
-                <div className="flex items-center gap-4">
-                  {signatures.president ? <img src={signatures.president} alt="Président" className="h-12 w-auto border border-slate-200 rounded p-1" /> : <div className="h-12 w-24 border border-slate-200 rounded bg-slate-50 flex items-center justify-center text-xs text-slate-400">Aucune</div>}
-                  <input type="file" accept="image/*" onChange={(e) => handleSignatureUpload(e, 'president')} className="text-xs" />
-                </div>
-              </div>
-            </div>
-            <div className="p-4 bg-slate-50/80 border-t border-slate-100 flex justify-end">
-              <button onClick={() => setShowSigModal(false)} className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md">Fermer</button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
@@ -3247,19 +3098,24 @@ const NotesFrais = ({ transactionsGlobales }) => {
           </h2>
           <p className="text-slate-500 text-sm mt-1">Gérez les demandes de remboursement et les abandons de frais (Dons).</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex bg-slate-100 p-1 rounded-xl">
-            <button onClick={() => setActiveView('saisie')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'saisie' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Saisie</button>
-            <button onClick={() => setActiveView('suivi')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'suivi' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Suivi & Validations</button>
-          </div>
-          <button onClick={() => setShowSigModal(true)} className="p-2.5 rounded-xl bg-slate-100 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors" title="Paramétrer les signatures Cerfa">
-            <FileSignature size={18} />
-          </button>
+        <div className="flex bg-slate-100 p-1 rounded-xl">
+          <button onClick={() => setActiveView('saisie')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'saisie' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Saisir une dépense</button>
+          <button onClick={() => setActiveView('suivi')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'suivi' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Suivi & Validations</button>
         </div>
       </div>
 
       {activeView === 'saisie' && (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8 max-w-3xl mx-auto animate-fade-in">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8 max-w-3xl mx-auto animate-fade-in relative">
+          
+          {/* OVERLAY DE CHARGEMENT */}
+          {isUploading && (
+            <div className="absolute inset-0 z-10 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center rounded-2xl">
+              <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
+              <p className="font-bold text-indigo-900">Envoi des justificatifs en cours...</p>
+              <p className="text-xs text-indigo-600 mt-1">Merci de patienter (jusqu'à 5 Mo autorisés)</p>
+            </div>
+          )}
+
           <h3 className="font-black text-lg text-slate-800 mb-6 border-b border-slate-100 pb-4">Nouvelle déclaration de frais</h3>
           <form onSubmit={handleSubmit} className="space-y-6">
             
@@ -3316,22 +3172,29 @@ const NotesFrais = ({ transactionsGlobales }) => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-slate-50 p-4 rounded-xl border border-slate-200">
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Justificatif / Facture *</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex justify-between">
+                  <span>Justificatif / Facture *</span>
+                  <span className="text-[10px] font-normal text-indigo-500">Max. 5 Mo</span>
+                </label>
                 <input type="file" accept="image/*,.pdf" required onChange={(e) => handleFileChange(e, 'justificatifFile')} className="text-xs w-full" />
-                {formData.justificatifFile && <span className="text-[10px] text-emerald-600 font-bold">✓ Fichier attaché</span>}
+                {formData.justificatifFile && <span className="text-[10px] text-emerald-600 font-bold block mt-1">✓ {formData.justificatifFile.name} (Prêt à l'envoi)</span>}
               </div>
               {formData.typeFrais === 'remboursement' && (
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Votre RIB *</label>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex justify-between">
+                    <span>Votre RIB *</span>
+                    <span className="text-[10px] font-normal text-indigo-500">Max. 5 Mo</span>
+                  </label>
                   <input type="file" accept="image/*,.pdf" required onChange={(e) => handleFileChange(e, 'ribFile')} className="text-xs w-full" />
-                  {formData.ribFile && <span className="text-[10px] text-emerald-600 font-bold">✓ RIB attaché</span>}
+                  {formData.ribFile && <span className="text-[10px] text-emerald-600 font-bold block mt-1">✓ {formData.ribFile.name} (Prêt à l'envoi)</span>}
                 </div>
               )}
             </div>
 
             <div className="pt-4 border-t border-slate-100 flex justify-end">
-              <button type="submit" className={`text-white px-8 py-3 rounded-xl font-bold transition-all shadow-md flex items-center gap-2 active:scale-95 ${formData.typeFrais === 'abandon' ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-200' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200'}`}>
-                <Send size={18} /> {formData.typeFrais === 'abandon' ? 'Soumettre le Don' : 'Demander le remboursement'}
+              <button type="submit" disabled={isUploading} className={`text-white px-8 py-3 rounded-xl font-bold transition-all shadow-md flex items-center gap-2 ${isUploading ? 'bg-slate-400 cursor-not-allowed' : formData.typeFrais === 'abandon' ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-200 active:scale-95' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200 active:scale-95'}`}>
+                {isUploading ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span> : <Send size={18} />}
+                {isUploading ? 'Envoi en cours...' : formData.typeFrais === 'abandon' ? 'Soumettre le Don' : 'Demander le remboursement'}
               </button>
             </div>
           </form>
@@ -3379,7 +3242,7 @@ const NotesFrais = ({ transactionsGlobales }) => {
                     </td>
                     <td className="p-4 text-right font-black text-indigo-700 whitespace-nowrap">{formatMontant(note.montant)} €</td>
                     <td className="p-4">
-                      <div className="flex justify-center">{getStatusBadge(note.statut, note.typeFrais)}</div>
+                      <div className="flex justify-center">{getStatusBadge(note.statut)}</div>
                     </td>
                     <td className="p-4">
                       <div className="flex justify-center items-center gap-2 flex-wrap max-w-[150px] mx-auto">
@@ -3398,12 +3261,6 @@ const NotesFrais = ({ transactionsGlobales }) => {
                             </button>
                             <button onClick={() => setModal({ isOpen: true, type: 'refus', payload: note.id })} className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg w-full text-[10px] font-bold">Refuser</button>
                           </>
-                        )}
-
-                        {note.statut === 'traitee_abandon' && (
-                          <button onClick={() => generateRecuFiscal(note)} className="bg-purple-600 text-white hover:bg-purple-700 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors w-full flex items-center justify-center gap-1 mt-1 shadow-sm">
-                            <FileSignature size={12}/> Créer Reçu Fiscal
-                          </button>
                         )}
 
                         <button onClick={() => setModal({ isOpen: true, type: 'delete', payload: note.id })} className="text-slate-300 hover:text-rose-600 p-1.5 rounded-lg transition-colors mt-1" title="Supprimer la note">
