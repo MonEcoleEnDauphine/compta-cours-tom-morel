@@ -4202,6 +4202,7 @@ const [activeTab, setActiveTab] = useState(() => {
 
   const renderContent = () => {
     switch (activeTab) {
+      case 'vie_ecole': return <VieEcole />;
       case 'accueil_famille': return <AccueilFamille />;
       case 'contact': return <InfosContact />;
       case 'etat_financier': return <EtatFinancier transactionsGlobales={transactionsGlobales} />;
