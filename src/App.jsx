@@ -40,6 +40,601 @@ const PlaceholderPage = ({ title }) => (
   </div>
 );
 
+// --- MODULE : PLANNINGS (Cantine & Ménage) ---
+const ModulePlannings = ({ defaultTab = 'cantine' }) => {
+  const [activeTab, setActiveTab] = useState(defaultTab);
+  const [selectedPeriod, setSelectedPeriod] = useState('p1');
+  const [selectedFamilyFilter, setSelectedFamilyFilter] = useState('');
+
+  // Met à jour l'onglet interne si on clique sur un autre lien dans le menu de gauche
+  useEffect(() => {
+    setActiveTab(defaultTab);
+  }, [defaultTab]);
+
+  const periods = {
+    p1: { id: 'p1', name: 'Période 1', desc: 'Rentrée - Toussaint' },
+    p2: { id: 'p2', name: 'Période 2', desc: 'Toussaint - Noël' },
+    p3: { id: 'p3', name: 'Période 3', desc: 'Noël - Février' },
+    p4: { id: 'p4', name: 'Période 4', desc: 'Février - Pâques' },
+    p5: { id: 'p5', name: 'Période 5', desc: 'Pâques - Été' }
+  };
+
+  const cantineSchedule = {
+    p1: [
+      { date: 'Jeu 03/09/2026', type: 'Mixité', p1: 'FIARD (A)', p2: 'CHOMEL (N)', obs: 'Binôme A/N' },
+      { date: 'Ven 04/09/2026', type: 'En cordée', p1: 'Mme HERVET', p2: 'BOCCA (A)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Lun 07/09/2026', type: 'Classique', p1: 'LE LÉZEC (A)', p2: 'DE SERRES (N)', obs: 'Binôme A/N' },
+      { date: 'Mar 08/09/2026', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'LE LÉZEC (A)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Jeu 10/09/2026', type: 'Mixité', p1: 'LE LÉZEC (A)', p2: 'DE LASTIC ST JAL (N)', obs: 'Binôme A/N' },
+      { date: 'Ven 11/09/2026', type: 'En cordée', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'MELLIES (N)', obs: 'Binôme A/N' },
+      { date: 'Lun 14/09/2026', type: 'Classique', p1: 'LE LÉZEC (A)', p2: 'CHOMEL (N)', obs: 'Binôme A/N' },
+      { date: 'Mar 15/09/2026', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'CONRNET-BOUBE (N)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 17/09/2026', type: 'Mixité', p1: 'FIARD (A)', p2: 'CONRNET-BOUBE (N)', obs: 'Binôme A/N' },
+      { date: 'Ven 18/09/2026', type: 'En cordée', p1: 'Mme HERVET', p2: 'BEZIAT-MENUT (A)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Lun 21/09/2026', type: 'Classique', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
+      { date: 'Mar 22/09/2026', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'FAUVAIN (A)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Jeu 24/09/2026', type: 'Mixité', p1: 'FIARD (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 25/09/2026', type: 'En cordée', p1: 'BOCCA (A)', p2: 'BEZIAT-MENUT (A)', obs: '' },
+      { date: 'Lun 28/09/2026', type: 'Classique', p1: 'GREPAT (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 29/09/2026', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'MELLIES (N)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 01/10/2026', type: 'Mixité', p1: 'CONRNET-BOUBE (N)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
+      { date: 'Ven 02/10/2026', type: 'En cordée', p1: 'Mme HERVET', p2: 'BEZIAT-MENUT (A)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Lun 05/10/2026', type: 'Classique', p1: 'DE MALAUSSENE (A)', p2: 'RIOBÉ (A)', obs: '' },
+      { date: 'Mar 06/10/2026', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'FAUVAIN (A)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Jeu 08/10/2026', type: 'Mixité', p1: 'FIARD (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 09/10/2026', type: 'En cordée', p1: 'BOCCA (A)', p2: 'BEZIAT-MENUT (A)', obs: '' },
+      { date: 'Lun 12/10/2026', type: 'Classique', p1: 'GREPAT (A)', p2: 'TAISSIDRE-CARVALHO (A)', obs: '' },
+      { date: 'Mar 13/10/2026', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'MELLIES (N)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 15/10/2026', type: 'Mixité', p1: 'CONRNET-BOUBE (N)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
+      { date: 'Ven 16/10/2026', type: 'En cordée', p1: 'Mme HERVET', p2: 'DE MALAUSSENE (A)', obs: 'Maîtresse 1/2 + Parent' },
+    ],
+    p2: [
+      { date: 'Lun 02/11/2026', type: 'Classique', p1: 'DE MALAUSSENE (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 03/11/2026', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'RIOBÉ (A)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Jeu 05/11/2026', type: 'Mixité', p1: 'DE MALAUSSENE (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 06/11/2026', type: 'En cordée', p1: 'BOCCA (A)', p2: 'LE LÉZEC (A)', obs: '' }, 
+      { date: 'Lun 09/11/2026', type: 'Classique', p1: 'GREPAT (A)', p2: 'RIOBÉ (A)', obs: '' },
+      { date: 'Mar 10/11/2026', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'MELLIES (N)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 12/11/2026', type: 'Mixité', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
+      { date: 'Ven 13/11/2026', type: 'En cordée', p1: 'Mme HERVET', p2: 'BEZIAT-MENUT (A)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Lun 16/11/2026', type: 'Classique', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 17/11/2026', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'FAUVAIN (A)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Jeu 19/11/2026', type: 'Mixité', p1: 'FIARD (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 20/11/2026', type: 'En cordée', p1: 'BOCCA (A)', p2: 'LE LÉZEC (A)', obs: '' }, 
+      { date: 'Lun 23/11/2026', type: 'Classique', p1: 'DE MALAUSSENE (A)', p2: 'RIOBÉ (A)', obs: '' },
+      { date: 'Mar 24/11/2026', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'MELLIES (N)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 26/11/2026', type: 'Mixité', p1: 'CONRNET-BOUBE (N)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
+      { date: 'Ven 27/11/2026', type: 'En cordée', p1: 'Mme HERVET', p2: 'DE MALAUSSENE (A)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Lun 30/11/2026', type: 'Classique', p1: 'GREPAT (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 01/12/2026', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'FAUVAIN (A)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Jeu 03/12/2026', type: 'Mixité', p1: 'FIARD (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 04/12/2026', type: 'En cordée', p1: 'BOCCA (A)', p2: 'LE LÉZEC (A)', obs: '' }, 
+      { date: 'Lun 07/12/2026', type: 'Classique', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'RIOBÉ (A)', obs: '' },
+      { date: 'Mar 08/12/2026', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'MELLIES (N)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 10/12/2026', type: 'Mixité', p1: 'CONRNET-BOUBE (N)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
+      { date: 'Ven 11/12/2026', type: 'En cordée', p1: 'Mme HERVET', p2: 'LE LÉZEC (A)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Lun 14/12/2026', type: 'Classique', p1: 'DE MALAUSSENE (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 15/12/2026', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'FAUVAIN (A)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Jeu 17/12/2026', type: 'Mixité', p1: 'FIARD (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 18/12/2026', type: 'En cordée', p1: 'BOCCA (A)', p2: 'BEZIAT-MENUT (A)', obs: '' }, 
+    ],
+    p3: [
+      { date: 'Lun 04/01/2027', type: 'Classique', p1: 'GREPAT (A)', p2: 'RIOBÉ (A)', obs: '' },
+      { date: 'Mar 05/01/2027', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'MELLIES (N)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 07/01/2027', type: 'Mixité', p1: 'CONRNET-BOUBE (N)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
+      { date: 'Ven 08/01/2027', type: 'En cordée', p1: 'Mme HERVET', p2: 'FIARD (A)', obs: 'Maîtresse 1/2 + Parent' }, 
+      { date: 'Lun 11/01/2027', type: 'Classique', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 12/01/2027', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'RIOBÉ (A)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Jeu 14/01/2027', type: 'Mixité', p1: 'FIARD (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 15/01/2027', type: 'En cordée', p1: 'BOCCA (A)', p2: 'LE LÉZEC (A)', obs: '' }, 
+      { date: 'Lun 18/01/2027', type: 'Classique', p1: 'DE MALAUSSENE (A)', p2: 'RIOBÉ (A)', obs: '' },
+      { date: 'Mar 19/01/2027', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'MELLIES (N)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 21/01/2027', type: 'Mixité', p1: 'DE MALAUSSENE (A)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
+      { date: 'Ven 22/01/2027', type: 'En cordée', p1: 'Mme HERVET', p2: 'GREPAT (A)', obs: 'Maîtresse 1/2 + Parent' }, 
+      { date: 'Lun 25/01/2027', type: 'Classique', p1: 'GREPAT (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 26/01/2027', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'FAUVAIN (A)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Jeu 28/01/2027', type: 'Mixité', p1: 'GREPAT (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 29/01/2027', type: 'En cordée', p1: 'BOCCA (A)', p2: 'BEZIAT-MENUT (A)', obs: '' }, 
+      { date: 'Lun 01/02/2027', type: 'Classique', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'RIOBÉ (A)', obs: '' },
+      { date: 'Mar 02/02/2027', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'MELLIES (N)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 04/02/2027', type: 'Mixité', p1: 'CONRNET-BOUBE (N)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
+      { date: 'Ven 05/02/2027', type: 'En cordée', p1: 'Mme HERVET', p2: 'LE LÉZEC (A)', obs: 'Maîtresse 1/2 + Parent' },
+    ],
+    p4: [
+      { date: 'Lun 22/02/2027', type: 'Classique', p1: 'DE MALAUSSENE (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 23/02/2027', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'FAUVAIN (A)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Jeu 25/02/2027', type: 'Mixité', p1: 'FIARD (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 26/02/2027', type: 'En cordée', p1: 'BOCCA (A)', p2: 'TAISSIDRE-CARVALHO (A)', obs: '' },
+      { date: 'Lun 01/03/2027', type: 'Classique', p1: 'GREPAT (A)', p2: 'RIOBÉ (A)', obs: '' },
+      { date: 'Mar 02/03/2027', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'MELLIES (N)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 04/03/2027', type: 'Mixité', p1: 'CONRNET-BOUBE (N)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
+      { date: 'Ven 05/03/2027', type: 'En cordée', p1: 'Mme HERVET', p2: 'CONRNET-BOUBE (N)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Lun 08/03/2027', type: 'Classique', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 09/03/2027', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'FAUVAIN (A)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Jeu 11/03/2027', type: 'Mixité', p1: 'FIARD (A)', p2: 'DE MALAUSSENE (A)', obs: '' },
+      { date: 'Ven 12/03/2027', type: 'En cordée', p1: 'BOCCA (A)', p2: 'BEZIAT-MENUT (A)', obs: '' }, 
+      { date: 'Lun 15/03/2027', type: 'Classique', p1: 'DE MALAUSSENE (A)', p2: 'RIOBÉ (A)', obs: '' },
+      { date: 'Mar 16/03/2027', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'MELLIES (N)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 18/03/2027', type: 'Mixité', p1: 'CONRNET-BOUBE (N)', p2: 'GREPAT (A)', obs: '' },
+      { date: 'Ven 19/03/2027', type: 'En cordée', p1: 'Mme HERVET', p2: 'DE MALAUSSENE (A)', obs: 'Maîtresse 1/2 + Parent' }, 
+      { date: 'Lun 22/03/2027', type: 'Classique', p1: 'GREPAT (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 23/03/2027', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'FAUVAIN (A)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Jeu 25/03/2027', type: 'Mixité', p1: 'FIARD (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Mar 30/03/2027', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'MELLIES (N)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 01/04/2027', type: 'Mixité', p1: 'CONRNET-BOUBE (N)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
+      { date: 'Ven 02/04/2027', type: 'En cordée', p1: 'BOCCA (A)', p2: 'BEZIAT-MENUT (A)', obs: '' }, 
+      { date: 'Lun 05/04/2027', type: 'Classique', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'RIOBÉ (A)', obs: '' },
+      { date: 'Mar 06/04/2027', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'FAUVAIN (A)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Jeu 08/04/2027', type: 'Mixité', p1: 'FIARD (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 09/04/2027', type: 'En cordée', p1: 'Mme HERVET', p2: 'LE LÉZEC (A)', obs: 'Maîtresse 1/2 + Parent' },
+    ],
+    p5: [
+      { date: 'Lun 26/04/2027', type: 'Classique', p1: 'DE MALAUSSENE (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 27/04/2027', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'MELLIES (N)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 29/04/2027', type: 'Mixité', p1: 'CONRNET-BOUBE (N)', p2: 'TAISSIDRE-CARVALHO (A)', obs: '' },
+      { date: 'Ven 30/04/2027', type: 'En cordée', p1: 'BOCCA (A)', p2: 'BEZIAT-MENUT (A)', obs: '' },
+      { date: 'Lun 03/05/2027', type: 'Classique', p1: 'GREPAT (A)', p2: 'RIOBÉ (A)', obs: '' },
+      { date: 'Mar 04/05/2027', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'FAUVAIN (A)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Lun 10/05/2027', type: 'Classique', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 11/05/2027', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'MELLIES (N)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 13/05/2027', type: 'Mixité', p1: 'FIARD (A)', p2: 'GREPAT (A)', obs: '' },
+      { date: 'Ven 14/05/2027', type: 'En cordée', p1: 'Mme HERVET', p2: 'BEZIAT-MENUT (A)', obs: 'Maîtresse 1/2 + Parent' }, 
+      { date: 'Mar 18/05/2027', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'FAUVAIN (A)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Jeu 20/05/2027', type: 'Mixité', p1: 'CONRNET-BOUBE (N)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
+      { date: 'Ven 21/05/2027', type: 'En cordée', p1: 'BOCCA (A)', p2: 'BEZIAT-MENUT (A)', obs: '' },
+      { date: 'Lun 24/05/2027', type: 'Classique', p1: 'DE MALAUSSENE (A)', p2: 'RIOBÉ (A)', obs: '' },
+      { date: 'Mar 25/05/2027', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'TAISSIDRE-CARVALHO (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 27/05/2027', type: 'Mixité', p1: 'FIARD (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 28/05/2027', type: 'En cordée', p1: 'Mme HERVET', p2: 'LE LÉZEC (A)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Lun 31/05/2027', type: 'Classique', p1: 'GREPAT (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 01/06/2027', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'FAUVAIN (A)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Jeu 03/06/2027', type: 'Mixité', p1: 'CONRNET-BOUBE (N)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
+      { date: 'Ven 04/06/2027', type: 'En cordée', p1: 'BOCCA (A)', p2: 'BEZIAT-MENUT (A)', obs: '' },
+      { date: 'Lun 07/06/2027', type: 'Classique', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'RIOBÉ (A)', obs: '' },
+      { date: 'Mar 08/06/2027', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'MELLIES (N)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 10/06/2027', type: 'Mixité', p1: 'FIARD (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 11/06/2027', type: 'En cordée', p1: 'Mme HERVET', p2: 'LE LÉZEC (A)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Lun 14/06/2027', type: 'Classique', p1: 'DE MALAUSSENE (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 15/06/2027', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'FAUVAIN (A)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Jeu 17/06/2027', type: 'Mixité', p1: 'CONRNET-BOUBE (N)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
+      { date: 'Ven 18/06/2027', type: 'En cordée', p1: 'BOCCA (A)', p2: 'BEZIAT-MENUT (A)', obs: '' },
+      { date: 'Lun 21/06/2027', type: 'Classique', p1: 'GREPAT (A)', p2: 'RIOBÉ (A)', obs: '' },
+      { date: 'Mar 22/06/2027', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'MELLIES (N)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 24/06/2027', type: 'Mixité', p1: 'FIARD (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 25/06/2027', type: 'En cordée', p1: 'Mme HERVET', p2: 'LE LÉZEC (A)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Lun 28/06/2027', type: 'Classique', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 29/06/2027', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'FAUVAIN (A)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Jeu 01/07/2027', type: 'Mixité', p1: 'CONRNET-BOUBE (N)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
+      { date: 'Ven 02/07/2027', type: 'En cordée', p1: 'BOCCA (A)', p2: 'BEZIAT-MENUT (A)', obs: '' },
+    ],
+  };
+
+  const menageSchedule = {
+    p1: [
+      { we: '05/09 - 06/09', fam: 'Famille TAISSIDRE-CARVALHO', obs: 'Garantie 1 ménage' },
+      { we: '12/09 - 13/09', fam: 'Famille GREPAT', obs: 'Garantie 1 ménage' },
+      { we: '19/09 - 20/09', fam: 'Famille DE MALAUSSENE', obs: 'Garantie 1 ménage' },
+      { we: '26/09 - 27/09', fam: 'Famille RIOBÉ', obs: 'Garantie 1 ménage' },
+      { we: '03/10 - 04/10', fam: 'Famille DE SERRES', obs: 'Garantie 1 ménage' },
+      { we: '10/10 - 11/10', fam: 'Famille FAUVAIN', obs: 'Garantie 1 ménage' },
+      { we: '17/10 - 18/10', fam: 'Famille LE LÉZEC', obs: 'Début Vac. (Membre Asso)' }
+    ],
+    p2: [
+      { we: '07/11 - 08/11', fam: 'Famille BOCCA', obs: 'Garantie 1 ménage' },
+      { we: '14/11 - 15/11', fam: 'Famille BEZIAT-MENUT', obs: 'Garantie 1 ménage' },
+      { we: '21/11 - 22/11', fam: 'Famille CHOMEL', obs: 'Garantie 1 ménage' },
+      { we: '28/11 - 29/11', fam: 'Famille FIARD', obs: 'Garantie 1 ménage' },
+      { we: '05/12 - 06/12', fam: 'Famille DE LASTIC ST JAL', obs: 'Garantie 1 ménage' },
+      { we: '12/12 - 13/12', fam: 'Famille MELLIES', obs: 'Garantie 1 ménage' },
+      { we: '19/12 - 20/12', fam: 'Famille DE MALAUSSENE', obs: 'Début Vac. (Membre Asso)' }
+    ],
+    p3: [
+      { we: '09/01 - 10/01', fam: 'Famille CONRNET-BOUBE', obs: 'Garantie 1 ménage' },
+      { we: '16/01 - 17/01', fam: 'Famille FAUVAIN', obs: 'Compense cantine' },
+      { we: '23/01 - 24/01', fam: 'Famille LE LÉZEC', obs: 'Compense cantine' },
+      { we: '30/01 - 31/01', fam: 'Famille GREPAT', obs: 'Compense cantine' },
+      { we: '06/02 - 07/02', fam: 'Famille BEZIAT-MENUT', obs: 'Début Vac. (Membre Asso)' }
+    ],
+    p4: [
+      { we: '27/02 - 28/02', fam: 'Famille TAISSIDRE-CARVALHO', obs: 'Compense cantine' },
+      { we: '06/03 - 07/03', fam: 'Famille DE SERRES', obs: 'Compense cantine' },
+      { we: '13/03 - 14/03', fam: 'Famille RIOBÉ', obs: 'Compense cantine' },
+      { we: '20/03 - 21/03', fam: 'Famille DE MALAUSSENE', obs: 'Compense cantine' },
+      { we: '27/03 - 28/03', fam: 'Famille BOCCA', obs: 'Compense cantine' },
+      { we: '03/04 - 04/04', fam: 'Famille FIARD', obs: 'Compense cantine' },
+      { we: '10/04 - 11/04', fam: 'Famille FAUVAIN', obs: 'Début Vac. (Membre Asso)' }
+    ],
+    p5: [
+      { we: '08/05 - 09/05', fam: 'Famille CHOMEL', obs: 'Compense cantine' },
+      { we: '15/05 - 16/05', fam: 'Famille MELLIES', obs: 'Compense cantine' },
+      { we: '22/05 - 23/05', fam: 'Famille DE LASTIC ST JAL', obs: 'Compense cantine' },
+      { we: '29/05 - 30/05', fam: 'Famille CONRNET-BOUBE', obs: 'Compense cantine' },
+      { we: '05/06 - 06/06', fam: 'Famille GREPAT', obs: 'Compense cantine' },
+      { we: '12/06 - 13/06', fam: 'Famille LE LÉZEC', obs: 'Compense cantine' },
+      { we: '19/06 - 20/06', fam: 'Famille TAISSIDRE-CARVALHO', obs: 'Compense cantine' },
+      { we: '26/06 - 27/06', fam: 'Famille DE SERRES', obs: 'Compense cantine' },
+      { we: '03/07 - 04/07', fam: 'Famille BEZIAT-MENUT', obs: 'Début Vac. (Membre Asso)' }
+    ]
+  };
+
+  const familyStats = useMemo(() => {
+    const stats = {};
+    const normalizeName = (name) => {
+      if (!name || name === '-') return '';
+      return name.replace(/\s*\(A\)/g, '').replace(/\s*\(N\)/g, '').replace('Famille ', '').trim();
+    };
+
+    Object.values(cantineSchedule).flat().forEach(row => {
+      const p1 = normalizeName(row.p1);
+      const p2 = normalizeName(row.p2);
+      if (p1) { stats[p1] = stats[p1] || { cantine: 0, menage: 0, isTeacher: p1.startsWith('Mme') }; stats[p1].cantine += 1; }
+      if (p2) { stats[p2] = stats[p2] || { cantine: 0, menage: 0, isTeacher: p2.startsWith('Mme') }; stats[p2].cantine += 1; }
+    });
+
+    Object.values(menageSchedule).flat().forEach(row => {
+      const fam = normalizeName(row.fam);
+      if (fam) { stats[fam] = stats[fam] || { cantine: 0, menage: 0, isTeacher: false }; stats[fam].menage += 1; }
+    });
+
+    return Object.entries(stats).map(([name, data]) => ({
+      name,
+      cantine: data.cantine,
+      menage: data.menage,
+      isTeacher: data.isTeacher,
+      total: data.cantine + data.menage
+    })).sort((a, b) => {
+      if (a.isTeacher && !b.isTeacher) return 1;
+      if (!a.isTeacher && b.isTeacher) return -1;
+      if (b.total !== a.total) return b.total - a.total;
+      return a.name.localeCompare(b.name);
+    });
+  }, []);
+
+  return (
+    <div className="bg-transparent font-sans text-slate-800 animate-fade-in">
+      <div className="max-w-6xl mx-auto">
+        
+        <div className="mb-6 text-center">
+          <h1 className="text-3xl font-bold text-slate-900 mb-2">Planning Scolaire 2026-2027 (Zone A)</h1>
+          <p className="text-slate-600">Tableau de bord de gestion des roulements de la Cantine et du Ménage</p>
+        </div>
+
+        <div className="flex flex-wrap justify-center gap-4 mb-6">
+          <button onClick={() => setActiveTab('cantine')} className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-medium transition-all shadow-sm ${activeTab === 'cantine' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-blue-50'}`}>
+            <Utensils size={18} /> Cantine
+          </button>
+          <button onClick={() => setActiveTab('menage')} className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-medium transition-all shadow-sm ${activeTab === 'menage' ? 'bg-emerald-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-emerald-50'}`}>
+            <Sparkles size={18} /> Ménage
+          </button>
+          <button onClick={() => setActiveTab('stats')} className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-medium transition-all shadow-sm ${activeTab === 'stats' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-indigo-50'}`}>
+            <BarChart3 size={18} /> Stats
+          </button>
+          <button onClick={() => setActiveTab('famille')} className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-medium transition-all shadow-sm ${activeTab === 'famille' ? 'bg-rose-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-rose-50'}`}>
+            <Search size={18} /> Famille
+          </button>
+          <button onClick={() => setActiveTab('regles')} className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-medium transition-all shadow-sm ${activeTab === 'regles' ? 'bg-amber-500 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-amber-50'}`}>
+            <Info size={18} /> Règles
+          </button>
+        </div>
+
+        {(activeTab === 'cantine' || activeTab === 'menage') && (
+          <div className="flex flex-wrap justify-center gap-2 mb-8 bg-white p-2 rounded-xl shadow-sm border border-slate-200">
+            {Object.values(periods).map((period) => (
+              <button
+                key={period.id}
+                onClick={() => setSelectedPeriod(period.id)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedPeriod === period.id ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+              >
+                {period.name} <span className="hidden sm:inline font-normal opacity-75">- {period.desc}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-slate-200">
+          
+          {activeTab === 'cantine' && (
+            <div className="animate-in fade-in duration-300">
+              <div className="bg-blue-50 p-6 border-b border-blue-100">
+                <h2 className="text-xl font-bold text-blue-900 flex items-center gap-2">
+                  <Calendar className="text-blue-600" /> Planning de Cantine : {periods[selectedPeriod].name}
+                </h2>
+                <p className="text-blue-700 text-sm mt-1">{periods[selectedPeriod].desc}</p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 text-slate-500 text-sm uppercase tracking-wider">
+                      <th className="p-4 font-semibold border-b border-slate-200">Date</th>
+                      <th className="p-4 font-semibold border-b border-slate-200">Procédure</th>
+                      <th className="p-4 font-semibold border-b border-slate-200">Intervenant 1</th>
+                      <th className="p-4 font-semibold border-b border-slate-200">Intervenant 2</th>
+                      <th className="p-4 font-semibold border-b border-slate-200">Observations</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {cantineSchedule[selectedPeriod].map((row, i) => (
+                      <tr key={i} className={`hover:bg-blue-50/50 transition-colors ${row.type === 'FERIÉ' ? 'bg-red-50/50' : ''}`}>
+                        <td className="p-4 font-medium text-slate-700 whitespace-nowrap">{row.date}</td>
+                        <td className="p-4 text-slate-600">
+                          <span className={`px-2 py-1 rounded-md text-xs font-medium ${row.type === 'Mixité' ? 'bg-purple-100 text-purple-700' : row.type === 'En cordée' ? 'bg-indigo-100 text-indigo-700' : row.type === 'Comme ils veulent' ? 'bg-teal-100 text-teal-700' : row.type === 'FERIÉ' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
+                            {row.type}
+                          </span>
+                        </td>
+                        <td className="p-4 text-slate-800 font-medium">{row.p1}</td>
+                        <td className="p-4 text-slate-800 font-medium">{row.p2}</td>
+                        <td className="p-4 text-slate-500 text-sm italic">{row.obs}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'menage' && (
+            <div className="animate-in fade-in duration-300">
+              <div className="bg-emerald-50 p-6 border-b border-emerald-100">
+                <h2 className="text-xl font-bold text-emerald-900 flex items-center gap-2">
+                  <Sparkles className="text-emerald-600" /> Planning de Ménage : {periods[selectedPeriod].name}
+                </h2>
+                <p className="text-emerald-700 text-sm mt-1">1 famille par week-end (Maîtresses exclues).</p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 text-slate-500 text-sm uppercase tracking-wider">
+                      <th className="p-4 font-semibold border-b border-slate-200">Week-end</th>
+                      <th className="p-4 font-semibold border-b border-slate-200">Famille Assignée</th>
+                      <th className="p-4 font-semibold border-b border-slate-200">Observations / Règles</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {menageSchedule[selectedPeriod].map((row, i) => (
+                      <tr key={i} className="hover:bg-emerald-50/50 transition-colors">
+                        <td className="p-4 font-medium text-slate-700 whitespace-nowrap">{row.we}</td>
+                        <td className="p-4 text-slate-800 font-bold">{row.fam}</td>
+                        <td className="p-4 text-slate-500 text-sm">{row.obs}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'stats' && (
+            <div className="animate-in fade-in duration-300">
+              <div className="bg-indigo-50 p-6 border-b border-indigo-100">
+                <h2 className="text-xl font-bold text-indigo-900 flex items-center gap-2">
+                  <BarChart3 className="text-indigo-600" /> Compteurs d'engagements Annuels
+                </h2>
+                <p className="text-indigo-700 text-sm mt-1">Cumul total des services sur l'année complète (Périodes 1 à 5).</p>
+              </div>
+              <div className="overflow-x-auto p-4 md:p-6">
+                <table className="w-full text-left border-collapse rounded-lg overflow-hidden border border-slate-200">
+                  <thead>
+                    <tr className="bg-slate-100 text-slate-600 text-sm uppercase tracking-wider">
+                      <th className="p-4 font-bold border-b border-slate-200">Famille / Intervenant</th>
+                      <th className="p-4 font-bold border-b border-slate-200 text-center">Tours de Cantine</th>
+                      <th className="p-4 font-bold border-b border-slate-200 text-center">Tours de Ménage</th>
+                      <th className="p-4 font-bold border-b border-slate-200 text-center bg-indigo-50">Total Services</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {familyStats.map((stat, i) => (
+                      <tr key={i} className={`hover:bg-slate-50 transition-colors ${stat.isTeacher ? 'bg-slate-50/50' : ''}`}>
+                        <td className="p-4 text-slate-800 font-medium">
+                          {stat.name} {stat.isTeacher && <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Équipe Éducative</span>}
+                        </td>
+                        <td className="p-4 text-center">
+                          <span className={`inline-block px-3 py-1 rounded-full text-sm font-bold ${stat.cantine > 0 ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-400'}`}>
+                            {stat.cantine}
+                          </span>
+                        </td>
+                        <td className="p-4 text-center">
+                          <span className={`inline-block px-3 py-1 rounded-full text-sm font-bold ${stat.menage > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
+                            {stat.menage}
+                          </span>
+                        </td>
+                        <td className="p-4 text-center bg-indigo-50/30">
+                          <span className="inline-block px-3 py-1 rounded-full text-sm font-bold bg-indigo-100 text-indigo-700">
+                            {stat.total}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'famille' && (
+            <div className="animate-in fade-in duration-300">
+              <div className="bg-rose-50 p-6 border-b border-rose-100 flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-rose-900 flex items-center gap-2">
+                    <Search className="text-rose-600" /> Profil et Engagements par Famille
+                  </h2>
+                  <p className="text-rose-700 text-sm mt-1">Sélectionnez une famille pour voir tout son planning annuel (Cantine & Ménage).</p>
+                </div>
+                <div className="w-full md:w-auto">
+                  <select 
+                    className="w-full md:w-64 p-2.5 rounded-lg border border-rose-200 shadow-sm focus:ring-rose-500 focus:border-rose-500 font-medium text-slate-700"
+                    value={selectedFamilyFilter}
+                    onChange={(e) => setSelectedFamilyFilter(e.target.value)}
+                  >
+                    <option value="">-- Choisir une famille --</option>
+                    {familyStats.map(f => (
+                      <option key={f.name} value={f.name}>{f.name} {f.isTeacher ? '(Maîtresse)' : ''}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              
+              {selectedFamilyFilter ? (
+                <div className="p-4 md:p-6 space-y-8">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4">
+                      <Utensils size={18} className="text-blue-600" /> Jours de Cantine pour {selectedFamilyFilter}
+                      <span className="ml-2 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-sm">
+                        {familyStats.find(f => f.name === selectedFamilyFilter)?.cantine || 0}
+                      </span>
+                    </h3>
+                    <div className="overflow-x-auto rounded-lg border border-slate-200">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
+                            <th className="p-3 font-semibold border-b border-slate-200">Période</th>
+                            <th className="p-3 font-semibold border-b border-slate-200">Date</th>
+                            <th className="p-3 font-semibold border-b border-slate-200">Procédure</th>
+                            <th className="p-3 font-semibold border-b border-slate-200">En binôme avec</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {Object.entries(cantineSchedule).flatMap(([pId, rows]) => 
+                            rows.filter(r => (r.p1 || '').includes(selectedFamilyFilter) || (r.p2 || '').includes(selectedFamilyFilter))
+                                .map((r, i) => {
+                                  const isP1 = (r.p1 || '').includes(selectedFamilyFilter);
+                                  const partner = isP1 ? r.p2 : r.p1;
+                                  return (
+                                    <tr key={`${pId}-${i}`} className="hover:bg-slate-50">
+                                      <td className="p-3 text-slate-600 text-sm font-medium">{periods[pId].name}</td>
+                                      <td className="p-3 font-bold text-slate-800 whitespace-nowrap">{r.date}</td>
+                                      <td className="p-3 text-slate-600 text-sm">{r.type}</td>
+                                      <td className="p-3 text-slate-700">{partner}</td>
+                                    </tr>
+                                  );
+                                })
+                          )}
+                          {Object.entries(cantineSchedule).flatMap(([pId, rows]) => rows.filter(r => (r.p1 || '').includes(selectedFamilyFilter) || (r.p2 || '').includes(selectedFamilyFilter))).length === 0 && (
+                            <tr><td colSpan="4" className="p-4 text-center text-slate-500 italic">Aucun jour de cantine assigné.</td></tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4">
+                      <Sparkles size={18} className="text-emerald-600" /> Week-ends de Ménage pour {selectedFamilyFilter}
+                      <span className="ml-2 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-sm">
+                        {familyStats.find(f => f.name === selectedFamilyFilter)?.menage || 0}
+                      </span>
+                    </h3>
+                    <div className="overflow-x-auto rounded-lg border border-slate-200">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
+                            <th className="p-3 font-semibold border-b border-slate-200">Période</th>
+                            <th className="p-3 font-semibold border-b border-slate-200">Week-end</th>
+                            <th className="p-3 font-semibold border-b border-slate-200">Observations</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {Object.entries(menageSchedule).flatMap(([pId, rows]) => 
+                            rows.filter(r => (r.fam || '').includes(selectedFamilyFilter))
+                                .map((r, i) => (
+                                  <tr key={`${pId}-${i}`} className="hover:bg-slate-50">
+                                    <td className="p-3 text-slate-600 text-sm font-medium">{periods[pId].name}</td>
+                                    <td className="p-3 font-bold text-slate-800 whitespace-nowrap">{r.we}</td>
+                                    <td className="p-3 text-slate-600 text-sm">{r.obs}</td>
+                                  </tr>
+                                ))
+                          )}
+                          {Object.entries(menageSchedule).flatMap(([pId, rows]) => rows.filter(r => (r.fam || '').includes(selectedFamilyFilter))).length === 0 && (
+                            <tr><td colSpan="3" className="p-4 text-center text-slate-500 italic">Aucun week-end de ménage assigné.</td></tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-12 text-center text-slate-400 flex flex-col items-center">
+                  <Search size={48} className="mb-4 opacity-20" />
+                  <p>Veuillez sélectionner une famille dans le menu déroulant ci-dessus pour afficher son planning complet.</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'regles' && (
+            <div className="p-6 md:p-8 animate-in fade-in duration-300">
+              <h2 className="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                <CheckCircle className="text-amber-500" /> Récapitulatif de vos Demandes
+              </h2>
+              
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="bg-slate-50 rounded-xl p-5 border border-slate-200 hover:shadow-md transition-shadow">
+                  <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
+                    <Utensils size={18} className="text-slate-500"/> Procédure des repas
+                  </h3>
+                  <ul className="space-y-2 text-sm text-slate-600">
+                    <li><strong className="text-slate-700">Lundi :</strong> Classique (Anciens + Nouveaux mélangés)</li>
+                    <li><strong className="text-slate-700">Mardi :</strong> Comme ils veulent</li>
+                    <li><strong className="text-slate-700">Jeudi :</strong> Mixité</li>
+                    <li><strong className="text-slate-700">Vendredi :</strong> En cordée</li>
+                  </ul>
+                </div>
+
+                <div className="bg-blue-50 rounded-xl p-5 border border-blue-100 hover:shadow-md transition-shadow">
+                  <h3 className="font-bold text-blue-900 mb-3 flex items-center gap-2">
+                    <Users size={18} className="text-blue-600"/> Règles des Familles
+                  </h3>
+                  <ul className="space-y-2 text-sm text-blue-800">
+                    <li><strong>Nouvelles Familles :</strong> Elles ne peuvent <u>jamais</u> faire la cantine deux jours d'affilée.</li>
+                    <li><strong>Période d'intégration (3 au 18 sept) :</strong> Création de binômes obligatoires <em>(1 Ancien Parent + 1 Nouveau)</em>.</li>
+                    <li><strong>Famille Le Lézec :</strong> Placée à la cantine <strong className="bg-blue-200 px-1 rounded">exactement 4 fois</strong> entre le 7 et le 19 septembre <em>(les Lundis, Mardis, Jeudis ou Vendredis)</em>, et allégée sur le reste de l'année pour compenser ce pic.</li>
+                  </ul>
+                </div>
+
+                <div className="bg-purple-50 rounded-xl p-5 border border-purple-100 md:col-span-2 hover:shadow-md transition-shadow">
+                  <h3 className="font-bold text-purple-900 mb-3 flex items-center gap-2">
+                    <Info size={18} className="text-purple-600"/> Contraintes des Maîtresses (Cantine)
+                  </h3>
+                  <ul className="grid md:grid-cols-2 gap-2 text-sm text-purple-800">
+                    <li><strong>Mme GERARD :</strong> Un Mardi sur deux, <strong>obligatoirement avec un parent</strong>.</li>
+                    <li><strong>Mme SUBLET :</strong> L'autre Mardi, avec un parent.</li>
+                    <li><strong>Mme HERVET :</strong> Un Vendredi sur deux, avec un parent.</li>
+                    <li className="text-purple-600 italic mt-2">Elles ne sont pas concernées par le ménage.</li>
+                  </ul>
+                </div>
+
+                <div className="bg-amber-50 rounded-xl p-5 border border-amber-100 md:col-span-2 hover:shadow-md transition-shadow">
+                  <h3 className="font-bold text-amber-900 mb-3 flex items-center gap-2">
+                    <AlertCircle size={18} className="text-amber-600"/> Particularités Familiales & Équité
+                  </h3>
+                  <ul className="space-y-3 text-sm text-amber-800">
+                    <li className="flex items-start gap-2">
+                      <span className="bg-amber-200 text-amber-800 px-2 py-0.5 rounded text-xs font-bold mt-0.5">Équité Totale</span>
+                      <span><strong>Bannissement L/V :</strong> Les familles très "flexibles" (Cornet-Boube, De Lastic St Jal) sont bannies le Lundi et très pénalisées le Vendredi. L'objectif est d'atteindre ~20 services totaux pour tous.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="bg-amber-200 text-amber-800 px-2 py-0.5 rounded text-xs font-bold mt-0.5">Fériés</span>
+                      <span>Le <strong>Vendredi Saint (26 mars 2027)</strong>, Lundi de Pâques, Ascension, et Pentecôte ne sont pas travaillés à la cantine.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="bg-amber-200 text-amber-800 px-2 py-0.5 rounded text-xs font-bold mt-0.5">Ménage Vacances</span>
+                      <span>Les <strong>membres de l'asso</strong> font le ménage <strong>uniquement sur le week-end qui débute les vacances</strong>. Chaque famille a au moins un (1) week-end de ménage garanti.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="bg-amber-200 text-amber-800 px-2 py-0.5 rounded text-xs font-bold mt-0.5">Cantine</span>
+                      <span><strong>2 familles (Fauvain, Riobé) font le Chant le Jeudi :</strong> Ne jamais les assigner à la cantine ce jour-là.</span>
+                    </li>
+                  </ul>
+                </div>
+
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // --- MODULE : BUDGET PRÉVISIONNEL ---
 const BudgetPrevisionnel = ({ transactionsGlobales }) => {
   const [anneeFiltre, setAnneeFiltre] = useState('2025'); // Par défaut Saison 2025-2026
@@ -4382,8 +4977,8 @@ const [activeTab, setActiveTab] = useState(() => {
       case 'tableau_bord': return <TableauBord transactionsGlobales={transactionsGlobales} />;
       case 'scolarite': return <PlaceholderPage title="Scolarité" />;
       case 'factures_parents': return <PlaceholderPage title="Mes Factures (Parents)" />;
-      case 'menage_weekend': return <PlaceholderPage title="Planning : Ménage Week-end" />;
-      case 'garde_cantine': return <PlaceholderPage title="Planning : Garde Cantine / Cour" />;
+      case 'menage_weekend': return <ModulePlannings defaultTab="menage" />;
+      case 'garde_cantine': return <ModulePlannings defaultTab="cantine" />;
       case 'fiche_travaux': return <FicheTravaux />;
       case 'budget': return <BudgetPrevisionnel transactionsGlobales={transactionsGlobales} />;
       case 'notes_frais': return <NotesFrais transactionsGlobales={transactionsGlobales} />;
