@@ -4979,8 +4979,7 @@ const [activeTab, setActiveTab] = useState(() => {
       case 'tableau_bord': return <TableauBord transactionsGlobales={transactionsGlobales} />;
       case 'scolarite': return <PlaceholderPage title="Scolarité" />;
       case 'factures_parents': return <PlaceholderPage title="Mes Factures (Parents)" />;
-      case 'menage_weekend': return <ModulePlannings defaultTab="menage" />;
-      case 'garde_cantine': return <ModulePlannings defaultTab="cantine" />;
+      case 'plannings': return <ModulePlannings defaultTab="cantine" />;
       case 'fiche_travaux': return <FicheTravaux />;
       case 'budget': return <BudgetPrevisionnel transactionsGlobales={transactionsGlobales} />;
       case 'notes_frais': return <NotesFrais transactionsGlobales={transactionsGlobales} />;
@@ -5035,14 +5034,14 @@ const [activeTab, setActiveTab] = useState(() => {
             </a>
           </div>
           
-          <div className="mb-6">
+         <div className="mb-6">
             <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Plannings Parents</h3>
-            <a href="#menage_weekend" onClick={() => handleNavigation('menage_weekend')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'menage_weekend' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-              <AlertTriangle size={18} /> Ménage Week-end
+            
+            {/* NOUVEAU : Bouton unifié pour tous les plannings */}
+            <a href="#plannings" onClick={() => handleNavigation('plannings')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'plannings' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
+              <Calendar size={18} /> Plannings Cantine & Ménage
             </a>
-            <a href="#garde_cantine" onClick={() => handleNavigation('garde_cantine')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'garde_cantine' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-              <CheckCircle2 size={18} /> Garde Cantine / Cour
-            </a>
+            
             <a href="#fiche_travaux" onClick={() => handleNavigation('fiche_travaux')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'fiche_travaux' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
               <Hammer size={18} /> Fiche Travaux
             </a>
