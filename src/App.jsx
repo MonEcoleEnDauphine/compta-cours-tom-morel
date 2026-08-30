@@ -47,9 +47,13 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [selectedPeriod, setSelectedPeriod] = useState('p1');
   const [selectedFamilyFilter, setSelectedFamilyFilter] = useState('');
+  
+  // NOUVEAU : État pour le filtre rapide au clic sur un nom
+  const [quickFilterFamily, setQuickFilterFamily] = useState(null);
 
   useEffect(() => {
     setActiveTab(defaultTab);
+    setQuickFilterFamily(null); // Reset du filtre si on change d'onglet depuis le menu
   }, [defaultTab]);
 
   const periods = {
@@ -258,13 +262,54 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     ]
   };
 
+  // --- NOUVEAU : UTILITAIRES POUR LES COULEURS DES FAMILLES ---
+  const normalizeName = (name) => {
+    if (!name || name === '-') return '';
+    return name.replace(/\s*\(A\)/g, '').replace(/\s*\(N\)/g, '').replace('Famille ', '').trim();
+  };
+
+  const getFamilyColor = (rawName) => {
+    const name = normalizeName(rawName);
+    if (!name) return 'bg-slate-100 text-slate-600';
+    if (name.startsWith('Mme')) return 'bg-pink-100 text-pink-800 border border-pink-200';
+    
+    const colors = {
+      'FAUVAIN': 'bg-red-100 text-red-800',
+      'LE LÉZEC': 'bg-orange-100 text-orange-800',
+      'GREPAT': 'bg-amber-100 text-amber-800',
+      'DE MALAUSSENE': 'bg-yellow-100 text-yellow-800',
+      'RIOBÉ': 'bg-lime-100 text-lime-800',
+      'DE SERRES': 'bg-green-100 text-green-800',
+      'BOCCA': 'bg-emerald-100 text-emerald-800',
+      'BEZIAT-MENUT': 'bg-teal-100 text-teal-800',
+      'CHOMEL': 'bg-cyan-100 text-cyan-800',
+      'FIARD': 'bg-sky-100 text-sky-800',
+      'DE LASTIC ST JAL': 'bg-blue-100 text-blue-800',
+      'MELLIES': 'bg-indigo-100 text-indigo-800',
+      'CONRNET-BOUBE': 'bg-violet-100 text-violet-800',
+      'TAISSIDRE-CARVALHO': 'bg-purple-100 text-purple-800'
+    };
+    return colors[name] || 'bg-slate-100 text-slate-700 border border-slate-200';
+  };
+
+  // Composant Badge Famille (Cliquable)
+  const FamilyPill = ({ rawName }) => {
+    if (!rawName || rawName === '-') return <span className="text-slate-400">-</span>;
+    const name = normalizeName(rawName);
+    const colorClass = getFamilyColor(rawName);
+    return (
+      <button 
+        onClick={() => setQuickFilterFamily(name)}
+        className={`px-2.5 py-1 rounded-md text-[11px] font-extrabold uppercase tracking-wider transition-all hover:ring-2 ring-offset-1 ring-indigo-300 hover:scale-105 active:scale-95 ${colorClass}`}
+        title={`Cliquez pour voir uniquement le planning de ${name}`}
+      >
+        {rawName}
+      </button>
+    );
+  };
+
   const familyStats = useMemo(() => {
     const stats = {};
-    const normalizeName = (name) => {
-      if (!name || name === '-') return '';
-      return name.replace(/\s*\(A\)/g, '').replace(/\s*\(N\)/g, '').replace('Famille ', '').trim();
-    };
-
     Object.values(cantineSchedule).flat().forEach(row => {
       const p1 = normalizeName(row.p1);
       const p2 = normalizeName(row.p2);
@@ -291,7 +336,16 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     });
   }, []);
 
-  // --- FONCTION D'EXPORT CSV (S'adapte à l'onglet en cours) ---
+  // --- FILTRES ACTIFS DES TABLEAUX ---
+  const displayedCantine = cantineSchedule[selectedPeriod].filter(r => 
+    !quickFilterFamily || (r.p1 || '').includes(quickFilterFamily) || (r.p2 || '').includes(quickFilterFamily)
+  );
+  
+  const displayedMenage = menageSchedule[selectedPeriod].filter(r => 
+    !quickFilterFamily || (r.fam || '').includes(quickFilterFamily)
+  );
+
+  // --- FONCTION D'EXPORT CSV ---
   const handleExportCSV = () => {
     let data = [];
     let filename = 'export.csv';
@@ -299,21 +353,15 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
 
     if (activeTab === 'cantine') {
       headers.push('Période', 'Date', 'Procédure', 'Intervenant 1', 'Intervenant 2', 'Observations');
-      cantineSchedule[selectedPeriod].forEach(r => {
-         data.push([periods[selectedPeriod].name, r.date, r.type, r.p1, r.p2, r.obs]);
-      });
-      filename = `Planning_Cantine_${selectedPeriod}.csv`;
+      displayedCantine.forEach(r => data.push([periods[selectedPeriod].name, r.date, r.type, r.p1, r.p2, r.obs]));
+      filename = `Planning_Cantine_${selectedPeriod}${quickFilterFamily ? `_${quickFilterFamily}` : ''}.csv`;
     } else if (activeTab === 'menage') {
       headers.push('Période', 'Week-end', 'Famille', 'Observations');
-      menageSchedule[selectedPeriod].forEach(r => {
-         data.push([periods[selectedPeriod].name, r.we, r.fam, r.obs]);
-      });
-      filename = `Planning_Menage_${selectedPeriod}.csv`;
+      displayedMenage.forEach(r => data.push([periods[selectedPeriod].name, r.we, r.fam, r.obs]));
+      filename = `Planning_Menage_${selectedPeriod}${quickFilterFamily ? `_${quickFilterFamily}` : ''}.csv`;
     } else if (activeTab === 'stats') {
       headers.push('Famille / Intervenant', 'Tours de Cantine', 'Tours de Ménage', 'Total Services');
-      familyStats.forEach(s => {
-         data.push([s.name, s.cantine, s.menage, s.total]);
-      });
+      familyStats.forEach(s => data.push([s.name, s.cantine, s.menage, s.total]));
       filename = `Statistiques_Engagements_Annuels.csv`;
     } else if (activeTab === 'famille') {
       if (!selectedFamilyFilter) return alert("Veuillez sélectionner une famille pour l'export.");
@@ -334,29 +382,21 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
       });
       filename = `Planning_Annuel_${selectedFamilyFilter.replace(/\s+/g, '_')}.csv`;
     } else {
-      return; // "Règles" n'est pas exportable en CSV
+      return; 
     }
 
-    if (data.length === 0) {
-      alert("Aucune donnée à exporter pour cette vue.");
-      return;
-    }
-
+    if (data.length === 0) return alert("Aucune donnée à exporter.");
     const csvContent = "\uFEFF" + [headers.join(';'), ...data.map(row => row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(';'))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    link.href = url; link.download = filename; document.body.appendChild(link);
+    link.click(); document.body.removeChild(link);
   };
 
   return (
     <div className="bg-transparent font-sans text-slate-800 animate-fade-in relative pb-10">
       
-      {/* Cacher les menus latéraux et hauts de l'ERP lors de l'impression (Magie CSS) */}
       <style>{`
         @media print {
           aside, header { display: none !important; }
@@ -372,7 +412,6 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
           <p className="text-slate-600 print:hidden">Tableau de bord de gestion des roulements de la Cantine et du Ménage</p>
         </div>
 
-        {/* NOUVEAU : BOUTONS IMPRIMER ET EXPORTER */}
         <div className="flex justify-center md:justify-end gap-3 mb-6 print:hidden">
           {activeTab !== 'regles' && (
             <button onClick={handleExportCSV} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors shadow-sm">
@@ -403,7 +442,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
         </div>
 
         {(activeTab === 'cantine' || activeTab === 'menage') && (
-          <div className="flex flex-wrap justify-center gap-2 mb-8 bg-white p-2 rounded-xl shadow-sm border border-slate-200 print:hidden">
+          <div className="flex flex-wrap justify-center gap-2 mb-4 bg-white p-2 rounded-xl shadow-sm border border-slate-200 print:hidden">
             {Object.values(periods).map((period) => (
               <button
                 key={period.id}
@@ -413,6 +452,19 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                 {period.name} <span className="hidden sm:inline font-normal opacity-75">- {period.desc}</span>
               </button>
             ))}
+          </div>
+        )}
+
+        {/* BANDEAU FILTRE ACTIF */}
+        {quickFilterFamily && (activeTab === 'cantine' || activeTab === 'menage') && (
+          <div className="bg-indigo-50 border border-indigo-200 text-indigo-900 px-6 py-3 mb-4 rounded-xl flex justify-between items-center shadow-sm print:hidden animate-fade-in">
+            <span className="font-bold text-sm flex items-center gap-2">
+              <Search size={16} className="text-indigo-600"/>
+              Filtre actif : Affichage exclusif pour la famille <span className="uppercase text-indigo-600">{quickFilterFamily}</span>
+            </span>
+            <button onClick={() => setQuickFilterFamily(null)} className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 hover:bg-indigo-700 transition-colors shadow-sm">
+              <XCircle size={14} /> Voir tout
+            </button>
           </div>
         )}
 
@@ -438,7 +490,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {cantineSchedule[selectedPeriod].map((row, i) => (
+                    {displayedCantine.map((row, i) => (
                       <tr key={i} className={`hover:bg-blue-50/50 transition-colors ${row.type === 'FERIÉ' ? 'bg-red-50/50' : ''}`}>
                         <td className="p-4 font-medium text-slate-700 whitespace-nowrap">{row.date}</td>
                         <td className="p-4 text-slate-600">
@@ -446,11 +498,14 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                             {row.type}
                           </span>
                         </td>
-                        <td className="p-4 text-slate-800 font-medium">{row.p1}</td>
-                        <td className="p-4 text-slate-800 font-medium">{row.p2}</td>
+                        <td className="p-4"><FamilyPill rawName={row.p1} /></td>
+                        <td className="p-4"><FamilyPill rawName={row.p2} /></td>
                         <td className="p-4 text-slate-500 text-sm italic">{row.obs}</td>
                       </tr>
                     ))}
+                    {displayedCantine.length === 0 && (
+                      <tr><td colSpan="5" className="p-8 text-center text-slate-500 italic">Aucun jour assigné pour cette famille sur cette période.</td></tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -475,13 +530,16 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {menageSchedule[selectedPeriod].map((row, i) => (
+                    {displayedMenage.map((row, i) => (
                       <tr key={i} className="hover:bg-emerald-50/50 transition-colors">
                         <td className="p-4 font-medium text-slate-700 whitespace-nowrap">{row.we}</td>
-                        <td className="p-4 text-slate-800 font-bold">{row.fam}</td>
+                        <td className="p-4"><FamilyPill rawName={row.fam} /></td>
                         <td className="p-4 text-slate-500 text-sm">{row.obs}</td>
                       </tr>
                     ))}
+                    {displayedMenage.length === 0 && (
+                      <tr><td colSpan="3" className="p-8 text-center text-slate-500 italic">Aucun ménage assigné pour cette famille sur cette période.</td></tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -588,7 +646,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                                       <td className="p-3 text-slate-600 text-sm font-medium">{periods[pId].name}</td>
                                       <td className="p-3 font-bold text-slate-800 whitespace-nowrap">{r.date}</td>
                                       <td className="p-3 text-slate-600 text-sm">{r.type}</td>
-                                      <td className="p-3 text-slate-700">{partner}</td>
+                                      <td className="p-3"><FamilyPill rawName={partner} /></td>
                                     </tr>
                                   );
                                 })
@@ -679,7 +737,6 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                     <Info size={18} className="text-purple-600"/> Contraintes des Maîtresses (Cantine)
                   </h3>
                   <ul className="grid md:grid-cols-2 gap-2 text-sm text-purple-800">
-                    {/* CORRECTION DU TEXTE DEMANDÉE PAR L'UTILISATEUR */}
                     <li><strong>Mme GERARD :</strong> Un Mardi sur deux, avec un parent.</li>
                     <li><strong>Mme SUBLET :</strong> L'autre Mardi, avec un parent.</li>
                     <li><strong>Mme HERVET :</strong> Un Vendredi sur deux, avec un parent.</li>
@@ -719,6 +776,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     </div>
   );
 };
+
 // --- MODULE : BUDGET PRÉVISIONNEL ---
 const BudgetPrevisionnel = ({ transactionsGlobales }) => {
   const [anneeFiltre, setAnneeFiltre] = useState('2025'); // Par défaut Saison 2025-2026
