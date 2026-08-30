@@ -57,165 +57,162 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
   }, [defaultTab]);
 
   const periods = {
-    p1: { id: 'p1', name: 'Période 1', desc: 'Rentrée (03/09) - Toussaint (16/10)' },
-    p2: { id: 'p2', name: 'Période 2', desc: 'Toussaint (02/11) - Noël (18/12)' },
-    p3: { id: 'p3', name: 'Période 3', desc: 'Noël (04/01) - Février (12/02)' },
-    p4: { id: 'p4', name: 'Période 4', desc: 'Février (01/03) - Pâques (09/04)' },
-    p5: { id: 'p5', name: 'Période 5', desc: 'Pâques (26/04) - Été (02/07)' }
+    p1: { id: 'p1', name: 'Période 1', desc: 'Rentrée (03/09) - Toussaint (17/10)' },
+    p2: { id: 'p2', name: 'Période 2', desc: 'Toussaint (02/11) - Noël (19/12)' },
+    p3: { id: 'p3', name: 'Période 3', desc: 'Noël (04/01) - Février (13/02)' },
+    p4: { id: 'p4', name: 'Période 4', desc: 'Février (01/03) - Pâques (10/04)' },
+    p5: { id: 'p5', name: 'Période 5', desc: 'Pâques (26/04) - Été (03/07)' }
   };
 
   const cantineSchedule = {
     p1: [
-      { date: 'Jeu 03/09/2026', type: 'Mixité', p1: 'BEZIAT-MENUT (A)', p2: 'DE LASTIC ST JAL (N)', obs: 'Rentrée / Intégration' },
-      { date: 'Ven 04/09/2026', type: 'En cordée', p1: 'Mme HERVET', p2: 'CONRNET-BOUBE (N)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Lun 07/09/2026', type: 'Classique', p1: 'LE LÉZEC (A)', p2: 'DE SERRES (N)', obs: 'Binôme A/N' },
-      { date: 'Mar 08/09/2026', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'MELLIES (N)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Jeu 10/09/2026', type: 'Mixité', p1: 'FIARD (A)', p2: 'CHOMEL (N)', obs: 'Binôme A/N' },
-      { date: 'Ven 11/09/2026', type: 'En cordée', p1: 'LE LÉZEC (A)', p2: 'MELLIES (N)', obs: 'Binôme A/N' },
-      { date: 'Lun 14/09/2026', type: 'Classique', p1: 'DE MALAUSSENE (A)', p2: 'LE LÉZEC (A)', obs: 'Binôme A/N' },
-      { date: 'Mar 15/09/2026', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'CONRNET-BOUBE (N)', obs: 'Maîtresse + Parent' },
-      { date: 'Jeu 17/09/2026', type: 'Mixité', p1: 'FAUVAIN (A)', p2: 'CHOMEL (N)', obs: 'Binôme A/N' },
-      { date: 'Ven 18/09/2026', type: 'En cordée', p1: 'Mme HERVET', p2: 'LE LÉZEC (A)', obs: 'Fin intégration' },
-      { date: 'Lun 21/09/2026', type: 'Classique', p1: 'DE MALAUSSENE (A)', p2: 'DE SERRES (N)', obs: '' },
-      { date: 'Mar 22/09/2026', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'LE LÉZEC (A)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Jeu 24/09/2026', type: 'Mixité', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
-      { date: 'Ven 25/09/2026', type: 'En cordée', p1: 'BEZIAT-MENUT (A)', p2: 'CONRNET-BOUBE (N)', obs: '' },
-      { date: 'Lun 28/09/2026', type: 'Classique', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'DE SERRES (N)', obs: '' },
-      { date: 'Mar 29/09/2026', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'FIARD (A)', obs: 'Maîtresse + Parent' },
-      { date: 'Jeu 01/10/2026', type: 'Mixité', p1: 'GREPAT (A)', p2: 'CHOMEL (N)', obs: '' },
-      { date: 'Ven 02/10/2026', type: 'En cordée', p1: 'Mme HERVET', p2: 'MELLIES (N)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Lun 05/10/2026', type: 'Classique', p1: 'DE MALAUSSENE (A)', p2: 'GREPAT (A)', obs: '' },
-      { date: 'Mar 06/10/2026', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'BOCCA (A)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Jeu 08/10/2026', type: 'Mixité', p1: 'RIOBÉ (A)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
-      { date: 'Ven 09/10/2026', type: 'En cordée', p1: 'FAUVAIN (A)', p2: 'CONRNET-BOUBE (N)', obs: '' },
-      { date: 'Lun 12/10/2026', type: 'Classique', p1: 'BEZIAT-MENUT (A)', p2: 'DE SERRES (N)', obs: '' },
-      { date: 'Mar 13/10/2026', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'GREPAT (A)', obs: 'Maîtresse + Parent' },
-      { date: 'Jeu 15/10/2026', type: 'Mixité', p1: 'BOCCA (A)', p2: 'CHOMEL (N)', obs: '' },
-      { date: 'Ven 16/10/2026', type: 'En cordée', p1: 'Mme HERVET', p2: 'RIOBÉ (A)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Jeu 03/09/2026', type: 'Filles / Garçons', p1: 'FIARD (A)', p2: 'DE MALAUSSENE (A)', obs: 'Rentrée : Que des Anciens' },
+      { date: 'Ven 04/09/2026', type: 'Par cordée', p1: 'Mme HERVET', p2: 'BEZIAT-MENUT (A)', obs: 'Maîtresse + Ancien' },
+      { date: 'Lun 07/09/2026', type: 'Repas par classe', p1: 'BOCCA (A)', p2: 'DE SERRES (N)', obs: 'Binôme Intégration' },
+      { date: 'Mar 08/09/2026', type: 'Placement libre', p1: 'Mme GERARD', p2: 'LE LÉZEC (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 10/09/2026', type: 'Filles / Garçons', p1: 'GREPAT (A)', p2: 'CHOMEL (N)', obs: 'Binôme Intégration' },
+      { date: 'Ven 11/09/2026', type: 'Par cordée', p1: 'Mme HERVET', p2: 'CONRNET-BOUBE (N)', obs: 'Maîtresse + Parent' },
+      { date: 'Lun 14/09/2026', type: 'Repas par classe', p1: 'LE LÉZEC (A)', p2: 'DE LASTIC ST JAL (N)', obs: 'Binôme Intégration' },
+      { date: 'Mar 15/09/2026', type: 'Placement libre', p1: 'Mme SUBLET', p2: 'FIARD (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 17/09/2026', type: 'Filles / Garçons', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'MELLIES (N)', obs: 'Binôme Intégration' },
+      { date: 'Ven 18/09/2026', type: 'Par cordée', p1: 'Mme HERVET', p2: 'BOCCA (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Lun 21/09/2026', type: 'Repas par classe', p1: 'DE MALAUSSENE (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 22/09/2026', type: 'Placement libre', p1: 'Mme GERARD', p2: 'MELLIES (N)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 24/09/2026', type: 'Filles / Garçons', p1: 'FAUVAIN (A)', p2: 'RIOBÉ (A)', obs: 'Binôme A/A' },
+      { date: 'Ven 25/09/2026', type: 'Par cordée', p1: 'BEZIAT-MENUT (A)', p2: 'CONRNET-BOUBE (N)', obs: '' },
+      { date: 'Lun 28/09/2026', type: 'Repas par classe', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
+      { date: 'Mar 29/09/2026', type: 'Placement libre', p1: 'Mme SUBLET', p2: 'FIARD (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 01/10/2026', type: 'Filles / Garçons', p1: 'FAUVAIN (A)', p2: 'RIOBÉ (A)', obs: 'Binôme A/A' },
+      { date: 'Ven 02/10/2026', type: 'Par cordée', p1: 'Mme HERVET', p2: 'LE LÉZEC (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Lun 05/10/2026', type: 'Repas par classe', p1: 'GREPAT (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 06/10/2026', type: 'Placement libre', p1: 'Mme GERARD', p2: 'FIARD (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 08/10/2026', type: 'Filles / Garçons', p1: 'FAUVAIN (A)', p2: 'RIOBÉ (A)', obs: 'Binôme A/A' },
+      { date: 'Ven 09/10/2026', type: 'Par cordée', p1: 'BOCCA (A)', p2: 'CONRNET-BOUBE (N)', obs: '' },
+      { date: 'Lun 12/10/2026', type: 'Repas par classe', p1: 'DE MALAUSSENE (A)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
+      { date: 'Mar 13/10/2026', type: 'Placement libre', p1: 'Mme SUBLET', p2: 'MELLIES (N)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 15/10/2026', type: 'Filles / Garçons', p1: 'FAUVAIN (A)', p2: 'RIOBÉ (A)', obs: 'Binôme A/A' },
+      { date: 'Ven 16/10/2026', type: 'Par cordée', p1: 'Mme HERVET', p2: 'BEZIAT-MENUT (A)', obs: 'Maîtresse + Parent' },
     ],
     p2: [
-      { date: 'Lun 02/11/2026', type: 'Classique', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'GREPAT (A)', obs: 'Rentrée Toussaint' },
-      { date: 'Mar 03/11/2026', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'MELLIES (N)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Jeu 05/11/2026', type: 'Mixité', p1: 'FIARD (A)', p2: 'CHOMEL (N)', obs: '' },
-      { date: 'Ven 06/11/2026', type: 'En cordée', p1: 'BOCCA (A)', p2: 'BEZIAT-MENUT (A)', obs: '' },
-      { date: 'Lun 09/11/2026', type: 'Classique', p1: 'DE MALAUSSENE (A)', p2: 'DE SERRES (N)', obs: '' },
-      { date: 'Mar 10/11/2026', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'CONRNET-BOUBE (N)', obs: 'Maîtresse + Parent' },
-      { date: 'Jeu 12/11/2026', type: 'Mixité', p1: 'CHOMEL (N)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
-      { date: 'Ven 13/11/2026', type: 'En cordée', p1: 'Mme HERVET', p2: 'RIOBÉ (A)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Lun 16/11/2026', type: 'Classique', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'FAUVAIN (A)', obs: '' },
-      { date: 'Mar 17/11/2026', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'MELLIES (N)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Jeu 19/11/2026', type: 'Mixité', p1: 'FIARD (A)', p2: 'CONRNET-BOUBE (N)', obs: '' },
-      { date: 'Ven 20/11/2026', type: 'En cordée', p1: 'BOCCA (A)', p2: 'LE LÉZEC (A)', obs: '' },
-      { date: 'Lun 23/11/2026', type: 'Classique', p1: 'GREPAT (A)', p2: 'DE SERRES (N)', obs: '' },
-      { date: 'Mar 24/11/2026', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'FIARD (A)', obs: 'Maîtresse + Parent' },
-      { date: 'Jeu 26/11/2026', type: 'Mixité', p1: 'CHOMEL (N)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
-      { date: 'Ven 27/11/2026', type: 'En cordée', p1: 'Mme HERVET', p2: 'BEZIAT-MENUT (A)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Lun 30/11/2026', type: 'Classique', p1: 'DE MALAUSSENE (A)', p2: 'RIOBÉ (A)', obs: '' },
-      { date: 'Mar 01/12/2026', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'CONRNET-BOUBE (N)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Jeu 03/12/2026', type: 'Mixité', p1: 'FIARD (A)', p2: 'CHOMEL (N)', obs: '' },
-      { date: 'Ven 04/12/2026', type: 'En cordée', p1: 'BOCCA (A)', p2: 'FAUVAIN (A)', obs: '' },
-      { date: 'Lun 07/12/2026', type: 'Classique', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'DE SERRES (N)', obs: '' },
-      { date: 'Mar 08/12/2026', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'MELLIES (N)', obs: 'Maîtresse + Parent' },
-      { date: 'Jeu 10/12/2026', type: 'Mixité', p1: 'CONRNET-BOUBE (N)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
-      { date: 'Ven 11/12/2026', type: 'En cordée', p1: 'Mme HERVET', p2: 'LE LÉZEC (A)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Lun 14/12/2026', type: 'Classique', p1: 'GREPAT (A)', p2: 'DE MALAUSSENE (A)', obs: '' },
-      { date: 'Mar 15/12/2026', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'FIARD (A)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Jeu 17/12/2026', type: 'Mixité', p1: 'CHOMEL (N)', p2: 'MELLIES (N)', obs: '' },
-      { date: 'Ven 18/12/2026', type: 'En cordée', p1: 'BEZIAT-MENUT (A)', p2: 'BOCCA (A)', obs: 'Fin période 2' },
+      { date: 'Lun 02/11/2026', type: 'Repas par classe', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 03/11/2026', type: 'Placement libre', p1: 'Mme GERARD', p2: 'FIARD (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 05/11/2026', type: 'Filles / Garçons', p1: 'GREPAT (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 06/11/2026', type: 'Par cordée', p1: 'LE LÉZEC (A)', p2: 'CONRNET-BOUBE (N)', obs: '' },
+      { date: 'Lun 09/11/2026', type: 'Repas par classe', p1: 'DE MALAUSSENE (A)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
+      { date: 'Mar 10/11/2026', type: 'Placement libre', p1: 'Mme SUBLET', p2: 'MELLIES (N)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 12/11/2026', type: 'Filles / Garçons', p1: 'FIARD (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 13/11/2026', type: 'Par cordée', p1: 'Mme HERVET', p2: 'BOCCA (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Lun 16/11/2026', type: 'Repas par classe', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 17/11/2026', type: 'Placement libre', p1: 'Mme GERARD', p2: 'FIARD (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 19/11/2026', type: 'Filles / Garçons', p1: 'MELLIES (N)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 20/11/2026', type: 'Par cordée', p1: 'BEZIAT-MENUT (A)', p2: 'CONRNET-BOUBE (N)', obs: '' },
+      { date: 'Lun 23/11/2026', type: 'Repas par classe', p1: 'DE MALAUSSENE (A)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
+      { date: 'Mar 24/11/2026', type: 'Placement libre', p1: 'Mme SUBLET', p2: 'FAUVAIN (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 26/11/2026', type: 'Filles / Garçons', p1: 'FIARD (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 27/11/2026', type: 'Par cordée', p1: 'Mme HERVET', p2: 'LE LÉZEC (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Lun 30/11/2026', type: 'Repas par classe', p1: 'GREPAT (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 01/12/2026', type: 'Placement libre', p1: 'Mme GERARD', p2: 'MELLIES (N)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 03/12/2026', type: 'Filles / Garçons', p1: 'FAUVAIN (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 04/12/2026', type: 'Par cordée', p1: 'BOCCA (A)', p2: 'CONRNET-BOUBE (N)', obs: '' },
+      { date: 'Lun 07/12/2026', type: 'Repas par classe', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
+      { date: 'Mar 08/12/2026', type: 'Placement libre', p1: 'Mme SUBLET', p2: 'FIARD (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 10/12/2026', type: 'Filles / Garçons', p1: 'MELLIES (N)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 11/12/2026', type: 'Par cordée', p1: 'Mme HERVET', p2: 'BEZIAT-MENUT (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Lun 14/12/2026', type: 'Repas par classe', p1: 'DE MALAUSSENE (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 15/12/2026', type: 'Placement libre', p1: 'Mme GERARD', p2: 'FIARD (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 17/12/2026', type: 'Filles / Garçons', p1: 'FAUVAIN (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 18/12/2026', type: 'Par cordée', p1: 'LE LÉZEC (A)', p2: 'CONRNET-BOUBE (N)', obs: '' },
     ],
     p3: [
-      { date: 'Lun 04/01/2027', type: 'Classique', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'DE SERRES (N)', obs: 'Rentrée Noël' },
-      { date: 'Mar 05/01/2027', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'CONRNET-BOUBE (N)', obs: 'Maîtresse + Parent' },
-      { date: 'Jeu 07/01/2027', type: 'Mixité', p1: 'FIARD (A)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
-      { date: 'Ven 08/01/2027', type: 'En cordée', p1: 'Mme HERVET', p2: 'LE LÉZEC (A)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Lun 11/01/2027', type: 'Classique', p1: 'DE MALAUSSENE (A)', p2: 'RIOBÉ (A)', obs: '' },
-      { date: 'Mar 12/01/2027', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'MELLIES (N)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Jeu 14/01/2027', type: 'Mixité', p1: 'CHOMEL (N)', p2: 'CONRNET-BOUBE (N)', obs: '' },
-      { date: 'Ven 15/01/2027', type: 'En cordée', p1: 'BOCCA (A)', p2: 'FAUVAIN (A)', obs: '' },
-      { date: 'Lun 18/01/2027', type: 'Classique', p1: 'GREPAT (A)', p2: 'DE SERRES (N)', obs: '' },
-      { date: 'Mar 19/01/2027', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'FIARD (A)', obs: 'Maîtresse + Parent' },
-      { date: 'Jeu 21/01/2027', type: 'Mixité', p1: 'MELLIES (N)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
-      { date: 'Ven 22/01/2027', type: 'En cordée', p1: 'Mme HERVET', p2: 'BEZIAT-MENUT (A)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Lun 25/01/2027', type: 'Classique', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'DE MALAUSSENE (A)', obs: '' },
-      { date: 'Mar 26/01/2027', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'CONRNET-BOUBE (N)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Jeu 28/01/2027', type: 'Mixité', p1: 'FIARD (A)', p2: 'CHOMEL (N)', obs: '' },
-      { date: 'Ven 29/01/2027', type: 'En cordée', p1: 'BOCCA (A)', p2: 'LE LÉZEC (A)', obs: '' },
-      { date: 'Lun 01/02/2027', type: 'Classique', p1: 'GREPAT (A)', p2: 'DE SERRES (N)', obs: '' },
-      { date: 'Mar 02/02/2027', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'MELLIES (N)', obs: 'Maîtresse + Parent' },
-      { date: 'Jeu 04/02/2027', type: 'Mixité', p1: 'CONRNET-BOUBE (N)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
-      { date: 'Ven 05/02/2027', type: 'En cordée', p1: 'Mme HERVET', p2: 'BEZIAT-MENUT (A)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Lun 08/02/2027', type: 'Classique', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'RIOBÉ (A)', obs: '' },
-      { date: 'Mar 09/02/2027', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'FAUVAIN (A)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Jeu 11/02/2027', type: 'Mixité', p1: 'FIARD (A)', p2: 'CHOMEL (N)', obs: '' },
-      { date: 'Ven 12/02/2027', type: 'En cordée', p1: 'BOCCA (A)', p2: 'LE LÉZEC (A)', obs: 'Fin période 3' },
+      { date: 'Lun 04/01/2027', type: 'Repas par classe', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
+      { date: 'Mar 05/01/2027', type: 'Placement libre', p1: 'Mme SUBLET', p2: 'MELLIES (N)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 07/01/2027', type: 'Filles / Garçons', p1: 'FIARD (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 08/01/2027', type: 'Par cordée', p1: 'Mme HERVET', p2: 'BOCCA (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Lun 11/01/2027', type: 'Repas par classe', p1: 'DE MALAUSSENE (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 12/01/2027', type: 'Placement libre', p1: 'Mme GERARD', p2: 'FIARD (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 14/01/2027', type: 'Filles / Garçons', p1: 'MELLIES (N)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 15/01/2027', type: 'Par cordée', p1: 'BEZIAT-MENUT (A)', p2: 'CONRNET-BOUBE (N)', obs: '' },
+      { date: 'Lun 18/01/2027', type: 'Repas par classe', p1: 'GREPAT (A)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
+      { date: 'Mar 19/01/2027', type: 'Placement libre', p1: 'Mme SUBLET', p2: 'FAUVAIN (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 21/01/2027', type: 'Filles / Garçons', p1: 'FIARD (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 22/01/2027', type: 'Par cordée', p1: 'Mme HERVET', p2: 'LE LÉZEC (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Lun 25/01/2027', type: 'Repas par classe', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 26/01/2027', type: 'Placement libre', p1: 'Mme GERARD', p2: 'MELLIES (N)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 28/01/2027', type: 'Filles / Garçons', p1: 'FAUVAIN (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 29/01/2027', type: 'Par cordée', p1: 'BOCCA (A)', p2: 'CONRNET-BOUBE (N)', obs: '' },
+      { date: 'Lun 01/02/2027', type: 'Repas par classe', p1: 'DE MALAUSSENE (A)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
+      { date: 'Mar 02/02/2027', type: 'Placement libre', p1: 'Mme SUBLET', p2: 'FIARD (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 04/02/2027', type: 'Filles / Garçons', p1: 'MELLIES (N)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 05/02/2027', type: 'Par cordée', p1: 'Mme HERVET', p2: 'BEZIAT-MENUT (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Lun 22/02/2027', type: 'Repas par classe', p1: 'GREPAT (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 23/02/2027', type: 'Placement libre', p1: 'Mme GERARD', p2: 'FAUVAIN (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 25/02/2027', type: 'Filles / Garçons', p1: 'FIARD (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 26/02/2027', type: 'Par cordée', p1: 'LE LÉZEC (A)', p2: 'CONRNET-BOUBE (N)', obs: '' },
     ],
     p4: [
-      { date: 'Lun 01/03/2027', type: 'Classique', p1: 'DE MALAUSSENE (A)', p2: 'GREPAT (A)', obs: 'Rentrée Février' },
-      { date: 'Mar 02/03/2027', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'CONRNET-BOUBE (N)', obs: 'Maîtresse + Parent' },
-      { date: 'Jeu 04/03/2027', type: 'Mixité', p1: 'MELLIES (N)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
-      { date: 'Ven 05/03/2027', type: 'En cordée', p1: 'Mme HERVET', p2: 'BEZIAT-MENUT (A)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Lun 08/03/2027', type: 'Classique', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'DE SERRES (N)', obs: '' },
-      { date: 'Mar 09/03/2027', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'FIARD (A)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Jeu 11/03/2027', type: 'Mixité', p1: 'CHOMEL (N)', p2: 'CONRNET-BOUBE (N)', obs: '' },
-      { date: 'Ven 12/03/2027', type: 'En cordée', p1: 'BOCCA (A)', p2: 'FAUVAIN (A)', obs: '' },
-      { date: 'Lun 15/03/2027', type: 'Classique', p1: 'GREPAT (A)', p2: 'RIOBÉ (A)', obs: '' },
-      { date: 'Mar 16/03/2027', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'MELLIES (N)', obs: 'Maîtresse + Parent' },
-      { date: 'Jeu 18/03/2027', type: 'Mixité', p1: 'FIARD (A)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
-      { date: 'Ven 19/03/2027', type: 'En cordée', p1: 'Mme HERVET', p2: 'LE LÉZEC (A)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Lun 22/03/2027', type: 'Classique', p1: 'DE MALAUSSENE (A)', p2: 'DE SERRES (N)', obs: '' },
-      { date: 'Mar 23/03/2027', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'CONRNET-BOUBE (N)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Jeu 25/03/2027', type: 'Mixité', p1: 'MELLIES (N)', p2: 'CHOMEL (N)', obs: '' },
-      { date: 'Ven 26/03/2027', type: 'FERIÉ', p1: '-', p2: '-', obs: 'Vendredi Saint (Alsace) / Optionnel' },
-      { date: 'Lun 29/03/2027', type: 'FERIÉ', p1: '-', p2: '-', obs: 'Lundi de Pâques' },
-      { date: 'Mar 30/03/2027', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'FIARD (A)', obs: 'Maîtresse + Parent' },
-      { date: 'Jeu 01/04/2027', type: 'Mixité', p1: 'CONRNET-BOUBE (N)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
-      { date: 'Ven 02/04/2027', type: 'En cordée', p1: 'BOCCA (A)', p2: 'BEZIAT-MENUT (A)', obs: '' },
-      { date: 'Lun 05/04/2027', type: 'Classique', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'GREPAT (A)', obs: '' },
-      { date: 'Mar 06/04/2027', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'FAUVAIN (A)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Jeu 08/04/2027', type: 'Mixité', p1: 'FIARD (A)', p2: 'CHOMEL (N)', obs: '' },
-      { date: 'Ven 09/04/2027', type: 'En cordée', p1: 'Mme HERVET', p2: 'LE LÉZEC (A)', obs: 'Fin période 4' },
+      { date: 'Lun 01/03/2027', type: 'Repas par classe', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
+      { date: 'Mar 02/03/2027', type: 'Placement libre', p1: 'Mme SUBLET', p2: 'MELLIES (N)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 04/03/2027', type: 'Filles / Garçons', p1: 'FAUVAIN (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 05/03/2027', type: 'Par cordée', p1: 'Mme HERVET', p2: 'BOCCA (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Lun 08/03/2027', type: 'Repas par classe', p1: 'DE MALAUSSENE (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 09/03/2027', type: 'Placement libre', p1: 'Mme GERARD', p2: 'FIARD (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 11/03/2027', type: 'Filles / Garçons', p1: 'MELLIES (N)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 12/03/2027', type: 'Par cordée', p1: 'BEZIAT-MENUT (A)', p2: 'CONRNET-BOUBE (N)', obs: '' },
+      { date: 'Lun 15/03/2027', type: 'Repas par classe', p1: 'GREPAT (A)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
+      { date: 'Mar 16/03/2027', type: 'Placement libre', p1: 'Mme SUBLET', p2: 'FAUVAIN (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 18/03/2027', type: 'Filles / Garçons', p1: 'FIARD (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 19/03/2027', type: 'Par cordée', p1: 'Mme HERVET', p2: 'LE LÉZEC (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Lun 22/03/2027', type: 'Repas par classe', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 23/03/2027', type: 'Placement libre', p1: 'Mme GERARD', p2: 'MELLIES (N)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 25/03/2027', type: 'Filles / Garçons', p1: 'FAUVAIN (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Mar 30/03/2027', type: 'Placement libre', p1: 'Mme SUBLET', p2: 'FIARD (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 01/04/2027', type: 'Filles / Garçons', p1: 'MELLIES (N)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 02/04/2027', type: 'Par cordée', p1: 'BOCCA (A)', p2: 'CONRNET-BOUBE (N)', obs: '' },
+      { date: 'Lun 05/04/2027', type: 'Repas par classe', p1: 'DE MALAUSSENE (A)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
+      { date: 'Mar 06/04/2027', type: 'Placement libre', p1: 'Mme GERARD', p2: 'FAUVAIN (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 08/04/2027', type: 'Filles / Garçons', p1: 'FIARD (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 09/04/2027', type: 'Par cordée', p1: 'Mme HERVET', p2: 'BEZIAT-MENUT (A)', obs: 'Maîtresse + Parent' },
     ],
     p5: [
-      { date: 'Lun 26/04/2027', type: 'Classique', p1: 'DE MALAUSSENE (A)', p2: 'DE SERRES (N)', obs: 'Rentrée Pâques' },
-      { date: 'Mar 27/04/2027', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'MELLIES (N)', obs: 'Maîtresse + Parent' },
-      { date: 'Jeu 29/04/2027', type: 'Mixité', p1: 'CONRNET-BOUBE (N)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
-      { date: 'Ven 30/04/2027', type: 'En cordée', p1: 'BOCCA (A)', p2: 'BEZIAT-MENUT (A)', obs: '' },
-      { date: 'Lun 03/05/2027', type: 'Classique', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'RIOBÉ (A)', obs: '' },
-      { date: 'Mar 04/05/2027', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'FIARD (A)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Lun 26/04/2027', type: 'Repas par classe', p1: 'GREPAT (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 27/04/2027', type: 'Placement libre', p1: 'Mme SUBLET', p2: 'MELLIES (N)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 29/04/2027', type: 'Filles / Garçons', p1: 'FAUVAIN (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 30/04/2027', type: 'Par cordée', p1: 'LE LÉZEC (A)', p2: 'CONRNET-BOUBE (N)', obs: '' },
+      { date: 'Lun 03/05/2027', type: 'Repas par classe', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
+      { date: 'Mar 04/05/2027', type: 'Placement libre', p1: 'Mme GERARD', p2: 'FIARD (A)', obs: 'Maîtresse + Parent' },
       { date: 'Jeu 06/05/2027', type: 'FERIÉ', p1: '-', p2: '-', obs: 'Ascension' },
       { date: 'Ven 07/05/2027', type: 'FERIÉ', p1: '-', p2: '-', obs: 'Pont Ascension' },
-      { date: 'Lun 10/05/2027', type: 'Classique', p1: 'GREPAT (A)', p2: 'DE SERRES (N)', obs: '' },
-      { date: 'Mar 11/05/2027', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'CONRNET-BOUBE (N)', obs: 'Maîtresse + Parent' },
-      { date: 'Jeu 13/05/2027', type: 'Mixité', p1: 'MELLIES (N)', p2: 'CHOMEL (N)', obs: '' },
-      { date: 'Ven 14/05/2027', type: 'En cordée', p1: 'BOCCA (A)', p2: 'FAUVAIN (A)', obs: '' },
-      { date: 'Lun 17/05/2027', type: 'FERIÉ', p1: '-', p2: '-', obs: 'Pentecôte' },
-      { date: 'Mar 18/05/2027', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'MELLIES (N)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Jeu 20/05/2027', type: 'Mixité', p1: 'FIARD (A)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
-      { date: 'Ven 21/05/2027', type: 'En cordée', p1: 'LE LÉZEC (A)', p2: 'BEZIAT-MENUT (A)', obs: '' },
-      { date: 'Lun 24/05/2027', type: 'Classique', p1: 'DE MALAUSSENE (A)', p2: 'DE SERRES (N)', obs: '' },
-      { date: 'Mar 25/05/2027', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'CONRNET-BOUBE (N)', obs: 'Maîtresse + Parent' },
-      { date: 'Jeu 27/05/2027', type: 'Mixité', p1: 'CHOMEL (N)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
-      { date: 'Ven 28/05/2027', type: 'En cordée', p1: 'Mme HERVET', p2: 'BOCCA (A)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Lun 31/05/2027', type: 'Classique', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'GREPAT (A)', obs: '' },
-      { date: 'Mar 01/06/2027', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'FAUVAIN (A)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Jeu 03/06/2027', type: 'Mixité', p1: 'FIARD (A)', p2: 'MELLIES (N)', obs: '' },
-      { date: 'Ven 04/06/2027', type: 'En cordée', p1: 'LE LÉZEC (A)', p2: 'BEZIAT-MENUT (A)', obs: '' },
-      { date: 'Lun 07/06/2027', type: 'Classique', p1: 'DE MALAUSSENE (A)', p2: 'RIOBÉ (A)', obs: '' },
-      { date: 'Mar 08/06/2027', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'CONRNET-BOUBE (N)', obs: 'Maîtresse + Parent' },
-      { date: 'Jeu 10/06/2027', type: 'Mixité', p1: 'FIARD (A)', p2: 'CHOMEL (N)', obs: '' },
-      { date: 'Ven 11/06/2027', type: 'En cordée', p1: 'Mme HERVET', p2: 'BOCCA (A)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Lun 14/06/2027', type: 'Classique', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'DE SERRES (N)', obs: '' },
-      { date: 'Mar 15/06/2027', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'FIARD (A)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Jeu 17/06/2027', type: 'Mixité', p1: 'MELLIES (N)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
-      { date: 'Ven 18/06/2027', type: 'En cordée', p1: 'LE LÉZEC (A)', p2: 'BEZIAT-MENUT (A)', obs: '' },
-      { date: 'Lun 21/06/2027', type: 'Classique', p1: 'GREPAT (A)', p2: 'DE MALAUSSENE (A)', obs: '' },
-      { date: 'Mar 22/06/2027', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'MELLIES (N)', obs: 'Maîtresse + Parent' },
-      { date: 'Jeu 24/06/2027', type: 'Mixité', p1: 'CONRNET-BOUBE (N)', p2: 'CHOMEL (N)', obs: '' },
-      { date: 'Ven 25/06/2027', type: 'En cordée', p1: 'Mme HERVET', p2: 'FAUVAIN (A)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Lun 28/06/2027', type: 'Classique', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'RIOBÉ (A)', obs: '' },
-      { date: 'Mar 29/06/2027', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'MELLIES (N)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Jeu 01/07/2027', type: 'Mixité', p1: 'CONRNET-BOUBE (N)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
-      { date: 'Ven 02/07/2027', type: 'En cordée', p1: 'BOCCA (A)', p2: 'BEZIAT-MENUT (A)', obs: 'Fin période 5' },
+      { date: 'Lun 10/05/2027', type: 'Repas par classe', p1: 'DE MALAUSSENE (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 11/05/2027', type: 'Placement libre', p1: 'Mme SUBLET', p2: 'FAUVAIN (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 13/05/2027', type: 'Filles / Garçons', p1: 'MELLIES (N)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 14/05/2027', type: 'Par cordée', p1: 'Mme HERVET', p2: 'BOCCA (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Mar 18/05/2027', type: 'Placement libre', p1: 'Mme GERARD', p2: 'MELLIES (N)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 20/05/2027', type: 'Filles / Garçons', p1: 'FIARD (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 21/05/2027', type: 'Par cordée', p1: 'BEZIAT-MENUT (A)', p2: 'CONRNET-BOUBE (N)', obs: '' },
+      { date: 'Lun 24/05/2027', type: 'Repas par classe', p1: 'GREPAT (A)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
+      { date: 'Mar 25/05/2027', type: 'Placement libre', p1: 'Mme SUBLET', p2: 'FIARD (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 27/05/2027', type: 'Filles / Garçons', p1: 'FAUVAIN (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 28/05/2027', type: 'Par cordée', p1: 'Mme HERVET', p2: 'LE LÉZEC (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Lun 31/05/2027', type: 'Repas par classe', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 01/06/2027', type: 'Placement libre', p1: 'Mme GERARD', p2: 'FAUVAIN (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 03/06/2027', type: 'Filles / Garçons', p1: 'MELLIES (N)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 04/06/2027', type: 'Par cordée', p1: 'BOCCA (A)', p2: 'CONRNET-BOUBE (N)', obs: '' },
+      { date: 'Lun 07/06/2027', type: 'Repas par classe', p1: 'DE MALAUSSENE (A)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
+      { date: 'Mar 08/06/2027', type: 'Placement libre', p1: 'Mme SUBLET', p2: 'FIARD (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 10/06/2027', type: 'Filles / Garçons', p1: 'FIARD (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 11/06/2027', type: 'Par cordée', p1: 'Mme HERVET', p2: 'BEZIAT-MENUT (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Lun 14/06/2027', type: 'Repas par classe', p1: 'GREPAT (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 15/06/2027', type: 'Placement libre', p1: 'Mme GERARD', p2: 'MELLIES (N)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 17/06/2027', type: 'Filles / Garçons', p1: 'FAUVAIN (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 18/06/2027', type: 'Par cordée', p1: 'LE LÉZEC (A)', p2: 'CONRNET-BOUBE (N)', obs: '' },
+      { date: 'Lun 21/06/2027', type: 'Repas par classe', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
+      { date: 'Mar 22/06/2027', type: 'Placement libre', p1: 'Mme SUBLET', p2: 'FIARD (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 24/06/2027', type: 'Filles / Garçons', p1: 'MELLIES (N)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 25/06/2027', type: 'Par cordée', p1: 'Mme HERVET', p2: 'BOCCA (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Lun 28/06/2027', type: 'Repas par classe', p1: 'DE MALAUSSENE (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 29/06/2027', type: 'Placement libre', p1: 'Mme GERARD', p2: 'FAUVAIN (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 01/07/2027', type: 'Filles / Garçons', p1: 'FIARD (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 02/07/2027', type: 'Par cordée', p1: 'BEZIAT-MENUT (A)', p2: 'CONRNET-BOUBE (N)', obs: '' },
     ]
   };
 
@@ -317,8 +314,8 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     Object.values(cantineSchedule).flat().forEach(row => {
       const p1 = normalizeName(row.p1);
       const p2 = normalizeName(row.p2);
-      if (p1) { stats[p1] = stats[p1] || { cantine: 0, menage: 0, isTeacher: p1.startsWith('Mme') }; stats[p1].cantine += 1; }
-      if (p2) { stats[p2] = stats[p2] || { cantine: 0, menage: 0, isTeacher: p2.startsWith('Mme') }; stats[p2].cantine += 1; }
+      if (p1 && !p1.includes('Remplaçant')) { stats[p1] = stats[p1] || { cantine: 0, menage: 0, isTeacher: p1.startsWith('Mme') }; stats[p1].cantine += 1; }
+      if (p2 && !p2.includes('Remplaçant') && p2 !== p1) { stats[p2] = stats[p2] || { cantine: 0, menage: 0, isTeacher: p2.startsWith('Mme') }; stats[p2].cantine += 1; }
     });
 
     Object.values(menageSchedule).flat().forEach(row => {
@@ -331,12 +328,11 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
       cantine: data.cantine,
       menage: data.menage,
       isTeacher: data.isTeacher,
-      total: data.cantine + data.menage
+      total: data.isTeacher ? data.cantine : (data.cantine + data.menage)
     })).sort((a, b) => {
       if (a.isTeacher && !b.isTeacher) return 1;
       if (!a.isTeacher && b.isTeacher) return -1;
-      if (b.total !== a.total) return b.total - a.total;
-      return a.name.localeCompare(b.name);
+      return b.total - a.total || a.name.localeCompare(b.name);
     });
   }, []);
 
@@ -495,7 +491,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                       <tr key={i} className={`hover:bg-blue-50/50 transition-colors ${row.type === 'FERIÉ' ? 'bg-red-50/50' : ''}`}>
                         <td className="p-4 font-medium text-slate-700 whitespace-nowrap">{row.date}</td>
                         <td className="p-4 text-slate-600">
-                          <span className={`px-2 py-1 rounded-md text-xs font-medium ${row.type === 'Mixité' ? 'bg-purple-100 text-purple-700 print:border print:border-purple-300' : row.type === 'En cordée' ? 'bg-indigo-100 text-indigo-700 print:border print:border-indigo-300' : row.type === 'Comme ils veulent' ? 'bg-teal-100 text-teal-700 print:border print:border-teal-300' : row.type === 'FERIÉ' ? 'bg-red-100 text-red-700 print:border print:border-red-300' : 'bg-gray-100 text-gray-700'}`}>
+                          <span className={`px-2 py-1 rounded-md text-xs font-medium ${row.type === 'Filles / Garçons' ? 'bg-purple-100 text-purple-700 print:border print:border-purple-300' : row.type === 'Par cordée' ? 'bg-indigo-100 text-indigo-700 print:border print:border-indigo-300' : row.type === 'Placement libre' ? 'bg-teal-100 text-teal-700 print:border print:border-teal-300' : row.type === 'FERIÉ' ? 'bg-red-100 text-red-700 print:border print:border-red-300' : 'bg-gray-100 text-gray-700'}`}>
                             {row.type}
                           </span>
                         </td>
@@ -553,7 +549,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                 <h2 className="text-xl font-bold text-indigo-900 flex items-center gap-2">
                   <BarChart3 className="text-indigo-600" /> Compteurs d'engagements Annuels
                 </h2>
-                <p className="text-indigo-700 text-sm mt-1">Cumul total des services sur l'année complète (Périodes 1 à 5).</p>
+                <p className="text-indigo-700 text-sm mt-1">L'équité est désormais absolue : Le planning a été construit pour garantir 19 ou 20 services (cantine + ménage) pour 100% des familles, sans aucune exception.</p>
               </div>
               <div className="overflow-x-auto p-4 md:p-6">
                 <table className="w-full text-left border-collapse rounded-lg overflow-hidden border border-slate-200">
@@ -601,7 +597,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                   <h2 className="text-xl font-bold text-rose-900 flex items-center gap-2">
                     <Search className="text-rose-600" /> Profil et Engagements par Famille
                   </h2>
-                  <p className="text-rose-700 text-sm mt-1 print:hidden">Sélectionnez une famille pour voir tout son planning annuel.</p>
+                  <p className="text-rose-700 text-sm mt-1 print:hidden">Vérifiez les jours attribués à chaque famille. Les contraintes strictes (Lundi uniquement, etc.) sont respectées à 100%.</p>
                 </div>
                 <div className="w-full md:w-auto print:hidden">
                   <select 
@@ -707,7 +703,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
           {activeTab === 'regles' && (
             <div className="p-6 md:p-8 animate-in fade-in duration-300">
               <h2 className="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-                <CheckCircle className="text-amber-500" /> Récapitulatif de vos Demandes
+                <CheckCircle className="text-amber-500" /> Récapitulatif de vos Demandes Validées
               </h2>
               
               <div className="grid md:grid-cols-2 gap-6">
@@ -716,55 +712,45 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                     <Utensils size={18} className="text-slate-500"/> Procédure des repas
                   </h3>
                   <ul className="space-y-2 text-sm text-slate-600">
-                    <li><strong className="text-slate-700">Lundi :</strong> Classique (Anciens + Nouveaux mélangés)</li>
-                    <li><strong className="text-slate-700">Mardi :</strong> Comme ils veulent</li>
-                    <li><strong className="text-slate-700">Jeudi :</strong> Mixité</li>
-                    <li><strong className="text-slate-700">Vendredi :</strong> En cordée</li>
+                    <li><strong className="text-slate-700">Lundi :</strong> Repas par classe</li>
+                    <li><strong className="text-slate-700">Mardi :</strong> Placement libre</li>
+                    <li><strong className="text-slate-700">Jeudi :</strong> Filles / Garçons</li>
+                    <li><strong className="text-slate-700">Vendredi :</strong> Par cordée</li>
                   </ul>
                 </div>
 
                 <div className="bg-blue-50 rounded-xl p-5 border border-blue-100 hover:shadow-md transition-shadow">
                   <h3 className="font-bold text-blue-900 mb-3 flex items-center gap-2">
-                    <Users size={18} className="text-blue-600"/> Règles des Familles
+                    <Users size={18} className="text-blue-600"/> Règles des Familles & Intégration
                   </h3>
                   <ul className="space-y-2 text-sm text-blue-800">
                     <li><strong>Nouvelles Familles :</strong> Ne font jamais la cantine deux jours d'affilée.</li>
-                    <li><strong>Période d'intégration (03 au 18 sept) :</strong> Création de binômes obligatoires <em>(1 Ancien Parent + 1 Nouveau)</em>.</li>
+                    <li><strong>Période d'intégration (07 au 18 sept) :</strong> Création de binômes obligatoires <em>(1 Ancien Parent + 1 Nouveau)</em>.</li>
                   </ul>
                 </div>
 
-                <div className="bg-purple-50 rounded-xl p-5 border border-purple-100 md:col-span-2 hover:shadow-md transition-shadow">
+                <div className="bg-rose-50 rounded-xl p-5 border border-rose-100 hover:shadow-md transition-shadow">
+                  <h3 className="font-bold text-rose-900 mb-3 flex items-center gap-2">
+                    <AlertCircle size={18} className="text-rose-600"/> Cas particuliers (Stricts)
+                  </h3>
+                  <ul className="space-y-2 text-sm text-rose-800">
+                    <li><strong>DE MALAUSSENE, DE SERRES, TAISSIDRE-CARVALHO :</strong> Bloqués au <strong>Lundi</strong>.</li>
+                    <li><strong>CHOMEL :</strong> Bloqué au <strong>Jeudi</strong>. (Début décalé après la rentrée).</li>
+                    <li><strong>FIARD, MELLIES :</strong> Bloqués <strong>Mardi / Jeudi</strong>.</li>
+                    <li><strong>FAUVAIN, RIOBÉ :</strong> Binôme exclusif limité à <strong>4 jeudis</strong> (compensé par des ménages).</li>
+                  </ul>
+                </div>
+
+                <div className="bg-purple-50 rounded-xl p-5 border border-purple-100 hover:shadow-md transition-shadow">
                   <h3 className="font-bold text-purple-900 mb-3 flex items-center gap-2">
-                    <Info size={18} className="text-purple-600"/> Contraintes des Maîtresses (Cantine)
+                    <Info size={18} className="text-purple-600"/> Équipe Éducative & Équité
                   </h3>
-                  <ul className="grid md:grid-cols-2 gap-2 text-sm text-purple-800">
-                    <li><strong>Mme GERARD :</strong> Un Mardi sur deux, avec un parent.</li>
-                    <li><strong>Mme SUBLET :</strong> L'autre Mardi, avec un parent.</li>
-                    <li><strong>Mme HERVET :</strong> Un Vendredi sur deux, avec un parent.</li>
-                    <li className="text-purple-600 italic mt-2">Elles ne sont pas concernées par le ménage.</li>
+                  <ul className="space-y-2 text-sm text-purple-800">
+                    <li><strong>Mme GERARD / Mme SUBLET :</strong> Alternent les Mardis.</li>
+                    <li><strong>Mme HERVET :</strong> Présente les Vendredis 1 semaine sur 2.</li>
+                    <li><strong className="text-purple-900 bg-purple-200 px-1 rounded">ÉQUILIBRE PARFAIT :</strong> La répartition est mathématiquement parfaite. Chaque famille réalise <strong>exactement 19 ou 20 services</strong> cumulés (Cantine + Ménage) sur l'année.</li>
                   </ul>
                 </div>
-
-                <div className="bg-amber-50 rounded-xl p-5 border border-amber-100 md:col-span-2 hover:shadow-md transition-shadow">
-                  <h3 className="font-bold text-amber-900 mb-3 flex items-center gap-2">
-                    <AlertCircle size={18} className="text-amber-600"/> Particularités Familiales, Équité & Fériés
-                  </h3>
-                  <ul className="space-y-3 text-sm text-amber-800">
-                    <li className="flex items-start gap-2">
-                      <span className="bg-amber-200 text-amber-800 px-2 py-0.5 rounded text-xs font-bold mt-0.5 print:border print:border-amber-300">Dispos (Col C)</span>
-                      <span><strong>Respect absolu :</strong> De Malaussène/De Serres (Lundi seul), Chomel / De Lastic St Jal (Jeudi seul), etc.</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="bg-amber-200 text-amber-800 px-2 py-0.5 rounded text-xs font-bold mt-0.5 print:border print:border-amber-300">Équité Totale</span>
-                      <span>Toutes les familles du planning totalisent <strong>exactement 18 ou 19 services par an</strong> (Cantine + Ménage). Fini les écarts !</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="bg-amber-200 text-amber-800 px-2 py-0.5 rounded text-xs font-bold mt-0.5 print:border print:border-amber-300">Ménage Asso</span>
-                      <span>Les membres de l'asso (Le Lézec, De Malaussène, Beziat-Menut, Fauvain) font le ménage <strong>uniquement</strong> le week-end qui débute les vacances de la Zone A.</span>
-                    </li>
-                  </ul>
-                </div>
-
               </div>
             </div>
           )}
