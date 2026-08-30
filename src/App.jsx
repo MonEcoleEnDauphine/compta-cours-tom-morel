@@ -5,7 +5,9 @@ import {
   Download, Trash2, XCircle, Search, ChevronRight, CheckCircle2, 
   Paperclip, Plus, Sparkles, Receipt, Heart, FileSpreadsheet, 
   Package, Target, TrendingUp, Info, Euro, ChevronDown, 
-  Globe, Mail, Phone, PlusCircle, Edit2, Send, Clock, Hammer, Menu, Megaphone, Bell, Newspaper, Camera, MessageCircle
+  Globe, Mail, Phone, PlusCircle, Edit2, Send, Clock, Hammer, Menu,
+  Megaphone, Bell, Newspaper, Camera, MessageCircle,
+  Utensils, BarChart3, CheckCircle, AlertCircle
 } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
