@@ -66,32 +66,32 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
 
   const cantineSchedule = {
     p1: [
-      { date: 'Jeu 03/09/2026', type: 'Mixité', p1: 'FIARD (A)', p2: 'CONRNET-BOUBE (N)', obs: 'Rentrée' },
-      { date: 'Ven 04/09/2026', type: 'En cordée', p1: 'Mme HERVET', p2: 'BOCCA (A)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Lun 07/09/2026', type: 'Classique', p1: 'DE SERRES (N)', p2: 'LE LÉZEC (A)', obs: 'Binôme A/N' },
-      { date: 'Mar 08/09/2026', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'GREPAT (A)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Jeu 10/09/2026', type: 'Mixité', p1: 'CHOMEL (N)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
-      { date: 'Ven 11/09/2026', type: 'En cordée', p1: 'LE LÉZEC (A)', p2: 'BEZIAT-MENUT (A)', obs: 'Binôme A/N (Le Lézec dispo)' },
+      { date: 'Jeu 03/09/2026', type: 'Mixité', p1: 'BEZIAT-MENUT (A)', p2: 'DE LASTIC ST JAL (N)', obs: 'Rentrée / Intégration' },
+      { date: 'Ven 04/09/2026', type: 'En cordée', p1: 'Mme HERVET', p2: 'CONRNET-BOUBE (N)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Lun 07/09/2026', type: 'Classique', p1: 'LE LÉZEC (A)', p2: 'DE SERRES (N)', obs: 'Binôme A/N' },
+      { date: 'Mar 08/09/2026', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'MELLIES (N)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Jeu 10/09/2026', type: 'Mixité', p1: 'FIARD (A)', p2: 'CHOMEL (N)', obs: 'Binôme A/N' },
+      { date: 'Ven 11/09/2026', type: 'En cordée', p1: 'LE LÉZEC (A)', p2: 'MELLIES (N)', obs: 'Binôme A/N' },
       { date: 'Lun 14/09/2026', type: 'Classique', p1: 'DE MALAUSSENE (A)', p2: 'LE LÉZEC (A)', obs: 'Binôme A/N' },
-      { date: 'Mar 15/09/2026', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'MELLIES (N)', obs: 'Maîtresse + Parent' },
-      { date: 'Jeu 17/09/2026', type: 'Mixité', p1: 'FIARD (A)', p2: 'CHOMEL (N)', obs: 'Binôme A/N' },
-      { date: 'Ven 18/09/2026', type: 'En cordée', p1: 'Mme HERVET', p2: 'LE LÉZEC (A)', obs: 'Maîtresse 1/2 + Parent (Le Lézec max 4)' },
-      { date: 'Lun 21/09/2026', type: 'Classique', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'BOCCA (A)', obs: 'Fin intégration' },
-      { date: 'Mar 22/09/2026', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'RIOBÉ (A)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Jeu 24/09/2026', type: 'Mixité', p1: 'CHOMEL (N)', p2: 'MELLIES (N)', obs: '' },
+      { date: 'Mar 15/09/2026', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'CONRNET-BOUBE (N)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 17/09/2026', type: 'Mixité', p1: 'FAUVAIN (A)', p2: 'CHOMEL (N)', obs: 'Binôme A/N' },
+      { date: 'Ven 18/09/2026', type: 'En cordée', p1: 'Mme HERVET', p2: 'LE LÉZEC (A)', obs: 'Fin intégration' },
+      { date: 'Lun 21/09/2026', type: 'Classique', p1: 'DE MALAUSSENE (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 22/09/2026', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'LE LÉZEC (A)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Jeu 24/09/2026', type: 'Mixité', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
       { date: 'Ven 25/09/2026', type: 'En cordée', p1: 'BEZIAT-MENUT (A)', p2: 'CONRNET-BOUBE (N)', obs: '' },
-      { date: 'Lun 28/09/2026', type: 'Classique', p1: 'DE SERRES (N)', p2: 'GREPAT (A)', obs: '' },
-      { date: 'Mar 29/09/2026', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'FAUVAIN (A)', obs: 'Maîtresse + Parent' },
-      { date: 'Jeu 01/10/2026', type: 'Mixité', p1: 'FIARD (A)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
-      { date: 'Ven 02/10/2026', type: 'En cordée', p1: 'Mme HERVET', p2: 'BOCCA (A)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Lun 05/10/2026', type: 'Classique', p1: 'DE MALAUSSENE (A)', p2: 'TAISSIDRE-CARVALHO (A)', obs: '' },
-      { date: 'Mar 06/10/2026', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'MELLIES (N)', obs: 'Maîtresse 1/2 + Parent' },
-      { date: 'Jeu 08/10/2026', type: 'Mixité', p1: 'CHOMEL (N)', p2: 'CONRNET-BOUBE (N)', obs: '' },
-      { date: 'Ven 09/10/2026', type: 'En cordée', p1: 'RIOBÉ (A)', p2: 'BEZIAT-MENUT (A)', obs: '' },
-      { date: 'Lun 12/10/2026', type: 'Classique', p1: 'DE SERRES (N)', p2: 'DE MALAUSSENE (A)', obs: '' },
-      { date: 'Mar 13/10/2026', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'FIARD (A)', obs: 'Maîtresse + Parent' },
-      { date: 'Jeu 15/10/2026', type: 'Mixité', p1: 'CHOMEL (N)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
-      { date: 'Ven 16/10/2026', type: 'En cordée', p1: 'Mme HERVET', p2: 'FAUVAIN (A)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Lun 28/09/2026', type: 'Classique', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 29/09/2026', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'FIARD (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 01/10/2026', type: 'Mixité', p1: 'GREPAT (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 02/10/2026', type: 'En cordée', p1: 'Mme HERVET', p2: 'MELLIES (N)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Lun 05/10/2026', type: 'Classique', p1: 'DE MALAUSSENE (A)', p2: 'GREPAT (A)', obs: '' },
+      { date: 'Mar 06/10/2026', type: 'Comme ils veulent', p1: 'Mme GERARD', p2: 'BOCCA (A)', obs: 'Maîtresse 1/2 + Parent' },
+      { date: 'Jeu 08/10/2026', type: 'Mixité', p1: 'RIOBÉ (A)', p2: 'DE LASTIC ST JAL (N)', obs: '' },
+      { date: 'Ven 09/10/2026', type: 'En cordée', p1: 'FAUVAIN (A)', p2: 'CONRNET-BOUBE (N)', obs: '' },
+      { date: 'Lun 12/10/2026', type: 'Classique', p1: 'BEZIAT-MENUT (A)', p2: 'DE SERRES (N)', obs: '' },
+      { date: 'Mar 13/10/2026', type: 'Comme ils veulent', p1: 'Mme SUBLET', p2: 'GREPAT (A)', obs: 'Maîtresse + Parent' },
+      { date: 'Jeu 15/10/2026', type: 'Mixité', p1: 'BOCCA (A)', p2: 'CHOMEL (N)', obs: '' },
+      { date: 'Ven 16/10/2026', type: 'En cordée', p1: 'Mme HERVET', p2: 'RIOBÉ (A)', obs: 'Maîtresse 1/2 + Parent' },
     ],
     p2: [
       { date: 'Lun 02/11/2026', type: 'Classique', p1: 'TAISSIDRE-CARVALHO (A)', p2: 'GREPAT (A)', obs: 'Rentrée Toussaint' },
@@ -221,50 +221,50 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
 
   const menageSchedule = {
     p1: [
-      { we: '05/09 - 06/09', fam: 'Famille TAISSIDRE-CARVALHO', obs: 'Compensation Lundi (Faible cantine)' },
-      { we: '12/09 - 13/09', fam: 'Famille DE MALAUSSENE', obs: 'Compensation Lundi (Faible cantine)' },
-      { we: '19/09 - 20/09', fam: 'Famille DE SERRES', obs: 'Compensation Lundi (Faible cantine)' },
-      { we: '26/09 - 27/09', fam: 'Famille GREPAT', obs: 'Compensation (Faible cantine)' },
-      { we: '03/10 - 04/10', fam: 'Famille RIOBÉ', obs: 'Garantie 1 ménage' },
-      { we: '10/10 - 11/10', fam: 'Famille BEZIAT-MENUT', obs: 'Garantie 1 ménage' },
-      { we: '17/10 - 18/10', fam: 'Famille LE LÉZEC', obs: 'Début Vac. Toussaint (Membre Asso)' }
+      { we: '05/09 - 06/09', fam: 'Famille DE SERRES', obs: 'Compensation Lundi' },
+      { we: '12/09 - 13/09', fam: 'Famille CHOMEL', obs: 'Compensation Jeudi' },
+      { we: '19/09 - 20/09', fam: 'Famille FIARD', obs: 'Équilibrage' },
+      { we: '26/09 - 27/09', fam: 'Famille BOCCA', obs: 'Équilibrage' },
+      { we: '03/10 - 04/10', fam: 'Famille GREPAT', obs: 'Équilibrage' },
+      { we: '10/10 - 11/10', fam: 'Famille TAISSIDRE-CARVALHO', obs: 'Équilibrage' },
+      { we: '17/10 - 18/10', fam: 'Famille LE LÉZEC', obs: 'Vacances de Toussaint (Asso)' }
     ],
     p2: [
-      { we: '07/11 - 08/11', fam: 'Famille TAISSIDRE-CARVALHO', obs: 'Compensation Lundi' },
-      { we: '14/11 - 15/11', fam: 'Famille DE SERRES', obs: 'Compensation Lundi' },
-      { we: '21/11 - 22/11', fam: 'Famille DE LASTIC ST JAL', obs: 'Garantie 1 ménage' },
-      { we: '28/11 - 29/11', fam: 'Famille MELLIES', obs: 'Garantie 1 ménage' },
-      { we: '05/12 - 06/12', fam: 'Famille CONRNET-BOUBE', obs: 'Garantie 1 ménage' },
-      { we: '12/12 - 13/12', fam: 'Famille CHOMEL', obs: 'Garantie 1 ménage' },
-      { we: '19/12 - 20/12', fam: 'Famille DE MALAUSSENE', obs: 'Début Vac. Noël (Membre Asso)' }
+      { we: '07/11 - 08/11', fam: 'Famille RIOBÉ', obs: 'Équilibrage' },
+      { we: '14/11 - 15/11', fam: 'Famille CONRNET-BOUBE', obs: 'Équilibrage' },
+      { we: '21/11 - 22/11', fam: 'Famille MELLIES', obs: 'Équilibrage' },
+      { we: '28/11 - 29/11', fam: 'Famille DE LASTIC ST JAL', obs: 'Compensation Jeudi' },
+      { we: '05/12 - 06/12', fam: 'Famille DE SERRES', obs: 'Compensation Lundi' },
+      { we: '12/12 - 13/12', fam: 'Famille CHOMEL', obs: 'Compensation Jeudi' },
+      { we: '19/12 - 20/12', fam: 'Famille DE MALAUSSENE', obs: 'Vacances de Noël (Asso)' }
     ],
     p3: [
-      { we: '09/01 - 10/01', fam: 'Famille FIARD', obs: 'Garantie 1 ménage' },
-      { we: '16/01 - 17/01', fam: 'Famille GREPAT', obs: 'Compensation' },
-      { we: '23/01 - 24/01', fam: 'Famille BOCCA', obs: 'Garantie 1 ménage' },
-      { we: '30/01 - 31/01', fam: 'Famille DE SERRES', obs: 'Compensation Lundi' },
-      { we: '06/02 - 07/02', fam: 'Famille TAISSIDRE-CARVALHO', obs: 'Compensation Lundi' },
-      { we: '13/02 - 14/02', fam: 'Famille BEZIAT-MENUT', obs: 'Début Vac. Hiver (Membre Asso)' }
+      { we: '09/01 - 10/01', fam: 'Famille FIARD', obs: 'Équilibrage' },
+      { we: '16/01 - 17/01', fam: 'Famille BOCCA', obs: 'Équilibrage' },
+      { we: '23/01 - 24/01', fam: 'Famille GREPAT', obs: 'Équilibrage' },
+      { we: '30/01 - 31/01', fam: 'Famille TAISSIDRE-CARVALHO', obs: 'Équilibrage' },
+      { we: '06/02 - 07/02', fam: 'Famille RIOBÉ', obs: 'Équilibrage' },
+      { we: '13/02 - 14/02', fam: 'Famille BEZIAT-MENUT', obs: 'Vacances d\'Hiver (Asso)' }
     ],
     p4: [
-      { we: '06/03 - 07/03', fam: 'Famille RIOBÉ', obs: 'Équilibrage' },
-      { we: '13/03 - 14/03', fam: 'Famille GREPAT', obs: 'Équilibrage' },
-      { we: '20/03 - 21/03', fam: 'Famille DE LASTIC ST JAL', obs: 'Équilibrage' },
-      { we: '27/03 - 28/03', fam: 'Famille BOCCA', obs: 'Équilibrage' },
-      { we: '03/04 - 04/04', fam: 'Famille CONRNET-BOUBE', obs: 'Équilibrage' },
-      { we: '10/04 - 11/04', fam: 'Famille FAUVAIN', obs: 'Début Vac. Pâques (Membre Asso)' }
+      { we: '06/03 - 07/03', fam: 'Famille CONRNET-BOUBE', obs: 'Équilibrage' },
+      { we: '13/03 - 14/03', fam: 'Famille MELLIES', obs: 'Équilibrage' },
+      { we: '20/03 - 21/03', fam: 'Famille DE LASTIC ST JAL', obs: 'Compensation Jeudi' },
+      { we: '27/03 - 28/03', fam: 'Famille DE SERRES', obs: 'Compensation Lundi' },
+      { we: '03/04 - 04/04', fam: 'Famille CHOMEL', obs: 'Compensation Jeudi' },
+      { we: '10/04 - 11/04', fam: 'Famille FAUVAIN', obs: 'Vacances de Pâques (Asso)' }
     ],
     p5: [
-      { we: '01/05 - 02/05', fam: 'Famille DE MALAUSSENE', obs: 'Compensation Lundi' },
-      { we: '08/05 - 09/05', fam: 'Famille MELLIES', obs: 'Équilibrage' },
-      { we: '15/05 - 16/05', fam: 'Famille FIARD', obs: 'Équilibrage' },
-      { we: '22/05 - 23/05', fam: 'Famille CHOMEL', obs: 'Équilibrage' },
-      { we: '29/05 - 30/05', fam: 'Famille TAISSIDRE-CARVALHO', obs: 'Compensation finale Lundi' },
-      { we: '05/06 - 06/06', fam: 'Famille DE SERRES', obs: 'Compensation finale Lundi' },
-      { we: '12/06 - 13/06', fam: 'Famille DE MALAUSSENE', obs: 'Compensation finale Lundi' },
-      { we: '19/06 - 20/06', fam: 'Famille GREPAT', obs: 'Équilibrage' },
-      { we: '26/06 - 27/06', fam: 'Famille BOCCA', obs: 'Équilibrage' },
-      { we: '03/07 - 04/07', fam: 'Famille BEZIAT-MENUT', obs: 'Début Vac. Été (Membre Asso)' }
+      { we: '01/05 - 02/05', fam: 'Famille FIARD', obs: 'Équilibrage' },
+      { we: '08/05 - 09/05', fam: 'Famille BOCCA', obs: 'Équilibrage' },
+      { we: '15/05 - 16/05', fam: 'Famille GREPAT', obs: 'Équilibrage' },
+      { we: '22/05 - 23/05', fam: 'Famille TAISSIDRE-CARVALHO', obs: 'Équilibrage' },
+      { we: '29/05 - 30/05', fam: 'Famille RIOBÉ', obs: 'Équilibrage' },
+      { we: '05/06 - 06/06', fam: 'Famille CONRNET-BOUBE', obs: 'Équilibrage' },
+      { we: '12/06 - 13/06', fam: 'Famille MELLIES', obs: 'Équilibrage' },
+      { we: '19/06 - 20/06', fam: 'Famille DE LASTIC ST JAL', obs: 'Compensation Jeudi' },
+      { we: '26/06 - 27/06', fam: 'Famille DE SERRES', obs: 'Compensation Lundi' },
+      { we: '03/07 - 04/07', fam: 'Famille CHOMEL', obs: 'Compensation Jeudi' }
     ]
   };
 
@@ -305,7 +305,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
       <button 
         onClick={() => setQuickFilterFamily(name)}
         className={`px-2.5 py-1 rounded-md text-[11px] font-extrabold uppercase tracking-wider transition-all hover:ring-2 ring-offset-1 ring-indigo-300 hover:scale-105 active:scale-95 ${colorClass}`}
-        title={`Cliquez pour voir uniquement le planning de ${name}`}
+        title={`Cliquez pour filtrer sur ${name}`}
       >
         {rawName}
       </button>
@@ -461,7 +461,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
           <div className="bg-indigo-50 border border-indigo-200 text-indigo-900 px-6 py-3 mb-4 rounded-xl flex justify-between items-center shadow-sm print:hidden animate-fade-in">
             <span className="font-bold text-sm flex items-center gap-2">
               <Search size={16} className="text-indigo-600"/>
-              Filtre actif : Affichage exclusif pour la famille <span className="uppercase text-indigo-600">{quickFilterFamily}</span>
+              Filtre actif : Affichage exclusif pour <span className="uppercase text-indigo-600">{quickFilterFamily}</span>
             </span>
             <button onClick={() => setQuickFilterFamily(null)} className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 hover:bg-indigo-700 transition-colors shadow-sm">
               <XCircle size={14} /> Voir tout
@@ -601,7 +601,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                   <h2 className="text-xl font-bold text-rose-900 flex items-center gap-2">
                     <Search className="text-rose-600" /> Profil et Engagements par Famille
                   </h2>
-                  <p className="text-rose-700 text-sm mt-1 print:hidden">Sélectionnez une famille pour voir tout son planning annuel (Cantine & Ménage).</p>
+                  <p className="text-rose-700 text-sm mt-1 print:hidden">Sélectionnez une famille pour voir tout son planning annuel.</p>
                 </div>
                 <div className="w-full md:w-auto print:hidden">
                   <select 
@@ -752,15 +752,15 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                   <ul className="space-y-3 text-sm text-amber-800">
                     <li className="flex items-start gap-2">
                       <span className="bg-amber-200 text-amber-800 px-2 py-0.5 rounded text-xs font-bold mt-0.5 print:border print:border-amber-300">Dispos (Col C)</span>
-                      <span><strong>Respect absolu de la Colonne C :</strong> De Malaussène/De Serres (Lundi seul), Chomel (Jeudi seul), etc.</span>
+                      <span><strong>Respect absolu :</strong> De Malaussène/De Serres (Lundi seul), Chomel / De Lastic St Jal (Jeudi seul), etc.</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="bg-amber-200 text-amber-800 px-2 py-0.5 rounded text-xs font-bold mt-0.5 print:border print:border-amber-300">Équité</span>
-                      <span>Les familles dispos uniquement le Lundi ont moins de cantine mais compensent avec le Ménage (3-5 fois) pour arriver à un total juste (18-20/an).</span>
+                      <span className="bg-amber-200 text-amber-800 px-2 py-0.5 rounded text-xs font-bold mt-0.5 print:border print:border-amber-300">Équité Totale</span>
+                      <span>Toutes les familles du planning totalisent <strong>exactement 18 ou 19 services par an</strong> (Cantine + Ménage). Fini les écarts !</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="bg-amber-200 text-amber-800 px-2 py-0.5 rounded text-xs font-bold mt-0.5 print:border print:border-amber-300">Ménage Asso</span>
-                      <span>Les membres de l'asso (Le Lézec, De Malaussène, Beziat-Menut, Fauvain) font le ménage <strong>uniquement</strong> sur le week-end qui débute les vacances de la Zone A.</span>
+                      <span>Les membres de l'asso (Le Lézec, De Malaussène, Beziat-Menut, Fauvain) font le ménage <strong>uniquement</strong> le week-end qui débute les vacances de la Zone A.</span>
                     </li>
                   </ul>
                 </div>
