@@ -41,7 +41,6 @@ const PlaceholderPage = ({ title }) => (
     <p className="text-slate-500">Cette page est en cours de construction. Le module sera bientôt disponible.</p>
   </div>
 );
-
 // --- MODULE : PLANNINGS (Cantine & Ménage) ---
 const ModulePlannings = ({ defaultTab = 'cantine' }) => {
   const [activeTab, setActiveTab] = useState(defaultTab);
@@ -251,7 +250,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
       { we: '20/03 - 21/03', fam: 'Famille TAISSIDRE-CARVALHO', obs: 'Equilibrage' },
       { we: '27/03 - 28/03', fam: 'Famille DE MALAUSSENE', obs: 'Equilibrage' },
       { we: '03/04 - 04/04', fam: 'Famille FAUVAIN', obs: 'Equilibrage' },
-      { we: '10/04 - 11/04', fam: 'Famille FAUVAIN', obs: 'Début Vac. (Asso)' } // Fauvain est membre Asso
+      { we: '10/04 - 11/04', fam: 'Famille FAUVAIN', obs: 'Début Vac. (Asso)' }
     ],
     p5: [
       { we: '01/05 - 02/05', fam: 'Famille RIOBÉ', obs: 'Equilibrage' },
@@ -313,7 +312,6 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
 
   const familyStats = useMemo(() => {
     const stats = {};
-
     Object.values(cantineSchedule).flat().forEach(row => {
       const p1 = normalizeName(row.p1);
       const p2 = normalizeName(row.p2);
@@ -371,6 +369,462 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
       Object.entries(cantineSchedule).forEach(([pId, rows]) => {
         rows.filter(r => (r.p1 || '').includes(selectedFamilyFilter) || (r.p2 || '').includes(selectedFamilyFilter)).forEach(r => {
            const isP1 = (r.p1 || '').includes(selectedFamilyFilter);
+           const partner = isP1 ? r.p2 : r.p1;
+           data.push(['Cantine', periods[pId].name, r.date, `Binôme avec : ${partner || 'Aucun'}`]);
+        });
+      });
+      
+      Object.entries(menageSchedule).forEach(([pId, rows]) => {
+        rows.filter(r => (r.fam || '').includes(selectedFamilyFilter)).forEach(r => {
+           data.push(['Ménage', periods[pId].name, r.we, r.obs]);
+        });
+      });
+      filename = `Planning_Annuel_${selectedFamilyFilter.replace(/\s+/g, '_')}.csv`;
+    } else {
+      return; 
+    }
+
+    if (data.length === 0) return alert("Aucune donnée à exporter.");
+    const csvContent = "\uFEFF" + [headers.join(';'), ...data.map(row => row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(';'))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url; link.download = filename; document.body.appendChild(link);
+    link.click(); document.body.removeChild(link);
+  };
+
+  return (
+    <div className="bg-transparent font-sans text-slate-800 animate-fade-in relative pb-10">
+      
+      {/* MAGIE CSS POUR L'IMPRESSION (Cache les menus de l'ERP) */}
+      <style>{`
+        @media print {
+          aside, header { display: none !important; }
+          main { padding: 0 !important; overflow: visible !important; }
+          .print\\:hidden { display: none !important; }
+          body { background: white !important; }
+          .shadow-sm { box-shadow: none !important; border: 1px solid #e2e8f0 !important; }
+        }
+      `}</style>
+
+      <div className="max-w-6xl mx-auto">
+        <div className="mb-6 text-center print:text-left print:mb-4">
+          <h1 className="text-3xl font-bold text-slate-900 mb-2">Planning Scolaire 2026-2027 (Zone A)</h1>
+          <p className="text-slate-600 print:hidden">Tableau de bord de gestion des roulements de la Cantine et du Ménage</p>
+        </div>
+
+        <div className="flex justify-center md:justify-end gap-3 mb-6 print:hidden">
+          {activeTab !== 'regles' && (
+            <button onClick={handleExportCSV} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors shadow-sm">
+              <Download size={16} /> Exporter (Excel)
+            </button>
+          )}
+          <button onClick={() => window.print()} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shadow-sm">
+            <Printer size={16} /> Imprimer (PDF)
+          </button>
+        </div>
+
+        {/* ONGLETS PRINCIPAUX */}
+        <div className="flex flex-wrap justify-center gap-4 mb-6 print:hidden">
+          <button onClick={() => setActiveTab('cantine')} className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-medium transition-all shadow-sm ${activeTab === 'cantine' ? 'bg-blue-600 text-white shadow-md border border-blue-700' : 'bg-white text-slate-600 border border-slate-200 hover:bg-blue-50'}`}>
+            <Utensils size={18} /> Cantine
+          </button>
+          <button onClick={() => setActiveTab('menage')} className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-medium transition-all shadow-sm ${activeTab === 'menage' ? 'bg-emerald-600 text-white shadow-md border border-emerald-700' : 'bg-white text-slate-600 border border-slate-200 hover:bg-emerald-50'}`}>
+            <Sparkles size={18} /> Ménage
+          </button>
+          <button onClick={() => setActiveTab('stats')} className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-medium transition-all shadow-sm ${activeTab === 'stats' ? 'bg-indigo-600 text-white shadow-md border border-indigo-700' : 'bg-white text-slate-600 border border-slate-200 hover:bg-indigo-50'}`}>
+            <BarChart3 size={18} /> Stats
+          </button>
+          <button onClick={() => setActiveTab('famille')} className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-medium transition-all shadow-sm ${activeTab === 'famille' ? 'bg-rose-600 text-white shadow-md border border-rose-700' : 'bg-white text-slate-600 border border-slate-200 hover:bg-rose-50'}`}>
+            <Search size={18} /> Par Famille
+          </button>
+          <button onClick={() => setActiveTab('regles')} className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-medium transition-all shadow-sm ${activeTab === 'regles' ? 'bg-amber-500 text-white shadow-md border border-amber-600' : 'bg-white text-slate-600 border border-slate-200 hover:bg-amber-50'}`}>
+            <Info size={18} /> Règles
+          </button>
+        </div>
+
+        {/* SELECTEUR DE PÉRIODES */}
+        {(activeTab === 'cantine' || activeTab === 'menage') && (
+          <div className="flex flex-wrap justify-center gap-2 mb-4 bg-white p-2 rounded-xl shadow-sm border border-slate-200 print:hidden">
+            {Object.values(periods).map((period) => (
+              <button
+                key={period.id}
+                onClick={() => setSelectedPeriod(period.id)}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${selectedPeriod === period.id ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}`}
+              >
+                {period.name} <span className="hidden sm:inline font-medium opacity-75">- {period.desc}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* BANDEAU DE FILTRE ACTIF */}
+        {quickFilterFamily && (activeTab === 'cantine' || activeTab === 'menage') && (
+          <div className="bg-indigo-50 border border-indigo-200 text-indigo-900 px-6 py-3 mb-4 rounded-xl flex justify-between items-center shadow-sm print:hidden animate-fade-in">
+            <span className="font-bold text-sm flex items-center gap-2">
+              <Search size={16} className="text-indigo-600"/>
+              Vue filtrée : Planning exclusif de <span className="uppercase text-indigo-600">{quickFilterFamily}</span>
+            </span>
+            <button onClick={() => setQuickFilterFamily(null)} className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 hover:bg-indigo-700 transition-colors shadow-sm">
+              <XCircle size={14} /> Voir tout le monde
+            </button>
+          </div>
+        )}
+
+        {/* CONTENU PRINCIPAL */}
+        <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-slate-200 print:border-none print:shadow-none">
+          
+          {/* TAB CANTINE - SOUS FORME DE CARTES */}
+          {activeTab === 'cantine' && (
+            <div className="animate-in fade-in duration-300 p-6">
+              <div className="mb-6 flex flex-col md:flex-row justify-between items-center gap-4 border-b border-slate-100 pb-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-blue-900 flex items-center gap-2">
+                    <Calendar className="text-blue-600" /> Cantine : {periods[selectedPeriod].name}
+                  </h2>
+                  <p className="text-blue-700 text-sm mt-1">{periods[selectedPeriod].desc}</p>
+                </div>
+                {quickFilterFamily && (
+                  <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-lg text-sm font-bold border border-blue-200 print:block hidden">
+                    Filtre actif : {quickFilterFamily}
+                  </div>
+                )}
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {displayedCantine.map((row, i) => {
+                  let isHol = row.type === 'FERIÉ';
+                  let bgCard = isHol ? 'bg-red-50/30 border-red-100' : 'bg-white border-slate-200';
+                  let typeBadge = '';
+                  
+                  if (row.type === 'Filles / Garçons') typeBadge = 'bg-purple-100 text-purple-700 border-purple-200';
+                  else if (row.type === 'Par cordée') typeBadge = 'bg-indigo-100 text-indigo-700 border-indigo-200';
+                  else if (row.type === 'Placement libre') typeBadge = 'bg-teal-100 text-teal-700 border-teal-200';
+                  else if (row.type === 'Repas par classe') typeBadge = 'bg-blue-100 text-blue-700 border-blue-200';
+                  else if (isHol) typeBadge = 'bg-red-100 text-red-700 border-red-200';
+                  else typeBadge = 'bg-slate-100 text-slate-700 border-slate-200';
+
+                  return (
+                    <div key={i} className={`${bgCard} rounded-xl p-4 border shadow-sm relative hover:shadow-md transition-shadow flex flex-col`}>
+                      <div className="text-sm font-black text-slate-700 mb-1 border-b border-slate-100 pb-2 capitalize">
+                        {row.date}
+                      </div>
+                      <div className="mt-2 mb-3">
+                        <span className={`px-2.5 py-1 rounded-md text-xs font-bold border shadow-sm ${typeBadge}`}>
+                          {row.type}
+                        </span>
+                      </div>
+                      <div className="space-y-2 mt-auto">
+                        <div className="flex items-center justify-between bg-slate-50 p-2 rounded-lg border border-slate-100">
+                          <span className="text-[10px] uppercase font-bold text-slate-400">P1</span>
+                          <FamilyPill rawName={row.p1} />
+                        </div>
+                        <div className="flex items-center justify-between bg-slate-50 p-2 rounded-lg border border-slate-100">
+                          <span className="text-[10px] uppercase font-bold text-slate-400">P2</span>
+                          <FamilyPill rawName={row.p2} />
+                        </div>
+                      </div>
+                      {row.obs && (
+                        <div className="mt-3 text-xs italic text-slate-500 bg-slate-50 p-2 rounded border border-slate-100">
+                          <i className="fa-solid fa-info-circle mr-1"></i> {row.obs}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {displayedCantine.length === 0 && (
+                <div className="p-12 text-center text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                  Aucun jour de cantine trouvé pour cette sélection.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB MENAGE - SOUS FORME DE CARTES */}
+          {activeTab === 'menage' && (
+            <div className="animate-in fade-in duration-300 p-6">
+              <div className="mb-6 flex flex-col md:flex-row justify-between items-center gap-4 border-b border-slate-100 pb-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-emerald-900 flex items-center gap-2">
+                    <Sparkles className="text-emerald-600" /> Ménage : {periods[selectedPeriod].name}
+                  </h2>
+                  <p className="text-emerald-700 text-sm mt-1">1 famille par week-end.</p>
+                </div>
+                {quickFilterFamily && (
+                  <div className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-lg text-sm font-bold border border-emerald-200 print:block hidden">
+                    Filtre actif : {quickFilterFamily}
+                  </div>
+                )}
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {displayedMenage.map((row, i) => {
+                  let isVac = row.obs && row.obs.includes('Vac');
+                  let bgCard = isVac ? 'bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200' : 'bg-white border-slate-200';
+                  
+                  return (
+                    <div key={i} className={`${bgCard} rounded-xl p-5 border shadow-sm relative overflow-hidden flex flex-col h-full hover:shadow-md transition-all`}>
+                      <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                        <Calendar size={14} className={isVac ? 'text-amber-500' : 'text-emerald-500'}/> Week-end
+                      </div>
+                      <div className={`text-lg font-black mb-4 ${isVac ? 'text-amber-900' : 'text-slate-800'}`}>
+                        {row.we}
+                      </div>
+                      
+                      <div className="mt-auto bg-white/60 p-3 rounded-lg border border-slate-100/50 flex items-center justify-between shadow-sm">
+                        <span className="text-xs font-semibold text-slate-500 uppercase">Resp.</span>
+                        <div className="flex items-center gap-2">
+                          <FamilyPill rawName={row.fam} />
+                          {isVac && <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded border border-amber-200 uppercase">Asso</span>}
+                        </div>
+                      </div>
+                      
+                      {row.obs && (
+                        <div className="mt-3 text-xs font-medium text-slate-500 flex items-start gap-1.5">
+                          <Info size={14} className="shrink-0 mt-0.5" /> {row.obs}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {displayedMenage.length === 0 && (
+                <div className="p-12 text-center text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                  Aucun ménage assigné pour cette sélection.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB STATS */}
+          {activeTab === 'stats' && (
+            <div className="animate-in fade-in duration-300">
+              <div className="bg-indigo-50 p-6 border-b border-indigo-100">
+                <h2 className="text-xl font-bold text-indigo-900 flex items-center gap-2">
+                  <BarChart3 className="text-indigo-600" /> Compteurs d'engagements Annuels
+                </h2>
+                <p className="text-indigo-700 text-sm mt-1">L'équité est désormais absolue : Le planning a été construit pour garantir 19 ou 20 services (cantine + ménage) pour 100% des familles.</p>
+              </div>
+              <div className="overflow-x-auto p-4 md:p-6">
+                <table className="w-full text-left border-collapse rounded-lg overflow-hidden border border-slate-200">
+                  <thead>
+                    <tr className="bg-slate-800 text-white text-sm uppercase tracking-wider">
+                      <th className="p-4 font-bold border-b border-slate-700">Famille / Intervenant</th>
+                      <th className="p-4 font-bold border-b border-slate-700 text-center"><Utensils size={14} className="inline mr-1"/> Cantine</th>
+                      <th className="p-4 font-bold border-b border-slate-700 text-center"><Sparkles size={14} className="inline mr-1"/> Ménage</th>
+                      <th className="p-4 font-black border-b border-slate-700 text-center text-emerald-300">TOTAL SERVICES</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {familyStats.map((stat, i) => (
+                      <tr key={i} className={`hover:bg-slate-50 transition-colors ${stat.isTeacher ? 'bg-slate-50/50' : ''}`}>
+                        <td className="p-4 text-slate-800 font-bold">
+                          {stat.name} {stat.isTeacher && <span className="ml-2 text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full border border-purple-200 shadow-sm print:border print:border-purple-300">Équipe Éducative</span>}
+                        </td>
+                        <td className="p-4 text-center">
+                          <span className={`inline-block px-3 py-1 rounded-full text-sm font-bold shadow-sm border ${stat.cantine > 0 ? 'bg-blue-50 text-blue-700 border-blue-200 print:border-blue-300' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+                            {stat.cantine}
+                          </span>
+                        </td>
+                        <td className="p-4 text-center">
+                          <span className={`inline-block px-3 py-1 rounded-full text-sm font-bold shadow-sm border ${stat.menage > 0 ? 'bg-emerald-50 text-emerald-700 border-emerald-200 print:border-emerald-300' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+                            {stat.menage}
+                          </span>
+                        </td>
+                        <td className="p-4 text-center bg-indigo-50/30">
+                          <span className="inline-block px-4 py-1.5 rounded-full text-base font-black border border-indigo-200 bg-white text-indigo-700 shadow-sm print:border-indigo-300">
+                            {stat.total}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* TAB FAMILLE */}
+          {activeTab === 'famille' && (
+            <div className="animate-in fade-in duration-300">
+              <div className="bg-rose-50 p-6 border-b border-rose-100 flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-rose-900 flex items-center gap-2">
+                    <Search className="text-rose-600" /> Profil et Engagements
+                  </h2>
+                  <p className="text-rose-700 text-sm mt-1 print:hidden">Sélectionnez une famille ci-dessous pour filtrer ses données.</p>
+                </div>
+                <div className="w-full md:w-auto print:hidden relative">
+                  <Search size={16} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400" />
+                  <select 
+                    className="w-full md:w-72 pl-10 pr-4 py-3 rounded-xl border border-rose-200 shadow-sm focus:ring-2 focus:ring-rose-500 font-bold text-slate-700 bg-white outline-none cursor-pointer"
+                    value={selectedFamilyFilter}
+                    onChange={(e) => setSelectedFamilyFilter(e.target.value)}
+                  >
+                    <option value="">-- Sélectionnez une famille --</option>
+                    {familyStats.map(f => (
+                      <option key={f.name} value={f.name}>{f.name} {f.isTeacher ? '(Maîtresse)' : ''}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              
+              {selectedFamilyFilter ? (
+                <div className="p-4 md:p-6 space-y-8">
+                  {/* Tableau Cantine Famille */}
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4">
+                      <Utensils size={18} className="text-blue-600" /> Jours de Cantine pour <span className="uppercase text-blue-600">{selectedFamilyFilter}</span>
+                      <span className="ml-2 px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 text-sm border border-blue-200 shadow-sm print:border-blue-300">
+                        {familyStats.find(f => f.name === selectedFamilyFilter)?.cantine || 0}
+                      </span>
+                    </h3>
+                    <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
+                            <th className="p-3 font-semibold border-b border-slate-200">Période</th>
+                            <th className="p-3 font-semibold border-b border-slate-200">Date</th>
+                            <th className="p-3 font-semibold border-b border-slate-200">Procédure</th>
+                            <th className="p-3 font-semibold border-b border-slate-200">En binôme avec</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {Object.entries(cantineSchedule).flatMap(([pId, rows]) => 
+                            rows.filter(r => (r.p1 || '').includes(selectedFamilyFilter) || (r.p2 || '').includes(selectedFamilyFilter))
+                                .map((r, i) => {
+                                  const isP1 = (r.p1 || '').includes(selectedFamilyFilter);
+                                  const partner = isP1 ? r.p2 : r.p1;
+                                  return (
+                                    <tr key={`${pId}-${i}`} className="hover:bg-slate-50 bg-white">
+                                      <td className="p-3 text-slate-500 text-xs font-bold uppercase">{periods[pId].name.split('-')[0]}</td>
+                                      <td className="p-3 font-black text-slate-800 whitespace-nowrap">{r.date}</td>
+                                      <td className="p-3 text-slate-600 text-sm font-medium">{r.type}</td>
+                                      <td className="p-3"><FamilyPill rawName={partner} /></td>
+                                    </tr>
+                                  );
+                                })
+                          )}
+                          {Object.entries(cantineSchedule).flatMap(([pId, rows]) => rows.filter(r => (r.p1 || '').includes(selectedFamilyFilter) || (r.p2 || '').includes(selectedFamilyFilter))).length === 0 && (
+                            <tr><td colSpan="4" className="p-6 text-center text-slate-400 italic bg-slate-50">Aucun jour de cantine assigné.</td></tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Tableau Ménage Famille */}
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4">
+                      <Sparkles size={18} className="text-emerald-600" /> Week-ends de Ménage pour <span className="uppercase text-emerald-600">{selectedFamilyFilter}</span>
+                      <span className="ml-2 px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-sm border border-emerald-200 shadow-sm print:border-emerald-300">
+                        {familyStats.find(f => f.name === selectedFamilyFilter)?.menage || 0}
+                      </span>
+                    </h3>
+                    <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
+                            <th className="p-3 font-semibold border-b border-slate-200">Période</th>
+                            <th className="p-3 font-semibold border-b border-slate-200">Week-end</th>
+                            <th className="p-3 font-semibold border-b border-slate-200">Observations</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {Object.entries(menageSchedule).flatMap(([pId, rows]) => 
+                            rows.filter(r => (r.fam || '').includes(selectedFamilyFilter))
+                                .map((r, i) => (
+                                  <tr key={`${pId}-${i}`} className="hover:bg-slate-50 bg-white">
+                                    <td className="p-3 text-slate-500 text-xs font-bold uppercase">{periods[pId].name.split('-')[0]}</td>
+                                    <td className="p-3 font-black text-slate-800 whitespace-nowrap">{r.we}</td>
+                                    <td className="p-3 text-slate-600 text-sm italic">{r.obs}</td>
+                                  </tr>
+                                ))
+                          )}
+                          {Object.entries(menageSchedule).flatMap(([pId, rows]) => rows.filter(r => (r.fam || '').includes(selectedFamilyFilter))).length === 0 && (
+                            <tr><td colSpan="3" className="p-6 text-center text-slate-400 italic bg-slate-50">Aucun week-end de ménage assigné.</td></tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-16 text-center text-slate-400 flex flex-col items-center print:hidden bg-white">
+                  <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4 border border-slate-200">
+                    <Search size={32} className="text-slate-300" />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-700 mb-2">Recherche Individuelle</h3>
+                  <p>Veuillez sélectionner une famille dans le menu déroulant ci-dessus pour afficher son calendrier personnel.</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'regles' && (
+            <div className="p-6 md:p-8 animate-in fade-in duration-300 bg-slate-50/50">
+              <h2 className="text-2xl font-black text-slate-800 mb-6 flex items-center gap-3 pb-4 border-b border-slate-200">
+                <CheckCircle className="text-amber-500" size={28} /> Récapitulatif de vos Demandes Validées
+              </h2>
+              
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+                  <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2 border-b border-slate-100 pb-2">
+                    <Utensils size={18} className="text-slate-400"/> Procédure des repas
+                  </h3>
+                  <ul className="space-y-3 text-sm text-slate-600">
+                    <li className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-slate-400"></div><strong className="text-slate-800">Lundi :</strong> Repas par classe</li>
+                    <li className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-slate-400"></div><strong className="text-slate-800">Mardi :</strong> Placement libre</li>
+                    <li className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-slate-400"></div><strong className="text-slate-800">Jeudi :</strong> Filles / Garçons</li>
+                    <li className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-slate-400"></div><strong className="text-slate-800">Vendredi :</strong> Par cordée</li>
+                  </ul>
+                </div>
+
+                <div className="bg-blue-50 rounded-2xl p-6 border border-blue-100 shadow-sm hover:shadow-md transition-shadow">
+                  <h3 className="font-bold text-blue-900 mb-4 flex items-center gap-2 border-b border-blue-200/50 pb-2">
+                    <Users size={18} className="text-blue-600"/> Règles des Familles & Intégration
+                  </h3>
+                  <ul className="space-y-3 text-sm text-blue-800">
+                    <li className="flex items-start gap-2"><div className="w-2 h-2 rounded-full bg-blue-400 mt-1.5 shrink-0"></div><span><strong>Nouvelles Familles :</strong> Ne font jamais la cantine deux jours d'affilée.</span></li>
+                    <li className="flex items-start gap-2"><div className="w-2 h-2 rounded-full bg-blue-400 mt-1.5 shrink-0"></div><span><strong>Période d'intégration (07 au 18 sept) :</strong> Création de binômes obligatoires <em>(1 Ancien Parent + 1 Nouveau)</em>.</span></li>
+                  </ul>
+                </div>
+
+                <div className="bg-rose-50 rounded-2xl p-6 border border-rose-100 shadow-sm hover:shadow-md transition-shadow">
+                  <h3 className="font-bold text-rose-900 mb-4 flex items-center gap-2 border-b border-rose-200/50 pb-2">
+                    <AlertCircle size={18} className="text-rose-600"/> Cas particuliers (Stricts)
+                  </h3>
+                  <ul className="space-y-3 text-sm text-rose-800">
+                    <li className="flex items-start gap-2"><div className="w-2 h-2 rounded-full bg-rose-400 mt-1.5 shrink-0"></div><span><strong>DE MALAUSSENE, DE SERRES, TAISSIDRE-CARVALHO :</strong> Bloqués au <strong>Lundi</strong>.</span></li>
+                    <li className="flex items-start gap-2"><div className="w-2 h-2 rounded-full bg-rose-400 mt-1.5 shrink-0"></div><span><strong>CHOMEL :</strong> Bloqué au <strong>Jeudi</strong>. (Début décalé après la rentrée).</span></li>
+                    <li className="flex items-start gap-2"><div className="w-2 h-2 rounded-full bg-rose-400 mt-1.5 shrink-0"></div><span><strong>FIARD, MELLIES :</strong> Bloqués <strong>Mardi / Jeudi</strong>.</span></li>
+                    <li className="flex items-start gap-2"><div className="w-2 h-2 rounded-full bg-rose-400 mt-1.5 shrink-0"></div><span><strong>FAUVAIN, RIOBÉ :</strong> Binôme exclusif limité à <strong>4 jeudis</strong> (compensé par des ménages).</span></li>
+                  </ul>
+                </div>
+
+                <div className="bg-purple-50 rounded-2xl p-6 border border-purple-100 shadow-sm hover:shadow-md transition-shadow">
+                  <h3 className="font-bold text-purple-900 mb-4 flex items-center gap-2 border-b border-purple-200/50 pb-2">
+                    <Info size={18} className="text-purple-600"/> Équipe Éducative & Équité
+                  </h3>
+                  <ul className="space-y-3 text-sm text-purple-800">
+                    <li className="flex items-start gap-2"><div className="w-2 h-2 rounded-full bg-purple-400 mt-1.5 shrink-0"></div><span><strong>Mme GERARD / Mme SUBLET :</strong> Alternent les Mardis avec un parent.</span></li>
+                    <li className="flex items-start gap-2"><div className="w-2 h-2 rounded-full bg-purple-400 mt-1.5 shrink-0"></div><span><strong>Mme HERVET :</strong> Présente les Vendredis 1 semaine sur 2 avec un parent.</span></li>
+                    <li className="flex items-start gap-2 mt-4 pt-4 border-t border-purple-200/50">
+                      <div className="w-2 h-2 rounded-full bg-purple-600 mt-1.5 shrink-0"></div>
+                      <span><strong className="text-purple-900 bg-white px-1.5 py-0.5 rounded shadow-sm border border-purple-200 inline-block mb-1">ÉQUILIBRE PARFAIT</strong> <br/>La répartition est mathématiquement parfaite. Chaque famille réalise <strong>exactement 19 ou 20 services</strong> cumulés (Cantine + Ménage) sur l'année.</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 // --- MODULE : BUDGET PRÉVISIONNEL ---
 const BudgetPrevisionnel = ({ transactionsGlobales }) => {
