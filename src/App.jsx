@@ -54,26 +54,26 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     setQuickFilterFamily(null); 
   }, [defaultTab]);
 
-  // --- L'ALGORITHME MAGIQUE ET LES DONNÉES ---
-  const { families, periods, schedule, menagesSchedule, familyStats, holidays, vacances } = useMemo(() => {
-    const fams = [
-      { id: "TAISSIDRE", name: "TAISSIDRE-CARVALHO", type: "Ancien", days: [1], isAsso: false },
-      { id: "DE MALAUSSENE", name: "DE MALAUSSENE", type: "Ancien", days: [1], isAsso: true },
-      { id: "DE SERRES", name: "DE SERRES", type: "Nouveau", days: [1], isAsso: false },
-      { id: "LE LÉZEC", name: "LE LÉZEC", type: "Ancien flex", days: [1, 5], isAsso: true, flexUntil: "2026-09-18" },
-      { id: "FIARD", name: "FIARD", type: "Ancien", days: [2, 4], isAsso: false },
-      { id: "GREPAT", name: "GREPAT", type: "Ancien", days: [1, 2], isAsso: false },
-      { id: "MELLIES", name: "MELLIES", type: "Nouveau", days: [2, 4], isAsso: false },
-      { id: "BOCCA", name: "BOCCA", type: "Ancien", days: [1, 5], isAsso: false },
-      { id: "BEZIAT", name: "BEZIAT-MENUT", type: "Ancien", days: [1, 5], isAsso: true },
-      { id: "DE LASTIC", name: "DE LASTIC ST JAL", type: "Nouveau", days: [1, 2, 4, 5], isAsso: false },
-      { id: "CHOMEL", name: "CHOMEL", type: "Nouveau", days: [4], isAsso: false },
-      { id: "CORNET", name: "CORNET-BOUBE", type: "Nouveau", days: [1, 2, 4, 5], isAsso: false },
-      { id: "RIOBÉ", name: "RIOBÉ", type: "Ancien", days: [1, 2, 4, 5], isAsso: false },
-      { id: "FAUVAIN", name: "FAUVAIN", type: "Ancien", days: [1, 2, 4, 5], isAsso: true }
+  // --- 1. DONNÉES ET ALGORITHME (Sécurisé pour React) ---
+  const { familiesList, periodsInfo, schedule, menagesSchedule, familyStats, holidays } = useMemo(() => {
+    const families = [
+      { id: "BOCCA", type: "Ancien", days: [1, 5], asso: false },
+      { id: "CHOMEL", type: "Nouveau", days: [4], asso: false },
+      { id: "CORNET-BOUBE", type: "Nouveau", days: [1, 2, 4, 5], asso: false },
+      { id: "DE LASTIC ST JAL", type: "Nouveau", days: [1, 2, 4, 5], asso: false },
+      { id: "DE SERRES DE MESPLES", type: "Nouveau", days: [1], asso: false },
+      { id: "FIARD", type: "Ancien", days: [2, 4], asso: false },
+      { id: "GREPAT", type: "Ancien", days: [1, 2], asso: false },
+      { id: "MELLIES", type: "Nouveau", days: [2, 4], asso: false },
+      { id: "RIOBÉ", type: "Ancien", days: [1, 2, 4, 5], asso: false },
+      { id: "TAISSIDRE-CARVALHO", type: "Ancien", days: [1], asso: false },
+      { id: "BEZIAT", type: "Ancien", days: [1, 5], asso: true },
+      { id: "DE MALAUSSENE", type: "Ancien", days: [1], asso: true },
+      { id: "FAUVAIN", type: "Ancien", days: [1, 2, 4, 5], asso: true },
+      { id: "LE LÉZEC", type: "Ancien", days: [1, 5], flexUntil: "2026-09-18", asso: true }
     ];
 
-    const per = [
+    const periods = [
       { id: 1, name: "Période 1", desc: "Rentrée (03/09) - Toussaint (17/10)", start: "2026-09-03", end: "2026-10-16", vacStart: "2026-10-17", vacName: "Toussaint" },
       { id: 2, name: "Période 2", desc: "Toussaint (02/11) - Noël (19/12)", start: "2026-11-02", end: "2026-12-18", vacStart: "2026-12-19", vacName: "Noël" },
       { id: 3, name: "Période 3", desc: "Noël (04/01) - Février (13/02)", start: "2027-01-04", end: "2027-02-12", vacStart: "2027-02-13", vacName: "Hiver" },
@@ -82,7 +82,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     ];
 
     const holi = ["2026-11-11", "2027-03-26", "2027-03-29", "2027-05-06", "2027-05-07", "2027-05-17"];
-    const vac = [
+    const vacances = [
       { name: "Toussaint", start: "2026-10-17", end: "2026-11-01" },
       { name: "Noël", start: "2026-12-19", end: "2027-01-03" },
       { name: "Hiver", start: "2027-02-13", end: "2027-02-28" },
@@ -91,56 +91,34 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     ];
 
     function getDateStr(d) {
-      let year = d.getFullYear();
-      let month = String(d.getMonth() + 1).padStart(2, '0');
-      let day = String(d.getDate()).padStart(2, '0');
+      let year = d.getFullYear(); let month = String(d.getMonth() + 1).padStart(2, '0'); let day = String(d.getDate()).padStart(2, '0');
       return `${year}-${month}-${day}`;
     }
 
     function isSchoolDay(dateStr) {
       if (holi.includes(dateStr)) return false;
-      for (let v of vac) { if (dateStr >= v.start && dateStr <= v.end) return false; }
+      for (let v of vacances) { if (dateStr >= v.start && dateStr <= v.end) return false; }
       return true;
-    }
-
-    function getPeriod(dateStr) {
-      if (dateStr <= "2026-10-16") return 1;
-      if (dateStr >= "2026-11-02" && dateStr <= "2026-12-18") return 2;
-      if (dateStr >= "2027-01-04" && dateStr <= "2027-02-12") return 3;
-      if (dateStr >= "2027-03-01" && dateStr <= "2027-04-09") return 4;
-      if (dateStr >= "2027-04-26" && dateStr <= "2027-07-02") return 5;
-      
-      if (dateStr >= "2026-10-17" && dateStr <= "2026-11-01") return 1; 
-      if (dateStr >= "2026-12-19" && dateStr <= "2027-01-03") return 2;
-      if (dateStr >= "2027-02-13" && dateStr <= "2027-02-28") return 3;
-      if (dateStr >= "2027-04-10" && dateStr <= "2027-04-25") return 4;
-      if (dateStr >= "2027-07-03") return 5;
-      return null;
     }
 
     let scheduleArr = [];
     let menageArr = [];
     let stats = {};
-    let statsCantine = {};
-    let statsMenage = {};
-    let lastWorked = {};
     
-    fams.forEach(f => {
-      stats[f.id] = 0; statsCantine[f.id] = 0; statsMenage[f.id] = 0;
-      lastWorked[f.id] = null;
+    families.forEach(f => {
+      stats[f.id] = { cantine: 0, menage: 0, total: 0, lastCantine: null, lastMenage: "2026-01-01" };
     });
 
     const duoDates = ["2026-09-03", "2026-11-05", "2027-01-07", "2027-03-04"];
 
     function pickFamily(dateStr, day, requiredType, avoidId, force = false) {
-      let eligible = fams.filter(f => {
+      let eligible = families.filter(f => {
         if (f.id === avoidId) return false;
-        if (requiredType === 'Ancien' && !f.type.startsWith('Ancien')) return false;
+        if (requiredType === 'Ancien' && f.type !== 'Ancien' && f.type !== 'Ancien flex') return false;
         if (requiredType === 'Nouveau' && f.type !== 'Nouveau') return false;
 
-        if (f.type === 'Nouveau' && lastWorked[f.id]) {
-          let d1 = new Date(lastWorked[f.id]);
-          let d2 = new Date(dateStr);
+        if (f.type === 'Nouveau' && stats[f.id].lastCantine) {
+          let d1 = new Date(stats[f.id].lastCantine); let d2 = new Date(dateStr);
           let diff = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
           if (diff <= 1) return false;
         }
@@ -148,7 +126,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
         if (day === 4 && f.id === 'FAUVAIN' && !duoDates.includes(dateStr)) return false;
 
         if (!force) {
-          let isFlex = (f.id === "LE LÉZEC" && dateStr <= "2026-09-18");
+          let isFlex = (f.id === "LE LÉZEC" && f.flexUntil && dateStr <= f.flexUntil);
           if (!f.days.includes(day) && !isFlex) return false;
         }
         return true;
@@ -160,19 +138,18 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
       }
 
       eligible.sort((a, b) => {
-        if (stats[a.id] !== stats[b.id]) return stats[a.id] - stats[b.id];
+        if (stats[a.id].total !== stats[b.id].total) return stats[a.id].total - stats[b.id].total;
         return a.id.localeCompare(b.id);
       });
       
       let picked = eligible[0];
-      stats[picked.id]++;
-      statsCantine[picked.id]++;
-      lastWorked[picked.id] = dateStr;
+      stats[picked.id].cantine++; stats[picked.id].total++; stats[picked.id].lastCantine = dateStr;
       return picked;
     }
 
-    let currentDate = new Date(2026, 8, 3);
-    let endDate = new Date(2027, 6, 2);
+    let currentDate = new Date(2026, 8, 3); // 3 Sept 2026
+    let endDate = new Date(2027, 6, 2);     // 2 Juillet 2027
+    
     let maitresseMardi = "Mme GERARD";
     let isHervetWeek = true;
     let fauvainRiobeThursdays = 0;
@@ -182,51 +159,43 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     while (currentDate <= endDate) {
       let dayOfWeek = currentDate.getDay();
       let dateStr = getDateStr(currentDate);
-      let period = getPeriod(dateStr);
 
-      let pIdx = per.findIndex(p => dateStr >= p.start && dateStr <= p.end);
+      let pIdx = periods.findIndex(p => dateStr >= p.start && dateStr <= p.end);
       if (pIdx !== -1 && pIdx !== currentPeriodIdx) {
-        currentPeriodIdx = pIdx;
-        periodThursdaysDone = false;
+        currentPeriodIdx = pIdx; periodThursdaysDone = false;
       }
-      const activeP = per.find(p => dateStr >= p.start && dateStr <= p.end);
-      const isSchoolDayFlag = activeP && !holi.includes(dateStr) && [1,2,4,5].includes(dayOfWeek);
+      
+      // Sécurisation : on trouve la période courante, sinon on force à 1 (évite l'écran blanc)
+      const activeP = periods.find(p => dateStr >= p.start && dateStr <= p.end) || periods[0];
+      const isSchoolDayFlag = !holi.includes(dateStr) && !vacances.some(v => dateStr >= v.start && dateStr <= v.end) && [1,2,4,5].includes(dayOfWeek);
 
       if (isSchoolDayFlag) {
-        let requiredParents = 2;
-        let p1 = null, p2 = null;
-        let repasType = "";
-        let forcedError = false;
-
-        const isIntegration1 = dateStr <= "2026-09-04";
-        const isIntegration2 = dateStr > "2026-09-04" && dateStr <= "2026-09-18";
+        let requiredParents = 2; let p1 = null, p2 = null; let repasType = ""; let forcedError = false;
+        const isInt1 = dateStr <= "2026-09-04"; const isInt2 = dateStr > "2026-09-04" && dateStr <= "2026-09-18";
 
         if (dayOfWeek === 1) { repasType = "Repas par classe"; } 
         else if (dayOfWeek === 2) { 
           repasType = "Placement libre"; requiredParents = 1; 
-          p1 = isMmeGerard ? "Mme GERARD" : "Mme SUBLET"; 
-          isMmeGerard = !isMmeGerard; 
+          p1 = { id: maitresseMardi }; maitresseMardi = maitresseMardi === "Mme GERARD" ? "Mme SUBLET" : "Mme GERARD"; 
         } 
         else if (dayOfWeek === 4) { repasType = "Filles / Garçons"; } 
         else if (dayOfWeek === 5) { 
           repasType = "Par cordée"; 
-          if (isHervetWeek) { requiredParents = 1; p1 = "Mme HERVET"; }
+          if (isHervetWeek) { requiredParents = 1; p1 = { id: "Mme HERVET" }; }
           isHervetWeek = !isHervetWeek; 
         }
 
-        let parentsToAssign = requiredParents === 1 && p1 ? 1 : 2;
+        let parentsToAssign = (requiredParents === 1 && p1) ? 1 : 2;
         let assigned = [];
 
         if (dayOfWeek === 4 && fauvainRiobeThursdays < 4 && !periodThursdaysDone && currentPeriodIdx < 4) {
           assigned = ["RIOBÉ", "FAUVAIN"];
-          fauvainRiobeThursdays++;
-          periodThursdaysDone = true;
-          stats["RIOBÉ"]++; statsCantine["RIOBÉ"]++; lastWorked["RIOBÉ"] = dateStr;
-          stats["FAUVAIN"]++; statsCantine["FAUVAIN"]++; lastWorked["FAUVAIN"] = dateStr;
-        } 
-        else {
+          fauvainRiobeThursdays++; periodThursdaysDone = true;
+          stats["RIOBÉ"].cantine++; stats["RIOBÉ"].total++; stats["RIOBÉ"].lastCantine = dateStr;
+          stats["FAUVAIN"].cantine++; stats["FAUVAIN"].total++; stats["FAUVAIN"].lastCantine = dateStr;
+        } else {
           for (let i = 0; i < parentsToAssign; i++) {
-            let available = fams.filter(f => {
+            let available = families.filter(f => {
               if (assigned.includes(f.id)) return false;
               if (f.id === "FAUVAIN" && dayOfWeek === 4) return false;
               if (f.id === "LE LÉZEC" && dateStr === "2026-10-12") return false;
@@ -235,112 +204,99 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
               if (f.id === "LE LÉZEC" && f.flexUntil && dateStr <= f.flexUntil) hasDay = true;
               if (!hasDay) return false;
 
-              if (f.type === "Nouveau" && lastWorked[f.id]) {
-                let lastD = new Date(lastWorked[f.id]);
+              if (f.type === "Nouveau" && stats[f.id].lastCantine) {
+                let lastD = new Date(stats[f.id].lastCantine);
                 let diffDays = Math.ceil(Math.abs(currentDate - lastD) / (1000 * 60 * 60 * 24));
                 if (diffDays <= 3) return false;
               }
 
-              if (isIntegration1 && f.type === "Nouveau") return false;
-              if (isIntegration2) {
-                let hasAncien = (p1 && p1.startsWith("Mme")) || assigned.some(a => fams.find(fam => fam.id === a).type.startsWith("Ancien"));
+              if (isInt1 && f.type === "Nouveau") return false;
+              if (isInt2) {
+                let hasAncien = (p1 && p1.id && p1.id.startsWith("Mme")) || assigned.some(a => families.find(fam => fam.id === a).type.startsWith("Ancien"));
                 if (hasAncien && f.type.startsWith("Ancien")) return false;
                 if (!hasAncien && f.type === "Nouveau" && i === 1) return false;
               }
               return true;
             });
 
-            available.sort((a, b) => stats[a.id] - stats[b.id]);
-
+            available.sort((a, b) => stats[a.id].total - stats[b.id].total);
             if (available.length > 0) {
               assigned.push(available[0].id);
-              stats[available[0].id]++; statsCantine[available[0].id]++; lastWorked[available[0].id] = dateStr;
+              stats[available[0].id].cantine++; stats[available[0].id].total++; stats[available[0].id].lastCantine = dateStr;
             } else {
-              let fallback = fams.filter(f => !assigned.includes(f.id)).sort((a, b) => stats[a.id] - stats[b.id]);
+              let fallback = families.filter(f => !assigned.includes(f.id)).sort((a, b) => stats[a.id].total - stats[b.id].total);
               if (fallback.length > 0) {
                 assigned.push(fallback[0].id);
-                stats[fallback[0].id]++; statsCantine[fallback[0].id]++; lastWorked[fallback[0].id] = dateStr;
+                stats[fallback[0].id].cantine++; stats[fallback[0].id].total++; stats[fallback[0].id].lastCantine = dateStr;
                 forcedError = true;
               }
             }
           }
         }
 
-        if (parentsToAssign === 2) { p1 = assigned[0]; p2 = assigned[1]; }
-        else if (parentsToAssign === 1 && !p1) { p1 = assigned[0]; }
-        else if (parentsToAssign === 1 && p1) { p2 = assigned[0]; }
+        let finalP1 = parentsToAssign === 2 ? assigned[0] : (p1 ? p1.id : assigned[0]);
+        let finalP2 = parentsToAssign === 2 ? assigned[1] : (p1 ? assigned[0] : null);
 
-        scheduleArr.push({ date: dateStr, period: activeP.id, dayOfWeek, p1, p2, repasType, isError: forcedError });
+        scheduleArr.push({ date: dateStr, period: activeP.id, dayOfWeek, p1: finalP1, p2: finalP2, repasType, isError: forcedError });
       }
 
-      if (dayOfWeek === 5 && isSchoolDay(dateStr) && period) {
-        let nextSat = new Date(currentDate); 
-        nextSat.setDate(nextSat.getDate() + 1);
+      if (dayOfWeek === 5 && isSchoolDayFlag) {
+        let nextSat = new Date(currentDate); nextSat.setDate(nextSat.getDate() + 1);
         let nextSatStr = getDateStr(nextSat);
         
-        let isHolidayStart = false;
-        let holidayName = "";
-        for (let v of vac) {
+        let isHolidayStart = false; let holidayName = "";
+        for (let v of vacances) {
           if (nextSatStr === v.start) { isHolidayStart = true; holidayName = "Vacances " + v.name; }
         }
 
         if (isHolidayStart) {
-          let eligibleAsso = fams.filter(f => f.isAsso && statsMenage[f.id] < 4);
-          if (eligibleAsso.length === 0) eligibleAsso = fams.filter(f => f.isAsso);
-          eligibleAsso.sort((a, b) => stats[a.id] - stats[b.id] || a.id.localeCompare(b.id));
-          
+          let eligibleAsso = families.filter(f => f.asso);
+          eligibleAsso.sort((a, b) => stats[a.id].total - stats[b.id].total || a.id.localeCompare(b.id));
           if(eligibleAsso.length > 0) {
             let chosen = eligibleAsso[0].id;
-            stats[chosen]++; statsMenage[chosen]++;
+            stats[chosen].menage++; stats[chosen].total++; stats[chosen].lastMenage = dateStr;
             let vacDate = new Date(currentDate); vacDate.setDate(vacDate.getDate() + 1);
-            menageArr.push({ date: getDateStr(vacDate), period: period, familyId: chosen, isVacances: true, label: holidayName });
+            menageArr.push({ date: getDateStr(vacDate), period: activeP.id, familyId: chosen, isVacances: true, label: holidayName });
           }
         } else {
-          let candidates = fams.filter(f => statsMenage[f.id] === 0);
+          let candidates = families.filter(f => stats[f.id].menage === 0);
           if (candidates.length === 0) {
-            candidates = fams.filter(f => {
-              if (f.isAsso && statsMenage[f.id] >= 2) return false;
-              return statsMenage[f.id] < 4;
+            candidates = families.filter(f => {
+              if (f.asso && stats[f.id].menage >= 2) return false;
+              return stats[f.id].menage < 4;
             });
-            if(candidates.length === 0) candidates = fams.filter(f => statsMenage[f.id] < 4);
-            if(candidates.length === 0) candidates = [...fams];
+            if(candidates.length === 0) candidates = families.filter(f => stats[f.id].menage < 4);
+            if(candidates.length === 0) candidates = [...families];
           }
           
           candidates.sort((a, b) => {
-            let lastA = new Date(lastWorked[a.id] || "2026-01-01").getTime();
-            let lastB = new Date(lastWorked[b.id] || "2026-01-01").getTime();
+            let lastA = new Date(stats[a.id].lastMenage).getTime(); let lastB = new Date(stats[b.id].lastMenage).getTime();
             let now = currentDate.getTime();
-            let penA = (now - lastA < 28 * 24 * 60 * 60 * 1000) ? 100 : 0;
-            let penB = (now - lastB < 28 * 24 * 60 * 60 * 1000) ? 100 : 0;
-            let scoreA = stats[a.id] + penA;
-            let scoreB = stats[b.id] + penB;
+            let penA = (now - lastA < 28 * 24 * 60 * 60 * 1000) ? 100 : 0; let penB = (now - lastB < 28 * 24 * 60 * 60 * 1000) ? 100 : 0;
+            let scoreA = stats[a.id].total + penA; let scoreB = stats[b.id].total + penB;
             if (scoreA === scoreB) return lastA - lastB;
             return scoreA - scoreB;
           });
 
           if(candidates.length > 0) {
             let chosen = candidates[0].id;
-            stats[chosen]++; statsMenage[chosen]++; lastWorked[chosen] = dateStr;
-            menageArr.push({ date: nextSatStr, period: period, familyId: chosen, isVacances: false, label: "Ménage Hebdomadaire" });
+            stats[chosen].menage++; stats[chosen].total++; stats[chosen].lastMenage = dateStr;
+            menageArr.push({ date: nextSatStr, period: activeP.id, familyId: chosen, isVacances: false, label: "Ménage Hebdomadaire" });
           }
         }
       }
       currentDate.setDate(currentDate.getDate() + 1);
     }
 
-    // Préparation propre des stats pour affichage sans erreur
     let fStats = Object.keys(stats).map(id => {
-      const fam = fams.find(f => f.id === id);
-      const isTeacher = id.startsWith("Mme");
-      return {
-        id: id,
-        name: fam ? fam.name : id,
-        isTeacher: isTeacher,
-        cantine: statsCantine[id] || 0,
-        menage: statsMenage[id] || 0,
-        total: stats[id] || 0
-      };
+      const fam = families.find(f => f.id === id);
+      return { id: id, name: fam ? fam.id : id, cantine: stats[id].cantine, menage: stats[id].menage, total: stats[id].total };
     });
+    
+    // Add teachers to stats
+    fStats.push({ id: "Mme GERARD", name: "Mme GERARD", isTeacher: true, cantine: scheduleArr.filter(s=>s.p1==="Mme GERARD" || s.p2==="Mme GERARD").length, menage: 0, total: scheduleArr.filter(s=>s.p1==="Mme GERARD" || s.p2==="Mme GERARD").length });
+    fStats.push({ id: "Mme SUBLET", name: "Mme SUBLET", isTeacher: true, cantine: scheduleArr.filter(s=>s.p1==="Mme SUBLET" || s.p2==="Mme SUBLET").length, menage: 0, total: scheduleArr.filter(s=>s.p1==="Mme SUBLET" || s.p2==="Mme SUBLET").length });
+    fStats.push({ id: "Mme HERVET", name: "Mme HERVET", isTeacher: true, cantine: scheduleArr.filter(s=>s.p1==="Mme HERVET" || s.p2==="Mme HERVET").length, menage: 0, total: scheduleArr.filter(s=>s.p1==="Mme HERVET" || s.p2==="Mme HERVET").length });
 
     fStats.sort((a, b) => {
       if (a.isTeacher && !b.isTeacher) return 1;
@@ -348,86 +304,114 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
       return b.total - a.total || a.name.localeCompare(b.name);
     });
 
-    return { 
-      families: fams, periods: per, holidays: holi, vacances: vac,
-      schedule: scheduleArr, menagesSchedule: menageArr, 
-      familyStats: fStats
-    };
+    return { familiesList: families, periodsInfo: periods, schedule: scheduleArr, menagesSchedule: menageArr, familyStats: fStats, holidays: holi, vacances: vac };
   }, []);
 
-
-  // --- UTILES ---
+  // --- 2. FONCTIONS DE FORMATAGE ---
   const getLocalDateString = (d) => {
     let year = d.getFullYear(); let month = String(d.getMonth() + 1).padStart(2, '0'); let day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   };
 
   const formatDate = (dateString) => {
+    if (!dateString) return "";
     const options = { weekday: 'long', day: 'numeric', month: 'short' };
     let str = new Date(dateString).toLocaleDateString('fr-FR', options);
     return str.charAt(0).toUpperCase() + str.slice(1);
   };
 
   const formatMenageDate = (dateString) => {
+    if (!dateString) return "";
     let d1 = new Date(dateString); let d2 = new Date(dateString);
     d1.setDate(d1.getDate() + 1); d2.setDate(d2.getDate() + 2); 
     return `Sam. ${d1.getDate()} au Dim. ${new Date(d2).toLocaleDateString('fr-FR', {day:'numeric', month:'short'})}`;
   };
 
-  // --- BADGES ET COULEURS ---
+  // --- 3. DESIGN ET BADGES (Sécurisé) ---
   const teacherStyles = {
-    "Mme GERARD": "bg-pink-600 text-white border-pink-700",
-    "Mme SUBLET": "bg-purple-600 text-white border-purple-700",
-    "Mme HERVET": "bg-teal-600 text-white border-teal-700"
+    "Mme GERARD": "bg-slate-700 text-white border-slate-800",
+    "Mme SUBLET": "bg-slate-700 text-white border-slate-800",
+    "Mme HERVET": "bg-slate-700 text-white border-slate-800"
   };
 
   const familyStyles = {
-    "TAISSIDRE": "bg-blue-100 text-blue-800 border-blue-200",
-    "DE MALAUSSENE": "bg-indigo-100 text-indigo-800 border-indigo-200",
-    "DE SERRES": "bg-emerald-100 text-emerald-800 border-emerald-200",
-    "LE LÉZEC": "bg-yellow-100 text-yellow-800 border-yellow-200",
-    "FIARD": "bg-red-100 text-red-800 border-red-200",
-    "GREPAT": "bg-orange-100 text-orange-800 border-orange-200",
-    "MELLIES": "bg-amber-100 text-amber-800 border-amber-200",
-    "BOCCA": "bg-lime-100 text-lime-800 border-lime-200",
-    "BEZIAT": "bg-cyan-100 text-cyan-800 border-cyan-200",
-    "DE LASTIC": "bg-sky-100 text-sky-800 border-sky-200",
-    "CHOMEL": "bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200",
-    "CORNET": "bg-rose-100 text-rose-800 border-rose-200",
-    "RIOBÉ": "bg-violet-100 text-violet-800 border-violet-200",
+    "TAISSIDRE": "bg-cyan-100 text-cyan-800 border-cyan-200",
+    "DE MALAUSSENE": "bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200",
+    "DE SERRES DE MESPLES": "bg-yellow-100 text-yellow-800 border-yellow-200",
+    "DE SERRES": "bg-yellow-100 text-yellow-800 border-yellow-200",
+    "LE LÉZEC": "bg-sky-100 text-sky-800 border-sky-200",
+    "FIARD": "bg-pink-100 text-pink-800 border-pink-200",
+    "GREPAT": "bg-indigo-100 text-indigo-800 border-indigo-200",
+    "MELLIES": "bg-teal-100 text-teal-800 border-teal-200",
+    "BOCCA": "bg-blue-100 text-blue-800 border-blue-200",
+    "BEZIAT": "bg-emerald-100 text-emerald-800 border-emerald-200",
+    "DE LASTIC ST JAL": "bg-purple-100 text-purple-800 border-purple-200",
+    "CHOMEL": "bg-red-100 text-red-800 border-red-200",
+    "CORNET-BOUBE": "bg-green-100 text-green-800 border-green-200",
+    "RIOBÉ": "bg-orange-100 text-orange-800 border-orange-200",
     "FAUVAIN": "bg-slate-200 text-slate-800 border-slate-300"
   };
 
   const FamilyPill = ({ id, isError = false }) => {
-    if (!id || id === "ERREUR") return <span className="text-red-500 text-xs italic bg-red-50 px-2 py-0.5 rounded border border-red-200"><AlertTriangle size={12} className="inline mr-1 -mt-0.5"/>À définir</span>;
+    if (!id || id === "ERREUR") return <span className="text-red-500 text-xs italic bg-red-50 px-2 py-0.5 rounded border border-red-200">À définir</span>;
     
-    let styleClass = id.startsWith("Mme") ? teacherStyles[id] : (familyStyles[id] || "bg-slate-100 text-slate-800 border-slate-200");
-    let errBorder = (isError && !id.startsWith("Mme")) ? "border-red-500 shadow-red-200 border-2" : "border-transparent";
+    let isTeacher = id.startsWith("Mme");
+    let styleClass = isTeacher ? (teacherStyles[id] || "bg-slate-700 text-white") : (familyStyles[id] || "bg-slate-100 text-slate-800");
+    let errBorder = (isError && !isTeacher) ? "border-red-500 shadow-red-200 border-2" : "border-transparent";
 
     return (
       <button 
         onClick={() => setQuickFilterFamily(id)}
-        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md border text-[11px] font-bold shadow-sm transition-all hover:ring-2 ring-indigo-300 active:scale-95 cursor-pointer ${styleClass} ${errBorder}`}
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[11px] font-bold shadow-sm transition-all hover:opacity-80 active:scale-95 cursor-pointer ${styleClass} ${errBorder}`}
         title={`Filtrer sur ${id}`}
       >
-        {isError && !id.startsWith("Mme") && <AlertTriangle size={12} className="text-red-500" title="Jour non souhaité forcé par l'algo" />}
-        {id.startsWith("Mme") ? <GraduationCap size={12} className="mr-0.5" /> : ''} {id}
+        {isTeacher ? <Users size={12} className="mr-0.5" /> : ''} {id}
       </button>
     );
   };
 
-  // --- FILTRES ACTIFS DES TABLEAUX ---
   const displayedCantine = schedule.filter(s => 
-    s.period === activePeriod && 
-    (!quickFilterFamily || s.p1 === quickFilterFamily || s.p2 === quickFilterFamily)
+    s.period === activePeriod && (!quickFilterFamily || s.p1 === quickFilterFamily || s.p2 === quickFilterFamily)
   );
   
   const displayedMenage = menagesSchedule.filter(m => 
-    m.period === activePeriod && 
-    (!quickFilterFamily || m.familyId === quickFilterFamily)
+    m.period === activePeriod && (!quickFilterFamily || m.familyId === quickFilterFamily)
   );
 
-  // --- RENDU CALENDRIER ANNUEL ---
+  // --- 4. EXPORT ET AFFICHAGE ---
+  const handleExportCSV = () => {
+    let data = []; const headers = [];
+    const activePName = periodsInfo.find(p => p.id === activePeriod)?.name || 'Période';
+
+    if (activeTab === 'cantine') {
+      headers.push('Période', 'Date', 'Procédure', 'Intervenant 1', 'Intervenant 2');
+      displayedCantine.forEach(r => data.push([activePName, r.date, r.repasType, r.p1, r.p2]));
+    } else if (activeTab === 'menage') {
+      headers.push('Période', 'Date', 'Famille', 'Type');
+      displayedMenage.forEach(r => data.push([activePName, r.date, r.familyId, r.label]));
+    } else if (activeTab === 'stats') {
+      headers.push('Famille / Intervenant', 'Tours de Cantine', 'Tours de Ménage', 'Total Services');
+      familyStats.forEach(s => data.push([s.name, s.cantine, s.menage, s.total]));
+    } else if (activeTab === 'famille') {
+      if (!selectedFamilyFilter) return alert("Sélectionnez un nom.");
+      headers.push('Type', 'Période', 'Date', 'Détails');
+      schedule.filter(s => s.p1 === selectedFamilyFilter || s.p2 === selectedFamilyFilter).forEach(r => {
+         const partner = r.p1 === selectedFamilyFilter ? r.p2 : r.p1;
+         data.push(['Cantine', periodsInfo.find(p=>p.id===r.period)?.name, r.date, `Binôme avec : ${partner || 'Aucun'}`]);
+      });
+      menagesSchedule.filter(m => m.familyId === selectedFamilyFilter).forEach(r => {
+         data.push(['Ménage', periodsInfo.find(p=>p.id===r.period)?.name, r.date, r.label]);
+      });
+    } else { return; }
+
+    if (data.length === 0) return alert("Aucune donnée à exporter.");
+    const csvContent = "\uFEFF" + [headers.join(';'), ...data.map(row => row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(';'))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a"); link.href = url; link.download = 'export_planning.csv'; 
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+  };
+
   const renderCalendarGrid = () => {
     const months = [
       { y: 2026, m: 8, name: 'Septembre' }, { y: 2026, m: 9, name: 'Octobre' }, { y: 2026, m: 10, name: 'Novembre' },
@@ -448,7 +432,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
         const isWeekend = dayWeek === 0 || dayWeek === 6;
         const isHoliday = holidays.includes(dateStr);
         
-        let cellClass = "p-1.5 flex flex-col gap-1 border-r border-b border-slate-200 min-h-[50px] text-[9px] ";
+        let cellClass = "p-1 flex flex-col gap-0.5 border-r border-b border-slate-200 min-h-[45px] text-[9px] ";
         if (isWeekend) cellClass += "bg-slate-50 ";
         if (isHoliday) cellClass += "bg-slate-100 opacity-60 ";
 
@@ -473,7 +457,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
               </div>
             )}
             {menageEvent && (dayWeek === 6 || menageEvent.isVacances) && (
-              <div className="mt-auto pt-1 border-t border-slate-100 flex flex-col gap-0.5 items-start">
+              <div className="mt-auto pt-0.5 border-t border-slate-100 flex flex-col gap-0.5 items-start">
                 <span className="text-[8px] text-indigo-400 uppercase font-bold"><Sparkles size={8} className="inline mr-0.5"/>Ménage</span>
                 <FamilyPill id={menageEvent.familyId} />
               </div>
@@ -499,46 +483,6 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
         </div>
       </div>
     );
-  };
-
-  // --- FONCTION D'EXPORT CSV ---
-  const handleExportCSV = () => {
-    let data = [];
-    const headers = [];
-    const activePName = periods.find(p => p.id === activePeriod)?.name || 'Période';
-
-    if (activeTab === 'cantine') {
-      headers.push('Période', 'Date', 'Procédure', 'Intervenant 1', 'Intervenant 2', 'Observations');
-      displayedCantine.forEach(r => data.push([activePName, r.date, r.repasType, r.p1, r.p2, r.isError ? "Jour forcé par l'algo" : ""]));
-    } 
-    else if (activeTab === 'menage') {
-      headers.push('Période', 'Week-end', 'Famille', 'Type');
-      displayedMenage.forEach(r => data.push([activePName, r.date, r.familyId, r.label]));
-    } 
-    else if (activeTab === 'stats') {
-      headers.push('Famille / Intervenant', 'Tours de Cantine', 'Tours de Ménage', 'Total Services');
-      familyStats.forEach(s => data.push([s.name, s.cantine, s.menage, s.total]));
-    } 
-    else if (activeTab === 'famille') {
-      if (!selectedFamilyFilter) return alert("Sélectionnez une famille.");
-      headers.push('Type de Service', 'Période', 'Date / Week-end', 'Détails');
-      
-      schedule.filter(s => s.p1 === selectedFamilyFilter || s.p2 === selectedFamilyFilter).forEach(r => {
-         const partner = r.p1 === selectedFamilyFilter ? r.p2 : r.p1;
-         data.push(['Cantine', periods.find(p=>p.id===r.period).name, r.date, `Binôme avec : ${partner || 'Aucun'}`]);
-      });
-      menagesSchedule.filter(m => m.familyId === selectedFamilyFilter).forEach(r => {
-         data.push(['Ménage', periods.find(p=>p.id===r.period).name, r.date, r.label]);
-      });
-    } else { return; }
-
-    if (data.length === 0) return alert("Aucune donnée à exporter.");
-    const csvContent = "\uFEFF" + [headers.join(';'), ...data.map(row => row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(';'))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url; link.download = 'export_planning.csv'; 
-    document.body.appendChild(link); link.click(); document.body.removeChild(link);
   };
 
   return (
@@ -577,7 +521,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
               </button>
             )}
             <button onClick={() => window.print()} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg font-semibold text-sm transition shadow-sm flex items-center gap-2">
-              <Printer size={16} /> Imprimer
+              <FileText size={16} /> Imprimer
             </button>
           </div>
         </header>
@@ -629,7 +573,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                 </h2>
                 <div className="flex justify-center md:justify-start mb-6 print:hidden">
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-2 bg-slate-100 p-2 rounded-xl max-w-3xl w-full shadow-inner">
-                    {periods.map(p => (
+                    {periodsInfo.map(p => (
                       <button key={p.id} onClick={() => setActivePeriod(p.id)} className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-all ${activePeriod === p.id ? 'bg-white shadow-sm text-blue-600 border-blue-200' : 'text-slate-500 border-transparent hover:bg-slate-200'}`}>
                         <div className="font-bold">{p.name}</div>
                         <div className="text-[10px] opacity-80">{p.desc.split(' - ')[0]}</div>
@@ -687,7 +631,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                 </h2>
                 <div className="flex justify-center md:justify-start mb-6 print:hidden">
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-2 bg-slate-100 p-2 rounded-xl max-w-3xl w-full shadow-inner">
-                    {periods.map(p => (
+                    {periodsInfo.map(p => (
                       <button key={p.id} onClick={() => setActivePeriod(p.id)} className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-all ${activePeriod === p.id ? 'bg-white shadow-sm text-indigo-600 border-indigo-200' : 'text-slate-500 border-transparent hover:bg-slate-200'}`}>
                         <div className="font-bold">{p.name}</div>
                         <div className="text-[10px] opacity-80">{p.desc.split(' - ')[0]}</div>
@@ -706,14 +650,14 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                       <div className="flex justify-between items-start mb-4">
                         <div>
                           <div className={`text-xs font-bold ${isVac ? 'text-amber-500' : 'text-slate-400'} uppercase tracking-wider mb-1 flex items-center gap-2`}>
-                            <Calendar size={14}/> {row.label}
+                            <Calendar size={14} className={isVac ? 'text-amber-500' : 'text-emerald-500'}/> {row.label}
                           </div>
                           <div className={`text-sm font-bold ${isVac ? 'text-amber-800' : 'text-slate-700'} capitalize mt-2 bg-white/50 px-3 py-1.5 rounded-lg border border-slate-100 inline-block`}>
                             {isVac ? formatDate(row.date) : formatMenageDate(row.date)}
                           </div>
                         </div>
                       </div>
-                      <div className="mt-auto bg-white/60 p-3 rounded-lg border border-slate-100/50 flex items-center justify-between">
+                      <div className="mt-auto bg-white/60 p-3 rounded-lg border border-slate-100/50 flex items-center justify-between shadow-sm">
                         <span className="text-xs font-semibold text-slate-500 uppercase">Resp.</span>
                         <div className="flex items-center gap-2">
                           <FamilyPill id={row.familyId} />
@@ -794,7 +738,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                   >
                     <option value="">Sélectionnez un nom...</option>
                     <optgroup label="Familles">
-                      {families.map(f => <option key={f.id} value={f.id}>{f.id}</option>)}
+                      {familiesList.map(f => <option key={f.id} value={f.id}>{f.id}</option>)}
                     </optgroup>
                     <optgroup label="Maîtresses">
                       <option value="Mme GERARD">Mme GERARD</option>
@@ -807,7 +751,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
               
               {selectedFamilyFilter ? (() => {
                 const isTeacher = selectedFamilyFilter.startsWith("Mme");
-                const famInfo = isTeacher ? { type: "Équipe Pédagogique", isAsso: false } : families.find(f => f.id === selectedFamilyFilter);
+                const famInfo = isTeacher ? { type: "Équipe Pédagogique", isAsso: false } : familiesList.find(f => f.id === selectedFamilyFilter);
                 let fSchedule = schedule.filter(s => s.p1 === selectedFamilyFilter || s.p2 === selectedFamilyFilter);
                 let fMenage = menagesSchedule.filter(m => m.familyId === selectedFamilyFilter);
                 
@@ -822,7 +766,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                         <div className="flex items-center gap-4">
                             <div className="text-xl"><FamilyPill id={selectedFamilyFilter} /></div>
                             <div>
-                                <div className="text-sm text-slate-500 font-bold uppercase tracking-wider">{famInfo.type} {famInfo.isAsso ? '• Membre Asso' : ''}</div>
+                                <div className="text-sm text-slate-500 font-bold uppercase tracking-wider">{famInfo ? famInfo.type : ''} {famInfo && famInfo.asso ? '• Membre Asso' : ''}</div>
                                 <div className="text-slate-800 font-bold mt-1">Total : {allEvents.length} services</div>
                             </div>
                         </div>
@@ -843,7 +787,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                                 let pHeader = null;
                                 if (e.period !== currentP) {
                                   currentP = e.period;
-                                  let pName = periods.find(p=>p.id===currentP).name;
+                                  let pName = periodsInfo.find(p=>p.id===currentP)?.name || 'Période inconnue';
                                   pHeader = <tr key={`ph-${idx}`}><td colSpan="2" className="bg-slate-100 px-6 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider">{pName}</td></tr>;
                                 }
                                 
