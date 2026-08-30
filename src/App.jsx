@@ -54,26 +54,26 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     setQuickFilterFamily(null); 
   }, [defaultTab]);
 
-  // --- 1. DONNÉES ET ALGORITHME (Sécurisé pour React) ---
-  const { familiesList, periodsInfo, schedule, menagesSchedule, familyStats, holidays } = useMemo(() => {
-    const families = [
-      { id: "BOCCA", type: "Ancien", days: [1, 5], asso: false },
-      { id: "CHOMEL", type: "Nouveau", days: [4], asso: false },
-      { id: "CORNET-BOUBE", type: "Nouveau", days: [1, 2, 4, 5], asso: false },
-      { id: "DE LASTIC ST JAL", type: "Nouveau", days: [1, 2, 4, 5], asso: false },
-      { id: "DE SERRES DE MESPLES", type: "Nouveau", days: [1], asso: false },
-      { id: "FIARD", type: "Ancien", days: [2, 4], asso: false },
-      { id: "GREPAT", type: "Ancien", days: [1, 2], asso: false },
-      { id: "MELLIES", type: "Nouveau", days: [2, 4], asso: false },
-      { id: "RIOBÉ", type: "Ancien", days: [1, 2, 4, 5], asso: false },
-      { id: "TAISSIDRE-CARVALHO", type: "Ancien", days: [1], asso: false },
-      { id: "BEZIAT", type: "Ancien", days: [1, 5], asso: true },
-      { id: "DE MALAUSSENE", type: "Ancien", days: [1], asso: true },
-      { id: "FAUVAIN", type: "Ancien", days: [1, 2, 4, 5], asso: true },
-      { id: "LE LÉZEC", type: "Ancien", days: [1, 5], flexUntil: "2026-09-18", asso: true }
+  // --- L'ALGORITHME MAGIQUE (Totalement sécurisé) ---
+  const { families, periods, schedule, menagesSchedule, familyStats, holidays, vacances } = useMemo(() => {
+    const familyData = [
+      { id: "TAISSIDRE", name: "TAISSIDRE-CARVALHO", type: "Ancien", days: [1], isAsso: false },
+      { id: "DE MALAUSSENE", name: "DE MALAUSSENE", type: "Ancien", days: [1], isAsso: true },
+      { id: "DE SERRES", name: "DE SERRES", type: "Nouveau", days: [1], isAsso: false },
+      { id: "LE LÉZEC", name: "LE LÉZEC", type: "Ancien flex", days: [1, 5], isAsso: true, flexUntil: "2026-09-18" },
+      { id: "FIARD", name: "FIARD", type: "Ancien", days: [2, 4], isAsso: false },
+      { id: "GREPAT", name: "GREPAT", type: "Ancien", days: [1, 2], isAsso: false },
+      { id: "MELLIES", name: "MELLIES", type: "Nouveau", days: [2, 4], isAsso: false },
+      { id: "BOCCA", name: "BOCCA", type: "Ancien", days: [1, 5], isAsso: false },
+      { id: "BEZIAT", name: "BEZIAT-MENUT", type: "Ancien", days: [1, 5], isAsso: true },
+      { id: "DE LASTIC", name: "DE LASTIC ST JAL", type: "Nouveau", days: [1, 2, 4, 5], isAsso: false },
+      { id: "CHOMEL", name: "CHOMEL", type: "Nouveau", days: [4], isAsso: false },
+      { id: "CORNET", name: "CORNET-BOUBE", type: "Nouveau", days: [1, 2, 4, 5], isAsso: false },
+      { id: "RIOBÉ", name: "RIOBÉ", type: "Ancien", days: [1, 2, 4, 5], isAsso: false },
+      { id: "FAUVAIN", name: "FAUVAIN", type: "Ancien", days: [1, 2, 4, 5], isAsso: true }
     ];
 
-    const periods = [
+    const periodData = [
       { id: 1, name: "Période 1", desc: "Rentrée (03/09) - Toussaint (17/10)", start: "2026-09-03", end: "2026-10-16", vacStart: "2026-10-17", vacName: "Toussaint" },
       { id: 2, name: "Période 2", desc: "Toussaint (02/11) - Noël (19/12)", start: "2026-11-02", end: "2026-12-18", vacStart: "2026-12-19", vacName: "Noël" },
       { id: 3, name: "Période 3", desc: "Noël (04/01) - Février (13/02)", start: "2027-01-04", end: "2027-02-12", vacStart: "2027-02-13", vacName: "Hiver" },
@@ -81,8 +81,8 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
       { id: 5, name: "Période 5", desc: "Pâques (26/04) - Été (03/07)", start: "2027-04-26", end: "2027-07-02", vacStart: "2027-07-03", vacName: "Été" }
     ];
 
-    const holi = ["2026-11-11", "2027-03-26", "2027-03-29", "2027-05-06", "2027-05-07", "2027-05-17"];
-    const vacances = [
+    const holiData = ["2026-11-11", "2027-03-26", "2027-03-29", "2027-05-06", "2027-05-07", "2027-05-17"];
+    const vacData = [
       { name: "Toussaint", start: "2026-10-17", end: "2026-11-01" },
       { name: "Noël", start: "2026-12-19", end: "2027-01-03" },
       { name: "Hiver", start: "2027-02-13", end: "2027-02-28" },
@@ -95,60 +95,18 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
       return `${year}-${month}-${day}`;
     }
 
-    function isSchoolDay(dateStr) {
-      if (holi.includes(dateStr)) return false;
-      for (let v of vacances) { if (dateStr >= v.start && dateStr <= v.end) return false; }
-      return true;
-    }
-
     let scheduleArr = [];
     let menageArr = [];
-    let stats = {};
+    let statsObj = {};
     
-    families.forEach(f => {
-      stats[f.id] = { cantine: 0, menage: 0, total: 0, lastCantine: null, lastMenage: "2026-01-01" };
+    familyData.forEach(f => {
+      statsObj[f.id] = { cantine: 0, menage: 0, total: 0, lastCantine: null, lastMenage: "2026-01-01" };
     });
 
     const duoDates = ["2026-09-03", "2026-11-05", "2027-01-07", "2027-03-04"];
 
-    function pickFamily(dateStr, day, requiredType, avoidId, force = false) {
-      let eligible = families.filter(f => {
-        if (f.id === avoidId) return false;
-        if (requiredType === 'Ancien' && f.type !== 'Ancien' && f.type !== 'Ancien flex') return false;
-        if (requiredType === 'Nouveau' && f.type !== 'Nouveau') return false;
-
-        if (f.type === 'Nouveau' && stats[f.id].lastCantine) {
-          let d1 = new Date(stats[f.id].lastCantine); let d2 = new Date(dateStr);
-          let diff = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
-          if (diff <= 1) return false;
-        }
-
-        if (day === 4 && f.id === 'FAUVAIN' && !duoDates.includes(dateStr)) return false;
-
-        if (!force) {
-          let isFlex = (f.id === "LE LÉZEC" && f.flexUntil && dateStr <= f.flexUntil);
-          if (!f.days.includes(day) && !isFlex) return false;
-        }
-        return true;
-      });
-
-      if (eligible.length === 0) {
-        if (!force) return pickFamily(dateStr, day, requiredType, avoidId, true);
-        return { id: "ERREUR" }; 
-      }
-
-      eligible.sort((a, b) => {
-        if (stats[a.id].total !== stats[b.id].total) return stats[a.id].total - stats[b.id].total;
-        return a.id.localeCompare(b.id);
-      });
-      
-      let picked = eligible[0];
-      stats[picked.id].cantine++; stats[picked.id].total++; stats[picked.id].lastCantine = dateStr;
-      return picked;
-    }
-
-    let currentDate = new Date(2026, 8, 3); // 3 Sept 2026
-    let endDate = new Date(2027, 6, 2);     // 2 Juillet 2027
+    let currentDate = new Date(2026, 8, 3); 
+    let endDate = new Date(2027, 6, 2);     
     
     let maitresseMardi = "Mme GERARD";
     let isHervetWeek = true;
@@ -160,14 +118,13 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
       let dayOfWeek = currentDate.getDay();
       let dateStr = getDateStr(currentDate);
 
-      let pIdx = periods.findIndex(p => dateStr >= p.start && dateStr <= p.end);
+      let pIdx = periodData.findIndex(p => dateStr >= p.start && dateStr <= p.end);
       if (pIdx !== -1 && pIdx !== currentPeriodIdx) {
         currentPeriodIdx = pIdx; periodThursdaysDone = false;
       }
       
-      // Sécurisation : on trouve la période courante, sinon on force à 1 (évite l'écran blanc)
-      const activeP = periods.find(p => dateStr >= p.start && dateStr <= p.end) || periods[0];
-      const isSchoolDayFlag = !holi.includes(dateStr) && !vacances.some(v => dateStr >= v.start && dateStr <= v.end) && [1,2,4,5].includes(dayOfWeek);
+      const activeP = periodData.find(p => dateStr >= p.start && dateStr <= p.end) || periodData[0];
+      const isSchoolDayFlag = !holiData.includes(dateStr) && !vacData.some(v => dateStr >= v.start && dateStr <= v.end) && [1,2,4,5].includes(dayOfWeek);
 
       if (isSchoolDayFlag) {
         let requiredParents = 2; let p1 = null, p2 = null; let repasType = ""; let forcedError = false;
@@ -191,11 +148,11 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
         if (dayOfWeek === 4 && fauvainRiobeThursdays < 4 && !periodThursdaysDone && currentPeriodIdx < 4) {
           assigned = ["RIOBÉ", "FAUVAIN"];
           fauvainRiobeThursdays++; periodThursdaysDone = true;
-          stats["RIOBÉ"].cantine++; stats["RIOBÉ"].total++; stats["RIOBÉ"].lastCantine = dateStr;
-          stats["FAUVAIN"].cantine++; stats["FAUVAIN"].total++; stats["FAUVAIN"].lastCantine = dateStr;
+          statsObj["RIOBÉ"].cantine++; statsObj["RIOBÉ"].total++; statsObj["RIOBÉ"].lastCantine = dateStr;
+          statsObj["FAUVAIN"].cantine++; statsObj["FAUVAIN"].total++; statsObj["FAUVAIN"].lastCantine = dateStr;
         } else {
           for (let i = 0; i < parentsToAssign; i++) {
-            let available = families.filter(f => {
+            let available = familyData.filter(f => {
               if (assigned.includes(f.id)) return false;
               if (f.id === "FAUVAIN" && dayOfWeek === 4) return false;
               if (f.id === "LE LÉZEC" && dateStr === "2026-10-12") return false;
@@ -204,30 +161,30 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
               if (f.id === "LE LÉZEC" && f.flexUntil && dateStr <= f.flexUntil) hasDay = true;
               if (!hasDay) return false;
 
-              if (f.type === "Nouveau" && stats[f.id].lastCantine) {
-                let lastD = new Date(stats[f.id].lastCantine);
+              if (f.type === "Nouveau" && statsObj[f.id].lastCantine) {
+                let lastD = new Date(statsObj[f.id].lastCantine);
                 let diffDays = Math.ceil(Math.abs(currentDate - lastD) / (1000 * 60 * 60 * 24));
                 if (diffDays <= 3) return false;
               }
 
               if (isInt1 && f.type === "Nouveau") return false;
               if (isInt2) {
-                let hasAncien = (p1 && p1.id && p1.id.startsWith("Mme")) || assigned.some(a => families.find(fam => fam.id === a).type.startsWith("Ancien"));
+                let hasAncien = (p1 && p1.id && p1.id.startsWith("Mme")) || assigned.some(a => familyData.find(fam => fam.id === a).type.startsWith("Ancien"));
                 if (hasAncien && f.type.startsWith("Ancien")) return false;
                 if (!hasAncien && f.type === "Nouveau" && i === 1) return false;
               }
               return true;
             });
 
-            available.sort((a, b) => stats[a.id].total - stats[b.id].total);
+            available.sort((a, b) => statsObj[a.id].total - statsObj[b.id].total);
             if (available.length > 0) {
               assigned.push(available[0].id);
-              stats[available[0].id].cantine++; stats[available[0].id].total++; stats[available[0].id].lastCantine = dateStr;
+              statsObj[available[0].id].cantine++; statsObj[available[0].id].total++; statsObj[available[0].id].lastCantine = dateStr;
             } else {
-              let fallback = families.filter(f => !assigned.includes(f.id)).sort((a, b) => stats[a.id].total - stats[b.id].total);
+              let fallback = familyData.filter(f => !assigned.includes(f.id)).sort((a, b) => statsObj[a.id].total - statsObj[b.id].total);
               if (fallback.length > 0) {
                 assigned.push(fallback[0].id);
-                stats[fallback[0].id].cantine++; stats[fallback[0].id].total++; stats[fallback[0].id].lastCantine = dateStr;
+                statsObj[fallback[0].id].cantine++; statsObj[fallback[0].id].total++; statsObj[fallback[0].id].lastCantine = dateStr;
                 forcedError = true;
               }
             }
@@ -245,42 +202,44 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
         let nextSatStr = getDateStr(nextSat);
         
         let isHolidayStart = false; let holidayName = "";
-        for (let v of vacances) {
+        for (let v of vacData) {
           if (nextSatStr === v.start) { isHolidayStart = true; holidayName = "Vacances " + v.name; }
         }
 
         if (isHolidayStart) {
-          let eligibleAsso = families.filter(f => f.asso);
-          eligibleAsso.sort((a, b) => stats[a.id].total - stats[b.id].total || a.id.localeCompare(b.id));
+          let eligibleAsso = familyData.filter(f => f.isAsso && statsObj[f.id].menage < 4);
+          if (eligibleAsso.length === 0) eligibleAsso = familyData.filter(f => f.isAsso);
+          eligibleAsso.sort((a, b) => statsObj[a.id].total - statsObj[b.id].total || a.id.localeCompare(b.id));
+          
           if(eligibleAsso.length > 0) {
             let chosen = eligibleAsso[0].id;
-            stats[chosen].menage++; stats[chosen].total++; stats[chosen].lastMenage = dateStr;
+            statsObj[chosen].menage++; statsObj[chosen].total++; statsObj[chosen].lastMenage = dateStr;
             let vacDate = new Date(currentDate); vacDate.setDate(vacDate.getDate() + 1);
             menageArr.push({ date: getDateStr(vacDate), period: activeP.id, familyId: chosen, isVacances: true, label: holidayName });
           }
         } else {
-          let candidates = families.filter(f => stats[f.id].menage === 0);
+          let candidates = familyData.filter(f => statsObj[f.id].menage === 0);
           if (candidates.length === 0) {
-            candidates = families.filter(f => {
-              if (f.asso && stats[f.id].menage >= 2) return false;
-              return stats[f.id].menage < 4;
+            candidates = familyData.filter(f => {
+              if (f.isAsso && statsObj[f.id].menage >= 2) return false;
+              return statsObj[f.id].menage < 4;
             });
-            if(candidates.length === 0) candidates = families.filter(f => stats[f.id].menage < 4);
-            if(candidates.length === 0) candidates = [...families];
+            if(candidates.length === 0) candidates = familyData.filter(f => statsObj[f.id].menage < 4);
+            if(candidates.length === 0) candidates = [...familyData];
           }
           
           candidates.sort((a, b) => {
-            let lastA = new Date(stats[a.id].lastMenage).getTime(); let lastB = new Date(stats[b.id].lastMenage).getTime();
+            let lastA = new Date(statsObj[a.id].lastMenage).getTime(); let lastB = new Date(statsObj[b.id].lastMenage).getTime();
             let now = currentDate.getTime();
             let penA = (now - lastA < 28 * 24 * 60 * 60 * 1000) ? 100 : 0; let penB = (now - lastB < 28 * 24 * 60 * 60 * 1000) ? 100 : 0;
-            let scoreA = stats[a.id].total + penA; let scoreB = stats[b.id].total + penB;
+            let scoreA = statsObj[a.id].total + penA; let scoreB = statsObj[b.id].total + penB;
             if (scoreA === scoreB) return lastA - lastB;
             return scoreA - scoreB;
           });
 
           if(candidates.length > 0) {
             let chosen = candidates[0].id;
-            stats[chosen].menage++; stats[chosen].total++; stats[chosen].lastMenage = dateStr;
+            statsObj[chosen].menage++; statsObj[chosen].total++; statsObj[chosen].lastMenage = dateStr;
             menageArr.push({ date: nextSatStr, period: activeP.id, familyId: chosen, isVacances: false, label: "Ménage Hebdomadaire" });
           }
         }
@@ -288,12 +247,11 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
       currentDate.setDate(currentDate.getDate() + 1);
     }
 
-    let fStats = Object.keys(stats).map(id => {
-      const fam = families.find(f => f.id === id);
-      return { id: id, name: fam ? fam.id : id, cantine: stats[id].cantine, menage: stats[id].menage, total: stats[id].total };
+    let fStats = Object.keys(statsObj).map(id => {
+      const fam = familyData.find(f => f.id === id);
+      return { id: id, name: fam ? fam.id : id, cantine: statsObj[id].cantine, menage: statsObj[id].menage, total: statsObj[id].total, isTeacher: false };
     });
     
-    // Add teachers to stats
     fStats.push({ id: "Mme GERARD", name: "Mme GERARD", isTeacher: true, cantine: scheduleArr.filter(s=>s.p1==="Mme GERARD" || s.p2==="Mme GERARD").length, menage: 0, total: scheduleArr.filter(s=>s.p1==="Mme GERARD" || s.p2==="Mme GERARD").length });
     fStats.push({ id: "Mme SUBLET", name: "Mme SUBLET", isTeacher: true, cantine: scheduleArr.filter(s=>s.p1==="Mme SUBLET" || s.p2==="Mme SUBLET").length, menage: 0, total: scheduleArr.filter(s=>s.p1==="Mme SUBLET" || s.p2==="Mme SUBLET").length });
     fStats.push({ id: "Mme HERVET", name: "Mme HERVET", isTeacher: true, cantine: scheduleArr.filter(s=>s.p1==="Mme HERVET" || s.p2==="Mme HERVET").length, menage: 0, total: scheduleArr.filter(s=>s.p1==="Mme HERVET" || s.p2==="Mme HERVET").length });
@@ -304,10 +262,10 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
       return b.total - a.total || a.name.localeCompare(b.name);
     });
 
-    return { familiesList: families, periodsInfo: periods, schedule: scheduleArr, menagesSchedule: menageArr, familyStats: fStats, holidays: holi, vacances: vac };
+    return { families: familyData, periods: periodData, schedule: scheduleArr, menagesSchedule: menageArr, familyStats: fStats, holidays: holiData, vacances: vacData };
   }, []);
 
-  // --- 2. FONCTIONS DE FORMATAGE ---
+  // --- FONCTIONS DE FORMATAGE ---
   const getLocalDateString = (d) => {
     let year = d.getFullYear(); let month = String(d.getMonth() + 1).padStart(2, '0'); let day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
@@ -327,7 +285,6 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     return `Sam. ${d1.getDate()} au Dim. ${new Date(d2).toLocaleDateString('fr-FR', {day:'numeric', month:'short'})}`;
   };
 
-  // --- 3. DESIGN ET BADGES (Sécurisé) ---
   const teacherStyles = {
     "Mme GERARD": "bg-slate-700 text-white border-slate-800",
     "Mme SUBLET": "bg-slate-700 text-white border-slate-800",
@@ -353,7 +310,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
   };
 
   const FamilyPill = ({ id, isError = false }) => {
-    if (!id || id === "ERREUR") return <span className="text-red-500 text-xs italic bg-red-50 px-2 py-0.5 rounded border border-red-200">À définir</span>;
+    if (!id || id === "ERREUR") return <span className="text-red-500 text-xs italic bg-red-50 px-2 py-0.5 rounded border border-red-200"><AlertCircle size={12} className="inline mr-1 -mt-0.5"/>À définir</span>;
     
     let isTeacher = id.startsWith("Mme");
     let styleClass = isTeacher ? (teacherStyles[id] || "bg-slate-700 text-white") : (familyStyles[id] || "bg-slate-100 text-slate-800");
@@ -370,18 +327,12 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     );
   };
 
-  const displayedCantine = schedule.filter(s => 
-    s.period === activePeriod && (!quickFilterFamily || s.p1 === quickFilterFamily || s.p2 === quickFilterFamily)
-  );
-  
-  const displayedMenage = menagesSchedule.filter(m => 
-    m.period === activePeriod && (!quickFilterFamily || m.familyId === quickFilterFamily)
-  );
+  const displayedCantine = schedule.filter(s => s.period === activePeriod && (!quickFilterFamily || s.p1 === quickFilterFamily || s.p2 === quickFilterFamily));
+  const displayedMenage = menagesSchedule.filter(m => m.period === activePeriod && (!quickFilterFamily || m.familyId === quickFilterFamily));
 
-  // --- 4. EXPORT ET AFFICHAGE ---
   const handleExportCSV = () => {
     let data = []; const headers = [];
-    const activePName = periodsInfo.find(p => p.id === activePeriod)?.name || 'Période';
+    const activePName = periods.find(p => p.id === activePeriod)?.name || 'Période';
 
     if (activeTab === 'cantine') {
       headers.push('Période', 'Date', 'Procédure', 'Intervenant 1', 'Intervenant 2');
@@ -390,17 +341,17 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
       headers.push('Période', 'Date', 'Famille', 'Type');
       displayedMenage.forEach(r => data.push([activePName, r.date, r.familyId, r.label]));
     } else if (activeTab === 'stats') {
-      headers.push('Famille / Intervenant', 'Tours de Cantine', 'Tours de Ménage', 'Total Services');
+      headers.push('Famille', 'Tours Cantine', 'Tours Ménage', 'Total Services');
       familyStats.forEach(s => data.push([s.name, s.cantine, s.menage, s.total]));
     } else if (activeTab === 'famille') {
       if (!selectedFamilyFilter) return alert("Sélectionnez un nom.");
       headers.push('Type', 'Période', 'Date', 'Détails');
       schedule.filter(s => s.p1 === selectedFamilyFilter || s.p2 === selectedFamilyFilter).forEach(r => {
          const partner = r.p1 === selectedFamilyFilter ? r.p2 : r.p1;
-         data.push(['Cantine', periodsInfo.find(p=>p.id===r.period)?.name, r.date, `Binôme avec : ${partner || 'Aucun'}`]);
+         data.push(['Cantine', periods.find(p=>p.id===r.period)?.name, r.date, `Binôme avec : ${partner || 'Aucun'}`]);
       });
       menagesSchedule.filter(m => m.familyId === selectedFamilyFilter).forEach(r => {
-         data.push(['Ménage', periodsInfo.find(p=>p.id===r.period)?.name, r.date, r.label]);
+         data.push(['Ménage', periods.find(p=>p.id===r.period)?.name, r.date, r.label]);
       });
     } else { return; }
 
@@ -432,7 +383,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
         const isWeekend = dayWeek === 0 || dayWeek === 6;
         const isHoliday = holidays.includes(dateStr);
         
-        let cellClass = "p-1 flex flex-col gap-0.5 border-r border-b border-slate-200 min-h-[45px] text-[9px] ";
+        let cellClass = "p-1.5 flex flex-col gap-1 border-r border-b border-slate-200 min-h-[50px] text-[9px] ";
         if (isWeekend) cellClass += "bg-slate-50 ";
         if (isHoliday) cellClass += "bg-slate-100 opacity-60 ";
 
@@ -457,7 +408,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
               </div>
             )}
             {menageEvent && (dayWeek === 6 || menageEvent.isVacances) && (
-              <div className="mt-auto pt-0.5 border-t border-slate-100 flex flex-col gap-0.5 items-start">
+              <div className="mt-auto pt-1 border-t border-slate-100 flex flex-col gap-0.5 items-start">
                 <span className="text-[8px] text-indigo-400 uppercase font-bold"><Sparkles size={8} className="inline mr-0.5"/>Ménage</span>
                 <FamilyPill id={menageEvent.familyId} />
               </div>
@@ -487,8 +438,6 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
 
   return (
     <div className="bg-transparent font-sans text-slate-800 animate-fade-in relative pb-10">
-      
-      {/* MAGIE CSS POUR L'IMPRESSION (Cache les menus de l'ERP) */}
       <style>{`
         @media print {
           aside, header { display: none !important; }
@@ -502,8 +451,6 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
       `}</style>
 
       <div className="max-w-7xl mx-auto">
-        
-        {/* HEADER */}
         <header className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 print:hidden">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
@@ -521,62 +468,37 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
               </button>
             )}
             <button onClick={() => window.print()} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg font-semibold text-sm transition shadow-sm flex items-center gap-2">
-              <FileText size={16} /> Imprimer
+              <Download size={16} /> Imprimer (PDF)
             </button>
           </div>
         </header>
 
-        {/* ONGLETS PRINCIPAUX */}
         <div className="flex flex-wrap justify-center gap-2 mb-8 print:hidden">
-          <button onClick={() => setActiveTab('cantine')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'cantine' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
-            <Utensils size={16} /> Cantine
-          </button>
-          <button onClick={() => setActiveTab('menage')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'menage' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
-            <Sparkles size={16} /> Ménage
-          </button>
-          <button onClick={() => setActiveTab('calendrier')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'calendrier' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
-            <Calendar size={16} /> Calendrier
-          </button>
-          <button onClick={() => setActiveTab('stats')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'stats' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
-            <BarChart3 size={16} /> Statistiques
-          </button>
-          <button onClick={() => setActiveTab('famille')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'famille' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
-            <Search size={16} /> Par Famille
-          </button>
-          <button onClick={() => setActiveTab('regles')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'regles' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
-            <Info size={16} /> Règles
-          </button>
+          <button onClick={() => setActiveTab('cantine')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'cantine' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Utensils size={16} /> Cantine</button>
+          <button onClick={() => setActiveTab('menage')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'menage' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Sparkles size={16} /> Ménage</button>
+          <button onClick={() => setActiveTab('calendrier')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'calendrier' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Calendar size={16} /> Calendrier</button>
+          <button onClick={() => setActiveTab('stats')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'stats' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><BarChart3 size={16} /> Statistiques</button>
+          <button onClick={() => setActiveTab('famille')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'famille' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Search size={16} /> Par Famille</button>
+          <button onClick={() => setActiveTab('regles')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'regles' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Info size={16} /> Règles</button>
         </div>
 
-        {/* BANDEAU DE FILTRE ACTIF */}
         {quickFilterFamily && (activeTab === 'cantine' || activeTab === 'menage') && (
           <div className="bg-indigo-50 border border-indigo-200 text-indigo-900 px-6 py-3 mb-4 rounded-xl flex justify-between items-center shadow-sm print:hidden animate-fade-in max-w-4xl mx-auto">
-            <span className="font-bold text-sm flex items-center gap-2">
-              <Search size={16} className="text-indigo-600"/>
-              Filtre actif : <span className="uppercase text-indigo-600">{quickFilterFamily}</span>
-            </span>
-            <button onClick={() => setQuickFilterFamily(null)} className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 hover:bg-indigo-700 transition-colors shadow-sm">
-              <XCircle size={14} /> Annuler le filtre
-            </button>
+            <span className="font-bold text-sm flex items-center gap-2"><Search size={16} className="text-indigo-600"/> Filtre actif : <span className="uppercase text-indigo-600">{quickFilterFamily}</span></span>
+            <button onClick={() => setQuickFilterFamily(null)} className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 hover:bg-indigo-700 transition-colors shadow-sm"><AlertCircle size={14} /> Annuler le filtre</button>
           </div>
         )}
 
-        {/* CONTENU PRINCIPAL */}
         <div className="bg-transparent border-none">
-          
-          {/* TAB CANTINE */}
           {activeTab === 'cantine' && (
             <div className="animate-in fade-in duration-300">
               <div className="mb-8 text-center print:text-left">
-                <h2 className="text-2xl font-bold text-slate-800 flex items-center justify-center md:justify-start gap-3 mb-4">
-                  <Utensils className="text-blue-500" /> Planning de la Cantine
-                </h2>
+                <h2 className="text-2xl font-bold text-slate-800 flex items-center justify-center md:justify-start gap-3 mb-4"><Utensils className="text-blue-500" /> Planning de la Cantine</h2>
                 <div className="flex justify-center md:justify-start mb-6 print:hidden">
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-2 bg-slate-100 p-2 rounded-xl max-w-3xl w-full shadow-inner">
-                    {periodsInfo.map(p => (
+                    {periods.map(p => (
                       <button key={p.id} onClick={() => setActivePeriod(p.id)} className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-all ${activePeriod === p.id ? 'bg-white shadow-sm text-blue-600 border-blue-200' : 'text-slate-500 border-transparent hover:bg-slate-200'}`}>
-                        <div className="font-bold">{p.name}</div>
-                        <div className="text-[10px] opacity-80">{p.desc.split(' - ')[0]}</div>
+                        <div className="font-bold">{p.name}</div><div className="text-[10px] opacity-80">{p.desc.split(' - ')[0]}</div>
                       </button>
                     ))}
                   </div>
@@ -592,49 +514,32 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
 
                   return (
                     <div key={i} className={`${dayBg} rounded-xl p-4 border ${dayBorder} shadow-sm relative hover:shadow-md transition-shadow flex flex-col`}>
-                      <div className="text-sm font-bold text-slate-700 mb-1 border-b border-slate-200/50 pb-2 capitalize">
-                        {formatDate(row.date)}
-                      </div>
-                      <div className="mt-2 mb-3">
-                        <span className="bg-white/80 text-slate-600 px-2 py-1 rounded border border-slate-100 text-xs font-semibold shadow-sm inline-block">
-                          {row.repasType}
-                        </span>
-                      </div>
+                      <div className="text-sm font-bold text-slate-700 mb-1 border-b border-slate-200/50 pb-2 capitalize">{formatDate(row.date)}</div>
+                      <div className="mt-2 mb-3"><span className="bg-white/80 text-slate-600 px-2 py-1 rounded border border-slate-100 text-xs font-semibold shadow-sm inline-block">{row.repasType}</span></div>
                       <div className="space-y-2 mt-auto">
                         <div className="flex items-center justify-between bg-white p-2 rounded-lg border border-slate-100 shadow-sm">
-                          <span className="text-[10px] uppercase font-bold text-slate-400">P1</span>
-                          <FamilyPill id={row.p1} isError={row.isError} />
+                          <span className="text-[10px] uppercase font-bold text-slate-400">P1</span><FamilyPill id={row.p1} isError={row.isError} />
                         </div>
                         <div className="flex items-center justify-between bg-white p-2 rounded-lg border border-slate-100 shadow-sm">
-                          <span className="text-[10px] uppercase font-bold text-slate-400">P2</span>
-                          <FamilyPill id={row.p2} isError={row.isError} />
+                          <span className="text-[10px] uppercase font-bold text-slate-400">P2</span><FamilyPill id={row.p2} isError={row.isError} />
                         </div>
                       </div>
                     </div>
                   );
                 })}
               </div>
-              {displayedCantine.length === 0 && (
-                <div className="p-12 text-center text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-300">
-                  Aucun jour de cantine trouvé pour cette sélection.
-                </div>
-              )}
             </div>
           )}
 
-          {/* TAB MENAGE */}
           {activeTab === 'menage' && (
             <div className="animate-in fade-in duration-300">
               <div className="mb-8 text-center print:text-left">
-                <h2 className="text-2xl font-bold text-slate-800 flex items-center justify-center md:justify-start gap-3 mb-4">
-                  <Sparkles className="text-indigo-500" /> Planning du Ménage
-                </h2>
+                <h2 className="text-2xl font-bold text-slate-800 flex items-center justify-center md:justify-start gap-3 mb-4"><Sparkles className="text-indigo-500" /> Planning du Ménage</h2>
                 <div className="flex justify-center md:justify-start mb-6 print:hidden">
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-2 bg-slate-100 p-2 rounded-xl max-w-3xl w-full shadow-inner">
-                    {periodsInfo.map(p => (
+                    {periods.map(p => (
                       <button key={p.id} onClick={() => setActivePeriod(p.id)} className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-all ${activePeriod === p.id ? 'bg-white shadow-sm text-indigo-600 border-indigo-200' : 'text-slate-500 border-transparent hover:bg-slate-200'}`}>
-                        <div className="font-bold">{p.name}</div>
-                        <div className="text-[10px] opacity-80">{p.desc.split(' - ')[0]}</div>
+                        <div className="font-bold">{p.name}</div><div className="text-[10px] opacity-80">{p.desc.split(' - ')[0]}</div>
                       </button>
                     ))}
                   </div>
@@ -644,87 +549,58 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                 {displayedMenage.map((row, i) => {
                   let isVac = row.isVacances;
                   let bgCard = isVac ? 'bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200' : 'bg-white border-slate-200';
-                  
                   return (
                     <div key={i} className={`${bgCard} rounded-xl p-5 border shadow-sm relative overflow-hidden flex flex-col h-full hover:shadow-md transition-all`}>
                       <div className="flex justify-between items-start mb-4">
                         <div>
-                          <div className={`text-xs font-bold ${isVac ? 'text-amber-500' : 'text-slate-400'} uppercase tracking-wider mb-1 flex items-center gap-2`}>
-                            <Calendar size={14} className={isVac ? 'text-amber-500' : 'text-emerald-500'}/> {row.label}
-                          </div>
-                          <div className={`text-sm font-bold ${isVac ? 'text-amber-800' : 'text-slate-700'} capitalize mt-2 bg-white/50 px-3 py-1.5 rounded-lg border border-slate-100 inline-block`}>
-                            {isVac ? formatDate(row.date) : formatMenageDate(row.date)}
-                          </div>
+                          <div className={`text-xs font-bold ${isVac ? 'text-amber-500' : 'text-slate-400'} uppercase tracking-wider mb-1 flex items-center gap-2`}><Calendar size={14}/> {row.label}</div>
+                          <div className={`text-sm font-bold ${isVac ? 'text-amber-800' : 'text-slate-700'} capitalize mt-2 bg-white/50 px-3 py-1.5 rounded-lg border border-slate-100 inline-block`}>{isVac ? formatDate(row.date) : formatMenageDate(row.date)}</div>
                         </div>
                       </div>
-                      <div className="mt-auto bg-white/60 p-3 rounded-lg border border-slate-100/50 flex items-center justify-between shadow-sm">
+                      <div className="mt-auto bg-white/60 p-3 rounded-lg border border-slate-100/50 flex items-center justify-between">
                         <span className="text-xs font-semibold text-slate-500 uppercase">Resp.</span>
-                        <div className="flex items-center gap-2">
-                          <FamilyPill id={row.familyId} />
-                          {isVac && <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded border border-amber-200 uppercase">Asso</span>}
-                        </div>
+                        <div className="flex items-center gap-2"><FamilyPill id={row.familyId} />{isVac && <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded border border-amber-200 uppercase">Asso</span>}</div>
                       </div>
                     </div>
                   );
                 })}
               </div>
-              {displayedMenage.length === 0 && (
-                <div className="p-12 text-center text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-300">
-                  Aucun ménage assigné pour cette sélection.
-                </div>
-              )}
             </div>
           )}
 
-          {/* TAB CALENDRIER */}
           {activeTab === 'calendrier' && (
             <div className="animate-in fade-in duration-300">
               <div className="text-center mb-6 print:text-left">
                 <h2 className="text-2xl font-bold text-slate-800 flex items-center justify-center md:justify-start gap-2"><Calendar className="text-blue-500" /> Calendrier Annuel Global</h2>
-                <p className="text-sm text-slate-500 mt-1">Vue panoramique de l'année scolaire 2026-2027.</p>
               </div>
               {renderCalendarGrid()}
             </div>
           )}
 
-          {/* TAB STATS */}
           {activeTab === 'stats' && (
             <div className="animate-in fade-in duration-300 max-w-4xl mx-auto pb-12">
               <div className="text-center mb-8 print:text-left">
                 <h2 className="text-2xl font-bold text-slate-800 flex items-center justify-center md:justify-start gap-2"><BarChart3 className="text-blue-500" /> Bilan d'Équité</h2>
-                <p className="text-slate-500 mt-2 text-sm">L'algorithme équilibre parfaitement les charges. Les ménages comblent les manques de cantine.</p>
               </div>
               <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
                 <table className="w-full text-left text-sm">
                   <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
-                    <tr>
-                      <th className="p-4 font-bold">Famille</th>
-                      <th className="p-4 font-bold text-center">Cantine</th>
-                      <th className="p-4 font-bold text-center">Ménage</th>
-                      <th className="p-4 font-bold text-center">Total Services</th>
-                    </tr>
+                    <tr><th className="p-4 font-bold">Famille</th><th className="p-4 font-bold text-center">Cantine</th><th className="p-4 font-bold text-center">Ménage</th><th className="p-4 font-bold text-center">Total Services</th></tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {familyStats.map((stat, i) => (
                       <tr key={i} className="hover:bg-slate-50 transition">
                         <td className="p-4 font-semibold text-slate-800"><FamilyPill id={stat.id} /></td>
-                        <td className="p-4 text-center text-blue-600 font-bold">{stat.cantine}</td>
-                        <td className="p-4 text-center text-indigo-600 font-bold">{stat.menage}</td>
-                        <td className="p-4 text-center">
-                          <span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-full font-bold border border-slate-200">{stat.total}</span>
-                        </td>
+                        <td className="p-4 text-center text-blue-600 font-bold">{stat.cantine}</td><td className="p-4 text-center text-indigo-600 font-bold">{stat.menage}</td>
+                        <td className="p-4 text-center"><span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-full font-bold border border-slate-200">{stat.total}</span></td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                <div className="p-4 bg-emerald-50 text-emerald-800 text-sm border-t border-emerald-100 text-center">
-                  <CheckCircle size={14} className="inline mr-2 -mt-0.5" /> Mathématiquement équilibré. L'algorithme a réparti les jours de manière à lisser la charge totale.
-                </div>
               </div>
             </div>
           )}
 
-          {/* TAB FAMILLE */}
           {activeTab === 'famille' && (
             <div className="animate-in fade-in duration-300 max-w-3xl mx-auto pb-12">
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mb-6 flex flex-col items-center print:hidden">
@@ -733,52 +609,33 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                   <Search size={16} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400" />
                   <select 
                     className="w-full bg-slate-50 border border-slate-300 text-slate-800 text-base rounded-lg focus:ring-blue-500 focus:border-blue-500 block pl-10 pr-4 py-3 font-semibold shadow-inner outline-none"
-                    value={selectedFamilyFilter}
-                    onChange={(e) => setSelectedFamilyFilter(e.target.value)}
+                    value={selectedFamilyFilter} onChange={(e) => setSelectedFamilyFilter(e.target.value)}
                   >
                     <option value="">Sélectionnez un nom...</option>
-                    <optgroup label="Familles">
-                      {familiesList.map(f => <option key={f.id} value={f.id}>{f.id}</option>)}
-                    </optgroup>
-                    <optgroup label="Maîtresses">
-                      <option value="Mme GERARD">Mme GERARD</option>
-                      <option value="Mme SUBLET">Mme SUBLET</option>
-                      <option value="Mme HERVET">Mme HERVET</option>
-                    </optgroup>
+                    <optgroup label="Familles">{families.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</optgroup>
+                    <optgroup label="Maîtresses"><option value="Mme GERARD">Mme GERARD</option><option value="Mme SUBLET">Mme SUBLET</option><option value="Mme HERVET">Mme HERVET</option></optgroup>
                   </select>
                 </div>
               </div>
               
               {selectedFamilyFilter ? (() => {
                 const isTeacher = selectedFamilyFilter.startsWith("Mme");
-                const famInfo = isTeacher ? { type: "Équipe Pédagogique", isAsso: false } : familiesList.find(f => f.id === selectedFamilyFilter);
-                let fSchedule = schedule.filter(s => s.p1 === selectedFamilyFilter || s.p2 === selectedFamilyFilter);
-                let fMenage = menagesSchedule.filter(m => m.familyId === selectedFamilyFilter);
-                
+                const famInfo = isTeacher ? { type: "Équipe Pédagogique", isAsso: false } : families.find(f => f.id === selectedFamilyFilter);
                 let allEvents = [
-                    ...fSchedule.map(s => ({ date: s.date, type: 'Cantine', details: s.repasType, isError: s.isError, period: s.period })),
-                    ...fMenage.map(m => ({ date: m.date, type: 'Ménage', details: m.label, isVacances: m.isVacances, period: m.period }))
+                    ...schedule.filter(s => s.p1 === selectedFamilyFilter || s.p2 === selectedFamilyFilter).map(s => ({ date: s.date, type: 'Cantine', details: s.repasType, isError: s.isError, period: s.period })),
+                    ...menagesSchedule.filter(m => m.familyId === selectedFamilyFilter).map(m => ({ date: m.date, type: 'Ménage', details: m.label, isVacances: m.isVacances, period: m.period }))
                 ].sort((a, b) => new Date(a.date) - new Date(b.date));
 
                 return (
                   <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
                     <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                        <div className="flex items-center gap-4">
-                            <div className="text-xl"><FamilyPill id={selectedFamilyFilter} /></div>
-                            <div>
-                                <div className="text-sm text-slate-500 font-bold uppercase tracking-wider">{famInfo ? famInfo.type : ''} {famInfo && famInfo.asso ? '• Membre Asso' : ''}</div>
-                                <div className="text-slate-800 font-bold mt-1">Total : {allEvents.length} services</div>
-                            </div>
-                        </div>
+                        <div className="flex items-center gap-4"><div className="text-xl"><FamilyPill id={selectedFamilyFilter} /></div><div><div className="text-sm text-slate-500 font-bold uppercase tracking-wider">{famInfo ? famInfo.type : ''} {famInfo && famInfo.asso ? '• Membre Asso' : ''}</div><div className="text-slate-800 font-bold mt-1">Total : {allEvents.length} services</div></div></div>
                     </div>
                     <div className="p-0">
                       {allEvents.length === 0 ? <div className="p-8 text-center text-slate-500">Aucun service planifié.</div> : (
                         <table className="w-full text-left text-sm">
                           <thead className="bg-slate-50 text-slate-500 text-[11px] font-bold uppercase tracking-wider">
-                              <tr>
-                                  <th className="p-4 border-b border-slate-200">Date</th>
-                                  <th className="p-4 border-b border-slate-200">Type de service</th>
-                              </tr>
+                              <tr><th className="p-4 border-b border-slate-200">Date</th><th className="p-4 border-b border-slate-200">Type de service</th></tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
                             {(() => {
@@ -787,10 +644,9 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                                 let pHeader = null;
                                 if (e.period !== currentP) {
                                   currentP = e.period;
-                                  let pName = periodsInfo.find(p=>p.id===currentP)?.name || 'Période inconnue';
+                                  let pName = periods.find(p=>p.id===currentP)?.name || 'Période inconnue';
                                   pHeader = <tr key={`ph-${idx}`}><td colSpan="2" className="bg-slate-100 px-6 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider">{pName}</td></tr>;
                                 }
-                                
                                 const isCantine = e.type === 'Cantine';
                                 const iconClass = isCantine ? 'text-blue-500 bg-blue-100' : (e.isVacances ? 'text-amber-500 bg-amber-100' : 'text-indigo-500 bg-indigo-100');
                                 const IconTag = isCantine ? Utensils : (e.isVacances ? Calendar : Sparkles);
@@ -800,19 +656,11 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                                   <React.Fragment key={`frag-${idx}`}>
                                     {pHeader}
                                     <tr className="hover:bg-slate-50 transition-colors">
-                                      <td className="p-4 font-semibold text-slate-700 whitespace-nowrap capitalize">
-                                          {dateDisplay}
-                                      </td>
+                                      <td className="p-4 font-semibold text-slate-700 whitespace-nowrap capitalize">{dateDisplay}</td>
                                       <td className="p-4">
                                           <div className="flex flex-wrap items-center gap-3">
-                                              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${iconClass}`}>
-                                                  <IconTag size={14} />
-                                              </div>
-                                              <div>
-                                                  <strong className="text-slate-800 block">{e.type}</strong> 
-                                                  <span className="text-slate-500 text-xs">{e.details}</span>
-                                              </div>
-                                              {e.isError && !isTeacher && <span className="ml-2 inline-flex items-center gap-1 text-[10px] font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded uppercase tracking-wider border border-red-200 shadow-sm"><AlertTriangle size={10}/> Jour forcé</span>}
+                                              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${iconClass}`}><IconTag size={14} /></div>
+                                              <div><strong className="text-slate-800 block">{e.type}</strong><span className="text-slate-500 text-xs">{e.details}</span></div>
                                           </div>
                                       </td>
                                     </tr>
@@ -828,9 +676,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                 );
               })() : (
                 <div className="p-16 text-center text-slate-400 flex flex-col items-center bg-white rounded-2xl border border-slate-200 print:hidden">
-                  <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4 border border-slate-200">
-                    <Search size={32} className="text-slate-300" />
-                  </div>
+                  <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4 border border-slate-200"><Search size={32} className="text-slate-300" /></div>
                   <h3 className="text-lg font-bold text-slate-700 mb-2">Recherche Individuelle</h3>
                   <p>Sélectionnez un nom ci-dessus pour afficher son calendrier personnel.</p>
                 </div>
@@ -840,42 +686,29 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
 
           {activeTab === 'regles' && (
             <div className="max-w-3xl mx-auto space-y-6 pb-12 animate-in fade-in duration-300">
-              <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-3 mb-6">
-                  <BookOpen className="text-blue-500" /> Règles de l'Algorithme
-              </h2>
-              
+              <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-3 mb-6"><Info className="text-blue-500" /> Règles de l'Algorithme</h2>
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                   <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><Utensils className="text-slate-400" size={18}/> Jours de Cantine</h3>
                   <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
-                      <li><strong>Lundi :</strong> Repas par classe (2 parents)</li>
-                      <li><strong>Mardi :</strong> Placement libre (1 maîtresse + 1 parent)</li>
-                      <li><strong>Jeudi :</strong> Filles/Garçons (2 parents)</li>
-                      <li><strong>Vendredi :</strong> Par cordée (Mme Hervet 1 sem/2, sinon 2 parents)</li>
+                      <li><strong>Lundi :</strong> Repas par classe (2 parents)</li><li><strong>Mardi :</strong> Placement libre (1 maîtresse + 1 parent)</li><li><strong>Jeudi :</strong> Filles/Garçons (2 parents)</li><li><strong>Vendredi :</strong> Par cordée (Mme Hervet 1 sem/2, sinon 2 parents)</li>
                   </ul>
               </div>
-
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                   <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><Users className="text-slate-400" size={18}/> Période d'intégration</h3>
                   <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
-                      <li><strong>Du 03 au 04 Sept. :</strong> Uniquement des anciens.</li>
-                      <li><strong>Du 07 au 18 Sept. :</strong> Binômes obligatoires (1 Ancien + 1 Nouveau). Les maîtresses comptent comme "Ancien".</li>
+                      <li><strong>Du 03 au 04 Sept. :</strong> Uniquement des anciens.</li><li><strong>Du 07 au 18 Sept. :</strong> Binômes obligatoires (1 Ancien + 1 Nouveau). Les maîtresses comptent comme "Ancien".</li>
                   </ul>
               </div>
-
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                   <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><AlertCircle className="text-slate-400" size={18}/> Cas Particuliers Strictes</h3>
                   <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
-                      <li><strong>Nouveaux :</strong> Ne sont jamais placés 2 jours d'affilée.</li>
-                      <li><strong>RIOBÉ & FAUVAIN :</strong> Font 4 jeudis en duo (1 par période sur les 4 premières périodes). FAUVAIN est ensuite exclu des autres jeudis. RIOBÉ tourne aléatoirement.</li>
+                      <li><strong>Nouveaux :</strong> Ne sont jamais placés 2 jours d'affilée.</li><li><strong>RIOBÉ & FAUVAIN :</strong> Font 4 jeudis en duo (1 par période sur les 4 premières périodes).</li>
                   </ul>
               </div>
-
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                   <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><Sparkles className="text-slate-400" size={18}/> Ménage et Équité</h3>
                   <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
-                      <li>Un ménage est planifié chaque week-end de période scolaire.</li>
-                      <li>Les 5 ménages des vacances sont strictement réservés aux membres de l'association.</li>
-                      <li>L'algorithme comble en priorité avec des ménages les familles qui ont le moins de jours de cantine, afin d'assurer l'équité parfaite en fin d'année.</li>
+                      <li>Un ménage est planifié chaque week-end de période scolaire.</li><li>Les 5 ménages des vacances sont réservés aux membres de l'association.</li>
                   </ul>
               </div>
             </div>
