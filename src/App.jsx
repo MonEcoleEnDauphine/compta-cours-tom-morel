@@ -49,14 +49,9 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
   const [selectedFamilyFilter, setSelectedFamilyFilter] = useState('');
   const [quickFilterFamily, setQuickFilterFamily] = useState(null);
 
-  useEffect(() => {
-    setActiveTab(defaultTab);
-    setQuickFilterFamily(null); 
-  }, [defaultTab]);
-
   // --- 1. DONNÉES ET ALGORITHME MATHÉMATIQUE EXACT ---
   const { familiesList, periodsInfo, schedule, menagesSchedule, familyStats, holidays, vacances } = useMemo(() => {
-    const families = [
+    const famsData = [
       { id: "BOCCA", type: "Ancien", days: [1, 5], asso: false },
       { id: "CHOMEL", type: "Nouveau", days: [4], asso: false },
       { id: "CORNET-BOUBE", type: "Nouveau", days: [1, 2, 4, 5], asso: false },
@@ -70,10 +65,10 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
       { id: "BEZIAT", type: "Ancien", days: [1, 5], asso: true },
       { id: "DE MALAUSSENE", type: "Ancien", days: [1], asso: true },
       { id: "FAUVAIN", type: "Ancien", days: [1, 2, 5], asso: true }, 
-      { id: "LE LÉZEC", type: "Ancien", days: [1, 5], flexUntil: "2026-09-18", asso: true }
+      { id: "LE LÉZEC", type: "Ancien flex", days: [1, 5], flexUntil: "2026-09-18", asso: true }
     ];
 
-    const periods = [
+    const perData = [
       { id: 1, name: "Période 1", desc: "Rentrée (03/09) - Toussaint (17/10)", start: "2026-09-03", end: "2026-10-16", vacStart: "2026-10-17", vacName: "Toussaint" },
       { id: 2, name: "Période 2", desc: "Toussaint (02/11) - Noël (19/12)", start: "2026-11-02", end: "2026-12-18", vacStart: "2026-12-19", vacName: "Noël" },
       { id: 3, name: "Période 3", desc: "Noël (04/01) - Février (13/02)", start: "2027-01-04", end: "2027-02-12", vacStart: "2027-02-13", vacName: "Hiver" },
@@ -81,7 +76,14 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
       { id: 5, name: "Période 5", desc: "Pâques (26/04) - Été (03/07)", start: "2027-04-26", end: "2027-07-02", vacStart: "2027-07-03", vacName: "Été" }
     ];
 
-    const holi = ["2026-11-11", "2027-03-26", "2027-04-05", "2027-05-06", "2027-05-07", "2027-05-17"];
+    const holiData = ["2026-11-11", "2027-03-26", "2027-03-29", "2027-05-06", "2027-05-07", "2027-05-17"];
+    const vacData = [
+      { name: "Toussaint", start: "2026-10-17", end: "2026-11-01" },
+      { name: "Noël", start: "2026-12-19", end: "2027-01-03" },
+      { name: "Hiver", start: "2027-02-13", end: "2027-02-28" },
+      { name: "Printemps", start: "2027-04-10", end: "2027-04-25" },
+      { name: "d'Été", start: "2027-07-03", end: "2027-08-31" }
+    ];
 
     function getDateStr(d) {
       let year = d.getFullYear(); let month = String(d.getMonth() + 1).padStart(2, '0'); let day = String(d.getDate()).padStart(2, '0');
@@ -90,10 +92,10 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
 
     let scheduleArr = [];
     let menageArr = [];
-    let stats = {};
+    let statsObj = {};
     
-    families.forEach(f => {
-      stats[f.id] = { cantine: 0, menage: 0, total: 0, lastCantine: null, lastMenage: "2026-01-01" };
+    famsData.forEach(f => {
+      statsObj[f.id] = { cantine: 0, menage: 0, total: 0, lastCantine: null, lastMenage: "2026-01-01" };
     });
 
     const duoDates = ["2026-09-03", "2026-11-05", "2027-01-07", "2027-03-04"];
@@ -109,13 +111,13 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
       const dateStr = getDateStr(currentDate);
       const dayOfWeek = currentDate.getDay();
       
-      let pIdx = periods.findIndex(p => dateStr >= p.start && dateStr <= p.end);
+      let pIdx = perData.findIndex(p => dateStr >= p.start && dateStr <= p.end);
       if (pIdx !== -1 && pIdx !== currentPeriodIdx) {
         currentPeriodIdx = pIdx;
         periodThursdaysDone = false;
       }
-      const activeP = periods.find(p => dateStr >= p.start && dateStr <= p.end);
-      const isSchoolDay = activeP && !holi.includes(dateStr) && [1,2,4,5].includes(dayOfWeek);
+      const activeP = perData.find(p => dateStr >= p.start && dateStr <= p.end);
+      const isSchoolDay = activeP && !holiData.includes(dateStr) && !vacData.some(v => dateStr >= v.start && dateStr <= v.end) && [1,2,4,5].includes(dayOfWeek);
 
       if (isSchoolDay) {
         if (dayOfWeek === 1) { subletMetronome = !subletMetronome; }
@@ -150,12 +152,12 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
           if (dayOfWeek === 4 && fauvainRiobeThursdays < 4 && !periodThursdaysDone && currentPeriodIdx < 4) {
             assigned = ["RIOBÉ", "FAUVAIN"];
             fauvainRiobeThursdays++; periodThursdaysDone = true;
-            stats["RIOBÉ"].cantine++; stats["RIOBÉ"].total++; stats["RIOBÉ"].lastCantine = dateStr;
-            stats["FAUVAIN"].cantine++; stats["FAUVAIN"].total++; stats["FAUVAIN"].lastCantine = dateStr;
+            statsObj["RIOBÉ"].cantine++; statsObj["RIOBÉ"].total++; statsObj["RIOBÉ"].lastCantine = dateStr;
+            statsObj["FAUVAIN"].cantine++; statsObj["FAUVAIN"].total++; statsObj["FAUVAIN"].lastCantine = dateStr;
           } 
           else {
             for (let i = 0; i < requiredParents; i++) {
-              let available = families.filter(f => {
+              let available = famsData.filter(f => {
                 if (assigned.includes(f.id)) return false;
                 if (f.id === "FAUVAIN" && dayOfWeek === 4) return false; 
                 if (f.id === "LE LÉZEC" && dateStr === "2026-10-12") return false; 
@@ -164,15 +166,15 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                 if (f.id === "LE LÉZEC" && f.flexUntil && dateStr <= f.flexUntil) hasDay = true;
                 if (!hasDay) return false;
 
-                if (f.type === "Nouveau" && stats[f.id].lastCantine) {
-                  let lastD = new Date(stats[f.id].lastCantine + "T12:00:00");
+                if (f.type === "Nouveau" && statsObj[f.id].lastCantine) {
+                  let lastD = new Date(statsObj[f.id].lastCantine + "T12:00:00");
                   let diffDays = Math.ceil(Math.abs(currentDate - lastD) / (1000 * 60 * 60 * 24));
                   if (diffDays <= 3) return false; 
                 }
 
                 if (isInt1 && f.type === "Nouveau") return false; 
                 if (isInt2) {
-                  let hasAncien = (p1 && p1.startsWith("Mme")) || assigned.some(a => families.find(fam => fam.id === a).type === "Ancien");
+                  let hasAncien = (p1 && p1.startsWith("Mme")) || assigned.some(a => famsData.find(fam => fam.id === a).type === "Ancien");
                   if (hasAncien && f.type === "Ancien") return false; 
                   if (!hasAncien && f.type === "Nouveau" && i === 1) return false; 
                 }
@@ -180,23 +182,23 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
               });
 
               available.sort((a, b) => {
-                let scoreA = stats[a.id].total; let scoreB = stats[b.id].total;
+                let scoreA = statsObj[a.id].total; let scoreB = statsObj[b.id].total;
                 if (a.id === "CHOMEL") scoreA += 1;
                 if (b.id === "CHOMEL") scoreB += 1;
 
                 if (scoreA !== scoreB) return scoreA - scoreB;
-                if (stats[a.id].menage !== stats[b.id].menage) return stats[a.id].menage - stats[b.id].menage; 
+                if (statsObj[a.id].menage !== statsObj[b.id].menage) return statsObj[a.id].menage - statsObj[b.id].menage; 
                 return a.days.length - b.days.length;
               });
 
               if (available.length > 0) {
                 assigned.push(available[0].id);
-                stats[available[0].id].cantine++; stats[available[0].id].total++; stats[available[0].id].lastCantine = dateStr;
+                statsObj[available[0].id].cantine++; statsObj[available[0].id].total++; statsObj[available[0].id].lastCantine = dateStr;
               } else {
-                let fallback = families.filter(f => !assigned.includes(f.id)).sort((a, b) => stats[a.id].total - stats[b.id].total);
+                let fallback = famsData.filter(f => !assigned.includes(f.id)).sort((a, b) => statsObj[a.id].total - statsObj[b.id].total);
                 if(fallback.length > 0) {
                   assigned.push(fallback[0].id);
-                  stats[fallback[0].id].cantine++; stats[fallback[0].id].total++; stats[fallback[0].id].lastCantine = dateStr;
+                  statsObj[fallback[0].id].cantine++; statsObj[fallback[0].id].total++; statsObj[fallback[0].id].lastCantine = dateStr;
                   forcedError = true;
                 }
               }
@@ -211,64 +213,64 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
       }
 
       if (dayOfWeek === 5) {
-        const isVacationEve = periods.some(p => p.end === dateStr);
+        const isVacationEve = perData.some(p => p.end === dateStr);
         if (isVacationEve) {
-          const p = periods.find(per => per.end === dateStr);
-          let available = families.filter(f => f.asso && stats[f.id].menage < 4);
-          if (available.length === 0) available = families.filter(f => f.asso); 
+          const p = perData.find(per => per.end === dateStr);
+          let available = famsData.filter(f => f.isAsso && statsObj[f.id].menage < 4);
+          if (available.length === 0) available = famsData.filter(f => f.isAsso); 
           
-          available.sort((a, b) => stats[a.id].total - stats[b.id].total);
-          let chosen = available[0].id;
-          
-          stats[chosen].menage++; stats[chosen].total++; stats[chosen].lastMenage = dateStr;
-          
-          let vacDate = new Date(currentDate); vacDate.setDate(vacDate.getDate() + 1);
-          menageArr.push({ date: getDateStr(vacDate), period: p.id, familyId: chosen, isVacances: true, label: `Vacances ${p.vacName}` });
+          available.sort((a, b) => statsObj[a.id].total - statsObj[b.id].total);
+          if(available.length > 0) {
+            let chosen = available[0].id;
+            statsObj[chosen].menage++; statsObj[chosen].total++; statsObj[chosen].lastMenage = dateStr;
+            let vacDate = new Date(currentDate); vacDate.setDate(vacDate.getDate() + 1);
+            menageArr.push({ date: getDateStr(vacDate), period: p.id, familyId: chosen, isVacances: true, label: `Vacances ${p.vacName}` });
+          }
         } else if (isSchoolDay) {
-          let candidates = families.filter(f => stats[f.id].menage === 0);
+          let candidates = famsData.filter(f => statsObj[f.id].menage === 0);
           
-          if (stats["CHOMEL"].menage < 4) {
-            if (stats["CHOMEL"].menage === 0) {
-              if (!candidates.some(f => f.id === "CHOMEL")) candidates.push(families.find(f => f.id === "CHOMEL"));
+          if (statsObj["CHOMEL"].menage < 4) {
+            if (statsObj["CHOMEL"].menage === 0) {
+              if (!candidates.some(f => f.id === "CHOMEL")) candidates.push(famsData.find(f => f.id === "CHOMEL"));
             } else {
-              let lastChomel = new Date(stats["CHOMEL"].lastMenage + "T12:00:00").getTime();
+              let lastChomel = new Date(statsObj["CHOMEL"].lastMenage + "T12:00:00").getTime();
               if (currentDate.getTime() - lastChomel >= 28 * 24 * 60 * 60 * 1000) {
-                if (!candidates.some(f => f.id === "CHOMEL")) candidates.push(families.find(f => f.id === "CHOMEL"));
+                if (!candidates.some(f => f.id === "CHOMEL")) candidates.push(famsData.find(f => f.id === "CHOMEL"));
               }
             }
           }
           
           if (candidates.length === 0) {
-            candidates = families.filter(f => {
-              if (f.asso && stats[f.id].menage >= 2) return false; 
-              return stats[f.id].menage < 4; 
+            candidates = famsData.filter(f => {
+              if (f.isAsso && statsObj[f.id].menage >= 2) return false; 
+              return statsObj[f.id].menage < 4; 
             });
-            if(candidates.length === 0) candidates = families.filter(f => stats[f.id].menage < 4);
-            if(candidates.length === 0) candidates = [...families]; 
+            if(candidates.length === 0) candidates = famsData.filter(f => statsObj[f.id].menage < 4);
+            if(candidates.length === 0) candidates = [...famsData]; 
           }
           
           candidates.sort((a, b) => {
-            let lastA = new Date(stats[a.id].lastMenage + "T12:00:00").getTime();
-            let lastB = new Date(stats[b.id].lastMenage + "T12:00:00").getTime();
+            let lastA = new Date(statsObj[a.id].lastMenage + "T12:00:00").getTime();
+            let lastB = new Date(statsObj[b.id].lastMenage + "T12:00:00").getTime();
             let now = currentDate.getTime();
             let penA = (now - lastA < 28 * 24 * 60 * 60 * 1000) ? 100 : 0;
             let penB = (now - lastB < 28 * 24 * 60 * 60 * 1000) ? 100 : 0;
             
-            let chomelA = (a.id === "CHOMEL" && penA === 0 && stats[a.id].menage < 4) ? -100 : 0;
-            let chomelB = (b.id === "CHOMEL" && penB === 0 && stats[b.id].menage < 4) ? -100 : 0;
+            let chomelA = (a.id === "CHOMEL" && penA === 0 && statsObj[a.id].menage < 4) ? -100 : 0;
+            let chomelB = (b.id === "CHOMEL" && penB === 0 && statsObj[b.id].menage < 4) ? -100 : 0;
             
-            let scoreA = stats[a.id].total + penA + chomelA;
-            let scoreB = stats[b.id].total + penB + chomelB;
+            let scoreA = statsObj[a.id].total + penA + chomelA;
+            let scoreB = statsObj[b.id].total + penB + chomelB;
             
             if (scoreA !== scoreB) return scoreA - scoreB;
-            if (stats[a.id].menage !== stats[b.id].menage) return stats[a.id].menage - stats[b.id].menage; 
+            if (statsObj[a.id].menage !== statsObj[b.id].menage) return statsObj[a.id].menage - statsObj[b.id].menage; 
             if (a.days.length !== b.days.length) return b.days.length - a.days.length; 
             return lastA - lastB; 
           });
 
           if (candidates.length > 0) {
             let chosen = candidates[0].id;
-            stats[chosen].menage++; stats[chosen].total++; stats[chosen].lastMenage = dateStr;
+            statsObj[chosen].menage++; statsObj[chosen].total++; statsObj[chosen].lastMenage = dateStr;
             let nextSat = new Date(currentDate); nextSat.setDate(nextSat.getDate() + 1);
             menageArr.push({ date: getDateStr(nextSat), period: activeP.id, familyId: chosen, isVacances: false, label: "Ménage Hebdomadaire" });
           }
@@ -277,9 +279,9 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
       currentDate.setDate(currentDate.getDate() + 1);
     }
 
-    let fStats = Object.keys(stats).map(id => {
-      const fam = families.find(f => f.id === id);
-      return { id: id, name: fam ? fam.name : id, cantine: stats[id].cantine, menage: stats[id].menage, total: stats[id].total, isTeacher: false };
+    let fStats = Object.keys(statsObj).map(id => {
+      const fam = famsData.find(f => f.id === id);
+      return { id: id, name: fam ? fam.name : id, cantine: statsObj[id].cantine, menage: statsObj[id].menage, total: statsObj[id].total, isTeacher: false };
     });
     
     let teaCantine = (tId) => scheduleArr.filter(s => s.p1 === tId || s.p2 === tId).length;
@@ -293,7 +295,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
       return b.total - a.total || a.name.localeCompare(b.name);
     });
 
-    return { familiesList: families, periodsInfo: periods, schedule: scheduleArr, menagesSchedule: menageArr, familyStats: fStats, holidays: holi };
+    return { familiesList: famsData, periodsInfo: perData, schedule: scheduleArr, menagesSchedule: menageArr, familyStats: fStats, holidays: holiData, vacances: vacData };
   }, []);
 
   // --- 2. FONCTIONS DE FORMATAGE ---
@@ -353,7 +355,6 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
 
     return (
       <button 
-        key={`pill-${id}`}
         onClick={() => setQuickFilterFamily(id)}
         className={`inline-flex items-center gap-1 px-1.5 py-1 rounded-md border font-bold shadow-sm transition-all hover:opacity-80 active:scale-95 cursor-pointer ${styleClass} ${errBorder} ${widthClass} ${textClass}`}
         title={`Filtrer sur ${famName}`}
@@ -378,7 +379,6 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
 
     if (activeTab === 'cantine') {
       headers.push('Période', 'Date', 'Procédure', 'Intervenant 1', 'Intervenant 2');
-      // Export de TOUTES les périodes pour la Cantine
       schedule.forEach(r => {
         if (!quickFilterFamily || r.p1 === quickFilterFamily || r.p2 === quickFilterFamily) {
            const pName = periodsInfo.find(p => p.id === r.period)?.name || 'Inconnu';
@@ -387,7 +387,6 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
       });
     } else if (activeTab === 'menage') {
       headers.push('Période', 'Date', 'Famille', 'Type');
-      // Export de TOUTES les périodes pour le Ménage
       menagesSchedule.forEach(r => {
         if (!quickFilterFamily || r.familyId === quickFilterFamily) {
            const pName = periodsInfo.find(p => p.id === r.period)?.name || 'Inconnu';
@@ -443,10 +442,10 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
 
         let cantineEvent = schedule.find(s => s.date === dateStr);
         let menageEvent = menagesSchedule.find(m => {
-          if (m.date === dateStr) return true; // C'est le samedi ou premier jour vacance
+          if (m.date === dateStr) return true; 
           if (!m.isVacances) {
              let sun = new Date(m.date + "T12:00:00"); sun.setDate(sun.getDate() + 1);
-             if (getLocalDateString(sun) === dateStr) return true; // C'est le dimanche
+             if (getLocalDateString(sun) === dateStr) return true; 
           }
           return false;
         });
@@ -456,14 +455,14 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
             <div className="font-bold text-slate-400 mb-0.5 text-center">{dayNames[dayWeek]}</div>
             {cantineEvent && (
               <div className="flex flex-col gap-0.5 items-center w-full">
-                {cantineEvent.p1 && FamilyPill({ id: cantineEvent.p1, isError: cantineEvent.isError, fullWidth: true })}
-                {cantineEvent.p2 && FamilyPill({ id: cantineEvent.p2, isError: cantineEvent.isError, fullWidth: true })}
+                {cantineEvent.p1 && <FamilyPill id={cantineEvent.p1} isError={cantineEvent.isError} fullWidth={true} />}
+                {cantineEvent.p2 && <FamilyPill id={cantineEvent.p2} isError={cantineEvent.isError} fullWidth={true} />}
               </div>
             )}
             {menageEvent && (dayWeek === 6 || dayWeek === 0 || menageEvent.isVacances) && (
               <div className="mt-auto pt-0.5 border-t border-slate-100 flex flex-col gap-0.5 items-center w-full">
                 <span className="text-[8px] text-indigo-400 uppercase font-bold flex items-center justify-center"><Sparkles size={8} className="mr-0.5 shrink-0"/> Ménage</span>
-                {FamilyPill({ id: menageEvent.familyId, isError: false, fullWidth: true })}
+                <FamilyPill id={menageEvent.familyId} isError={false} fullWidth={true} />
               </div>
             )}
           </div>
@@ -492,7 +491,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
   return (
     <div className="bg-transparent font-sans text-slate-800 animate-fade-in relative pb-10">
       
-      {/* MAGIE CSS POUR L'IMPRESSION (PAYSAGE, S'ADAPTE À LA FEUILLE) */}
+      {/* CSS D'IMPRESSION (PAYSAGE, S'ADAPTE À LA FEUILLE) */}
       <style>{`
         @media print {
           @page { size: landscape; margin: 5mm; }
@@ -518,7 +517,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
         <header className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 print:hidden">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
-              <CalendarDays size={24} />
+              <Calendar size={24} />
             </div>
             <div>
               <h1 className="text-2xl font-extrabold text-slate-800">Planning Scolaire 2026-2027 <span className="text-blue-600">(Zone A)</span></h1>
@@ -532,7 +531,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
               </button>
             )}
             <button onClick={() => window.print()} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg font-semibold text-sm transition shadow-sm flex items-center gap-2">
-              <Printer size={16} /> Imprimer (PDF)
+              <Calendar size={16} /> Imprimer (PDF)
             </button>
           </div>
         </header>
@@ -546,7 +545,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
             <Sparkles size={16} /> Ménage
           </button>
           <button onClick={() => setActiveTab('calendrier')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'calendrier' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
-            <CalendarDays size={16} /> Calendrier
+            <Calendar size={16} /> Calendrier
           </button>
           <button onClick={() => setActiveTab('stats')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'stats' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
             <BarChart3 size={16} /> Statistiques
@@ -567,7 +566,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
               Filtre actif : <span className="uppercase text-indigo-600">{quickFilterFamily}</span>
             </span>
             <button onClick={() => setQuickFilterFamily(null)} className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 hover:bg-indigo-700 transition-colors shadow-sm">
-              <XCircle size={14} /> Annuler le filtre
+              <AlertCircle size={14} /> Annuler le filtre
             </button>
           </div>
         )}
@@ -661,7 +660,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                       <div className="flex justify-between items-start mb-4">
                         <div>
                           <div className={`text-xs font-bold ${isVac ? 'text-amber-500' : 'text-slate-400'} uppercase tracking-wider mb-1 flex items-center gap-2`}>
-                            <CalendarDays size={14} className={isVac ? 'text-amber-500' : 'text-emerald-500'}/> {row.label}
+                            <Calendar size={14}/> {row.label}
                           </div>
                           <div className={`text-sm font-bold ${isVac ? 'text-amber-800' : 'text-slate-700'} capitalize mt-2 bg-white/50 px-3 py-1.5 rounded-lg border border-slate-100 inline-block`}>
                             {isVac ? formatDate(row.date) : formatMenageDate(row.date)}
@@ -691,7 +690,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
           {activeTab === 'calendrier' && (
             <div className="animate-in fade-in duration-300">
               <div className="text-center mb-6 print:text-left">
-                <h2 className="text-2xl font-bold text-slate-800 flex items-center justify-center md:justify-start gap-2"><CalendarDays className="text-blue-500" /> Calendrier Annuel Global</h2>
+                <h2 className="text-2xl font-bold text-slate-800 flex items-center justify-center md:justify-start gap-2"><Calendar className="text-blue-500" /> Calendrier Annuel Global</h2>
               </div>
               {renderCalendarGrid()}
             </div>
@@ -771,7 +770,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                                 }
                                 const isCantine = e.type === 'Cantine';
                                 const iconClass = isCantine ? 'text-blue-500 bg-blue-100' : (e.isVacances ? 'text-amber-500 bg-amber-100' : 'text-indigo-500 bg-indigo-100');
-                                const IconTag = isCantine ? Utensils : (e.isVacances ? CalendarDays : Sparkles);
+                                const IconTag = isCantine ? Utensils : (e.isVacances ? Calendar : Sparkles);
                                 const dateDisplay = (e.type === 'Ménage' && !e.isVacances) ? formatMenageDate(e.date) : formatDate(e.date);
 
                                 return (
@@ -783,7 +782,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                                           <div className="flex flex-wrap items-center gap-3">
                                               <div className={`w-8 h-8 rounded-full flex items-center justify-center ${iconClass}`}><IconTag size={14} /></div>
                                               <div><strong className="text-slate-800 block">{e.type}</strong><span className="text-slate-500 text-xs">{e.details}</span></div>
-                                              {e.isError && !isTeacher && <span className="ml-2 inline-flex items-center gap-1 text-[10px] font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded uppercase tracking-wider border border-red-200 shadow-sm"><AlertTriangle size={10}/> Jour forcé</span>}
+                                              {e.isError && !isTeacher && <span className="ml-2 inline-flex items-center gap-1 text-[10px] font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded uppercase tracking-wider border border-red-200 shadow-sm"><AlertCircle size={10}/> Jour forcé</span>}
                                           </div>
                                       </td>
                                     </tr>
