@@ -54,26 +54,26 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     setQuickFilterFamily(null); 
   }, [defaultTab]);
 
-  // --- L'ALGORITHME MAGIQUE (Totalement sécurisé) ---
-  const data = useMemo(() => {
-    const famsData = [
-      { id: "BOCCA", type: "Ancien", days: [1, 5], asso: false },
-      { id: "CHOMEL", type: "Nouveau", days: [4], asso: false },
-      { id: "CORNET-BOUBE", type: "Nouveau", days: [1, 2, 4, 5], asso: false },
-      { id: "DE LASTIC ST JAL", type: "Nouveau", days: [1, 2, 4, 5], asso: false },
-      { id: "DE SERRES DE MESPLES", type: "Nouveau", days: [1], asso: false },
-      { id: "FIARD", type: "Ancien", days: [2, 4], asso: false },
-      { id: "GREPAT", type: "Ancien", days: [1, 2], asso: false },
-      { id: "MELLIES", type: "Nouveau", days: [2, 4], asso: false },
-      { id: "RIOBÉ", type: "Ancien", days: [1, 2, 4, 5], asso: false },
-      { id: "TAISSIDRE-CARVALHO", type: "Ancien", days: [1], asso: false },
-      { id: "BEZIAT", type: "Ancien", days: [1, 5], asso: true },
-      { id: "DE MALAUSSENE", type: "Ancien", days: [1], asso: true },
-      { id: "FAUVAIN", type: "Ancien", days: [1, 2, 5], asso: true }, 
-      { id: "LE LÉZEC", type: "Ancien flex", days: [1, 5], flexUntil: "2026-09-18", asso: true }
+  // --- ALGORITHME & DONNÉES (Protégé) ---
+  const { familiesList, periodsInfo, schedule, menagesSchedule, familyStats, holidays, vacances } = useMemo(() => {
+    const fams = [
+      { id: "BOCCA", type: "Ancien", days: [1, 5], isAsso: false },
+      { id: "CHOMEL", type: "Nouveau", days: [4], isAsso: false },
+      { id: "CORNET-BOUBE", type: "Nouveau", days: [1, 2, 4, 5], isAsso: false },
+      { id: "DE LASTIC ST JAL", type: "Nouveau", days: [1, 2, 4, 5], isAsso: false },
+      { id: "DE SERRES DE MESPLES", type: "Nouveau", days: [1], isAsso: false },
+      { id: "FIARD", type: "Ancien", days: [2, 4], isAsso: false },
+      { id: "GREPAT", type: "Ancien", days: [1, 2], isAsso: false },
+      { id: "MELLIES", type: "Nouveau", days: [2, 4], isAsso: false },
+      { id: "RIOBÉ", type: "Ancien", days: [1, 2, 4, 5], isAsso: false },
+      { id: "TAISSIDRE-CARVALHO", type: "Ancien", days: [1], isAsso: false },
+      { id: "BEZIAT", type: "Ancien", days: [1, 5], isAsso: true },
+      { id: "DE MALAUSSENE", type: "Ancien", days: [1], isAsso: true },
+      { id: "FAUVAIN", type: "Ancien", days: [1, 2, 5], isAsso: true }, 
+      { id: "LE LÉZEC", type: "Ancien flex", days: [1, 5], flexUntil: "2026-09-18", isAsso: true }
     ];
 
-    const perData = [
+    const per = [
       { id: 1, name: "Période 1", desc: "Rentrée (03/09) - Toussaint (17/10)", start: "2026-09-03", end: "2026-10-16", vacStart: "2026-10-17", vacName: "Toussaint" },
       { id: 2, name: "Période 2", desc: "Toussaint (02/11) - Noël (19/12)", start: "2026-11-02", end: "2026-12-18", vacStart: "2026-12-19", vacName: "Noël" },
       { id: 3, name: "Période 3", desc: "Noël (04/01) - Février (13/02)", start: "2027-01-04", end: "2027-02-12", vacStart: "2027-02-13", vacName: "Hiver" },
@@ -81,8 +81,8 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
       { id: 5, name: "Période 5", desc: "Pâques (26/04) - Été (03/07)", start: "2027-04-26", end: "2027-07-02", vacStart: "2027-07-03", vacName: "Été" }
     ];
 
-    const holiData = ["2026-11-11", "2027-03-26", "2027-03-29", "2027-05-06", "2027-05-07", "2027-05-17"];
-    const vacData = [
+    const holi = ["2026-11-11", "2027-03-26", "2027-03-29", "2027-05-06", "2027-05-07", "2027-05-17"];
+    const vac = [
       { name: "Toussaint", start: "2026-10-17", end: "2026-11-01" },
       { name: "Noël", start: "2026-12-19", end: "2027-01-03" },
       { name: "Hiver", start: "2027-02-13", end: "2027-02-28" },
@@ -99,32 +99,32 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     let menageArr = [];
     let statsObj = {};
     
-    famsData.forEach(f => {
+    fams.forEach(f => {
       statsObj[f.id] = { cantine: 0, menage: 0, total: 0, lastCantine: null, lastMenage: "2026-01-01" };
     });
 
     const duoDates = ["2026-09-03", "2026-11-05", "2027-01-07", "2027-03-04"];
-
     let currentDate = new Date(2026, 8, 3, 12, 0, 0); 
-    let endDate = new Date(2027, 6, 3, 12, 0, 0);     
+    const endDate = new Date(2027, 6, 3, 12, 0, 0);
     
     let maitresseMardi = "Mme GERARD";
-    let isHervetWeek = true;
+    // ⚠️ MME HERVET NE DOIT PAS FAIRE LE VENDREDI 4 SEPT 2026. L'alternance doit donc commencer sur FALSE.
+    let isHervetWeek = false; 
     let fauvainRiobeThursdays = 0;
     let currentPeriodIdx = 0;
     let periodThursdaysDone = false;
 
     while (currentDate <= endDate) {
-      let dayOfWeek = currentDate.getDay();
-      let dateStr = getDateStr(currentDate);
-
-      let pIdx = perData.findIndex(p => dateStr >= p.start && dateStr <= p.end);
-      if (pIdx !== -1 && pIdx !== currentPeriodIdx) {
-        currentPeriodIdx = pIdx; periodThursdaysDone = false;
-      }
+      const dateStr = getDateStr(currentDate);
+      const dayOfWeek = currentDate.getDay();
       
-      const activeP = perData.find(p => dateStr >= p.start && dateStr <= p.end) || perData[0];
-      const isSchoolDayFlag = !holiData.includes(dateStr) && !vacData.some(v => dateStr >= v.start && dateStr <= v.end) && [1,2,4,5].includes(dayOfWeek);
+      let pIdx = per.findIndex(p => dateStr >= p.start && dateStr <= p.end);
+      if (pIdx !== -1 && pIdx !== currentPeriodIdx) {
+        currentPeriodIdx = pIdx;
+        periodThursdaysDone = false;
+      }
+      const activeP = per.find(p => dateStr >= p.start && dateStr <= p.end) || per[0];
+      const isSchoolDayFlag = !holi.includes(dateStr) && !vac.some(v => dateStr >= v.start && dateStr <= v.end) && [1,2,4,5].includes(dayOfWeek);
 
       if (isSchoolDayFlag) {
         let requiredParents = 2; let p1 = null, p2 = null; let repasType = ""; let forcedError = false;
@@ -133,12 +133,12 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
         if (dayOfWeek === 1) { repasType = "Repas par classe"; } 
         else if (dayOfWeek === 2) { 
           repasType = "Placement libre"; requiredParents = 1; 
-          p1 = { id: maitresseMardi }; maitresseMardi = maitresseMardi === "Mme GERARD" ? "Mme SUBLET" : "Mme GERARD"; 
+          p1 = maitresseMardi; maitresseMardi = maitresseMardi === "Mme GERARD" ? "Mme SUBLET" : "Mme GERARD"; 
         } 
         else if (dayOfWeek === 4) { repasType = "Filles / Garçons"; } 
         else if (dayOfWeek === 5) { 
           repasType = "Par cordée"; 
-          if (isHervetWeek) { requiredParents = 1; p1 = { id: "Mme HERVET" }; }
+          if (isHervetWeek) { requiredParents = 1; p1 = "Mme HERVET"; }
           isHervetWeek = !isHervetWeek; 
         }
 
@@ -152,7 +152,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
           statsObj["FAUVAIN"].cantine++; statsObj["FAUVAIN"].total++; statsObj["FAUVAIN"].lastCantine = dateStr;
         } else {
           for (let i = 0; i < parentsToAssign; i++) {
-            let available = famsData.filter(f => {
+            let available = fams.filter(f => {
               if (assigned.includes(f.id)) return false;
               if (f.id === "FAUVAIN" && dayOfWeek === 4) return false; 
               if (f.id === "LE LÉZEC" && dateStr === "2026-10-12") return false; 
@@ -169,7 +169,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
 
               if (isInt1 && f.type === "Nouveau") return false; 
               if (isInt2) {
-                let hasAncien = (p1 && p1.id && p1.id.startsWith("Mme")) || assigned.some(a => famsData.find(fam => fam.id === a)?.type.startsWith("Ancien"));
+                let hasAncien = (p1 && p1.startsWith("Mme")) || assigned.some(a => fams.find(fam => fam.id === a)?.type.startsWith("Ancien"));
                 if (hasAncien && f.type.startsWith("Ancien")) return false; 
                 if (!hasAncien && f.type === "Nouveau" && i === 1) return false; 
               }
@@ -190,7 +190,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
               assigned.push(available[0].id);
               statsObj[available[0].id].cantine++; statsObj[available[0].id].total++; statsObj[available[0].id].lastCantine = dateStr;
             } else {
-              let fallback = famsData.filter(f => !assigned.includes(f.id)).sort((a, b) => statsObj[a.id].total - statsObj[b.id].total);
+              let fallback = fams.filter(f => !assigned.includes(f.id)).sort((a, b) => statsObj[a.id].total - statsObj[b.id].total);
               if (fallback.length > 0) {
                 assigned.push(fallback[0].id);
                 statsObj[fallback[0].id].cantine++; statsObj[fallback[0].id].total++; statsObj[fallback[0].id].lastCantine = dateStr;
@@ -200,7 +200,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
           }
         }
 
-        let finalP1 = parentsToAssign === 2 ? assigned[0] : (p1 ? p1.id : assigned[0]);
+        let finalP1 = parentsToAssign === 2 ? assigned[0] : (p1 ? p1 : assigned[0]);
         let finalP2 = parentsToAssign === 2 ? assigned[1] : (p1 ? assigned[0] : null);
 
         scheduleArr.push({ date: dateStr, period: activeP.id, dayOfWeek, p1: finalP1, p2: finalP2, repasType, isError: forcedError });
@@ -211,13 +211,13 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
         let nextSatStr = getDateStr(nextSat);
         
         let isHolidayStart = false; let holidayName = "";
-        for (let v of vacData) {
+        for (let v of vac) {
           if (nextSatStr === v.start) { isHolidayStart = true; holidayName = "Vacances " + v.name; }
         }
 
         if (isHolidayStart) {
-          let eligibleAsso = famsData.filter(f => f.asso && statsObj[f.id].menage < 4);
-          if (eligibleAsso.length === 0) eligibleAsso = famsData.filter(f => f.asso);
+          let eligibleAsso = fams.filter(f => f.isAsso && statsObj[f.id].menage < 4);
+          if (eligibleAsso.length === 0) eligibleAsso = fams.filter(f => f.isAsso);
           eligibleAsso.sort((a, b) => statsObj[a.id].total - statsObj[b.id].total || a.id.localeCompare(b.id));
           
           if(eligibleAsso.length > 0) {
@@ -227,23 +227,31 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
             menageArr.push({ date: getDateStr(vacDate), period: activeP.id, familyId: chosen, isVacances: true, label: holidayName });
           }
         } else {
-          let candidates = famsData.filter(f => statsObj[f.id].menage === 0);
+          let candidates = fams.filter(f => statsObj[f.id].menage === 0);
           if (candidates.length === 0) {
-            candidates = famsData.filter(f => {
-              if (f.asso && statsObj[f.id].menage >= 2) return false; 
+            candidates = fams.filter(f => {
+              if (f.isAsso && statsObj[f.id].menage >= 2) return false; 
               return statsObj[f.id].menage < 4; 
             });
-            if(candidates.length === 0) candidates = famsData.filter(f => statsObj[f.id].menage < 4);
-            if(candidates.length === 0) candidates = [...famsData]; 
+            if(candidates.length === 0) candidates = fams.filter(f => statsObj[f.id].menage < 4);
+            if(candidates.length === 0) candidates = [...fams]; 
           }
           
           candidates.sort((a, b) => {
             let lastA = new Date(statsObj[a.id].lastMenage + "T12:00:00").getTime(); let lastB = new Date(statsObj[b.id].lastMenage + "T12:00:00").getTime();
             let now = currentDate.getTime();
             let penA = (now - lastA < 28 * 24 * 60 * 60 * 1000) ? 100 : 0; let penB = (now - lastB < 28 * 24 * 60 * 60 * 1000) ? 100 : 0;
-            let scoreA = statsObj[a.id].total + penA; let scoreB = statsObj[b.id].total + penB;
-            if (scoreA === scoreB) return lastA - lastB;
-            return scoreA - scoreB;
+            
+            let chomelA = (a.id === "CHOMEL" && penA === 0 && statsObj[a.id].menage < 4) ? -100 : 0;
+            let chomelB = (b.id === "CHOMEL" && penB === 0 && statsObj[b.id].menage < 4) ? -100 : 0;
+            
+            let scoreA = statsObj[a.id].total + penA + chomelA;
+            let scoreB = statsObj[b.id].total + penB + chomelB;
+            
+            if (scoreA !== scoreB) return scoreA - scoreB;
+            if (statsObj[a.id].menage !== statsObj[b.id].menage) return statsObj[a.id].menage - statsObj[b.id].menage; 
+            if (a.days.length !== b.days.length) return b.days.length - a.days.length; 
+            return lastA - lastB; 
           });
 
           if(candidates.length > 0) {
@@ -257,8 +265,8 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     }
 
     let fStats = Object.keys(statsObj).map(id => {
-      const fam = famsData.find(f => f.id === id);
-      return { id: id, name: fam ? fam.id : id, cantine: statsObj[id].cantine, menage: statsObj[id].menage, total: statsObj[id].total, isTeacher: false };
+      const fam = fams.find(f => f.id === id);
+      return { id: id, name: fam ? fam.name : id, cantine: statsObj[id].cantine, menage: statsObj[id].menage, total: statsObj[id].total, isTeacher: false };
     });
     
     let teaCantine = (tId) => scheduleArr.filter(s => s.p1 === tId || s.p2 === tId).length;
@@ -272,10 +280,8 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
       return b.total - a.total || a.id.localeCompare(b.id);
     });
 
-    return { familiesList: famsData, periodsInfo: perData, schedule: scheduleArr, menagesSchedule: menageArr, familyStats: fStats, holidays: holiData, vacances: vacData };
+    return { familiesList: fams, periodsInfo: per, schedule: scheduleArr, menagesSchedule: menageArr, familyStats: fStats, holidays: holi, vacances: vac };
   }, []);
-
-  const { familiesList, periodsInfo, schedule, menagesSchedule, familyStats, holidays, vacances } = data;
 
   // --- FONCTIONS DE FORMATAGE ---
   const getLocalDateString = (d) => {
@@ -321,11 +327,12 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     "FAUVAIN": "bg-slate-200 text-slate-800 border-slate-300"
   };
 
-  const FamilyPill = ({ id, isError = false, fullWidth = false }) => {
-    if (!id || id === "ERREUR") return <span className={`text-red-500 text-xs italic bg-red-50 px-2 py-0.5 rounded border border-red-200 ${fullWidth ? 'w-full text-center block' : ''}`}>À définir</span>;
+  const renderFamilyPill = (id, isError = false, fullWidth = false) => {
+    if (!id || id === "ERREUR") return <span key={Math.random()} className={`text-red-500 text-xs italic bg-red-50 px-2 py-0.5 rounded border border-red-200 ${fullWidth ? 'w-full text-center block' : ''}`}>À définir</span>;
     
     let isTeacher = id.startsWith("Mme");
-    let styleClass = isTeacher ? (teacherStyles[id] || "bg-slate-700 text-white") : (familyStyles[id] || "bg-slate-100 text-slate-800 border-slate-200");
+    const famName = isTeacher ? id : (familiesList.find(f => f.id === id)?.name || id);
+    let styleClass = isTeacher ? (teacherStyles[id] || "bg-slate-700 text-white") : (familyStyles[famName] || "bg-slate-100 text-slate-800 border-slate-200");
     let errBorder = (isError && !isTeacher) ? "border-red-500 shadow-red-200 border-2" : "border-transparent";
     
     const widthClass = fullWidth ? "w-full justify-center" : "";
@@ -333,9 +340,10 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
 
     return (
       <button 
+        key={`pill-${id}-${Math.random()}`}
         onClick={() => setQuickFilterFamily(id)}
         className={`inline-flex items-center gap-1 px-1.5 py-1 rounded-md border font-bold shadow-sm transition-all hover:opacity-80 active:scale-95 cursor-pointer ${styleClass} ${errBorder} ${widthClass} ${textClass}`}
-        title={`Filtrer sur ${id}`}
+        title={`Filtrer sur ${famName}`}
       >
         {isTeacher ? <Users size={10} className="shrink-0" /> : null} 
         <span className="truncate">{id}</span>
@@ -433,14 +441,14 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
             <div className="font-bold text-slate-400 mb-0.5 text-center">{dayNames[dayWeek]}</div>
             {cantineEvent && (
               <div className="flex flex-col gap-0.5 items-center w-full">
-                {cantineEvent.p1 && <FamilyPill id={cantineEvent.p1} isError={cantineEvent.isError} fullWidth={true} />}
-                {cantineEvent.p2 && <FamilyPill id={cantineEvent.p2} isError={cantineEvent.isError} fullWidth={true} />}
+                {cantineEvent.p1 && renderFamilyPill(cantineEvent.p1, cantineEvent.isError, true)}
+                {cantineEvent.p2 && renderFamilyPill(cantineEvent.p2, cantineEvent.isError, true)}
               </div>
             )}
             {menageEvent && (dayWeek === 6 || dayWeek === 0 || menageEvent.isVacances) && (
               <div className="mt-auto pt-0.5 border-t border-slate-100 flex flex-col gap-0.5 items-center w-full">
                 <span className="text-[8px] text-indigo-400 uppercase font-bold flex items-center justify-center"><Sparkles size={8} className="mr-0.5 shrink-0"/> Ménage</span>
-                <FamilyPill id={menageEvent.familyId} isError={false} fullWidth={true} />
+                {renderFamilyPill(menageEvent.familyId, false, true)}
               </div>
             )}
           </div>
@@ -466,60 +474,9 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     );
   };
 
-  // NOUVEAU RENDU SÉCURISÉ POUR LES ÉVÉNEMENTS DU FILTRE DE FAMILLE
-  const renderFamilyEvents = () => {
-    let allEvents = [
-        ...schedule.filter(s => s.p1 === selectedFamilyFilter || s.p2 === selectedFamilyFilter).map(s => ({ date: s.date, type: 'Cantine', details: s.repasType, isError: s.isError, period: s.period })),
-        ...menagesSchedule.filter(m => m.familyId === selectedFamilyFilter).map(m => ({ date: m.date, type: 'Ménage', details: m.label, isVacances: m.isVacances, period: m.period }))
-    ].sort((a, b) => new Date(a.date) - new Date(b.date));
-
-    if (allEvents.length === 0) {
-      return <div className="p-8 text-center text-slate-500">Aucun service planifié.</div>;
-    }
-
-    let currentP = 0;
-    return (
-      <table className="w-full text-left text-sm">
-        <thead className="bg-slate-50 text-slate-500 text-[11px] font-bold uppercase tracking-wider">
-            <tr><th className="p-4 border-b border-slate-200">Date</th><th className="p-4 border-b border-slate-200">Type de service</th></tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {allEvents.map((e, idx) => {
-            let pHeader = null;
-            if (e.period !== currentP) {
-              currentP = e.period;
-              let pName = periodsInfo.find(p=>p.id===currentP)?.name || 'Période inconnue';
-              pHeader = <tr key={`ph-${idx}`}><td colSpan="2" className="bg-slate-100 px-6 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider">{pName}</td></tr>;
-            }
-            const isCantine = e.type === 'Cantine';
-            const iconClass = isCantine ? 'text-blue-500 bg-blue-100' : (e.isVacances ? 'text-amber-500 bg-amber-100' : 'text-indigo-500 bg-indigo-100');
-            const dateDisplay = (e.type === 'Ménage' && !e.isVacances) ? formatMenageDate(e.date) : formatDate(e.date);
-
-            return (
-              <React.Fragment key={`frag-${idx}`}>
-                {pHeader}
-                <tr className="hover:bg-slate-50 transition-colors">
-                  <td className="p-4 font-semibold text-slate-700 whitespace-nowrap capitalize">{dateDisplay}</td>
-                  <td className="p-4">
-                      <div className="flex flex-wrap items-center gap-3">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${iconClass}`}>
-                            {isCantine ? <Utensils size={14} /> : (e.isVacances ? <CalendarDays size={14} /> : <Sparkles size={14} />)}
-                          </div>
-                          <div><strong className="text-slate-800 block">{e.type}</strong><span className="text-slate-500 text-xs">{e.details}</span></div>
-                          {e.isError && !selectedFamilyFilter.startsWith("Mme") && <span className="ml-2 inline-flex items-center gap-1 text-[10px] font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded uppercase tracking-wider border border-red-200 shadow-sm"><AlertCircle size={10}/> Jour forcé</span>}
-                      </div>
-                  </td>
-                </tr>
-              </React.Fragment>
-            );
-          })}
-        </tbody>
-      </table>
-    );
-  };
-
   return (
     <div className="bg-transparent font-sans text-slate-800 animate-fade-in relative pb-10">
+      
       <style>{`
         @media print {
           @page { size: landscape; margin: 5mm; }
@@ -574,7 +531,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
         {quickFilterFamily && (activeTab === 'cantine' || activeTab === 'menage') && (
           <div className="bg-indigo-50 border border-indigo-200 text-indigo-900 px-6 py-3 mb-4 rounded-xl flex justify-between items-center shadow-sm print:hidden animate-fade-in max-w-4xl mx-auto">
             <span className="font-bold text-sm flex items-center gap-2"><Search size={16} className="text-indigo-600"/> Filtre actif : <span className="uppercase text-indigo-600">{quickFilterFamily}</span></span>
-            <button onClick={() => setQuickFilterFamily(null)} className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 hover:bg-indigo-700 transition-colors shadow-sm"><XCircle size={14} /> Annuler le filtre</button>
+            <button onClick={() => setQuickFilterFamily(null)} className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 hover:bg-indigo-700 transition-colors shadow-sm"><AlertCircle size={14} /> Annuler le filtre</button>
           </div>
         )}
 
@@ -607,10 +564,10 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                       <div className="mt-2 mb-3"><span className="bg-white/80 text-slate-600 px-2 py-1 rounded border border-slate-100 text-xs font-semibold shadow-sm inline-block">{row.repasType}</span></div>
                       <div className="space-y-2 mt-auto">
                         <div className="flex items-center justify-between bg-white p-2 rounded-lg border border-slate-100 shadow-sm">
-                          <span className="text-[10px] uppercase font-bold text-slate-400">P1</span><FamilyPill id={row.p1} isError={row.isError} />
+                          <span className="text-[10px] uppercase font-bold text-slate-400">P1</span>{renderFamilyPill(row.p1, row.isError)}
                         </div>
                         <div className="flex items-center justify-between bg-white p-2 rounded-lg border border-slate-100 shadow-sm">
-                          <span className="text-[10px] uppercase font-bold text-slate-400">P2</span><FamilyPill id={row.p2} isError={row.isError} />
+                          <span className="text-[10px] uppercase font-bold text-slate-400">P2</span>{renderFamilyPill(row.p2, row.isError)}
                         </div>
                       </div>
                     </div>
@@ -642,13 +599,13 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                     <div key={i} className={`${bgCard} rounded-xl p-5 border shadow-sm relative overflow-hidden flex flex-col h-full hover:shadow-md transition-all`}>
                       <div className="flex justify-between items-start mb-4">
                         <div>
-                          <div className={`text-xs font-bold ${isVac ? 'text-amber-500' : 'text-slate-400'} uppercase tracking-wider mb-1 flex items-center gap-2`}><CalendarDays size={14}/> {row.label}</div>
+                          <div className={`text-xs font-bold ${isVac ? 'text-amber-500' : 'text-slate-400'} uppercase tracking-wider mb-1 flex items-center gap-2`}><CalendarDays size={14} className={isVac ? 'text-amber-500' : 'text-emerald-500'}/> {row.label}</div>
                           <div className={`text-sm font-bold ${isVac ? 'text-amber-800' : 'text-slate-700'} capitalize mt-2 bg-white/50 px-3 py-1.5 rounded-lg border border-slate-100 inline-block`}>{isVac ? formatDate(row.date) : formatMenageDate(row.date)}</div>
                         </div>
                       </div>
                       <div className="mt-auto bg-white/60 p-3 rounded-lg border border-slate-100/50 flex items-center justify-between">
                         <span className="text-xs font-semibold text-slate-500 uppercase">Resp.</span>
-                        <div className="flex items-center gap-2"><FamilyPill id={row.familyId} />{isVac && <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded border border-amber-200 uppercase">Asso</span>}</div>
+                        <div className="flex items-center gap-2">{renderFamilyPill(row.familyId)}{isVac && <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded border border-amber-200 uppercase">Asso</span>}</div>
                       </div>
                     </div>
                   );
@@ -679,7 +636,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                   <tbody className="divide-y divide-slate-100">
                     {familyStats.map((stat, i) => (
                       <tr key={i} className="hover:bg-slate-50 transition">
-                        <td className="p-4 font-semibold text-slate-800"><FamilyPill id={stat.id} /></td>
+                        <td className="p-4 font-semibold text-slate-800">{renderFamilyPill(stat.id)}</td>
                         <td className="p-4 text-center text-blue-600 font-bold">{stat.cantine}</td><td className="p-4 text-center text-indigo-600 font-bold">{stat.menage}</td>
                         <td className="p-4 text-center"><span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-full font-bold border border-slate-200">{stat.total}</span></td>
                       </tr>
@@ -693,7 +650,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
           {activeTab === 'famille' && (
             <div className="animate-in fade-in duration-300 max-w-3xl mx-auto pb-12">
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mb-6 flex flex-col items-center print:hidden">
-                <label className="font-bold text-slate-700 mb-3 text-lg">Rechercher le planning d'une famille :</label>
+                <label className="font-bold text-slate-700 mb-3 text-lg">Rechercher le planning d'une famille ou maîtresse :</label>
                 <div className="relative w-full max-w-md">
                   <Search size={16} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400" />
                   <select 
@@ -701,7 +658,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                     value={selectedFamilyFilter} onChange={(e) => setSelectedFamilyFilter(e.target.value)}
                   >
                     <option value="">Sélectionnez un nom...</option>
-                    <optgroup label="Familles">{familiesList.map(f => <option key={f.id} value={f.id}>{f.id}</option>)}</optgroup>
+                    <optgroup label="Familles">{familiesList.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</optgroup>
                     <optgroup label="Maîtresses"><option value="Mme GERARD">Mme GERARD</option><option value="Mme SUBLET">Mme SUBLET</option><option value="Mme HERVET">Mme HERVET</option></optgroup>
                   </select>
                 </div>
@@ -710,14 +667,57 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
               {selectedFamilyFilter ? (() => {
                 const isTeacher = selectedFamilyFilter.startsWith("Mme");
                 const famInfo = isTeacher ? { type: "Équipe Pédagogique", isAsso: false } : familiesList.find(f => f.id === selectedFamilyFilter);
-                
+                let allEvents = [
+                    ...schedule.filter(s => s.p1 === selectedFamilyFilter || s.p2 === selectedFamilyFilter).map(s => ({ date: s.date, type: 'Cantine', details: s.repasType, isError: s.isError, period: s.period })),
+                    ...menagesSchedule.filter(m => m.familyId === selectedFamilyFilter).map(m => ({ date: m.date, type: 'Ménage', details: m.label, isVacances: m.isVacances, period: m.period }))
+                ].sort((a, b) => new Date(a.date) - new Date(b.date));
+
                 return (
                   <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
                     <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                        <div className="flex items-center gap-4"><div className="text-xl"><FamilyPill id={selectedFamilyFilter} /></div><div><div className="text-sm text-slate-500 font-bold uppercase tracking-wider">{famInfo ? famInfo.type : ''} {famInfo && famInfo.isAsso ? '• Membre Asso' : ''}</div></div></div>
+                        <div className="flex items-center gap-4"><div className="text-xl">{renderFamilyPill(selectedFamilyFilter)}</div><div><div className="text-sm text-slate-500 font-bold uppercase tracking-wider">{famInfo ? famInfo.type : ''} {famInfo && famInfo.isAsso ? '• Membre Asso' : ''}</div><div className="text-slate-800 font-bold mt-1">Total : {allEvents.length} services</div></div></div>
                     </div>
                     <div className="p-0">
-                      {renderFamilyEvents()}
+                      {allEvents.length === 0 ? <div className="p-8 text-center text-slate-500">Aucun service planifié.</div> : (
+                        <table className="w-full text-left text-sm">
+                          <thead className="bg-slate-50 text-slate-500 text-[11px] font-bold uppercase tracking-wider">
+                              <tr><th className="p-4 border-b border-slate-200">Date</th><th className="p-4 border-b border-slate-200">Type de service</th></tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {(() => {
+                              let currentP = 0;
+                              return allEvents.map((e, idx) => {
+                                let pHeader = null;
+                                if (e.period !== currentP) {
+                                  currentP = e.period;
+                                  let pName = periodsInfo.find(p=>p.id===currentP)?.name || 'Période inconnue';
+                                  pHeader = <tr key={`ph-${idx}`}><td colSpan="2" className="bg-slate-100 px-6 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider">{pName}</td></tr>;
+                                }
+                                const isCantine = e.type === 'Cantine';
+                                const iconClass = isCantine ? 'text-blue-500 bg-blue-100' : (e.isVacances ? 'text-amber-500 bg-amber-100' : 'text-indigo-500 bg-indigo-100');
+                                const IconTag = isCantine ? Utensils : (e.isVacances ? CalendarDays : Sparkles);
+                                const dateDisplay = (e.type === 'Ménage' && !e.isVacances) ? formatMenageDate(e.date) : formatDate(e.date);
+
+                                return (
+                                  <React.Fragment key={`frag-${idx}`}>
+                                    {pHeader}
+                                    <tr className="hover:bg-slate-50 transition-colors">
+                                      <td className="p-4 font-semibold text-slate-700 whitespace-nowrap capitalize">{dateDisplay}</td>
+                                      <td className="p-4">
+                                          <div className="flex flex-wrap items-center gap-3">
+                                              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${iconClass}`}><IconTag size={14} /></div>
+                                              <div><strong className="text-slate-800 block">{e.type}</strong><span className="text-slate-500 text-xs">{e.details}</span></div>
+                                              {e.isError && !isTeacher && <span className="ml-2 inline-flex items-center gap-1 text-[10px] font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded uppercase tracking-wider border border-red-200 shadow-sm"><AlertCircle size={10}/> Jour forcé</span>}
+                                          </div>
+                                      </td>
+                                    </tr>
+                                  </React.Fragment>
+                                );
+                              });
+                            })()}
+                          </tbody>
+                        </table>
+                      )}
                     </div>
                   </div>
                 );
