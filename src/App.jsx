@@ -326,6 +326,10 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     return { familiesList: famsData, periodsInfo: perData, schedule: scheduleArr, menagesSchedule: menageArr, familyStats: fStats, holidays: holiData, vacances: vacData };
   }, []);
 
+// 👇 AJOUTEZ EXACTEMENT CETTE LIGNE ICI 👇
+  const { familiesList, periodsInfo, schedule, menagesSchedule, familyStats, holidays, vacances } = data;
+  // 👆 --------------------------------- 👆
+  
   // --- FONCTIONS DE FORMATAGE ---
   const getLocalDateString = (d) => {
     let year = d.getFullYear(); let month = String(d.getMonth() + 1).padStart(2, '0'); let day = String(d.getDate()).padStart(2, '0');
