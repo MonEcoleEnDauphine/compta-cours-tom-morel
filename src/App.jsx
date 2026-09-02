@@ -120,7 +120,6 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     let fauvainRiobeThursdays = 0;
     let currentPeriodIdx = 0;
     let periodThursdaysDone = false;
-    const duoDates = ["2026-09-03", "2026-11-05", "2027-01-07", "2027-03-04"];
 
     while (currentDate <= endDate) {
       const dateStr = getDateStr(currentDate);
@@ -169,7 +168,6 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
 
         let assigned = [];
 
-        // RÈGLE SPÉCIALE : Duo de base, mais avec l'exception d'échange BOCCA/RIOBÉ le 3 septembre
         if (dayOfWeek === 4 && fauvainRiobeThursdays < 4 && !periodThursdaysDone && currentPeriodIdx < 4) {
           if (dateStr === "2026-09-03") {
             assigned = ["BOCCA", "FAUVAIN"];
@@ -184,7 +182,6 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
           }
         } else if (requiredParents > 0) {
           
-          // RÈGLE SPÉCIALE : RIOBÉ forcé le vendredi 4 septembre
           if (dateStr === "2026-09-04") {
             assigned.push("RIOBÉ");
             statsObj["RIOBÉ"].cantine++; statsObj["RIOBÉ"].total++; statsObj["RIOBÉ"].lastCantine = dateStr;
@@ -195,7 +192,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
               if (assigned.includes(f.id)) return false;
               if (f.id === "FAUVAIN" && dayOfWeek === 4) return false; 
               if (f.id === "LE LÉZEC" && dateStr === "2026-10-12") return false; 
-              if (f.id === "BOCCA" && dateStr === "2026-09-04") return false; // Évite que BOCCA enchaîne le 3 et le 4
+              if (f.id === "BOCCA" && dateStr === "2026-09-04") return false; 
 
               let hasDay = f.days.includes(dayOfWeek);
               if (f.id === "LE LÉZEC" && f.flexUntil && dateStr <= f.flexUntil) hasDay = true;
@@ -341,9 +338,6 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     return { familiesList: famsData, periodsInfo: perData, schedule: scheduleArr, menagesSchedule: menageArr, familyStats: fStats, holidays: holiData, vacances: vacData };
   }, []);
 
-  const { familiesList, periodsInfo, schedule, menagesSchedule, familyStats, holidays, vacances } = data;
-
-  // --- FONCTIONS DE FORMATAGE ---
   const getLocalDateString = (d) => {
     let year = d.getFullYear(); let month = String(d.getMonth() + 1).padStart(2, '0'); let day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
@@ -363,36 +357,36 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     return `Sam. ${d1.getDate()} au Dim. ${new Date(d2).toLocaleDateString('fr-FR', {day:'numeric', month:'short'})}`;
   };
 
+  // --- NOUVELLES COULEURS (TRÈS DISTINCTES) ---
   const teacherStyles = {
-    "Mme GERARD": "bg-slate-700 text-white border-slate-800",
-    "Mme SUBLET": "bg-slate-700 text-white border-slate-800",
-    "Mme HERVET": "bg-slate-700 text-white border-slate-800"
+    "Mme GERARD": "bg-slate-800 text-white border-slate-900",
+    "Mme SUBLET": "bg-neutral-800 text-white border-neutral-900",
+    "Mme HERVET": "bg-zinc-800 text-white border-zinc-900"
   };
 
   const familyStyles = {
-    "TAISSIDRE-CARVALHO": "bg-cyan-100 text-cyan-800 border-cyan-200",
-    "DE MALAUSSENE": "bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200",
-    "DE SERRES DE MESPLES": "bg-yellow-100 text-yellow-800 border-yellow-200",
-    "DE SERRES": "bg-yellow-100 text-yellow-800 border-yellow-200",
-    "LE LÉZEC": "bg-sky-100 text-sky-800 border-sky-200",
-    "FIARD": "bg-pink-100 text-pink-800 border-pink-200",
-    "GREPAT": "bg-indigo-100 text-indigo-800 border-indigo-200",
-    "MELLIES": "bg-teal-100 text-teal-800 border-teal-200",
-    "BOCCA": "bg-blue-100 text-blue-800 border-blue-200",
-    "BEZIAT-MENUT": "bg-emerald-100 text-emerald-800 border-emerald-200",
-    "DE LASTIC ST JAL": "bg-purple-100 text-purple-800 border-purple-200",
-    "CHOMEL": "bg-red-100 text-red-800 border-red-200",
-    "CORNET-BOUBE": "bg-green-100 text-green-800 border-green-200",
-    "RIOBÉ": "bg-orange-100 text-orange-800 border-orange-200",
-    "FAUVAIN": "bg-slate-200 text-slate-800 border-slate-300"
+    "BOCCA": "bg-blue-100 text-blue-800 border-blue-300",
+    "CHOMEL": "bg-red-100 text-red-800 border-red-300",
+    "CORNET-BOUBE": "bg-green-100 text-green-800 border-green-300",
+    "DE LASTIC ST JAL": "bg-violet-100 text-violet-800 border-violet-300",
+    "DE SERRES DE MESPLES": "bg-yellow-200 text-yellow-900 border-yellow-400",
+    "FIARD": "bg-rose-100 text-rose-800 border-rose-300",
+    "GREPAT": "bg-indigo-100 text-indigo-800 border-indigo-300",
+    "MELLIES": "bg-teal-100 text-teal-800 border-teal-300",
+    "RIOBÉ": "bg-orange-100 text-orange-800 border-orange-300",
+    "TAISSIDRE-CARVALHO": "bg-cyan-100 text-cyan-800 border-cyan-300",
+    "BEZIAT": "bg-lime-200 text-lime-900 border-lime-400",
+    "DE MALAUSSENE": "bg-fuchsia-100 text-fuchsia-800 border-fuchsia-300",
+    "FAUVAIN": "bg-amber-100 text-amber-800 border-amber-300",
+    "LE LÉZEC": "bg-sky-100 text-sky-800 border-sky-300"
   };
 
   const renderFamilyPill = (id, isError = false, fullWidth = false) => {
-    if (!id || id === "ERREUR") return <span key={Math.random()} className={`text-red-500 text-xs italic bg-red-50 px-2 py-0.5 rounded border border-red-200 ${fullWidth ? 'w-full text-center block' : ''}`}>À définir</span>;
+    if (!id || id === "ERREUR") return <span key={Math.random()} className={`text-red-500 text-xs italic bg-red-50 px-2 py-0.5 rounded border border-red-300 ${fullWidth ? 'w-full text-center block' : ''}`}>À définir</span>;
     
     let isTeacher = id.startsWith("Mme");
-    let styleClass = isTeacher ? (teacherStyles[id] || "bg-slate-700 text-white") : (familyStyles[id] || "bg-slate-100 text-slate-800 border-slate-200");
-    let errBorder = (isError && !isTeacher) ? "border-red-500 shadow-red-200 border-2" : "border-transparent";
+    let styleClass = isTeacher ? (teacherStyles[id] || "bg-slate-700 text-white") : (familyStyles[id] || "bg-slate-100 text-slate-800 border-slate-300");
+    let errBorder = (isError && !isTeacher) ? "border-red-600 shadow-red-200 border-2" : "";
     
     const widthClass = fullWidth ? "w-full justify-center" : "";
     const textClass = fullWidth ? "text-[10px] leading-tight truncate" : "text-[11px]";
@@ -401,7 +395,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
       <button 
         key={`pill-${id}-${Math.random()}`}
         onClick={() => setQuickFilterFamily(id)}
-        className={`inline-flex items-center gap-1 px-1.5 py-1 rounded-md border font-bold shadow-sm transition-all hover:opacity-80 active:scale-95 cursor-pointer ${styleClass} ${errBorder} ${widthClass} ${textClass}`}
+        className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border font-extrabold shadow-sm transition-all hover:opacity-80 active:scale-95 cursor-pointer ${styleClass} ${errBorder} ${widthClass} ${textClass}`}
         title={`Filtrer sur ${id}`}
       >
         {isTeacher ? <Users size={10} className="shrink-0" /> : null} 
@@ -598,12 +592,8 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
 
         {quickFilterFamily && (activeTab === 'cantine' || activeTab === 'menage') && (
           <div className="bg-indigo-50 border border-indigo-200 text-indigo-900 px-6 py-3 mb-4 rounded-xl flex justify-between items-center shadow-sm print:hidden animate-fade-in max-w-4xl mx-auto">
-            <span className="font-bold text-sm flex items-center gap-2">
-              <Search size={16} className="text-indigo-600"/> Filtre actif : <span className="uppercase text-indigo-600">{quickFilterFamily}</span>
-            </span>
-            <button onClick={() => setQuickFilterFamily(null)} className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 hover:bg-indigo-700 transition-colors shadow-sm">
-              <XCircle size={14} /> Annuler
-            </button>
+            <span className="font-bold text-sm flex items-center gap-2"><Search size={16} className="text-indigo-600"/> Filtre actif : <span className="uppercase text-indigo-600">{quickFilterFamily}</span></span>
+            <button onClick={() => setQuickFilterFamily(null)} className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 hover:bg-indigo-700 transition-colors shadow-sm"><XCircle size={14} /> Annuler</button>
           </div>
         )}
 
@@ -746,7 +736,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                     value={selectedFamilyFilter} onChange={(e) => setSelectedFamilyFilter(e.target.value)}
                   >
                     <option value="">Sélectionnez un nom...</option>
-                    <optgroup label="Familles">{familiesList.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</optgroup>
+                    <optgroup label="Familles">{familiesList.map(f => <option key={f.id} value={f.id}>{f.id}</option>)}</optgroup>
                     <optgroup label="Maîtresses"><option value="Mme GERARD">Mme GERARD</option><option value="Mme SUBLET">Mme SUBLET</option><option value="Mme HERVET">Mme HERVET</option></optgroup>
                   </select>
                 </div>
