@@ -63,7 +63,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     return `${y}-${m}-${day}`;
   }, []);
 
-  // --- L'ALGORITHME MAGIQUE ---
+  // --- L'ALGORITHME MAGIQUE (SÉCURISÉ & BLINDÉ) ---
   const data = useMemo(() => {
     const famsData = [
       { id: "BOCCA", type: "Ancien", days: [1, 5], isAsso: false },
@@ -126,6 +126,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     let fauvainRiobeThursdays = 0;
     let currentPeriodIdx = 0;
     let periodThursdaysDone = false;
+    let regularMenageCount = 0; // Compteur pour les ménages hors vacances
 
     while (currentDate <= endDate) {
       const dateStr = getDateStr(currentDate);
@@ -307,6 +308,17 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
             if(candidates.length === 0) candidates = famsData.filter(f => statsObj[f.id].menage < 4);
             if(candidates.length === 0) candidates = [...famsData]; 
           }
+
+          // RÈGLE SCELLÉE : Les 2 premiers ménages hors vacances réservés aux Anciens. Le LÉZEC exclu du 1er.
+          if (regularMenageCount < 2) {
+             let restricted = candidates.filter(f => f.type && f.type.startsWith("Ancien"));
+             if (regularMenageCount === 0) {
+                 restricted = restricted.filter(f => f.id !== "LE LÉZEC");
+             }
+             if (restricted.length > 0) {
+                 candidates = restricted;
+             }
+          }
           
           candidates.sort((a, b) => {
             let lastA = new Date(statsObj[a.id].lastMenage + "T12:00:00").getTime(); let lastB = new Date(statsObj[b.id].lastMenage + "T12:00:00").getTime();
@@ -329,6 +341,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
             statsObj[chosen].menage++; statsObj[chosen].total++; statsObj[chosen].lastMenage = dateStr;
             let nextSat = new Date(currentDate); nextSat.setDate(nextSat.getDate() + 1);
             menageArr.push({ date: getDateStr(nextSat), period: activeP.id, familyId: chosen, isVacances: false, label: "Ménage Hebdomadaire" });
+            regularMenageCount++;
           }
         }
       }
@@ -344,11 +357,12 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     fStats.push({ id: "Mme SUBLET", name: "Mme SUBLET", isTeacher: true, cantine: teaCantine("Mme SUBLET"), menage: 0, total: teaCantine("Mme SUBLET") });
     fStats.push({ id: "Mme HERVET", name: "Mme HERVET", isTeacher: true, cantine: teaCantine("Mme HERVET"), menage: 0, total: teaCantine("Mme HERVET") });
 
+    // SÉCURITÉ ANTI-ÉCRAN BLANC : Forcer String()
     fStats.sort((a, b) => {
       if (a.isTeacher && !b.isTeacher) return 1;
       if (!a.isTeacher && b.isTeacher) return -1;
       if (b.total !== a.total) return b.total - a.total;
-      return a.id.localeCompare(b.id);
+      return String(a.id).localeCompare(String(b.id));
     });
 
     return { familiesList: famsData, periodsInfo: perData, schedule: scheduleArr, menagesSchedule: menageArr, familyStats: fStats, holidays: holiData, vacances: vacData };
@@ -400,7 +414,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     "FAUVAIN": "bg-amber-100 text-amber-800 border-amber-300"
   };
 
-  const FamilyPill = ({ id, isOut = false, fullWidth = false }) => {
+  const renderFamilyPill = (id, isOut = false, fullWidth = false) => {
     if (!id || id === "ERREUR") return <span key={Math.random()} className={`text-red-500 text-xs italic bg-red-50 px-2 py-0.5 rounded border border-red-300 ${fullWidth ? 'w-full text-center block' : ''}`}>À définir</span>;
     
     let isTeacher = id.startsWith("Mme");
@@ -414,7 +428,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
       <button 
         key={`pill-${id}-${Math.random()}`}
         onClick={() => setQuickFilterFamily(id)}
-        className={`inline-flex items-center gap-1 px-1.5 py-1 rounded-md border font-extrabold shadow-sm transition-all hover:opacity-80 active:scale-95 cursor-pointer ${styleClass} ${errBorder} ${widthClass} ${textClass}`}
+        className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border font-extrabold shadow-sm transition-all hover:opacity-80 active:scale-95 cursor-pointer ${styleClass} ${errBorder} ${widthClass} ${textClass}`}
         title={isOut ? `⚠️ Jour non souhaité par ${id}` : `Filtrer sur ${id}`}
       >
         {isTeacher && <Users size={10} className="shrink-0" />} 
@@ -484,7 +498,6 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     document.body.appendChild(link); link.click(); document.body.removeChild(link);
   };
 
-  // --- CALENDRIER ANNUEL (VERSION 2 : SPÉCIALE IMPRESSION COMPACTE) ---
   const renderCalendarGrid = () => {
     const months = [
       { y: 2026, m: 8, name: 'Septembre' }, { y: 2026, m: 9, name: 'Octobre' }, { y: 2026, m: 10, name: 'Novembre' },
@@ -573,8 +586,8 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
             
             {cantineEvent && (
               <div className="flex flex-col gap-0.5 items-center w-full relative z-10">
-                {cantineEvent.p1 && <FamilyPill id={cantineEvent.p1} isOut={cantineEvent.p1IsOut} fullWidth={true} />}
-                {cantineEvent.p2 && <FamilyPill id={cantineEvent.p2} isOut={cantineEvent.p2IsOut} fullWidth={true} />}
+                {cantineEvent.p1 && renderFamilyPill(cantineEvent.p1, cantineEvent.p1IsOut, true)}
+                {cantineEvent.p2 && renderFamilyPill(cantineEvent.p2, cantineEvent.p2IsOut, true)}
               </div>
             )}
 
@@ -583,7 +596,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                 <span className="text-[9px] text-indigo-700 uppercase font-black flex items-center justify-center bg-indigo-100 border border-indigo-200 w-full py-0.5 rounded shadow-sm print:text-[8px]">
                    🧹 MÉNAGE
                 </span>
-                <FamilyPill id={menageEvent.familyId} isError={false} fullWidth={true} />
+                {renderFamilyPill(menageEvent.familyId, false, true)}
               </div>
             )}
           </div>
@@ -682,13 +695,10 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
 
   return (
     <div className="bg-transparent font-sans text-slate-800 animate-fade-in relative pb-10">
-      
-      {/* ⚠️ LA MAGIE DE L'IMPRESSION EST ICI */}
       <style>{`
         @media print {
           @page { size: landscape; margin: 3mm; }
           
-          /* DÉBLOQUE LE DÉFILEMENT POUR L'IMPRESSION GLOBALE */
           html, body, #root, main, .overflow-y-auto, .h-screen, .overflow-hidden, .custom-scrollbar { 
              height: auto !important; 
              max-height: none !important;
@@ -700,7 +710,6 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
           main { padding: 0 !important; margin: 0 !important; }
           body { background: white !important; }
           
-          /* OPTIMISATION DES CARTES CANTINE/MÉNAGE (3 COLONNES SANS COUPURE) */
           .print-cards-container {
              display: grid !important;
              grid-template-columns: repeat(3, 1fr) !important;
@@ -714,7 +723,6 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
              box-shadow: none !important;
           }
 
-          /* CALENDRIER GLOBAL : FORCÉ SUR UNE PAGE */
           .calendar-container { 
              overflow: visible !important; 
              width: 100% !important;
@@ -722,7 +730,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
           .calendar-grid { 
              min-width: 100% !important; 
              width: 100% !important; 
-             height: 95vh !important; /* Force le tableau à prendre 1 seule page max */
+             height: 95vh !important;
              grid-template-columns: 20px repeat(11, minmax(0, 1fr)) !important; 
              grid-template-rows: auto repeat(31, minmax(0, 1fr)) !important; 
           }
@@ -731,7 +739,6 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
              min-height: 0 !important; 
              page-break-inside: avoid !important;
           }
-          /* Réduit le texte pour que tout tienne */
           .calendar-grid * { line-height: 1 !important; }
           .calendar-grid button { padding: 1px !important; border-width: 0.5px !important; }
           .shadow-sm { box-shadow: none !important; }
@@ -794,10 +801,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                       </button>
                     ))}
                   </div>
-                  <button 
-                    onClick={() => setShowHistory(!showHistory)} 
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 shadow-sm"
-                  >
+                  <button onClick={() => setShowHistory(!showHistory)} className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 shadow-sm">
                     <Clock size={16} /> {showHistory ? "Masquer le passé" : "Afficher l'historique"}
                   </button>
                 </div>
@@ -823,11 +827,11 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                       <div className="space-y-2 mt-auto">
                         <div className="flex items-center justify-between bg-white p-2 rounded-lg border border-slate-100 shadow-sm">
                           <span className="text-[10px] uppercase font-bold text-slate-400">Famille</span>
-                          <FamilyPill id={row.p1} isOut={row.p1IsOut} />
+                          {renderFamilyPill(row.p1, row.p1IsOut)}
                         </div>
                         <div className="flex items-center justify-between bg-white p-2 rounded-lg border border-slate-100 shadow-sm">
                           <span className="text-[10px] uppercase font-bold text-slate-400">Famille</span>
-                          <FamilyPill id={row.p2} isOut={row.p2IsOut} />
+                          {renderFamilyPill(row.p2, row.p2IsOut)}
                         </div>
                       </div>
                     </div>
@@ -884,7 +888,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                       <div className="mt-auto bg-white/60 p-3 rounded-lg border border-slate-100/50 flex items-center justify-between">
                         <span className="text-xs font-semibold text-slate-500 uppercase">Resp.</span>
                         <div className="flex items-center gap-2">
-                          <FamilyPill id={row.familyId} />
+                          {renderFamilyPill(row.familyId)}
                           {isVac && <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded border border-amber-200 uppercase">Asso</span>}
                         </div>
                       </div>
@@ -944,7 +948,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                     value={selectedFamilyFilter} onChange={(e) => setSelectedFamilyFilter(e.target.value)}
                   >
                     <option value="">Sélectionnez un nom...</option>
-                    <optgroup label="Familles">{familiesList.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</optgroup>
+                    <optgroup label="Familles">{familiesList.map(f => <option key={f.id} value={f.id}>{f.id}</option>)}</optgroup>
                     <optgroup label="Maîtresses"><option value="Mme GERARD">Mme GERARD</option><option value="Mme SUBLET">Mme SUBLET</option><option value="Mme HERVET">Mme HERVET</option></optgroup>
                   </select>
                 </div>
@@ -984,7 +988,9 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                   <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><Sparkles className="text-slate-400" size={18}/> Ménage et Équité</h3>
                   <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
-                      <li>Un ménage est planifié chaque week-end de période scolaire.</li><li>Les 5 ménages des vacances sont réservés aux membres de l'association.</li>
+                      <li>Un ménage est planifié chaque week-end de période scolaire.</li>
+                      <li><strong>Règle Rentrée :</strong> Les 2 premiers week-ends sont exclusivement réalisés par des "Anciens" (Le Lézec exclu du tout premier).</li>
+                      <li>Les 5 ménages des vacances sont réservés aux membres de l'association.</li>
                   </ul>
               </div>
             </div>
