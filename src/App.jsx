@@ -63,7 +63,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     return `${y}-${m}-${day}`;
   }, []);
 
-  // --- L'ALGORITHME MAGIQUE ET RÈGLES SCELLÉES ---
+  // --- L'ALGORITHME MAGIQUE ---
   const data = useMemo(() => {
     const famsData = [
       { id: "BOCCA", type: "Ancien", days: [1, 5], isAsso: false },
@@ -248,6 +248,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
               if (fallback.length > 0) {
                 assigned.push(fallback[0].id);
                 statsObj[fallback[0].id].cantine++; statsObj[fallback[0].id].total++; statsObj[fallback[0].id].lastCantine = dateStr;
+                forcedError = true;
               }
             }
           }
@@ -413,7 +414,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
       <button 
         key={`pill-${id}-${Math.random()}`}
         onClick={() => setQuickFilterFamily(id)}
-        className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border font-extrabold shadow-sm transition-all hover:opacity-80 active:scale-95 cursor-pointer ${styleClass} ${errBorder} ${widthClass} ${textClass}`}
+        className={`inline-flex items-center gap-1 px-1.5 py-1 rounded-md border font-extrabold shadow-sm transition-all hover:opacity-80 active:scale-95 cursor-pointer ${styleClass} ${errBorder} ${widthClass} ${textClass}`}
         title={isOut ? `⚠️ Jour non souhaité par ${id}` : `Filtrer sur ${id}`}
       >
         {isTeacher && <Users size={10} className="shrink-0" />} 
@@ -483,7 +484,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     document.body.appendChild(link); link.click(); document.body.removeChild(link);
   };
 
-  // --- CALENDRIER ANNUEL HACHURÉ ET FUSIONNÉ ---
+  // --- CALENDRIER ANNUEL (VERSION 2 : SPÉCIALE IMPRESSION COMPACTE) ---
   const renderCalendarGrid = () => {
     const months = [
       { y: 2026, m: 8, name: 'Septembre' }, { y: 2026, m: 9, name: 'Octobre' }, { y: 2026, m: 10, name: 'Novembre' },
@@ -495,12 +496,11 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
 
     const cells = [];
 
-    // Coin vide haut gauche
     cells.push(<div key="tl" className="bg-slate-100 border-r border-b-2 border-slate-300 sticky top-0 z-20" style={{ gridColumn: 1, gridRow: 1 }}></div>);
 
     months.forEach((mo, idx) => {
       cells.push(
-        <div key={`header-${idx}`} className="bg-slate-100 font-bold text-center p-2 border-r border-b-2 border-slate-300 sticky top-0 z-10" style={{ gridColumn: idx + 2, gridRow: 1 }}>
+        <div key={`header-${idx}`} className="bg-slate-100 font-bold text-center p-2 border-r border-b-2 border-slate-300 sticky top-0 z-10 print:text-[10px] print:p-1" style={{ gridColumn: idx + 2, gridRow: 1 }}>
           {mo.name}
         </div>
       );
@@ -508,7 +508,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
 
     for (let day = 1; day <= 31; day++) {
       cells.push(
-        <div key={`day-${day}`} className="bg-slate-50 font-bold text-slate-500 border-r border-b border-slate-200 flex items-center justify-center text-xs sticky left-0 z-10" style={{ gridColumn: 1, gridRow: day + 1 }}>
+        <div key={`day-${day}`} className="bg-slate-50 font-bold text-slate-500 border-r border-b border-slate-200 flex items-center justify-center text-xs sticky left-0 z-10 print:text-[8px]" style={{ gridColumn: 1, gridRow: day + 1 }}>
           {day}
         </div>
       );
@@ -532,28 +532,24 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
         let cantineEvent = schedule.find(s => s.date === dateStr);
         let menageEvent = menagesSchedule.find(m => m.date === dateStr);
 
-        // Si dimanche, chercher le ménage du samedi précédent
         if (!menageEvent && dayWeek === 0) {
            let satDate = new Date(d);
            satDate.setDate(satDate.getDate() - 1);
            menageEvent = menagesSchedule.find(m => m.date === getLocalDateString(satDate));
         }
 
-        // Si on est dimanche (>1), le samedi précédent a déjà fusionné par dessus, on ne rend pas de cellule.
         if (dayWeek === 0 && day > 1 && menageEvent) {
            continue;
         }
 
         let rowSpan = 1;
-        // Fusion du Samedi sur le Dimanche (si le mois ne finit pas un samedi)
         if (menageEvent && dayWeek === 6 && day < daysInMonth) {
            rowSpan = 2;
         }
 
         let customStyle = { gridColumn: moIdx + 2, gridRow: `${day + 1} / span ${rowSpan}` };
-        let cellClass = "p-1.5 flex flex-col gap-1 border-r border-b border-slate-200 text-[9px] min-h-[45px] relative overflow-hidden ";
+        let cellClass = "p-1 flex flex-col gap-0.5 border-r border-b border-slate-200 text-[9px] min-h-[40px] relative overflow-hidden ";
 
-        // HACHURÉ SI JOUR TOTALEMENT VIDE
         if (!cantineEvent && !menageEvent && !isHoliday && !isWeekend) {
            customStyle.backgroundImage = 'repeating-linear-gradient(45deg, #ffffff, #ffffff 6px, #f1f5f9 6px, #f1f5f9 12px)';
         } else if (isHoliday) {
@@ -573,7 +569,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
 
         cells.push(
           <div key={`${mo.m}-${day}`} className={cellClass} style={customStyle}>
-            <div className="font-bold text-slate-400 mb-0.5 text-center bg-white/60 rounded px-1 w-fit mx-auto">{dayLabel}</div>
+            <div className="font-bold text-slate-400 mb-0.5 text-center bg-white/60 rounded px-1 w-fit mx-auto print:text-[8px]">{dayLabel}</div>
             
             {cantineEvent && (
               <div className="flex flex-col gap-0.5 items-center w-full relative z-10">
@@ -583,8 +579,8 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
             )}
 
             {menageEvent && (
-              <div className={`mt-auto pt-1 flex flex-col gap-1 items-center w-full relative z-10 ${rowSpan === 2 ? 'mb-auto' : ''}`}>
-                <span className="text-[10px] text-indigo-700 uppercase font-black flex items-center justify-center bg-indigo-100 border border-indigo-200 w-full py-1 rounded shadow-sm">
+              <div className={`mt-auto pt-0.5 flex flex-col gap-0.5 items-center w-full relative z-10 ${rowSpan === 2 ? 'mb-auto' : ''}`}>
+                <span className="text-[9px] text-indigo-700 uppercase font-black flex items-center justify-center bg-indigo-100 border border-indigo-200 w-full py-0.5 rounded shadow-sm print:text-[8px]">
                    🧹 MÉNAGE
                 </span>
                 <FamilyPill id={menageEvent.familyId} isError={false} fullWidth={true} />
@@ -596,8 +592,8 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     });
 
     return (
-      <div className="overflow-x-auto pb-10 calendar-container print:overflow-visible print:pb-0">
-        <div className="grid border-t border-l border-slate-200 min-w-[1200px] calendar-grid print:min-w-0 print:w-full" style={{ gridTemplateColumns: "30px repeat(11, minmax(0, 1fr))", gridTemplateRows: "auto repeat(31, minmax(45px, auto))" }}>
+      <div className="overflow-x-auto pb-10 calendar-container print:overflow-visible print:pb-0 print:w-full print:max-w-none">
+        <div className="grid border-t border-l border-slate-200 min-w-[1200px] calendar-grid print:min-w-0 print:w-full print:h-[95vh]" style={{ gridTemplateColumns: "25px repeat(11, minmax(0, 1fr))", gridTemplateRows: "auto repeat(31, minmax(0, 1fr))" }}>
           {cells}
         </div>
       </div>
@@ -686,11 +682,13 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
 
   return (
     <div className="bg-transparent font-sans text-slate-800 animate-fade-in relative pb-10">
+      
+      {/* ⚠️ LA MAGIE DE L'IMPRESSION EST ICI */}
       <style>{`
         @media print {
-          @page { size: landscape; margin: 5mm; }
+          @page { size: landscape; margin: 3mm; }
           
-          /* DÉBLOQUE LE SCROLL POUR L'IMPRESSION GLOBALE */
+          /* DÉBLOQUE LE DÉFILEMENT POUR L'IMPRESSION GLOBALE */
           html, body, #root, main, .overflow-y-auto, .h-screen, .overflow-hidden, .custom-scrollbar { 
              height: auto !important; 
              max-height: none !important;
@@ -698,15 +696,15 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
              position: static !important;
           }
           
-          aside, header, #main-nav, .print\\:hidden, button { display: none !important; }
+          aside, header, #main-nav, .print\\:hidden { display: none !important; }
           main { padding: 0 !important; margin: 0 !important; }
           body { background: white !important; }
           
-          /* OPTIMISATION DES CARTES POUR NE PAS LES COUPER */
+          /* OPTIMISATION DES CARTES CANTINE/MÉNAGE (3 COLONNES SANS COUPURE) */
           .print-cards-container {
              display: grid !important;
              grid-template-columns: repeat(3, 1fr) !important;
-             gap: 15px !important;
+             gap: 10px !important;
              width: 100% !important;
           }
           .print-cards-container > div {
@@ -716,7 +714,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
              box-shadow: none !important;
           }
 
-          /* CALENDRIER GLOBAL OPTIMISÉ SUR UNE PAGE */
+          /* CALENDRIER GLOBAL : FORCÉ SUR UNE PAGE */
           .calendar-container { 
              overflow: visible !important; 
              width: 100% !important;
@@ -724,15 +722,18 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
           .calendar-grid { 
              min-width: 100% !important; 
              width: 100% !important; 
-             grid-template-columns: 25px repeat(11, minmax(0, 1fr)) !important; 
-             zoom: 0.65; /* Force l'ajustement de la grille immense sur A4 */
+             height: 95vh !important; /* Force le tableau à prendre 1 seule page max */
+             grid-template-columns: 20px repeat(11, minmax(0, 1fr)) !important; 
+             grid-template-rows: auto repeat(31, minmax(0, 1fr)) !important; 
           }
           .calendar-grid > div { 
              padding: 1px !important; 
-             min-height: 25px !important; 
+             min-height: 0 !important; 
              page-break-inside: avoid !important;
           }
-          .calendar-grid * { line-height: 1.1 !important; }
+          /* Réduit le texte pour que tout tienne */
+          .calendar-grid * { line-height: 1 !important; }
+          .calendar-grid button { padding: 1px !important; border-width: 0.5px !important; }
           .shadow-sm { box-shadow: none !important; }
         }
       `}</style>
@@ -755,7 +756,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
               </button>
             )}
             <button onClick={() => window.print()} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg font-semibold text-sm transition shadow-sm flex items-center gap-2">
-              <Printer size={16} /> Imprimer (PDF)
+              <Printer size={16} /> Imprimer
             </button>
           </div>
         </header>
@@ -781,13 +782,10 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
         )}
 
         <div className="bg-transparent border-none">
-          
           {activeTab === 'cantine' && (
             <div className="animate-in fade-in duration-300">
               <div className="mb-8 text-center print:text-left">
-                <h2 className="text-2xl font-bold text-slate-800 flex items-center justify-center md:justify-start gap-3 mb-4">
-                  <Utensils className="text-blue-500" /> Planning de la Cantine
-                </h2>
+                <h2 className="text-2xl font-bold text-slate-800 flex items-center justify-center md:justify-start gap-3 mb-4"><Utensils className="text-blue-500" /> Planning de la Cantine</h2>
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6 print:hidden">
                   <div className="grid grid-cols-2 md:flex md:flex-wrap gap-2 bg-slate-100 p-2 rounded-xl w-full md:w-auto shadow-inner">
                     {periodsInfo.map(p => (
@@ -804,7 +802,6 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                   </button>
                 </div>
               </div>
-              
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 print-cards-container">
                 {displayedCantine.map((row, i) => {
                   let dayBg = "bg-white"; let dayBorder = "border-slate-200";
@@ -845,7 +842,6 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
             </div>
           )}
 
-          {/* TAB MENAGE */}
           {activeTab === 'menage' && (
             <div className="animate-in fade-in duration-300">
               <div className="mb-8 text-center print:text-left">
@@ -904,7 +900,6 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
             </div>
           )}
 
-          {/* TAB CALENDRIER */}
           {activeTab === 'calendrier' && (
             <div className="animate-in fade-in duration-300">
               <div className="text-center mb-6 print:text-left">
@@ -927,7 +922,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                   <tbody className="divide-y divide-slate-100">
                     {familyStats.map((stat, i) => (
                       <tr key={i} className="hover:bg-slate-50 transition">
-                        <td className="p-4 font-semibold text-slate-800"><FamilyPill id={stat.id} /></td>
+                        <td className="p-4 font-semibold text-slate-800">{renderFamilyPill(stat.id)}</td>
                         <td className="p-4 text-center text-blue-600 font-bold">{stat.cantine}</td><td className="p-4 text-center text-indigo-600 font-bold">{stat.menage}</td>
                         <td className="p-4 text-center"><span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-full font-bold border border-slate-200">{stat.total}</span></td>
                       </tr>
