@@ -63,7 +63,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     return `${y}-${m}-${day}`;
   }, []);
 
-  // --- L'ALGORITHME MAGIQUE ET LES RÈGLES MAÎTRESSES ---
+  // --- L'ALGORITHME MAGIQUE (Totalement scellé et protégé) ---
   const data = useMemo(() => {
     const famsData = [
       { id: "BOCCA", type: "Ancien", days: [1, 5], isAsso: false },
@@ -104,6 +104,15 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
       return `${year}-${month}-${day}`;
     }
 
+    // Fonction pour savoir si un parent n'est pas sur un jour demandé (Warning ⚠️)
+    const checkIsOut = (famId, dOw, dStr) => {
+      if (!famId || famId.startsWith("Mme")) return false;
+      const fam = famsData.find(f => f.id === famId);
+      if (!fam) return false;
+      if (fam.id === "LE LÉZEC" && fam.flexUntil && dStr <= fam.flexUntil) return false;
+      return !fam.days.includes(dOw);
+    };
+
     let scheduleArr = [];
     let menageArr = [];
     let statsObj = {};
@@ -115,7 +124,6 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     let currentDate = new Date(2026, 8, 3, 12, 0, 0); 
     const endDate = new Date(2027, 6, 3, 12, 0, 0);
     
-    let weekCount = 0; // Compteur de semaines pour l'alternance parfaite
     let fauvainRiobeThursdays = 0;
     let currentPeriodIdx = 0;
     let periodThursdaysDone = false;
@@ -123,11 +131,6 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     while (currentDate <= endDate) {
       const dateStr = getDateStr(currentDate);
       const dayOfWeek = currentDate.getDay();
-      
-      // On incrémente le compteur de semaines chaque lundi, à partir du 7 septembre
-      if (dayOfWeek === 1 && dateStr >= "2026-09-07") {
-        weekCount++;
-      }
       
       let pIdx = perData.findIndex(p => dateStr >= p.start && dateStr <= p.end);
       if (pIdx !== -1 && pIdx !== currentPeriodIdx) {
@@ -149,44 +152,53 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
 
       const isSchoolDayFlag = !holiData.includes(dateStr) && !isVacance && [1,2,4,5].includes(dayOfWeek);
 
+      // Calcul de la semaine d'alternance pour les maîtresses (Semaine A = pair, Semaine B = impair)
+      let weekIndex = -1;
+      if (dateStr >= "2026-09-07") {
+         const d1 = new Date(2026, 8, 7, 12, 0, 0);
+         const diffDays = Math.round((currentDate - d1) / (24 * 60 * 60 * 1000));
+         weekIndex = Math.floor(diffDays / 7);
+      }
+      const isGerardSubletWeek = weekIndex >= 0 && weekIndex % 2 === 0;
+      const isSubletHervetWeek = weekIndex >= 0 && weekIndex % 2 === 1;
+
       if (isSchoolDayFlag) {
-        let requiredParents = 2; let p1 = null; let p2 = null; let repasType = ""; let forcedError = false;
+        let requiredParents = 2; let p1 = null; let p2 = null; let repasType = "";
         const isInt1 = dateStr <= "2026-09-04"; const isInt2 = dateStr > "2026-09-04" && dateStr <= "2026-09-18";
 
-        // --- RÈGLES DES MAÎTRESSES ---
+        // --- RÈGLES DES MAÎTRESSES SCELLÉES ---
         if (dayOfWeek === 1) { 
           repasType = "Repas par classe"; 
         } 
         else if (dayOfWeek === 2) { 
           repasType = "Placement libre";
-          // Semaines impaires (1, 3, 5...) : SUBLET + GERARD
-          if (weekCount > 0 && weekCount % 2 !== 0) { 
-            requiredParents = 0; p1 = "Mme GERARD"; p2 = "Mme SUBLET"; 
-          } else { 
-            requiredParents = 1; p1 = "Mme GERARD"; 
-          }
+          if (isGerardSubletWeek) { requiredParents = 0; p1 = "Mme GERARD"; p2 = "Mme SUBLET"; } 
+          else { requiredParents = 2; }
         } 
         else if (dayOfWeek === 4) { 
           repasType = "Filles / Garçons"; 
         } 
         else if (dayOfWeek === 5) { 
-          repasType = "Par cordée"; 
-          // Semaines paires (2, 4, 6...) : SUBLET + HERVET
-          if (weekCount > 0 && weekCount % 2 === 0) { 
-            requiredParents = 0; p1 = "Mme SUBLET"; p2 = "Mme HERVET"; 
-          } else { 
-            requiredParents = 2; 
-          }
+          repasType = "Par cordée";
+          if (isSubletHervetWeek) { requiredParents = 0; p1 = "Mme SUBLET"; p2 = "Mme HERVET"; } 
+          else { requiredParents = 2; }
         }
 
         let assigned = [];
 
-        // RÈGLE SPÉCIALE : Échange BOCCA / TAISSIDRE-CARVALHO le 3 septembre
+        // RÈGLE SCELLÉE : Échange BOCCA / TAISSIDRE-CARVALHO le 3 septembre
         if (dateStr === "2026-09-03") {
           assigned = ["BOCCA", "TAISSIDRE-CARVALHO"];
           statsObj["BOCCA"].cantine++; statsObj["BOCCA"].total++; statsObj["BOCCA"].lastCantine = dateStr;
           statsObj["TAISSIDRE-CARVALHO"].cantine++; statsObj["TAISSIDRE-CARVALHO"].total++; statsObj["TAISSIDRE-CARVALHO"].lastCantine = dateStr;
+        }
+        // RÈGLE SCELLÉE : RIOBÉ / BEZIAT le 4 septembre
+        else if (dateStr === "2026-09-04") {
+          assigned = ["RIOBÉ", "BEZIAT"];
+          statsObj["RIOBÉ"].cantine++; statsObj["RIOBÉ"].total++; statsObj["RIOBÉ"].lastCantine = dateStr;
+          statsObj["BEZIAT"].cantine++; statsObj["BEZIAT"].total++; statsObj["BEZIAT"].lastCantine = dateStr;
         } 
+        // 4 Jeudis de FAUVAIN + RIOBÉ
         else if (dayOfWeek === 4 && fauvainRiobeThursdays < 4 && !periodThursdaysDone && currentPeriodIdx < 4) {
           assigned = ["RIOBÉ", "FAUVAIN"];
           fauvainRiobeThursdays++; periodThursdaysDone = true;
@@ -194,19 +206,11 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
           statsObj["FAUVAIN"].cantine++; statsObj["FAUVAIN"].total++; statsObj["FAUVAIN"].lastCantine = dateStr;
         } 
         else if (requiredParents > 0) {
-          
-          // RÈGLE SPÉCIALE : RIOBÉ forcé le vendredi 4 septembre
-          if (dateStr === "2026-09-04") {
-            assigned.push("RIOBÉ");
-            statsObj["RIOBÉ"].cantine++; statsObj["RIOBÉ"].total++; statsObj["RIOBÉ"].lastCantine = dateStr;
-          }
-
           for (let i = assigned.length; i < requiredParents; i++) {
             let available = famsData.filter(f => {
               if (assigned.includes(f.id)) return false;
               if (f.id === "FAUVAIN" && dayOfWeek === 4) return false; 
               if (f.id === "LE LÉZEC" && dateStr === "2026-10-12") return false; 
-              if (f.id === "BOCCA" && dateStr === "2026-09-04") return false; 
 
               let hasDay = f.days.includes(dayOfWeek);
               if (f.id === "LE LÉZEC" && f.flexUntil && dateStr <= f.flexUntil) hasDay = true;
@@ -250,7 +254,6 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
               if (fallback.length > 0) {
                 assigned.push(fallback[0].id);
                 statsObj[fallback[0].id].cantine++; statsObj[fallback[0].id].total++; statsObj[fallback[0].id].lastCantine = dateStr;
-                forcedError = true;
               }
             }
           }
@@ -261,7 +264,10 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
         else if (requiredParents === 1) { finalP1 = p1; finalP2 = assigned[0]; }
         else if (requiredParents === 0) { finalP1 = p1; finalP2 = p2; }
 
-        scheduleArr.push({ date: dateStr, period: activeP.id, dayOfWeek, p1: finalP1, p2: finalP2, repasType, isError: forcedError });
+        let p1Out = checkIsOut(finalP1, dayOfWeek, dateStr);
+        let p2Out = checkIsOut(finalP2, dayOfWeek, dateStr);
+
+        scheduleArr.push({ date: dateStr, period: activeP.id, dayOfWeek, p1: finalP1, p2: finalP2, repasType, p1IsOut: p1Out, p2IsOut: p2Out });
       }
 
       if (dayOfWeek === 5 && isSchoolDayFlag) {
@@ -276,7 +282,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
         if (isHolidayStart) {
           let eligibleAsso = famsData.filter(f => f.isAsso && statsObj[f.id].menage < 4);
           if (eligibleAsso.length === 0) eligibleAsso = famsData.filter(f => f.isAsso);
-          eligibleAsso.sort((a, b) => statsObj[a.id].total - statsObj[b.id].total || a.id.localeCompare(b.id));
+          eligibleAsso.sort((a, b) => statsObj[a.id].total - statsObj[b.id].total);
           
           if(eligibleAsso.length > 0) {
             let chosen = eligibleAsso[0].id;
@@ -326,7 +332,8 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
           if(candidates.length > 0) {
             let chosen = candidates[0].id;
             statsObj[chosen].menage++; statsObj[chosen].total++; statsObj[chosen].lastMenage = dateStr;
-            menageArr.push({ date: nextSatStr, period: activeP.id, familyId: chosen, isVacances: false, label: "Ménage Hebdomadaire" });
+            let nextSat = new Date(currentDate); nextSat.setDate(nextSat.getDate() + 1);
+            menageArr.push({ date: getDateStr(nextSat), period: activeP.id, familyId: chosen, isVacances: false, label: "Ménage Hebdomadaire" });
           }
         }
       }
@@ -390,20 +397,20 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     "GREPAT": "bg-indigo-100 text-indigo-800 border-indigo-300",
     "MELLIES": "bg-teal-100 text-teal-800 border-teal-300",
     "BOCCA": "bg-blue-100 text-blue-800 border-blue-300",
-    "BEZIAT": "bg-lime-200 text-lime-900 border-lime-400",
+    "BEZIAT": "bg-emerald-100 text-emerald-800 border-emerald-300",
     "DE LASTIC ST JAL": "bg-purple-100 text-purple-800 border-purple-300",
     "CHOMEL": "bg-red-100 text-red-800 border-red-300",
-    "CORNET-BOUBE": "bg-green-100 text-green-800 border-green-300",
+    "CORNET-BOUBE": "bg-lime-100 text-lime-800 border-lime-300",
     "RIOBÉ": "bg-orange-100 text-orange-800 border-orange-300",
     "FAUVAIN": "bg-amber-100 text-amber-800 border-amber-300"
   };
 
-  const renderFamilyPill = (id, isError = false, fullWidth = false) => {
+  const FamilyPill = ({ id, isOut = false, fullWidth = false }) => {
     if (!id || id === "ERREUR") return <span key={Math.random()} className={`text-red-500 text-xs italic bg-red-50 px-2 py-0.5 rounded border border-red-300 ${fullWidth ? 'w-full text-center block' : ''}`}>À définir</span>;
     
     let isTeacher = id.startsWith("Mme");
     let styleClass = isTeacher ? (teacherStyles[id] || "bg-slate-700 text-white") : (familyStyles[id] || "bg-slate-100 text-slate-800 border-slate-300");
-    let errBorder = (isError && !isTeacher) ? "border-red-600 shadow-red-200 border-2" : "border-transparent";
+    let errBorder = isOut ? "border-red-600 shadow-red-200 border-2" : "border-transparent";
     
     const widthClass = fullWidth ? "w-full justify-center" : "";
     const textClass = fullWidth ? "text-[10px] leading-tight truncate" : "text-[11px]";
@@ -413,9 +420,10 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
         key={`pill-${id}-${Math.random()}`}
         onClick={() => setQuickFilterFamily(id)}
         className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border font-extrabold shadow-sm transition-all hover:opacity-80 active:scale-95 cursor-pointer ${styleClass} ${errBorder} ${widthClass} ${textClass}`}
-        title={`Filtrer sur ${id}`}
+        title={isOut ? `⚠️ Jour non souhaité par ${id}` : `Filtrer sur ${id}`}
       >
-        {isTeacher ? <Users size={10} className="shrink-0" /> : null} 
+        {isTeacher && <Users size={10} className="shrink-0" />} 
+        {isOut && <AlertTriangle size={10} className="text-red-600 shrink-0" />} 
         <span className="truncate">{id}</span>
       </button>
     );
@@ -520,14 +528,14 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
             <div className="font-bold text-slate-400 mb-0.5 text-center">{dayNames[dayWeek]}</div>
             {cantineEvent && (
               <div className="flex flex-col gap-0.5 items-center w-full">
-                {cantineEvent.p1 && renderFamilyPill(cantineEvent.p1, cantineEvent.isError, true)}
-                {cantineEvent.p2 && renderFamilyPill(cantineEvent.p2, cantineEvent.isError, true)}
+                {cantineEvent.p1 && <FamilyPill id={cantineEvent.p1} isOut={cantineEvent.p1IsOut} fullWidth={true} />}
+                {cantineEvent.p2 && <FamilyPill id={cantineEvent.p2} isOut={cantineEvent.p2IsOut} fullWidth={true} />}
               </div>
             )}
             {menageEvent && (dayWeek === 6 || dayWeek === 0 || menageEvent.isVacances) && (
               <div className="mt-auto pt-0.5 border-t border-slate-100 flex flex-col gap-0.5 items-center w-full">
                 <span className="text-[8px] text-indigo-400 uppercase font-bold flex items-center justify-center"><Sparkles size={8} className="mr-0.5 shrink-0"/> Ménage</span>
-                {renderFamilyPill(menageEvent.familyId, false, true)}
+                <FamilyPill id={menageEvent.familyId} isOut={false} fullWidth={true} />
               </div>
             )}
           </div>
@@ -567,7 +575,10 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     const isTeacher = selectedFamilyFilter.startsWith("Mme");
     const famInfo = isTeacher ? { type: "Équipe Pédagogique", isAsso: false } : familiesList.find(f => f.id === selectedFamilyFilter);
     let allEvents = [
-        ...schedule.filter(s => s.p1 === selectedFamilyFilter || s.p2 === selectedFamilyFilter).map(s => ({ date: s.date, type: 'Cantine', details: s.repasType, isError: s.isError, period: s.period })),
+        ...schedule.filter(s => s.p1 === selectedFamilyFilter || s.p2 === selectedFamilyFilter).map(s => ({ 
+          date: s.date, type: 'Cantine', details: s.repasType, period: s.period, 
+          isOut: (s.p1 === selectedFamilyFilter && s.p1IsOut) || (s.p2 === selectedFamilyFilter && s.p2IsOut) 
+        })),
         ...menagesSchedule.filter(m => m.familyId === selectedFamilyFilter).map(m => ({ date: m.date, type: 'Ménage', details: m.label, isVacances: m.isVacances, period: m.period }))
     ].sort((a, b) => new Date(a.date+"T12:00:00") - new Date(b.date+"T12:00:00"));
 
@@ -575,7 +586,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
         <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
             <div className="flex items-center gap-4">
-              <div className="text-xl">{renderFamilyPill(selectedFamilyFilter)}</div>
+              <div className="text-xl"><FamilyPill id={selectedFamilyFilter} /></div>
               <div>
                 <div className="text-sm text-slate-500 font-bold uppercase tracking-wider">{famInfo ? famInfo.type : ''} {famInfo && famInfo.isAsso ? '• Membre Asso' : ''}</div>
                 <div className="text-slate-800 font-bold mt-1">Total : {allEvents.length} services</div>
@@ -614,7 +625,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                                     {isCantine ? <Utensils size={14} /> : (e.isVacances ? <CalendarDays size={14} /> : <Sparkles size={14} />)}
                                   </div>
                                   <div><strong className="text-slate-800 block">{e.type}</strong><span className="text-slate-500 text-xs">{e.details}</span></div>
-                                  {e.isError && !isTeacher && <span className="ml-2 inline-flex items-center gap-1 text-[10px] font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded uppercase tracking-wider border border-red-200 shadow-sm"><AlertCircle size={10}/> Jour forcé</span>}
+                                  {e.isOut && !isTeacher && <span className="ml-2 inline-flex items-center gap-1 text-[10px] font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded uppercase tracking-wider border border-red-300 shadow-sm"><AlertTriangle size={10}/> Dépannage (Hors dispo)</span>}
                               </div>
                           </td>
                         </tr>
@@ -685,12 +696,8 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
 
         {quickFilterFamily && (activeTab === 'cantine' || activeTab === 'menage') && (
           <div className="bg-indigo-50 border border-indigo-200 text-indigo-900 px-6 py-3 mb-4 rounded-xl flex justify-between items-center shadow-sm print:hidden animate-fade-in max-w-4xl mx-auto">
-            <span className="font-bold text-sm flex items-center gap-2">
-              <Search size={16} className="text-indigo-600"/> Filtre actif : <span className="uppercase text-indigo-600">{quickFilterFamily}</span>
-            </span>
-            <button onClick={() => setQuickFilterFamily(null)} className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 hover:bg-indigo-700 transition-colors shadow-sm">
-              <XCircle size={14} /> Annuler le filtre
-            </button>
+            <span className="font-bold text-sm flex items-center gap-2"><Search size={16} className="text-indigo-600"/> Filtre actif : <span className="uppercase text-indigo-600">{quickFilterFamily}</span></span>
+            <button onClick={() => setQuickFilterFamily(null)} className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 hover:bg-indigo-700 transition-colors shadow-sm"><XCircle size={14} /> Annuler le filtre</button>
           </div>
         )}
 
@@ -726,10 +733,10 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                       <div className="mt-2 mb-3"><span className="bg-white/80 text-slate-600 px-2 py-1 rounded border border-slate-100 text-xs font-semibold shadow-sm inline-block">{row.repasType}</span></div>
                       <div className="space-y-2 mt-auto">
                         <div className="flex items-center justify-between bg-white p-2 rounded-lg border border-slate-100 shadow-sm">
-                          <span className="text-[10px] uppercase font-bold text-slate-400">Famille</span>{renderFamilyPill(row.p1, row.isError)}
+                          <span className="text-[10px] uppercase font-bold text-slate-400">Famille</span><FamilyPill id={row.p1} isOut={row.p1IsOut} />
                         </div>
                         <div className="flex items-center justify-between bg-white p-2 rounded-lg border border-slate-100 shadow-sm">
-                          <span className="text-[10px] uppercase font-bold text-slate-400">Famille</span>{renderFamilyPill(row.p2, row.isError)}
+                          <span className="text-[10px] uppercase font-bold text-slate-400">Famille</span><FamilyPill id={row.p2} isOut={row.p2IsOut} />
                         </div>
                       </div>
                     </div>
@@ -775,7 +782,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                       </div>
                       <div className="mt-auto bg-white/60 p-3 rounded-lg border border-slate-100/50 flex items-center justify-between">
                         <span className="text-xs font-semibold text-slate-500 uppercase">Resp.</span>
-                        <div className="flex items-center gap-2">{renderFamilyPill(row.familyId)}{isVac && <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded border border-amber-200 uppercase">Asso</span>}</div>
+                        <div className="flex items-center gap-2"><FamilyPill id={row.familyId} />{isVac && <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded border border-amber-200 uppercase">Asso</span>}</div>
                       </div>
                     </div>
                   );
@@ -811,7 +818,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                   <tbody className="divide-y divide-slate-100">
                     {familyStats.map((stat, i) => (
                       <tr key={i} className="hover:bg-slate-50 transition">
-                        <td className="p-4 font-semibold text-slate-800">{renderFamilyPill(stat.id)}</td>
+                        <td className="p-4 font-semibold text-slate-800"><FamilyPill id={stat.id} /></td>
                         <td className="p-4 text-center text-blue-600 font-bold">{stat.cantine}</td><td className="p-4 text-center text-indigo-600 font-bold">{stat.menage}</td>
                         <td className="p-4 text-center"><span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-full font-bold border border-slate-200">{stat.total}</span></td>
                       </tr>
@@ -849,7 +856,10 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                   <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><Utensils className="text-slate-400" size={18}/> Jours de Cantine</h3>
                   <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
-                      <li><strong>Lundi :</strong> Repas par classe (2 parents)</li><li><strong>Mardi :</strong> Placement libre (Mme Gerard ou Mme Sublet + 1 parent)</li><li><strong>Jeudi :</strong> Filles/Garçons (2 parents)</li><li><strong>Vendredi :</strong> Par cordée (Mme Hervet / Mme Sublet 1 sem/2, sinon 2 parents)</li>
+                      <li><strong>Lundi :</strong> Repas par classe (2 parents)</li>
+                      <li><strong>Mardi :</strong> Alternance. Semaine 1 : Mme Gerard + Mme Sublet (0 parent). Semaine 2 : 2 parents.</li>
+                      <li><strong>Jeudi :</strong> Filles/Garçons (2 parents)</li>
+                      <li><strong>Vendredi :</strong> Par cordée. Alternance. Semaine 1 : 2 parents. Semaine 2 : Mme Sublet + Mme Hervet (0 parent).</li>
                   </ul>
               </div>
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
@@ -861,7 +871,8 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                   <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><AlertCircle className="text-slate-400" size={18}/> Cas Particuliers Strictes</h3>
                   <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
-                      <li><strong>Nouveaux :</strong> Ne sont jamais placés 2 jours d'affilée.</li><li><strong>Échange Septembre :</strong> BOCCA + TAISSIDRE-CARVALHO le 3 sept. RIOBÉ + 1 parent le 4 sept.</li><li><strong>FAUVAIN :</strong> Font 4 jeudis en duo avec RIOBÉ (1 par période).</li>
+                      <li><strong>Nouveaux :</strong> Ne sont jamais placés 2 jours d'affilée.</li><li><strong>Échange Septembre :</strong> BOCCA + TAISSIDRE-CARVALHO le 3 sept. RIOBÉ + BEZIAT le 4 sept.</li><li><strong>FAUVAIN :</strong> Font 4 jeudis en duo avec RIOBÉ (1 par période).</li>
+                      <li><strong className="text-rose-600 flex items-center gap-1"><AlertTriangle size={14}/> Icône d'alerte :</strong> Indique qu'une famille a été affectée sur un jour qu'elle n'avait pas coché dans ses disponibilités (ex: Dépannage).</li>
                   </ul>
               </div>
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
