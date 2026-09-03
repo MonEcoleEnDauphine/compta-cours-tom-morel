@@ -63,7 +63,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     return `${y}-${m}-${day}`;
   }, []);
 
-  // --- L'ALGORITHME MAGIQUE ---
+  // --- L'ALGORITHME MAGIQUE ET LES RÈGLES MAÎTRESSES ---
   const data = useMemo(() => {
     const famsData = [
       { id: "BOCCA", type: "Ancien", days: [1, 5], isAsso: false },
@@ -77,7 +77,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
       { id: "RIOBÉ", type: "Ancien", days: [1, 2, 4, 5], isAsso: false },
       { id: "TAISSIDRE-CARVALHO", type: "Ancien", days: [1], isAsso: false },
       { id: "BEZIAT", type: "Ancien", days: [1, 5], isAsso: true },
-      { id: "DE MALAUSSENE", type: "Ancien", days: [1], asso: true },
+      { id: "DE MALAUSSENE", type: "Ancien", days: [1], isAsso: true },
       { id: "FAUVAIN", type: "Ancien", days: [1, 2, 5], isAsso: true }, 
       { id: "LE LÉZEC", type: "Ancien flex", days: [1, 5], flexUntil: "2026-09-18", isAsso: true }
     ];
@@ -115,8 +115,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     let currentDate = new Date(2026, 8, 3, 12, 0, 0); 
     const endDate = new Date(2027, 6, 3, 12, 0, 0);
     
-    let maitresseMardi = "Mme GERARD";
-    let isHervetWeek = false; 
+    let weekCount = 0; // Compteur de semaines pour l'alternance parfaite
     let fauvainRiobeThursdays = 0;
     let currentPeriodIdx = 0;
     let periodThursdaysDone = false;
@@ -124,6 +123,11 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     while (currentDate <= endDate) {
       const dateStr = getDateStr(currentDate);
       const dayOfWeek = currentDate.getDay();
+      
+      // On incrémente le compteur de semaines chaque lundi, à partir du 7 septembre
+      if (dayOfWeek === 1 && dateStr >= "2026-09-07") {
+        weekCount++;
+      }
       
       let pIdx = perData.findIndex(p => dateStr >= p.start && dateStr <= p.end);
       if (pIdx !== -1 && pIdx !== currentPeriodIdx) {
@@ -149,21 +153,30 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
         let requiredParents = 2; let p1 = null; let p2 = null; let repasType = ""; let forcedError = false;
         const isInt1 = dateStr <= "2026-09-04"; const isInt2 = dateStr > "2026-09-04" && dateStr <= "2026-09-18";
 
+        // --- RÈGLES DES MAÎTRESSES ---
         if (dayOfWeek === 1) { 
           repasType = "Repas par classe"; 
         } 
         else if (dayOfWeek === 2) { 
-          repasType = "Placement libre"; requiredParents = 1; 
-          p1 = maitresseMardi; maitresseMardi = maitresseMardi === "Mme GERARD" ? "Mme SUBLET" : "Mme GERARD"; 
+          repasType = "Placement libre";
+          // Semaines impaires (1, 3, 5...) : SUBLET + GERARD
+          if (weekCount > 0 && weekCount % 2 !== 0) { 
+            requiredParents = 0; p1 = "Mme GERARD"; p2 = "Mme SUBLET"; 
+          } else { 
+            requiredParents = 1; p1 = "Mme GERARD"; 
+          }
         } 
         else if (dayOfWeek === 4) { 
           repasType = "Filles / Garçons"; 
         } 
         else if (dayOfWeek === 5) { 
           repasType = "Par cordée"; 
-          if (dateStr >= "2026-09-11") { isHervetWeek = !isHervetWeek; }
-          if (isHervetWeek) { requiredParents = 0; p1 = "Mme SUBLET"; p2 = "Mme HERVET"; } 
-          else { requiredParents = 2; }
+          // Semaines paires (2, 4, 6...) : SUBLET + HERVET
+          if (weekCount > 0 && weekCount % 2 === 0) { 
+            requiredParents = 0; p1 = "Mme SUBLET"; p2 = "Mme HERVET"; 
+          } else { 
+            requiredParents = 2; 
+          }
         }
 
         let assigned = [];
@@ -182,6 +195,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
         } 
         else if (requiredParents > 0) {
           
+          // RÈGLE SPÉCIALE : RIOBÉ forcé le vendredi 4 septembre
           if (dateStr === "2026-09-04") {
             assigned.push("RIOBÉ");
             statsObj["RIOBÉ"].cantine++; statsObj["RIOBÉ"].total++; statsObj["RIOBÉ"].lastCantine = dateStr;
@@ -361,9 +375,9 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
   };
 
   const teacherStyles = {
-    "Mme GERARD": "bg-slate-700 text-white border-slate-800",
-    "Mme SUBLET": "bg-slate-700 text-white border-slate-800",
-    "Mme HERVET": "bg-slate-700 text-white border-slate-800"
+    "Mme GERARD": "bg-slate-800 text-white border-slate-900",
+    "Mme SUBLET": "bg-neutral-800 text-white border-neutral-900",
+    "Mme HERVET": "bg-zinc-800 text-white border-zinc-900"
   };
 
   const familyStyles = {
@@ -376,10 +390,10 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     "GREPAT": "bg-indigo-100 text-indigo-800 border-indigo-300",
     "MELLIES": "bg-teal-100 text-teal-800 border-teal-300",
     "BOCCA": "bg-blue-100 text-blue-800 border-blue-300",
-    "BEZIAT": "bg-emerald-100 text-emerald-800 border-emerald-300",
+    "BEZIAT": "bg-lime-200 text-lime-900 border-lime-400",
     "DE LASTIC ST JAL": "bg-purple-100 text-purple-800 border-purple-300",
     "CHOMEL": "bg-red-100 text-red-800 border-red-300",
-    "CORNET-BOUBE": "bg-lime-100 text-lime-800 border-lime-300",
+    "CORNET-BOUBE": "bg-green-100 text-green-800 border-green-300",
     "RIOBÉ": "bg-orange-100 text-orange-800 border-orange-300",
     "FAUVAIN": "bg-amber-100 text-amber-800 border-amber-300"
   };
@@ -398,7 +412,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
       <button 
         key={`pill-${id}-${Math.random()}`}
         onClick={() => setQuickFilterFamily(id)}
-        className={`inline-flex items-center gap-1 px-1.5 py-1 rounded-md border font-extrabold shadow-sm transition-all hover:opacity-80 active:scale-95 cursor-pointer ${styleClass} ${errBorder} ${widthClass} ${textClass}`}
+        className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border font-extrabold shadow-sm transition-all hover:opacity-80 active:scale-95 cursor-pointer ${styleClass} ${errBorder} ${widthClass} ${textClass}`}
         title={`Filtrer sur ${id}`}
       >
         {isTeacher ? <Users size={10} className="shrink-0" /> : null} 
@@ -407,7 +421,6 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     );
   };
 
-  // --- MASQUAGE DU PASSÉ SI showHistory EST FAUX ---
   const displayedCantine = schedule.filter(s => 
     s.period === activePeriod && 
     (!quickFilterFamily || s.p1 === quickFilterFamily || s.p2 === quickFilterFamily) &&
@@ -420,7 +433,6 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     (showHistory || m.date >= todayStr)
   );
 
-  // --- EXPORT CSV COMPLET (Toute l'année d'un coup) ---
   const handleExportCSV = () => {
     let exportData = []; const headers = [];
 
@@ -620,7 +632,6 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
 
   return (
     <div className="bg-transparent font-sans text-slate-800 animate-fade-in relative pb-10">
-      
       <style>{`
         @media print {
           @page { size: landscape; margin: 5mm; }
@@ -654,7 +665,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
           <div className="flex gap-3">
             {activeTab !== 'regles' && activeTab !== 'calendrier' && (
               <button onClick={handleExportCSV} className="bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200 px-4 py-2 rounded-lg font-semibold text-sm transition flex items-center gap-2">
-                <Download size={16} /> Exporter (Toute l'année)
+                <Download size={16} /> Exporter l'année complète
               </button>
             )}
             <button onClick={() => window.print()} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg font-semibold text-sm transition shadow-sm flex items-center gap-2">
@@ -674,8 +685,12 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
 
         {quickFilterFamily && (activeTab === 'cantine' || activeTab === 'menage') && (
           <div className="bg-indigo-50 border border-indigo-200 text-indigo-900 px-6 py-3 mb-4 rounded-xl flex justify-between items-center shadow-sm print:hidden animate-fade-in max-w-4xl mx-auto">
-            <span className="font-bold text-sm flex items-center gap-2"><Search size={16} className="text-indigo-600"/> Filtre actif : <span className="uppercase text-indigo-600">{quickFilterFamily}</span></span>
-            <button onClick={() => setQuickFilterFamily(null)} className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 hover:bg-indigo-700 transition-colors shadow-sm"><XCircle size={14} /> Annuler le filtre</button>
+            <span className="font-bold text-sm flex items-center gap-2">
+              <Search size={16} className="text-indigo-600"/> Filtre actif : <span className="uppercase text-indigo-600">{quickFilterFamily}</span>
+            </span>
+            <button onClick={() => setQuickFilterFamily(null)} className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 hover:bg-indigo-700 transition-colors shadow-sm">
+              <XCircle size={14} /> Annuler le filtre
+            </button>
           </div>
         )}
 
@@ -818,76 +833,13 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
                     value={selectedFamilyFilter} onChange={(e) => setSelectedFamilyFilter(e.target.value)}
                   >
                     <option value="">Sélectionnez un nom...</option>
-                    <optgroup label="Familles">{familiesList.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</optgroup>
+                    <optgroup label="Familles">{familiesList.map(f => <option key={f.id} value={f.id}>{f.id}</option>)}</optgroup>
                     <optgroup label="Maîtresses"><option value="Mme GERARD">Mme GERARD</option><option value="Mme SUBLET">Mme SUBLET</option><option value="Mme HERVET">Mme HERVET</option></optgroup>
                   </select>
                 </div>
               </div>
               
-              {selectedFamilyFilter ? (() => {
-                const isTeacher = selectedFamilyFilter.startsWith("Mme");
-                const famInfo = isTeacher ? { type: "Équipe Pédagogique", isAsso: false } : familiesList.find(f => f.id === selectedFamilyFilter);
-                let allEvents = [
-                    ...schedule.filter(s => s.p1 === selectedFamilyFilter || s.p2 === selectedFamilyFilter).map(s => ({ date: s.date, type: 'Cantine', details: s.repasType, isError: s.isError, period: s.period })),
-                    ...menagesSchedule.filter(m => m.familyId === selectedFamilyFilter).map(m => ({ date: m.date, type: 'Ménage', details: m.label, isVacances: m.isVacances, period: m.period }))
-                ].sort((a, b) => new Date(a.date) - new Date(b.date));
-
-                return (
-                  <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-                    <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                        <div className="flex items-center gap-4"><div className="text-xl">{renderFamilyPill(selectedFamilyFilter)}</div><div><div className="text-sm text-slate-500 font-bold uppercase tracking-wider">{famInfo ? famInfo.type : ''} {famInfo && famInfo.isAsso ? '• Membre Asso' : ''}</div><div className="text-slate-800 font-bold mt-1">Total : {allEvents.length} services</div></div></div>
-                    </div>
-                    <div className="p-0">
-                      {allEvents.length === 0 ? <div className="p-8 text-center text-slate-500">Aucun service planifié.</div> : (
-                        <table className="w-full text-left text-sm">
-                          <thead className="bg-slate-50 text-slate-500 text-[11px] font-bold uppercase tracking-wider">
-                              <tr><th className="p-4 border-b border-slate-200">Date</th><th className="p-4 border-b border-slate-200">Type de service</th></tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                            {(() => {
-                              let currentP = 0;
-                              return allEvents.map((e, idx) => {
-                                let pHeader = null;
-                                if (e.period !== currentP) {
-                                  currentP = e.period;
-                                  let pName = periodsInfo.find(p=>p.id===currentP)?.name || 'Période inconnue';
-                                  pHeader = <tr key={`ph-${idx}`}><td colSpan="2" className="bg-slate-100 px-6 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider">{pName}</td></tr>;
-                                }
-                                const isCantine = e.type === 'Cantine';
-                                const iconClass = isCantine ? 'text-blue-500 bg-blue-100' : (e.isVacances ? 'text-amber-500 bg-amber-100' : 'text-indigo-500 bg-indigo-100');
-                                const IconTag = isCantine ? Utensils : (e.isVacances ? CalendarDays : Sparkles);
-                                const dateDisplay = (e.type === 'Ménage' && !e.isVacances) ? formatMenageDate(e.date) : formatDate(e.date);
-
-                                return (
-                                  <React.Fragment key={`frag-${idx}`}>
-                                    {pHeader}
-                                    <tr className="hover:bg-slate-50 transition-colors">
-                                      <td className="p-4 font-semibold text-slate-700 whitespace-nowrap capitalize">{dateDisplay}</td>
-                                      <td className="p-4">
-                                          <div className="flex flex-wrap items-center gap-3">
-                                              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${iconClass}`}><IconTag size={14} /></div>
-                                              <div><strong className="text-slate-800 block">{e.type}</strong><span className="text-slate-500 text-xs">{e.details}</span></div>
-                                              {e.isError && !isTeacher && <span className="ml-2 inline-flex items-center gap-1 text-[10px] font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded uppercase tracking-wider border border-red-200 shadow-sm"><AlertCircle size={10}/> Jour forcé</span>}
-                                          </div>
-                                      </td>
-                                    </tr>
-                                  </React.Fragment>
-                                );
-                              });
-                            })()}
-                          </tbody>
-                        </table>
-                      )}
-                    </div>
-                  </div>
-                );
-              })() : (
-                <div className="p-16 text-center text-slate-400 flex flex-col items-center bg-white rounded-2xl border border-slate-200 print:hidden">
-                  <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4 border border-slate-200"><Search size={32} className="text-slate-300" /></div>
-                  <h3 className="text-lg font-bold text-slate-700 mb-2">Recherche Individuelle</h3>
-                  <p>Sélectionnez un nom ci-dessus pour afficher son calendrier personnel.</p>
-                </div>
-              )}
+              {renderFamilyTab()}
             </div>
           )}
 
@@ -909,7 +861,7 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                   <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><AlertCircle className="text-slate-400" size={18}/> Cas Particuliers Strictes</h3>
                   <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
-                      <li><strong>Nouveaux :</strong> Ne sont jamais placés 2 jours d'affilée.</li><li><strong>RIOBÉ & FAUVAIN :</strong> Font 4 jeudis en duo (1 par période sur les 4 premières périodes).</li>
+                      <li><strong>Nouveaux :</strong> Ne sont jamais placés 2 jours d'affilée.</li><li><strong>Échange Septembre :</strong> BOCCA + TAISSIDRE-CARVALHO le 3 sept. RIOBÉ + 1 parent le 4 sept.</li><li><strong>FAUVAIN :</strong> Font 4 jeudis en duo avec RIOBÉ (1 par période).</li>
                   </ul>
               </div>
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
