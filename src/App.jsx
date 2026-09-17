@@ -73,7 +73,7 @@ const AccueilFamille = () => {
     { nom: "Laurence Gérard", role: "Direction", img: "https://ui-avatars.com/api/?name=Laurence+Gérard&background=4f46e5&color=fff&size=128" },
     { nom: "Cécile Sublet", role: "Enseignante", img: "https://ui-avatars.com/api/?name=Cécile+Sublet&background=0ea5e9&color=fff&size=128" },
     { nom: "Florence Hervet", role: "Enseignante", img: "https://ui-avatars.com/api/?name=Florence+ Hervet&background=10b981&color=fff&size=128" },
-    { nom: "Laurent Fauvain", role: "Président Asso.", img: "https://ui-avatars.com/api/?name=Laurent+Fauvain&background=8b5cf6&color=fff&size=128" },
+    { nom: "Luc Fauvain", role: "Président Asso.", img: "https://ui-avatars.com/api/?name=Laurent+Fauvain&background=8b5cf6&color=fff&size=128" },
     { nom: "Louis-Vianney Le Lézec", role: "Trésorier", img: "https://ui-avatars.com/api/?name=Le+Lezec&background=f59e0b&color=fff&size=128" },
   ];
 
@@ -289,7 +289,7 @@ const InfosContact = () => (
           <Globe size={24} />
         </div>
         <h3 className="text-lg font-bold text-slate-800 mb-1">Le Cours Tom Morel</h3>
-        <p className="text-blue-500 text-sm mb-6">24 rue de la Chapelle, Saint-Chef</p>
+        <p className="text-blue-500 text-sm mb-6">24, rue de la Chapelle 38890 Saint-Chef-en-Dauphiné</p>
         <div className="flex-1"></div>
         <a href="https://sites.google.com/view/courstommorel/cours-tom-morel" target="_blank" rel="noreferrer" className="w-full inline-flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-600 px-4 py-2.5 rounded-lg transition-colors font-medium text-sm">
           <Globe size={18} /> Visiter le site
