@@ -2340,19 +2340,9 @@ const SearchableCompteSelect = ({ value, onChange, comptesList, placeholder = "S
 
 // --- GRAND LIVRE (Import CSV/XLSX, OD, Validations) ---
 const GrandLivre = ({ transactionsGlobales }) => {
-  // Liste des projets pour l'analytique
-  const LISTE_PROJETS = [
-    "Kermesse", 
-    "Marché de Noël", 
-    "Loto", 
-    "Spectacle de fin d'année", 
-    "Bourse aux vêtements",
-    "Sortie Scolaire",
-    "Autre"
-  ];
-
   const [lignesEnAttente, setLignesEnAttente] = useState([]);
   const [comptesList, setComptesList] = useState([]);
+  const [projetsList, setProjetsList] = useState([]); 
   const [editingRowId, setEditingRowId] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [lastImportBatch, setLastImportBatch] = useState(null);
@@ -2360,17 +2350,24 @@ const GrandLivre = ({ transactionsGlobales }) => {
   const [selectedTxForPdf, setSelectedTxForPdf] = useState(null);
   const fileInputPdfRef = useRef(null);
 
+  // Modales
   const [showCompteModal, setShowCompteModal] = useState(false);
   const [pendingCompte, setPendingCompte] = useState({ code: '', libelle: '', lineId: null });
+  
+  const [showProjetModal, setShowProjetModal] = useState(false);
+  const [nouveauProjet, setNouveauProjet] = useState('');
 
   const [activeTab, setActiveTab] = useState(null);
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetAnnee, setResetAnnee] = useState('TOTAL');
 
+  // NOUVEAU: Masquer/Afficher les colonnes techniques
+  const [showAdvancedCols, setShowAdvancedCols] = useState(false);
+
   const [odFormDate, setOdFormDate] = useState('');
   const [odFormLibelle, setOdFormLibelle] = useState('');
   const [odFormCommentaire, setOdFormCommentaire] = useState('');
-  const [odFormProjet, setOdFormProjet] = useState(''); // Nouveau state pour le projet
+  const [odFormProjet, setOdFormProjet] = useState('');
   const [odLines, setOdLines] = useState([
     { id: 1, compte: '', debit: '', credit: '' },
     { id: 2, compte: '', debit: '', credit: '' }
@@ -2387,16 +2384,23 @@ const GrandLivre = ({ transactionsGlobales }) => {
   const fileInputODRef = useRef(null);
 
   useEffect(() => {
-    const q = collection(db, 'artifacts', appId, 'public', 'data', 'comptes');
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const qComptes = collection(db, 'artifacts', appId, 'public', 'data', 'comptes');
+    const unsubComptes = onSnapshot(qComptes, (snapshot) => {
       const liste = [];
-      snapshot.forEach((doc) => {
-        liste.push({ id: doc.id, ...doc.data() });
-      });
+      snapshot.forEach((doc) => { liste.push({ id: doc.id, ...doc.data() }); });
       liste.sort((a, b) => String(a.code || '').localeCompare(String(b.code || '')));
       setComptesList(liste);
     });
-    return () => unsubscribe();
+
+    const qProjets = collection(db, 'artifacts', appId, 'public', 'data', 'projets');
+    const unsubProjets = onSnapshot(qProjets, (snapshot) => {
+      const liste = [];
+      snapshot.forEach((doc) => { liste.push({ id: doc.id, ...doc.data() }); });
+      liste.sort((a, b) => String(a.nom || '').localeCompare(String(b.nom || '')));
+      setProjetsList(liste);
+    });
+
+    return () => { unsubComptes(); unsubProjets(); };
   }, []);
 
   const getClasseLabel = (code) => {
@@ -2510,6 +2514,19 @@ const GrandLivre = ({ transactionsGlobales }) => {
       setPendingCompte({ code: '', libelle: '', lineId: null });
     } catch (e) {
       alert("Erreur lors de la création du compte.");
+    }
+  };
+
+  const handleSaveProjet = async () => {
+    if (!nouveauProjet.trim()) return;
+    try {
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'projets'), {
+        nom: nouveauProjet.trim()
+      });
+      setShowProjetModal(false);
+      setNouveauProjet('');
+    } catch (e) {
+      alert("Erreur lors de la création du projet.");
     }
   };
 
@@ -2734,7 +2751,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
               reference: cols[2] ? String(cols[2]) : '', 
               typeOp: cols[4] ? String(cols[4]) : '',
               commentaire: '',
-              projet: '', // Initialise le champ projet
+              projet: '', 
               montant: mt,
               comptePropose: devinerCompte(libelleExtrait),
               statut: 'attente'
@@ -3025,7 +3042,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
             compteDebit: debit > 0 ? line.compte : '',
             compteCredit: credit > 0 ? line.compte : '',
             typeOp: 'OD',
-            projet: odFormProjet, // On ajoute le projet ici
+            projet: odFormProjet, 
             commentaire: odFormCommentaire,
             date_creation: new Date().toISOString()
           };
@@ -3035,7 +3052,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
       setOdFormDate('');
       setOdFormLibelle('');
       setOdFormCommentaire('');
-      setOdFormProjet(''); // On vide le projet
+      setOdFormProjet(''); 
       setOdLines([{ id: 1, compte: '', debit: '', credit: '' }, { id: 2, compte: '', debit: '', credit: '' }]);
       alert("OD enregistrée et ventilée avec succès !");
       setActiveTab(null);
@@ -3238,7 +3255,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
       <input type="file" accept=".txt,.tsv" className="hidden" ref={fileInputPaieRef} onChange={handleImportPaie} />
       <input type="file" accept=".csv,.xlsx" className="hidden" ref={fileInputODRef} onChange={handleImportODMass} />
 
-      {/* MODAL CRÉATION DE COMPTE */}
+      {/* MODAL CRÉATION DE NOUVEAU COMPTE */}
       {showCompteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
           <div className="bg-white rounded-3xl shadow-2xl border border-purple-100 w-full max-w-md overflow-hidden transition-all scale-100">
@@ -3278,6 +3295,42 @@ const GrandLivre = ({ transactionsGlobales }) => {
               <button onClick={() => setShowCompteModal(false)} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-200/60 transition-colors">Annuler</button>
               <button onClick={handleSaveNewCompteFromModal} disabled={pendingCompte.code.length < 6 || !pendingCompte.libelle.trim()} className={`px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all flex items-center gap-2 ${pendingCompte.code.length >= 6 && pendingCompte.libelle.trim() ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-purple-200 cursor-pointer' : 'bg-purple-300 cursor-not-allowed shadow-none'}`}>
                 <CheckCircle2 size={16} /> Créer & Affecter
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CRÉATION DE NOUVEAU PROJET ANALYTIQUE */}
+      {showProjetModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl border border-indigo-100 w-full max-w-md overflow-hidden transition-all scale-100">
+            <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 p-6 text-white flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 backdrop-blur-md rounded-2xl">
+                  <Target size={22} className="text-indigo-200" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg leading-tight">Nouveau Projet</h3>
+                  <p className="text-indigo-200 text-xs mt-0.5">Ajouter un axe analytique (Événements...)</p>
+                </div>
+              </div>
+              <button onClick={() => setShowProjetModal(false)} className="text-white/70 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-colors">
+                <XCircle size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Nom du projet</label>
+                <input type="text" value={nouveauProjet} onChange={e => setNouveauProjet(e.target.value)} className="w-full border border-slate-200 rounded-2xl p-3 text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-600 bg-slate-50/50" placeholder="ex: Kermesse 2026" autoFocus onKeyDown={e => { if(e.key === 'Enter') handleSaveProjet(); }} />
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50/80 border-t border-slate-100 flex justify-end gap-3">
+              <button onClick={() => setShowProjetModal(false)} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-200/60 transition-colors">Annuler</button>
+              <button onClick={handleSaveProjet} disabled={!nouveauProjet.trim()} className={`px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all flex items-center gap-2 ${nouveauProjet.trim() ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 cursor-pointer' : 'bg-indigo-300 cursor-not-allowed shadow-none'}`}>
+                <CheckCircle2 size={16} /> Créer le projet
               </button>
             </div>
           </div>
@@ -3481,7 +3534,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
                   <div className="flex gap-3 mt-1">
                     <select value={odFormProjet} onChange={e => setOdFormProjet(e.target.value)} className="w-1/3 border border-slate-200 rounded-xl p-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-purple-600 shadow-sm text-slate-600 font-medium cursor-pointer">
                       <option value="">-- Aucun projet (Optionnel) --</option>
-                      {LISTE_PROJETS.map(p => <option key={p} value={p}>{p}</option>)}
+                      {projetsList.map(p => <option key={`od-${p.id}`} value={p.nom}>{p.nom}</option>)}
                     </select>
                     <input type="text" placeholder="Commentaire ou référence optionnelle..." value={odFormCommentaire} onChange={e => setOdFormCommentaire(e.target.value)} className="flex-1 border border-slate-200 rounded-xl p-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-purple-600 shadow-sm" />
                   </div>
@@ -3579,7 +3632,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
                       <div className="flex flex-col gap-1.5">
                         <select value={ligne.projet || ''} onChange={(e) => { const val = e.target.value; setLignesEnAttente(prev => prev.map(l => l.id === ligne.id ? { ...l, projet: val } : l)); }} className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px] w-full outline-none focus:border-indigo-500 bg-white text-slate-600 cursor-pointer shadow-sm">
                           <option value="">Aucun projet</option>
-                          {LISTE_PROJETS.map(p => <option key={p} value={p}>{p}</option>)}
+                          {projetsList.map(p => <option key={`sas-${p.id}`} value={p.nom}>{p.nom}</option>)}
                         </select>
                         <input type="text" placeholder="Ajouter un commentaire..." value={ligne.commentaire || ''} onChange={(e) => { const val = e.target.value; setLignesEnAttente(prev => prev.map(l => l.id === ligne.id ? { ...l, commentaire: val } : l)); }} className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px] w-full outline-none focus:border-indigo-500 bg-slate-50/50 shadow-inner" />
                       </div>
@@ -3634,6 +3687,10 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
             
+            <button onClick={() => setShowProjetModal(true)} className="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-2 active:scale-95" title="Créer un nouveau projet analytique">
+              <PlusCircle size={14} /> Nouveau Projet
+            </button>
+
             {/* NOUVEAU BOUTON : EXPORT CSV */}
             <button onClick={handleExportCSV} className="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-2 active:scale-95" title="Exporter le tableau actuel sur Excel (CSV)">
               <Download size={14} /> Exporter (.csv)
@@ -3642,6 +3699,11 @@ const GrandLivre = ({ transactionsGlobales }) => {
             {/* BOUTON D'OUVERTURE DE LA MODALE DE SUPPRESSION SÉLECTIVE */}
             <button onClick={() => setShowResetModal(true)} className="text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-2 active:scale-95" title="Vider le Grand Livre de manière sélective">
               <Trash2 size={14} /> Vider le Grand Livre (Filtre)
+            </button>
+
+            {/* BOUTON AFFICHER/MASQUER COLONNES TECHNIQUES */}
+            <button onClick={() => setShowAdvancedCols(!showAdvancedCols)} className={`text-xs px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-2 active:scale-95 ${showAdvancedCols ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'}`} title="Afficher ou masquer les colonnes techniques (ID, Référence, Type d'opération)">
+              <Menu size={14} /> {showAdvancedCols ? "Masquer détails" : "Plus de détails"}
             </button>
 
             <select 
@@ -3694,17 +3756,19 @@ const GrandLivre = ({ transactionsGlobales }) => {
                 <th className="py-3.5 px-4 cursor-pointer hover:bg-slate-200/50 transition-colors whitespace-nowrap" onClick={() => handleSort('date')}>
                   <div className="flex items-center gap-1">Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
                 </th>
-                <th className="py-3.5 px-3 text-slate-400">ID</th>
+                
+                {showAdvancedCols && <th className="py-3.5 px-3 text-slate-400">ID</th>}
+                
                 <th className="py-3.5 px-3 cursor-pointer hover:bg-slate-200/50 transition-colors" onClick={() => handleSort('source')}>
                   <div className="flex items-center gap-1">Source {sortConfig.key === 'source' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
                 </th>
                 <th className="py-3.5 px-4 cursor-pointer hover:bg-slate-200/50 transition-colors min-w-[220px]" onClick={() => handleSort('libelle')}>
                   <div className="flex items-center gap-1">Libellé {sortConfig.key === 'libelle' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
                 </th>
-                <th className="py-3.5 px-3 text-slate-400 min-w-[140px]">Référence</th>
-                <th className="py-3.5 px-3 text-slate-400">Type Op.</th>
                 
-                {/* NOUVELLE COLONNE PROJET */}
+                {showAdvancedCols && <th className="py-3.5 px-3 text-slate-400 min-w-[140px]">Référence</th>}
+                {showAdvancedCols && <th className="py-3.5 px-3 text-slate-400">Type Op.</th>}
+                
                 <th className="py-3.5 px-4 cursor-pointer hover:bg-slate-200/50 transition-colors" onClick={() => handleSort('projet')}>
                   <div className="flex items-center gap-1 text-indigo-500">Projet {sortConfig.key === 'projet' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
                 </th>
@@ -3742,18 +3806,21 @@ const GrandLivre = ({ transactionsGlobales }) => {
                 return (
                   <tr key={t.id} className="hover:bg-slate-50/80 transition-colors group">
                     <td className="py-3.5 px-4 font-mono font-semibold text-slate-600 whitespace-nowrap">{normaliserDateFR(t.date)}</td>
-                    <td className="py-3.5 px-3 text-slate-400 font-mono text-[10px]" title={t.id}>{t.id.substring(0, 6)}...</td>
+                    
+                    {showAdvancedCols && <td className="py-3.5 px-3 text-slate-400 font-mono text-[10px]" title={t.id}>{t.id.substring(0, 6)}...</td>}
+                    
                     <td className="py-3.5 px-3"><span className={`px-2.5 py-1 rounded-full border text-[10px] font-extrabold uppercase tracking-wider whitespace-nowrap ${sourceColor}`}>{sourceLabel}</span></td>
                     <td className="py-3.5 px-4 text-slate-800 font-semibold whitespace-normal max-w-xs leading-snug">{t.libelle}</td>
-                    <td className="py-3.5 px-3 text-slate-500 text-xs whitespace-normal max-w-[140px]">{t.reference || <span className="text-slate-300 italic">-</span>}</td>
-                    <td className="py-3.5 px-3 text-slate-500 text-xs whitespace-nowrap">{t.typeOp || <span className="text-slate-300 italic">-</span>}</td>
+                    
+                    {showAdvancedCols && <td className="py-3.5 px-3 text-slate-500 text-xs whitespace-normal max-w-[140px]">{t.reference || <span className="text-slate-300 italic">-</span>}</td>}
+                    {showAdvancedCols && <td className="py-3.5 px-3 text-slate-500 text-xs whitespace-nowrap">{t.typeOp || <span className="text-slate-300 italic">-</span>}</td>}
                     
                     {/* CELLULE PROJET AVEC ÉDITION RAPIDE */}
                     <td className="py-3.5 px-4 text-indigo-700 text-[11px] font-bold whitespace-nowrap">
                       {editingRowId === t.id ? (
                         <select value={t.projet || ''} onChange={(e) => handleUpdateField(t.id, e.target.value, 'projet')} className="border border-indigo-300 rounded-lg p-1.5 text-xs bg-indigo-50/50 w-full outline-none text-slate-600 cursor-pointer">
                           <option value="">-- Aucun --</option>
-                          {LISTE_PROJETS.map(p => <option key={`tbl-${p}`} value={p}>{p}</option>)}
+                          {projetsList.map(p => <option key={`tbl-${p.id}`} value={p.nom}>{p.nom}</option>)}
                         </select>
                       ) : ( 
                         t.projet ? <span className="bg-indigo-50 border border-indigo-100 px-2 py-1 rounded-md">{t.projet}</span> : <span className="text-slate-300 italic font-normal">-</span> 
@@ -3825,7 +3892,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
               })}
               {filteredAndSortedTransactions.length === 0 && (
                 <tr>
-                  <td colSpan="12" className="py-16 text-center bg-slate-50/40">
+                  <td colSpan={showAdvancedCols ? 12 : 9} className="py-16 text-center bg-slate-50/40">
                     <div className="flex flex-col items-center justify-center max-w-sm mx-auto space-y-3">
                       <div className="p-4 bg-slate-100 text-slate-400 rounded-3xl"><BookOpen size={32} /></div>
                       <h4 className="font-bold text-slate-700 text-base">Aucune écriture au Grand Livre</h4>
