@@ -4764,6 +4764,59 @@ const AccueilFamille = () => {
   );
 };
 
+// --- MODULE : VIE DE L'ÉCOLE ---
+const VieEcole = () => (
+  <div className="space-y-6 max-w-6xl mx-auto pb-10 font-sans animate-fade-in">
+    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mt-6">
+      <div>
+        <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+          <Newspaper className="text-indigo-600" /> Vie de l'école
+        </h2>
+        <p className="text-slate-500 text-sm mt-1">Retrouvez les dernières lettres aux parents, les photos et les actualités des classes.</p>
+      </div>
+    </div>
+
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Lettres aux parents */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+         <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
+          <FileText className="text-blue-500" size={20} /> Lettres aux parents
+         </h3>
+         <div className="space-y-3">
+           <div className="flex justify-between items-center p-3 hover:bg-slate-50 rounded-xl border border-slate-100 transition-colors cursor-pointer group">
+             <div className="flex items-center gap-3">
+               <div className="bg-blue-100 text-blue-600 p-2 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors"><FileText size={16} /></div>
+               <div>
+                 <p className="font-bold text-sm text-slate-700">Lettre de rentrée - Période 1</p>
+                 <p className="text-[10px] text-slate-400">Exemple de document</p>
+               </div>
+             </div>
+             <Download size={16} className="text-slate-400 group-hover:text-blue-600 transition-colors" />
+           </div>
+           <div className="text-center mt-4">
+             <p className="text-xs text-slate-400 italic">Espace d'administration à venir pour déposer vos PDF...</p>
+           </div>
+         </div>
+      </div>
+
+      {/* Photos */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+         <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
+          <Camera className="text-emerald-500" size={20} /> Galerie Photos
+         </h3>
+         <div className="grid grid-cols-2 gap-3">
+           <div className="aspect-video bg-slate-50 rounded-xl flex items-center justify-center border border-slate-200 border-dashed hover:bg-slate-100 cursor-pointer transition-colors">
+             <span className="text-xs text-slate-400 font-medium text-center px-2">Sortie Forêt<br/>(Album vide)</span>
+           </div>
+           <div className="aspect-video bg-slate-50 rounded-xl flex items-center justify-center border border-slate-200 border-dashed hover:bg-slate-100 cursor-pointer transition-colors">
+             <span className="text-xs text-slate-400 font-medium text-center px-2">Atelier Peinture<br/>(Album vide)</span>
+           </div>
+         </div>
+      </div>
+    </div>
+  </div>
+);
+
 // --- MODULE : GESTION DES ÉVÉNEMENTS ---
 const GestionEvenements = () => {
   const [activeView, setActiveView] = useState('organisation');
