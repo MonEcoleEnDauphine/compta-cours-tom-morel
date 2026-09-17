@@ -713,8 +713,9 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
 
   const formatMenageDate = (dateString) => {
     if (!dateString) return "";
-    let d1 = new Date(dateString + "T12:00:00"); let d2 = new Date(dateString + "T12:00:00");
-    d1.setDate(d1.getDate() + 1); d2.setDate(d2.getDate() + 2); 
+    let d1 = new Date(dateString + "T12:00:00"); // Samedi
+    let d2 = new Date(dateString + "T12:00:00");
+    d2.setDate(d2.getDate() + 1); // Dimanche (+1 jour par rapport à samedi)
     return `Sam. ${d1.getDate()} au Dim. ${new Date(d2).toLocaleDateString('fr-FR', {day:'numeric', month:'short'})}`;
   };
 
