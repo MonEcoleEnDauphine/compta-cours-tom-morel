@@ -5402,43 +5402,252 @@ const DonsRecus = ({ transactionsGlobales }) => {
 };
 
 // --- MODULE : GESTION DES ÉVÉNEMENTS ---
-const GestionEvenements = () => {
-  const [activeView, setActiveView] = useState('organisation');
+const GestionEvenements = ({ transactionsGlobales }) => {
+  const [activeView, setActiveView] = useState('rentabilite');
+  const [projetsList, setProjetsList] = useState([]);
+  const [projetDetail, setProjetDetail] = useState(null); // Pour voir les écritures d'un projet
+
+  // Récupérer la liste des projets existants
+  useEffect(() => {
+    const qProjets = collection(db, 'artifacts', appId, 'public', 'data', 'projets');
+    const unsubProjets = onSnapshot(qProjets, (snapshot) => {
+      const liste = [];
+      snapshot.forEach((doc) => { liste.push({ id: doc.id, ...doc.data() }); });
+      liste.sort((a, b) => String(a.nom || '').localeCompare(String(b.nom || '')));
+      setProjetsList(liste);
+    });
+    return () => unsubProjets();
+  }, []);
+
+  const formatMontant = (val) => new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(val) || 0);
+
+  // Le moteur analytique : Calcule les recettes/dépenses par projet
+  const statsProjets = useMemo(() => {
+    const stats = {};
+    
+    // Initialiser avec tous les projets connus
+    projetsList.forEach(p => {
+      stats[p.nom] = { id: p.id, nom: p.nom, recettes: 0, depenses: 0, txs: [] };
+    });
+
+    // Scanner le Grand Livre
+    (transactionsGlobales || []).forEach(tx => {
+      if (tx.projet && tx.projet.trim() !== '') {
+        const pName = tx.projet;
+        // Si le projet a été supprimé de la liste mais existe encore dans une écriture
+        if (!stats[pName]) {
+          stats[pName] = { id: 'old_'+pName, nom: pName, recettes: 0, depenses: 0, txs: [] };
+        }
+
+        let isRecette = false;
+        let absM = Math.abs(tx.montant || 0);
+
+        // Déterminer si c'est une charge ou un produit
+        if (tx.type === 'od') {
+           if (tx.compteCredit && String(tx.compteCredit).startsWith('7')) isRecette = true;
+           else if (tx.compteDebit && String(tx.compteDebit).startsWith('6')) isRecette = false;
+           else isRecette = tx.montant > 0;
+        } else {
+           isRecette = tx.montant > 0;
+        }
+
+        if (isRecette) stats[pName].recettes += absM;
+        else stats[pName].depenses += absM;
+
+        stats[pName].txs.push(tx);
+      }
+    });
+
+    // Transformer en tableau et trier par le plus gros événement (Recettes)
+    return Object.values(stats).sort((a, b) => (b.recettes + b.depenses) - (a.recettes + a.depenses));
+  }, [transactionsGlobales, projetsList]);
+
+  const handleDeleteProjet = async (projetId, nomProjet) => {
+    if (window.confirm(`Supprimer le projet "${nomProjet}" de la liste ?\n\n(Les écritures comptables liées ne seront pas supprimées, mais l'événement disparaîtra d'ici si son solde est à 0).`)) {
+      try {
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'projets', projetId));
+      } catch (e) {
+        alert("Erreur lors de la suppression.");
+      }
+    }
+  };
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-10 font-sans animate-fade-in">
+    <div className="space-y-6 max-w-7xl mx-auto pb-10 font-sans animate-fade-in">
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mt-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Calendar className="text-indigo-600" /> Événements & Rentabilité
+            <Target className="text-indigo-600" /> Comptabilité Analytique
           </h2>
-          <p className="text-slate-500 text-sm mt-1">Organisation des manifestations et suivi du bilan financier.</p>
+          <p className="text-slate-500 text-sm mt-1">Bilan financier de vos événements et actions spécifiques.</p>
         </div>
         <div className="flex bg-slate-100 p-1 rounded-xl">
-          <button onClick={() => setActiveView('organisation')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'organisation' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Organisation</button>
-          <button onClick={() => setActiveView('rentabilite')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'rentabilite' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Bilan Financier</button>
+          <button onClick={() => { setActiveView('rentabilite'); setProjetDetail(null); }} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'rentabilite' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Bilan Événements</button>
+          <button onClick={() => { setActiveView('organisation'); setProjetDetail(null); }} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'organisation' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Gestion des Projets</button>
         </div>
       </div>
 
-      {activeView === 'organisation' && (
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 text-center py-16 animate-fade-in">
-          <Calendar className="mx-auto text-slate-300 mb-4" size={48} />
-          <h2 className="text-xl font-bold text-slate-800 mb-2">Calendrier des Événements</h2>
-          <p className="text-slate-500">Le module de création et de gestion des événements (Kermesse, Marché de Noël...) est en cours de développement.</p>
+      {activeView === 'rentabilite' && (
+        <div className="animate-fade-in">
+          {projetDetail ? (
+            // VUE DÉTAILLÉE D'UN PROJET
+            <div className="space-y-6">
+              <button onClick={() => setProjetDetail(null)} className="text-indigo-600 font-bold hover:underline flex items-center gap-1 text-sm">
+                <ChevronRight className="rotate-180" size={16} /> Retour aux événements
+              </button>
+              
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div>
+                  <h3 className="text-2xl font-black text-slate-800 mb-1">{projetDetail.nom}</h3>
+                  <p className="text-slate-500 text-sm">Analyse détaillée des {projetDetail.txs.length} opérations rattachées.</p>
+                </div>
+                <div className="flex gap-4">
+                  <div className="bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100">
+                    <p className="text-[10px] uppercase font-bold text-emerald-600">Recettes</p>
+                    <p className="text-lg font-black text-emerald-700">{formatMontant(projetDetail.recettes)} €</p>
+                  </div>
+                  <div className="bg-rose-50 px-4 py-2 rounded-xl border border-rose-100">
+                    <p className="text-[10px] uppercase font-bold text-rose-600">Dépenses</p>
+                    <p className="text-lg font-black text-rose-700">{formatMontant(projetDetail.depenses)} €</p>
+                  </div>
+                  <div className={`${(projetDetail.recettes - projetDetail.depenses) >= 0 ? 'bg-indigo-50 border-indigo-100' : 'bg-orange-50 border-orange-100'} px-4 py-2 rounded-xl border`}>
+                    <p className={`text-[10px] uppercase font-bold ${(projetDetail.recettes - projetDetail.depenses) >= 0 ? 'text-indigo-600' : 'text-orange-600'}`}>Bénéfice Net</p>
+                    <p className={`text-lg font-black ${(projetDetail.recettes - projetDetail.depenses) >= 0 ? 'text-indigo-700' : 'text-orange-700'}`}>{formatMontant(projetDetail.recettes - projetDetail.depenses)} €</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                    <tr>
+                      <th className="p-4">Date</th>
+                      <th className="p-4">Source</th>
+                      <th className="p-4">Libellé</th>
+                      <th className="p-4 text-right">Dépense</th>
+                      <th className="p-4 text-right">Recette</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {projetDetail.txs.map((tx, idx) => {
+                       let isRecette = false;
+                       let absM = Math.abs(tx.montant || 0);
+                       if (tx.type === 'od') {
+                          if (tx.compteCredit && String(tx.compteCredit).startsWith('7')) isRecette = true;
+                          else if (tx.compteDebit && String(tx.compteDebit).startsWith('6')) isRecette = false;
+                          else isRecette = tx.montant > 0;
+                       } else {
+                          isRecette = tx.montant > 0;
+                       }
+
+                       return (
+                        <tr key={idx} className="hover:bg-slate-50">
+                          <td className="p-4 font-mono font-semibold text-slate-600">{tx.date}</td>
+                          <td className="p-4"><span className="bg-slate-100 px-2 py-1 rounded font-bold text-[10px] text-slate-500 uppercase">{tx.type === 'od' ? 'OD' : 'Banque'}</span></td>
+                          <td className="p-4 font-medium text-slate-800">{tx.libelle}</td>
+                          <td className="p-4 text-right font-bold text-rose-600">{!isRecette ? formatMontant(absM) + ' €' : '-'}</td>
+                          <td className="p-4 text-right font-bold text-emerald-600">{isRecette ? formatMontant(absM) + ' €' : '-'}</td>
+                        </tr>
+                       )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            // VUE GLOBALE DES ÉVÉNEMENTS
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {statsProjets.map(stat => {
+                const totalMouvements = stat.recettes + stat.depenses;
+                const benefice = stat.recettes - stat.depenses;
+                const isBenefice = benefice >= 0;
+                
+                // Calcul de la marge (pourcentage)
+                let pctMarge = 0;
+                if (stat.recettes > 0) {
+                  pctMarge = ((benefice / stat.recettes) * 100).toFixed(0);
+                }
+
+                if (totalMouvements === 0) return null; // Ne pas afficher les projets 100% vides ici
+
+                return (
+                  <div key={stat.nom} onClick={() => setProjetDetail(stat)} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 cursor-pointer hover:shadow-md hover:border-indigo-300 transition-all group flex flex-col h-full">
+                    <div className="flex justify-between items-start mb-4">
+                      <h3 className="font-bold text-lg text-slate-800 group-hover:text-indigo-600 transition-colors">{stat.nom}</h3>
+                      <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded-lg">{stat.txs.length} op.</span>
+                    </div>
+                    
+                    <div className="space-y-3 mb-6 flex-1">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-slate-500 font-medium">Recettes</span>
+                        <span className="font-black text-emerald-600">{formatMontant(stat.recettes)} €</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-slate-500 font-medium">Dépenses</span>
+                        <span className="font-black text-rose-600">{formatMontant(stat.depenses)} €</span>
+                      </div>
+                    </div>
+
+                    <div className={`p-4 rounded-xl border ${isBenefice ? 'bg-indigo-50 border-indigo-100' : 'bg-orange-50 border-orange-100'}`}>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className={`text-[10px] font-black uppercase tracking-wider ${isBenefice ? 'text-indigo-600' : 'text-orange-600'}`}>
+                          {isBenefice ? 'Bénéfice Net' : 'Déficit'}
+                        </span>
+                        {stat.recettes > 0 && isBenefice && (
+                          <span className="text-[10px] font-bold text-indigo-500 bg-indigo-100 px-1.5 py-0.5 rounded">Marge: {pctMarge}%</span>
+                        )}
+                      </div>
+                      <p className={`text-xl font-black ${isBenefice ? 'text-indigo-800' : 'text-orange-800'}`}>
+                        {isBenefice ? '+' : ''}{formatMontant(benefice)} €
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+              
+              {statsProjets.filter(s => (s.recettes + s.depenses) > 0).length === 0 && (
+                <div className="col-span-full py-16 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-300">
+                  <PieChart className="mx-auto text-slate-300 mb-4" size={48} />
+                  <h3 className="font-bold text-slate-700 text-lg mb-2">Aucun événement chiffré</h3>
+                  <p className="text-slate-500 text-sm max-w-md mx-auto">Affectez un projet à vos écritures dans le <strong className="text-indigo-600">Grand Livre</strong> pour qu'il apparaisse ici et que sa rentabilité soit calculée automatiquement.</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
-      {activeView === 'rentabilite' && (
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 text-center py-16 animate-fade-in">
-          <TrendingUp className="mx-auto text-slate-300 mb-4" size={48} />
-          <h2 className="text-xl font-bold text-slate-800 mb-2">Rentabilité de l'événement</h2>
-          <p className="text-slate-500">Le tableau de bord d'analyse financière (Dépenses vs Recettes liées à un événement) est en cours de développement.</p>
+      {activeView === 'organisation' && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 animate-fade-in max-w-2xl mx-auto">
+          <h2 className="text-xl font-bold text-slate-800 mb-6 border-b border-slate-100 pb-4">Gérer les Projets Analytiques</h2>
+          
+          <div className="space-y-2">
+            {projetsList.length === 0 ? (
+              <p className="text-sm text-slate-500 italic py-4">Aucun projet créé pour le moment.</p>
+            ) : (
+              projetsList.map(projet => (
+                <div key={projet.id} className="flex justify-between items-center p-4 rounded-xl border border-slate-100 bg-slate-50 hover:bg-slate-100 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <Target size={16} className="text-indigo-500" />
+                    <span className="font-bold text-slate-700">{projet.nom}</span>
+                  </div>
+                  <button onClick={() => handleDeleteProjet(projet.id, projet.nom)} className="text-slate-400 hover:text-rose-600 p-2 rounded-lg bg-white shadow-sm border border-slate-200 transition-colors" title="Supprimer ce projet">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+          
+          <div className="mt-6 pt-6 border-t border-slate-100">
+            <p className="text-xs text-slate-500 mb-4">Pour créer un nouveau projet, rendez-vous dans le module <strong>Grand Livre</strong> et cliquez sur le bouton "Nouveau Projet" au-dessus du tableau.</p>
+          </div>
         </div>
       )}
     </div>
   );
 };
-  
+
 export default function App() {
   // 1. On lit l'URL pour voir si on ouvre un nouvel onglet sur un module précis
 const [activeTab, setActiveTab] = useState(() => {
