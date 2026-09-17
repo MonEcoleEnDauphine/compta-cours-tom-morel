@@ -5705,7 +5705,7 @@ const [activeTab, setActiveTab] = useState(() => {
       case 'budget': return <BudgetPrevisionnel transactionsGlobales={transactionsGlobales} />;
       case 'notes_frais': return <NotesFrais transactionsGlobales={transactionsGlobales} />;
       case 'dons_recus': return <DonsRecus transactionsGlobales={transactionsGlobales} />;
-      case 'evenements': return <GestionEvenements />;
+      case 'evenements': return <GestionEvenements transactionsGlobales={transactionsGlobales} />;
       case 'gestion_acces': return <PlaceholderPage title="Gestion des Accès" />;
       case 'factures_familles': return <PlaceholderPage title="Factures Familles (Admin)" />;
       case 'equipe_contrats': return <PlaceholderPage title="Équipe et Contrats" />;
