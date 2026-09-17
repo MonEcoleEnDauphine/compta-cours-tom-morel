@@ -5405,9 +5405,20 @@ const DonsRecus = ({ transactionsGlobales }) => {
 const GestionEvenements = ({ transactionsGlobales }) => {
   const [activeView, setActiveView] = useState('rentabilite');
   const [projetsList, setProjetsList] = useState([]);
-  const [projetDetail, setProjetDetail] = useState(null); // Pour voir les écritures d'un projet
+  const [projetDetail, setProjetDetail] = useState(null);
 
-  // Récupérer la liste des projets existants
+  // Édition de nom de projet dans la gestion
+  const [editingProjetId, setEditingProjetId] = useState(null);
+  const [tempProjetNom, setTempProjetNom] = useState('');
+
+  // Création directe de projet dans l'onglet Gestion
+  const [newProjetNom, setNewProjetNom] = useState('');
+
+  // Édition du commentaire analytique
+  const [editingComment, setEditingComment] = useState(false);
+  const [customComment, setTempComment] = useState('');
+
+  // Charger les projets depuis Firebase
   useEffect(() => {
     const qProjets = collection(db, 'artifacts', appId, 'public', 'data', 'projets');
     const unsubProjets = onSnapshot(qProjets, (snapshot) => {
@@ -5421,28 +5432,24 @@ const GestionEvenements = ({ transactionsGlobales }) => {
 
   const formatMontant = (val) => new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(val) || 0);
 
-  // Le moteur analytique : Calcule les recettes/dépenses par projet
+  // Moteur de calcul analytique par événement
   const statsProjets = useMemo(() => {
     const stats = {};
     
-    // Initialiser avec tous les projets connus
     projetsList.forEach(p => {
-      stats[p.nom] = { id: p.id, nom: p.nom, recettes: 0, depenses: 0, txs: [] };
+      stats[p.nom] = { id: p.id, nom: p.nom, commentaire: p.commentaire || '', recettes: 0, depenses: 0, txs: [] };
     });
 
-    // Scanner le Grand Livre
     (transactionsGlobales || []).forEach(tx => {
       if (tx.projet && tx.projet.trim() !== '') {
-        const pName = tx.projet;
-        // Si le projet a été supprimé de la liste mais existe encore dans une écriture
+        const pName = tx.projet.trim();
         if (!stats[pName]) {
-          stats[pName] = { id: 'old_'+pName, nom: pName, recettes: 0, depenses: 0, txs: [] };
+          stats[pName] = { id: 'old_' + pName, nom: pName, commentaire: '', recettes: 0, depenses: 0, txs: [] };
         }
 
         let isRecette = false;
         let absM = Math.abs(tx.montant || 0);
 
-        // Déterminer si c'est une charge ou un produit
         if (tx.type === 'od') {
            if (tx.compteCredit && String(tx.compteCredit).startsWith('7')) isRecette = true;
            else if (tx.compteDebit && String(tx.compteDebit).startsWith('6')) isRecette = false;
@@ -5458,12 +5465,92 @@ const GestionEvenements = ({ transactionsGlobales }) => {
       }
     });
 
-    // Transformer en tableau et trier par le plus gros événement (Recettes)
     return Object.values(stats).sort((a, b) => (b.recettes + b.depenses) - (a.recettes + a.depenses));
   }, [transactionsGlobales, projetsList]);
 
+  // Génération automatique du commentaire analytique si aucun commentaire sur-mesure n'est saisi
+  const getAutoComment = (stat) => {
+    if (stat.commentaire && stat.commentaire.trim() !== '') {
+      return stat.commentaire;
+    }
+    const benefice = stat.recettes - stat.depenses;
+    const marge = stat.recettes > 0 ? ((benefice / stat.recettes) * 100).toFixed(1) : 0;
+    const roi = stat.depenses > 0 ? ((benefice / stat.depenses) * 100).toFixed(1) : 0;
+
+    if (stat.recettes === 0 && stat.depenses === 0) {
+      return "Aucune écriture comptable imputée sur cet événement pour le moment.";
+    }
+    if (benefice > 0) {
+      return `L'événement dégagé un résultat positif de +${formatMontant(benefice)} € avec une marge nette de ${marge}% et un retour sur investissement (ROI) de ${roi}%. L'opération est très rentable pour l'établissement.`;
+    } else if (benefice < 0) {
+      return `L'événement présente un déficit de ${formatMontant(benefice)} €. Les charges subies (${formatMontant(stat.depenses)} €) dépassent les encaissements générés (${formatMontant(stat.recettes)} €).`;
+    }
+    return `L'opération est à l'équilibre strict (Recettes = Dépenses = ${formatMontant(stat.recettes)} €).`;
+  };
+
+  // Sauvegarder un commentaire spécifique pour un projet
+  const handleSaveComment = async (projetNom) => {
+    const projObj = projetsList.find(p => p.nom === projetNom);
+    if (!projObj) return;
+
+    try {
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'projets', projObj.id), {
+        commentaire: customComment
+      });
+      setEditingComment(false);
+    } catch (e) {
+      alert("Erreur lors de la mise à jour du commentaire.");
+    }
+  };
+
+  // Renommer un projet ET mettre à jour toutes les écritures du Grand Livre (GL)
+  const handleRenameProjetCascade = async (projetId, ancienNom) => {
+    const nouveauNom = tempProjetNom.trim();
+    if (!nouveauNom || nouveauNom === ancienNom) {
+      setEditingProjetId(null);
+      return;
+    }
+
+    try {
+      // 1. Mettre à jour la collection "projets"
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'projets', projetId), {
+        nom: nouveauNom
+      });
+
+      // 2. Mettre à jour les écritures du Grand Livre
+      const txToUpdate = transactionsGlobales.filter(t => t.projet === ancienNom);
+      for (const tx of txToUpdate) {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', tx.id), {
+          projet: nouveauNom
+        });
+      }
+
+      setEditingProjetId(null);
+      setTempProjetNom('');
+      alert(`Le projet a été renommé en "${nouveauNom}" et ${txToUpdate.length} écriture(s) du Grand Livre ont été actualisées.`);
+    } catch (e) {
+      alert("Erreur lors du renommage du projet.");
+    }
+  };
+
+  // Création d'un projet directement depuis cet onglet
+  const handleCreateProjetDirect = async (e) => {
+    e.preventDefault();
+    if (!newProjetNom.trim()) return;
+
+    try {
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'projets'), {
+        nom: newProjetNom.trim(),
+        commentaire: ''
+      });
+      setNewProjetNom('');
+    } catch (e) {
+      alert("Erreur lors de la création du projet.");
+    }
+  };
+
   const handleDeleteProjet = async (projetId, nomProjet) => {
-    if (window.confirm(`Supprimer le projet "${nomProjet}" de la liste ?\n\n(Les écritures comptables liées ne seront pas supprimées, mais l'événement disparaîtra d'ici si son solde est à 0).`)) {
+    if (window.confirm(`Supprimer le projet "${nomProjet}" de la liste ?\n\nNote : Les écritures comptables liées resteront au Grand Livre mais le tag projet sera libéré.`)) {
       try {
         await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'projets', projetId));
       } catch (e) {
@@ -5474,130 +5561,194 @@ const GestionEvenements = ({ transactionsGlobales }) => {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-10 font-sans animate-fade-in">
+      {/* BANNIÈRE DE NAVIGATION */}
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mt-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Target className="text-indigo-600" /> Comptabilité Analytique
+          <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2">
+            <Target className="text-indigo-600" /> Comptabilité Analytique & Événements
           </h2>
-          <p className="text-slate-500 text-sm mt-1">Bilan financier de vos événements et actions spécifiques.</p>
+          <p className="text-slate-500 text-sm mt-1">Pilotage budgétaire, rentabilité opérationnelle et suivi des projets.</p>
         </div>
         <div className="flex bg-slate-100 p-1 rounded-xl">
-          <button onClick={() => { setActiveView('rentabilite'); setProjetDetail(null); }} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'rentabilite' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Bilan Événements</button>
-          <button onClick={() => { setActiveView('organisation'); setProjetDetail(null); }} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'organisation' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Gestion des Projets</button>
+          <button onClick={() => { setActiveView('rentabilite'); setProjetDetail(null); }} className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${activeView === 'rentabilite' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Bilan Événements</button>
+          <button onClick={() => { setActiveView('organisation'); setProjetDetail(null); }} className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${activeView === 'organisation' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Gestion des Projets</button>
         </div>
       </div>
 
+      {/* VUE : BILAN DES ÉVÉNEMENTS */}
       {activeView === 'rentabilite' && (
         <div className="animate-fade-in">
           {projetDetail ? (
-            // VUE DÉTAILLÉE D'UN PROJET
+            // FOCUS SUR UN PROJET DÉTAILLÉ
             <div className="space-y-6">
-              <button onClick={() => setProjetDetail(null)} className="text-indigo-600 font-bold hover:underline flex items-center gap-1 text-sm">
-                <ChevronRight className="rotate-180" size={16} /> Retour aux événements
+              <button onClick={() => { setProjetDetail(null); setEditingComment(false); }} className="text-indigo-600 font-bold hover:underline flex items-center gap-1 text-sm bg-indigo-50 px-3 py-1.5 rounded-lg w-fit border border-indigo-100">
+                ← Retour au tableau de bord des événements
               </button>
               
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                <div>
-                  <h3 className="text-2xl font-black text-slate-800 mb-1">{projetDetail.nom}</h3>
-                  <p className="text-slate-500 text-sm">Analyse détaillée des {projetDetail.txs.length} opérations rattachées.</p>
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 md:p-8 space-y-6">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-b border-slate-100 pb-6">
+                  <div>
+                    <span className="text-xs font-bold text-indigo-600 uppercase tracking-widest bg-indigo-50 px-2.5 py-1 rounded-md border border-indigo-100">Fiche Événement</span>
+                    <h3 className="text-3xl font-black text-slate-800 mt-2">{projetDetail.nom}</h3>
+                    <p className="text-slate-400 text-xs mt-1 font-medium">{projetDetail.txs.length} opération(s) enregistrée(s) au Grand Livre</p>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-4">
+                    <div className="bg-emerald-50/80 px-4 py-3 rounded-2xl border border-emerald-100 min-w-[120px]">
+                      <p className="text-[10px] uppercase font-bold text-emerald-600">Total Recettes</p>
+                      <p className="text-xl font-black text-emerald-700 mt-0.5">+{formatMontant(projetDetail.recettes)} €</p>
+                    </div>
+                    <div className="bg-rose-50/80 px-4 py-3 rounded-2xl border border-rose-100 min-w-[120px]">
+                      <p className="text-[10px] uppercase font-bold text-rose-600">Total Dépenses</p>
+                      <p className="text-xl font-black text-rose-700 mt-0.5">-{formatMontant(projetDetail.depenses)} €</p>
+                    </div>
+                    <div className={`${(projetDetail.recettes - projetDetail.depenses) >= 0 ? 'bg-indigo-50/80 border-indigo-100' : 'bg-orange-50/80 border-orange-100'} px-5 py-3 rounded-2xl border min-w-[140px]`}>
+                      <p className={`text-[10px] uppercase font-bold ${(projetDetail.recettes - projetDetail.depenses) >= 0 ? 'text-indigo-600' : 'text-orange-600'}`}>Résultat Net</p>
+                      <p className={`text-2xl font-black ${(projetDetail.recettes - projetDetail.depenses) >= 0 ? 'text-indigo-800' : 'text-orange-800'} mt-0.5`}>
+                        {(projetDetail.recettes - projetDetail.depenses) >= 0 ? '+' : ''}{formatMontant(projetDetail.recettes - projetDetail.depenses)} €
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex gap-4">
-                  <div className="bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100">
-                    <p className="text-[10px] uppercase font-bold text-emerald-600">Recettes</p>
-                    <p className="text-lg font-black text-emerald-700">{formatMontant(projetDetail.recettes)} €</p>
+
+                {/* ZONE DE SYNTHÈSE ANALYTIQUE & COMMENTAIRE EDITABLE */}
+                <div className="bg-gradient-to-r from-slate-900 to-indigo-950 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden">
+                  <div className="flex justify-between items-center mb-3">
+                    <div className="flex items-center gap-2">
+                      <Sparkles size={18} className="text-amber-400" />
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-200">Analyse Financière & Rapport</h4>
+                    </div>
+                    {!editingComment ? (
+                      <button onClick={() => { setTempComment(getAutoComment(projetDetail)); setEditingComment(true); }} className="text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1 rounded-lg font-bold transition-all flex items-center gap-1.5 border border-white/10">
+                        <Edit2 size={12} /> Personnaliser le compte-rendu
+                      </button>
+                    ) : (
+                      <div className="flex gap-2">
+                        <button onClick={() => setEditingComment(false)} className="text-xs bg-white/10 hover:bg-white/20 text-white px-2.5 py-1 rounded-lg font-bold">Annuler</button>
+                        <button onClick={() => handleSaveComment(projetDetail.nom)} className="text-xs bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1 rounded-lg font-bold flex items-center gap-1 shadow-sm">
+                          <CheckCircle2 size={12} /> Sauvegarder
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <div className="bg-rose-50 px-4 py-2 rounded-xl border border-rose-100">
-                    <p className="text-[10px] uppercase font-bold text-rose-600">Dépenses</p>
-                    <p className="text-lg font-black text-rose-700">{formatMontant(projetDetail.depenses)} €</p>
-                  </div>
-                  <div className={`${(projetDetail.recettes - projetDetail.depenses) >= 0 ? 'bg-indigo-50 border-indigo-100' : 'bg-orange-50 border-orange-100'} px-4 py-2 rounded-xl border`}>
-                    <p className={`text-[10px] uppercase font-bold ${(projetDetail.recettes - projetDetail.depenses) >= 0 ? 'text-indigo-600' : 'text-orange-600'}`}>Bénéfice Net</p>
-                    <p className={`text-lg font-black ${(projetDetail.recettes - projetDetail.depenses) >= 0 ? 'text-indigo-700' : 'text-orange-700'}`}>{formatMontant(projetDetail.recettes - projetDetail.depenses)} €</p>
-                  </div>
+
+                  {editingComment ? (
+                    <textarea value={customComment} onChange={(e) => setTempComment(e.target.value)} rows="3" className="w-full bg-slate-800/90 text-white border border-indigo-400/50 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-400 font-sans leading-relaxed" placeholder="Rédigez votre synthèse financière..." />
+                  ) : (
+                    <p className="text-sm font-medium leading-relaxed text-slate-200 italic">
+                      "{getAutoComment(projetDetail)}"
+                    </p>
+                  )}
                 </div>
-              </div>
 
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
-                    <tr>
-                      <th className="p-4">Date</th>
-                      <th className="p-4">Source</th>
-                      <th className="p-4">Libellé</th>
-                      <th className="p-4 text-right">Dépense</th>
-                      <th className="p-4 text-right">Recette</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {projetDetail.txs.map((tx, idx) => {
-                       let isRecette = false;
-                       let absM = Math.abs(tx.montant || 0);
-                       if (tx.type === 'od') {
-                          if (tx.compteCredit && String(tx.compteCredit).startsWith('7')) isRecette = true;
-                          else if (tx.compteDebit && String(tx.compteDebit).startsWith('6')) isRecette = false;
-                          else isRecette = tx.montant > 0;
-                       } else {
-                          isRecette = tx.montant > 0;
-                       }
+                {/* TABLEAU DES ÉCRITURES DU PROJET */}
+                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                  <div className="p-4 bg-slate-50 border-b border-slate-200 font-bold text-slate-700 text-xs uppercase tracking-wider">
+                    Détail des pièces comptables rattachées
+                  </div>
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-100/50 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                      <tr>
+                        <th className="p-4">Date</th>
+                        <th className="p-4">Source</th>
+                        <th className="p-4">Libellé</th>
+                        <th className="p-4 text-right">Dépense (€)</th>
+                        <th className="p-4 text-right">Recette (€)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {projetDetail.txs.map((tx, idx) => {
+                         let isRecette = false;
+                         let absM = Math.abs(tx.montant || 0);
+                         if (tx.type === 'od') {
+                            if (tx.compteCredit && String(tx.compteCredit).startsWith('7')) isRecette = true;
+                            else if (tx.compteDebit && String(tx.compteDebit).startsWith('6')) isRecette = false;
+                            else isRecette = tx.montant > 0;
+                         } else {
+                            isRecette = tx.montant > 0;
+                         }
 
-                       return (
-                        <tr key={idx} className="hover:bg-slate-50">
-                          <td className="p-4 font-mono font-semibold text-slate-600">{tx.date}</td>
-                          <td className="p-4"><span className="bg-slate-100 px-2 py-1 rounded font-bold text-[10px] text-slate-500 uppercase">{tx.type === 'od' ? 'OD' : 'Banque'}</span></td>
-                          <td className="p-4 font-medium text-slate-800">{tx.libelle}</td>
-                          <td className="p-4 text-right font-bold text-rose-600">{!isRecette ? formatMontant(absM) + ' €' : '-'}</td>
-                          <td className="p-4 text-right font-bold text-emerald-600">{isRecette ? formatMontant(absM) + ' €' : '-'}</td>
-                        </tr>
-                       )
-                    })}
-                  </tbody>
-                </table>
+                         return (
+                          <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
+                            <td className="p-4 font-mono font-semibold text-slate-600">{tx.date}</td>
+                            <td className="p-4"><span className="bg-slate-100 px-2 py-1 rounded font-bold text-[10px] text-slate-600 border border-slate-200 uppercase">{tx.type === 'od' ? 'OD' : 'Banque'}</span></td>
+                            <td className="p-4 font-bold text-slate-800">{tx.libelle}</td>
+                            <td className="p-4 text-right font-black text-rose-600 font-mono">{!isRecette ? formatMontant(absM) + ' €' : '-'}</td>
+                            <td className="p-4 text-right font-black text-emerald-600 font-mono">{isRecette ? formatMontant(absM) + ' €' : '-'}</td>
+                          </tr>
+                         )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           ) : (
-            // VUE GLOBALE DES ÉVÉNEMENTS
+            // GRILLE DES CARTES D'ÉVÉNEMENTS
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {statsProjets.map(stat => {
                 const totalMouvements = stat.recettes + stat.depenses;
                 const benefice = stat.recettes - stat.depenses;
                 const isBenefice = benefice >= 0;
                 
-                // Calcul de la marge (pourcentage)
                 let pctMarge = 0;
                 if (stat.recettes > 0) {
-                  pctMarge = ((benefice / stat.recettes) * 100).toFixed(0);
+                  pctMarge = Math.min(Math.max(((benefice / stat.recettes) * 100), -100), 100).toFixed(0);
                 }
 
-                if (totalMouvements === 0) return null; // Ne pas afficher les projets 100% vides ici
+                // Pourcentage visuel pour la barre de comparaison
+                const totalFlux = stat.recettes + stat.depenses;
+                const pctRecettesVisuel = totalFlux > 0 ? ((stat.recettes / totalFlux) * 100).toFixed(0) : 50;
+                const pctDepensesVisuel = totalFlux > 0 ? ((stat.depenses / totalFlux) * 100).toFixed(0) : 50;
+
+                if (totalMouvements === 0) return null;
 
                 return (
-                  <div key={stat.nom} onClick={() => setProjetDetail(stat)} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 cursor-pointer hover:shadow-md hover:border-indigo-300 transition-all group flex flex-col h-full">
-                    <div className="flex justify-between items-start mb-4">
-                      <h3 className="font-bold text-lg text-slate-800 group-hover:text-indigo-600 transition-colors">{stat.nom}</h3>
-                      <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded-lg">{stat.txs.length} op.</span>
-                    </div>
-                    
-                    <div className="space-y-3 mb-6 flex-1">
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-slate-500 font-medium">Recettes</span>
-                        <span className="font-black text-emerald-600">{formatMontant(stat.recettes)} €</span>
+                  <div key={stat.nom} onClick={() => setProjetDetail(stat)} className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 cursor-pointer hover:shadow-xl hover:border-indigo-300 transition-all group flex flex-col justify-between relative overflow-hidden">
+                    <div>
+                      <div className="flex justify-between items-start mb-3">
+                        <h3 className="font-black text-lg text-slate-800 group-hover:text-indigo-600 transition-colors leading-snug">{stat.nom}</h3>
+                        <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] font-bold px-2.5 py-1 rounded-full shrink-0 ml-2">{stat.txs.length} op.</span>
                       </div>
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-slate-500 font-medium">Dépenses</span>
-                        <span className="font-black text-rose-600">{formatMontant(stat.depenses)} €</span>
+
+                      {/* STATS CHIFFRÉES */}
+                      <div className="grid grid-cols-2 gap-3 my-4">
+                        <div className="bg-emerald-50/60 p-3 rounded-2xl border border-emerald-100">
+                          <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider flex items-center gap-1"><TrendingUp size={10}/> Recettes</p>
+                          <p className="text-base font-black text-emerald-700 mt-1">{formatMontant(stat.recettes)} €</p>
+                        </div>
+                        <div className="bg-rose-50/60 p-3 rounded-2xl border border-rose-100">
+                          <p className="text-[9px] font-bold text-rose-600 uppercase tracking-wider flex items-center gap-1"><TrendingUp size={10} className="rotate-180"/> Dépenses</p>
+                          <p className="text-base font-black text-rose-700 mt-1">{formatMontant(stat.depenses)} €</p>
+                        </div>
+                      </div>
+
+                      {/* BARRE VISUELLE COMPARATIVE */}
+                      <div className="space-y-1 mb-5">
+                        <div className="flex justify-between text-[9px] font-bold text-slate-400 uppercase">
+                          <span>Flux Recettes ({pctRecettesVisuel}%)</span>
+                          <span>Dépenses ({pctDepensesVisuel}%)</span>
+                        </div>
+                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden flex">
+                          <div className="bg-emerald-500 h-full transition-all duration-700" style={{ width: `${pctRecettesVisuel}%` }}></div>
+                          <div className="bg-rose-500 h-full transition-all duration-700" style={{ width: `${pctDepensesVisuel}%` }}></div>
+                        </div>
                       </div>
                     </div>
 
-                    <div className={`p-4 rounded-xl border ${isBenefice ? 'bg-indigo-50 border-indigo-100' : 'bg-orange-50 border-orange-100'}`}>
+                    {/* BLOC BÉNÉFICE ET MARGE */}
+                    <div className={`p-4 rounded-2xl border transition-all ${isBenefice ? 'bg-indigo-50/70 border-indigo-100' : 'bg-orange-50/70 border-orange-100'}`}>
                       <div className="flex justify-between items-center mb-1">
                         <span className={`text-[10px] font-black uppercase tracking-wider ${isBenefice ? 'text-indigo-600' : 'text-orange-600'}`}>
-                          {isBenefice ? 'Bénéfice Net' : 'Déficit'}
+                          {isBenefice ? 'Bénéfice Net' : 'Déficit Net'}
                         </span>
-                        {stat.recettes > 0 && isBenefice && (
-                          <span className="text-[10px] font-bold text-indigo-500 bg-indigo-100 px-1.5 py-0.5 rounded">Marge: {pctMarge}%</span>
+                        {stat.recettes > 0 && (
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isBenefice ? 'bg-indigo-100 text-indigo-700' : 'bg-orange-100 text-orange-700'}`}>
+                            Marge : {pctMarge}%
+                          </span>
                         )}
                       </div>
-                      <p className={`text-xl font-black ${isBenefice ? 'text-indigo-800' : 'text-orange-800'}`}>
+                      <p className={`text-2xl font-black ${isBenefice ? 'text-indigo-900' : 'text-orange-900'}`}>
                         {isBenefice ? '+' : ''}{formatMontant(benefice)} €
                       </p>
                     </div>
@@ -5606,10 +5757,12 @@ const GestionEvenements = ({ transactionsGlobales }) => {
               })}
               
               {statsProjets.filter(s => (s.recettes + s.depenses) > 0).length === 0 && (
-                <div className="col-span-full py-16 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-300">
-                  <PieChart className="mx-auto text-slate-300 mb-4" size={48} />
-                  <h3 className="font-bold text-slate-700 text-lg mb-2">Aucun événement chiffré</h3>
-                  <p className="text-slate-500 text-sm max-w-md mx-auto">Affectez un projet à vos écritures dans le <strong className="text-indigo-600">Grand Livre</strong> pour qu'il apparaisse ici et que sa rentabilité soit calculée automatiquement.</p>
+                <div className="col-span-full py-20 text-center bg-white rounded-3xl border border-dashed border-slate-200 shadow-sm p-8">
+                  <div className="w-16 h-16 bg-indigo-50 text-indigo-500 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-indigo-100">
+                    <PieChart size={32} />
+                  </div>
+                  <h3 className="font-bold text-slate-800 text-lg mb-2">Aucun événement chiffré</h3>
+                  <p className="text-slate-500 text-sm max-w-md mx-auto leading-relaxed">Affectez un projet à vos écritures dans le <strong className="text-indigo-600">Grand Livre</strong> pour générer automatiquement vos bilans financiers et marges analytiques.</p>
                 </div>
               )}
             </div>
@@ -5617,37 +5770,71 @@ const GestionEvenements = ({ transactionsGlobales }) => {
         </div>
       )}
 
+      {/* VUE : GESTION DES PROJETS (RENOMMAGE & CRÉATION) */}
       {activeView === 'organisation' && (
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 animate-fade-in max-w-2xl mx-auto">
-          <h2 className="text-xl font-bold text-slate-800 mb-6 border-b border-slate-100 pb-4">Gérer les Projets Analytiques</h2>
-          
-          <div className="space-y-2">
-            {projetsList.length === 0 ? (
-              <p className="text-sm text-slate-500 italic py-4">Aucun projet créé pour le moment.</p>
-            ) : (
-              projetsList.map(projet => (
-                <div key={projet.id} className="flex justify-between items-center p-4 rounded-xl border border-slate-100 bg-slate-50 hover:bg-slate-100 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <Target size={16} className="text-indigo-500" />
-                    <span className="font-bold text-slate-700">{projet.nom}</span>
-                  </div>
-                  <button onClick={() => handleDeleteProjet(projet.id, projet.nom)} className="text-slate-400 hover:text-rose-600 p-2 rounded-lg bg-white shadow-sm border border-slate-200 transition-colors" title="Supprimer ce projet">
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              ))
-            )}
+        <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-200 animate-fade-in max-w-3xl mx-auto space-y-6">
+          <div className="border-b border-slate-100 pb-4">
+            <h2 className="text-xl font-black text-slate-800">Gestion de la Référentiel des Projets</h2>
+            <p className="text-xs text-slate-500 mt-1">Créez ou modifiez le nom de vos projets analytiques. Tout changement répercutera automatiquement le nom sur vos écritures existantes au Grand Livre.</p>
           </div>
-          
-          <div className="mt-6 pt-6 border-t border-slate-100">
-            <p className="text-xs text-slate-500 mb-4">Pour créer un nouveau projet, rendez-vous dans le module <strong>Grand Livre</strong> et cliquez sur le bouton "Nouveau Projet" au-dessus du tableau.</p>
+
+          {/* FORMULAIRE DE CRÉATION DIRECTE */}
+          <form onSubmit={handleCreateProjetDirect} className="flex gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+            <input type="text" value={newProjetNom} onChange={e => setNewProjetNom(e.target.value)} placeholder="Nom du nouveau projet (ex: Marché de Printemps 2027)..." className="flex-1 border border-slate-200 bg-white rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-600" />
+            <button type="submit" disabled={!newProjetNom.trim()} className={`px-5 py-2.5 rounded-xl font-bold text-sm text-white shadow-md transition-all flex items-center gap-2 ${newProjetNom.trim() ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200 cursor-pointer' : 'bg-slate-300 cursor-not-allowed shadow-none'}`}>
+              <PlusCircle size={16} /> Ajouter
+            </button>
+          </form>
+
+          {/* LISTE DES PROJETS AVEC RENOMMAGE EN CASCADE */}
+          <div className="space-y-3 pt-2">
+            {projetsList.length === 0 ? (
+              <p className="text-sm text-slate-400 italic py-6 text-center">Aucun projet créé dans la base de données.</p>
+            ) : (
+              projetsList.map(projet => {
+                const nbTxAssociated = (transactionsGlobales || []).filter(t => t.projet === projet.nom).length;
+                const isEditingThis = editingProjetId === projet.id;
+
+                return (
+                  <div key={projet.id} className="flex justify-between items-center p-4 rounded-2xl border border-slate-200 bg-slate-50/50 hover:bg-slate-100/50 transition-colors">
+                    {isEditingThis ? (
+                      <div className="flex items-center gap-2 flex-1 mr-3">
+                        <input type="text" value={tempProjetNom} onChange={e => setTempProjetNom(e.target.value)} className="flex-1 border border-indigo-300 rounded-xl px-3 py-1.5 text-sm font-bold outline-none bg-white focus:ring-2 focus:ring-indigo-600" autoFocus />
+                        <button onClick={() => handleRenameProjetCascade(projet.id, projet.nom)} className="bg-emerald-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm hover:bg-emerald-700">OK</button>
+                        <button onClick={() => setEditingProjetId(null)} className="bg-slate-200 text-slate-600 px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-slate-300">Annuler</button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                          <Target size={18} />
+                        </div>
+                        <div>
+                          <span className="font-extrabold text-slate-800 text-sm">{projet.nom}</span>
+                          <span className="ml-3 text-[10px] font-bold text-slate-400 bg-white px-2 py-0.5 rounded-full border border-slate-200">{nbTxAssociated} écriture(s) GL</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {!isEditingThis && (
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => { setEditingProjetId(projet.id); setTempProjetNom(projet.nom); }} className="p-2 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 transition-colors shadow-2xs" title="Renommer ce projet (Mettra à jour le Grand Livre)">
+                          <Edit2 size={16} />
+                        </button>
+                        <button onClick={() => handleDeleteProjet(projet.id, projet.nom)} className="p-2 rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-rose-600 transition-colors shadow-2xs" title="Supprimer ce projet">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       )}
     </div>
   );
 };
-
 export default function App() {
   // 1. On lit l'URL pour voir si on ouvre un nouvel onglet sur un module précis
 const [activeTab, setActiveTab] = useState(() => {
