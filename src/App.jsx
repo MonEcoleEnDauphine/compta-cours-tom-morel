@@ -4675,10 +4675,13 @@ const DonsRecus = ({ transactionsGlobales }) => {
   // Filtre de période
   const [anneeFiltre, setAnneeFiltre] = useState('TOTAL');
 
-  // Objectif de dons modifiable
+  // Objectif de dons modifiable (Appliqué comme référence annuelle)
   const [budgetGoal, setBudgetGoal] = useState(58724);
   const [isEditingGoal, setIsEditingGoal] = useState(false);
   const [tempGoal, setTempGoal] = useState(58724);
+
+  // ---> AJOUTEZ CETTE LIGNE EXACTEMENT ICI <---
+  const formatMontant = (val) => new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(val) || 0);
 
   const [formData, setFormData] = useState({
     nom: '', prenom: '', type: 'Privé', frequence: 'Ponctuel', mail: '', adresse: '', date: '', montant: '', provenance: 'Virement', commentaire: '', apporteur: ''
@@ -5235,6 +5238,44 @@ const DonsRecus = ({ transactionsGlobales }) => {
   );
 };
 
+// --- MODULE : GESTION DES ÉVÉNEMENTS ---
+const GestionEvenements = () => {
+  const [activeView, setActiveView] = useState('organisation');
+
+  return (
+    <div className="space-y-6 max-w-6xl mx-auto pb-10 font-sans animate-fade-in">
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mt-4">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+            <Calendar className="text-indigo-600" /> Événements & Rentabilité
+          </h2>
+          <p className="text-slate-500 text-sm mt-1">Organisation des manifestations et suivi du bilan financier.</p>
+        </div>
+        <div className="flex bg-slate-100 p-1 rounded-xl">
+          <button onClick={() => setActiveView('organisation')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'organisation' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Organisation</button>
+          <button onClick={() => setActiveView('rentabilite')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'rentabilite' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Bilan Financier</button>
+        </div>
+      </div>
+
+      {activeView === 'organisation' && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 text-center py-16 animate-fade-in">
+          <Calendar className="mx-auto text-slate-300 mb-4" size={48} />
+          <h2 className="text-xl font-bold text-slate-800 mb-2">Calendrier des Événements</h2>
+          <p className="text-slate-500">Le module de création et de gestion des événements (Kermesse, Marché de Noël...) est en cours de développement.</p>
+        </div>
+      )}
+
+      {activeView === 'rentabilite' && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 text-center py-16 animate-fade-in">
+          <TrendingUp className="mx-auto text-slate-300 mb-4" size={48} />
+          <h2 className="text-xl font-bold text-slate-800 mb-2">Rentabilité de l'événement</h2>
+          <p className="text-slate-500">Le tableau de bord d'analyse financière (Dépenses vs Recettes liées à un événement) est en cours de développement.</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function App() {
   // 1. On lit l'URL pour voir si on ouvre un nouvel onglet sur un module précis
 const [activeTab, setActiveTab] = useState(() => {
@@ -5288,7 +5329,7 @@ const [activeTab, setActiveTab] = useState(() => {
       case 'scolarite': return <PlaceholderPage title="Scolarité" />;
       case 'factures_parents': return <PlaceholderPage title="Mes Factures (Parents)" />;
       case 'plannings': return <ModulePlannings defaultTab="cantine" />;
-      case 'fiche_travaux': return <PlaceholderPage title="Fiche Travaux" />;
+      case 'fiche_travaux': return <FicheTravaux />;
       case 'budget': return <BudgetPrevisionnel transactionsGlobales={transactionsGlobales} />;
       case 'notes_frais': return <NotesFrais transactionsGlobales={transactionsGlobales} />;
       case 'dons_recus': return <DonsRecus transactionsGlobales={transactionsGlobales} />;
@@ -5436,3 +5477,4 @@ const [activeTab, setActiveTab] = useState(() => {
     </div>
   );
 }
+
