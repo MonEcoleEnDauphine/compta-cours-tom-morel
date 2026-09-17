@@ -46,15 +46,6 @@ const PlaceholderPage = ({ title }) => (
   </div>
 );
 
-export default function App() {
-  const [activeTab, setActiveTab] = useState(() => {
-    const hash = window.location.hash.replace('#', '');
-    return hash || 'accueil_famille'; 
-  });
-  
-  const [transactionsGlobales, setTransactionsGlobales] = useState([]);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
 // --- MODULE : ACCUEIL FAMILLE (Tableau de Bord Parents) ---
 const AccueilFamille = () => {
   const [dons, setDons] = useState([]);
@@ -5285,7 +5276,7 @@ const GestionEvenements = () => {
     </div>
   );
 };
-};
+  
 export default function App() {
   // 1. On lit l'URL pour voir si on ouvre un nouvel onglet sur un module précis
 const [activeTab, setActiveTab] = useState(() => {
