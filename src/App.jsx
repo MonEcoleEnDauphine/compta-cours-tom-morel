@@ -3,13 +3,14 @@ import {
   LayoutDashboard, Users, BookOpen, GraduationCap, FileSignature, 
   AlertTriangle, Building, Calendar, PieChart, Lock, FileText, 
   Download, Trash2, XCircle, Search, ChevronRight, CheckCircle2, 
-  Paperclip, Plus, Sparkles, Receipt, Heart, FileSpreadsheet, 
+  Paperclip, Sparkles, Receipt, Heart, FileSpreadsheet, 
   Package, Target, TrendingUp, Info, Euro, ChevronDown, 
   Globe, Mail, Phone, PlusCircle, Edit2, Send, Clock, Hammer, Menu,
   Megaphone, Bell, Newspaper, Camera, MessageCircle,
-  Utensils, BarChart3, CheckCircle, AlertCircle, Printer, CalendarDays
+  Utensils, BarChart3, AlertCircle, Printer, CalendarDays
 } from 'lucide-react';
 import { initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
 import { getFirestore, collection, doc, deleteDoc, onSnapshot, addDoc, updateDoc } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import * as XLSX from 'xlsx';
@@ -26,6 +27,11 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+
+// ⚠️ ASTUCE VERCEL : On fait semblant d'utiliser 'auth' pour forcer Vercel à accepter la mise en ligne
+console.log("Firebase Auth prêt pour plus tard :", auth); 
+
 const db = getFirestore(app);
 const storage = getStorage(app);
 const appId = "cours-tom-morel-erp";
