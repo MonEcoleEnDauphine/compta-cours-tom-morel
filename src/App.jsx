@@ -45,7 +45,318 @@ const PlaceholderPage = ({ title }) => (
     <p className="text-slate-500">Cette page est en cours de construction. Le module sera bientôt disponible.</p>
   </div>
 );
+// --- MODULE : ACCUEIL FAMILLE (Tableau de Bord Parents) ---
+const AccueilFamille = () => {
+  const [dons, setDons] = useState([]);
+  const budgetGoal = 58724; // L'objectif que vous aviez fixé
 
+  // Récupération des dons en temps réel pour la jauge
+  useEffect(() => {
+    const q = collection(db, 'artifacts', appId, 'public', 'data', 'dons');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const liste = [];
+      snapshot.forEach((doc) => { liste.push({ id: doc.id, ...doc.data() }); });
+      setDons(liste);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Calculs pour la jauge
+  const totalDons = dons.reduce((acc, d) => acc + (Number(d.montant) || 0), 0);
+  const pctProgression = budgetGoal > 0 ? Math.min((totalDons / budgetGoal) * 100, 100).toFixed(2) : 0;
+  const resteCollecter = Math.max(0, budgetGoal - totalDons);
+  const formatMontant = (val) => new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val || 0);
+
+  // Données fictives (Trombinoscope)
+  const equipe = [
+    { nom: "Laurence Gérard", role: "Direction", img: "https://ui-avatars.com/api/?name=Laurence+Gérard&background=4f46e5&color=fff&size=128" },
+    { nom: "Cécile Sublet", role: "Enseignante", img: "https://ui-avatars.com/api/?name=Cécile+Sublet&background=0ea5e9&color=fff&size=128" },
+    { nom: "Florence Hervet", role: "Enseignante", img: "https://ui-avatars.com/api/?name=Florence+ Hervet&background=10b981&color=fff&size=128" },
+    { nom: "Laurent Fauvain", role: "Président Asso.", img: "https://ui-avatars.com/api/?name=Laurent+Fauvain&background=8b5cf6&color=fff&size=128" },
+    { nom: "Louis-Vianney Le Lézec", role: "Trésorier", img: "https://ui-avatars.com/api/?name=Le+Lezec&background=f59e0b&color=fff&size=128" },
+  ];
+
+  return (
+    <div className="space-y-6 max-w-7xl mx-auto pb-10 font-sans animate-fade-in">
+      
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-8 rounded-2xl shadow-md text-white flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-black mb-2">Bienvenue sur le portail Familles</h1>
+          <p className="text-blue-100 text-sm">Toutes les informations, plannings et actualités du Cours Tom Morel centralisées ici.</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* COLONNE GAUCHE (Plus large) */}
+        <div className="lg:col-span-2 space-y-6">
+          
+          {/* ACTUALITÉS */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
+              <Megaphone className="text-indigo-500" size={20} /> Le mot de l'équipe
+            </h2>
+            <div className="bg-indigo-50/50 border border-indigo-100 p-4 rounded-xl">
+              <h3 className="font-bold text-indigo-900 mb-2">Préparation de la rentrée 2026/2027</h3>
+              <p className="text-sm text-slate-600 leading-relaxed">
+                Chers parents, nous sommes impatients de retrouver vos enfants. N'oubliez pas de vérifier vos plannings de ménage et de cantine dans le menu de gauche. Les fournitures scolaires ont été commandées.
+              </p>
+              <p className="text-xs text-slate-400 mt-3 text-right">Publié par La Direction, hier à 14:30</p>
+            </div>
+          </div>
+
+          {/* JAUGE DES DONS (Design type HelloAsso/Dashboard) */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
+              <Target className="text-rose-500" size={20} /> Objectif de la Période 2025/2026
+            </h2>
+            
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-center">
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Objectif</span>
+                <p className="text-xl font-black text-indigo-600">{formatMontant(budgetGoal)} €</p>
+              </div>
+              <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 text-center">
+                <span className="text-[10px] font-bold text-emerald-600 uppercase">Dons Actuels</span>
+                <p className="text-xl font-black text-emerald-700">{formatMontant(totalDons)} €</p>
+              </div>
+              <div className="bg-rose-50 p-4 rounded-xl border border-rose-100 text-center">
+                <span className="text-[10px] font-bold text-rose-600 uppercase">Reste à collecter</span>
+                <p className="text-xl font-black text-rose-700">{formatMontant(resteCollecter)} €</p>
+              </div>
+            </div>
+
+            <div className="mb-2 flex justify-between items-end">
+              <span className="text-xs font-bold text-slate-500">Progression de l'Objectif :</span>
+              <span className="text-xl font-black text-indigo-600">{pctProgression}%</span>
+            </div>
+            <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden shadow-inner">
+              <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 h-full rounded-full transition-all duration-1000" style={{ width: `${pctProgression}%` }}></div>
+            </div>
+            <div className="flex justify-between items-center mt-2 text-[10px] font-bold text-slate-400">
+              <span>0 €</span>
+              <span>{formatMontant(budgetGoal)} €</span>
+            </div>
+          </div>
+
+          {/* TROMBINOSCOPE */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
+              <Users className="text-emerald-500" size={20} /> L'équipe (Trombinoscope)
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+              {equipe.map((membre, idx) => (
+                <div key={idx} className="flex flex-col items-center p-3 hover:bg-slate-50 rounded-xl transition-colors text-center border border-transparent hover:border-slate-100">
+                  <img src={membre.img} alt={membre.nom} className="w-16 h-16 rounded-full shadow-sm mb-3 border-2 border-white" />
+                  <span className="text-sm font-bold text-slate-800 leading-tight">{membre.nom}</span>
+                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mt-1">{membre.role}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+        </div>
+
+        {/* COLONNE DROITE (Plus fine) */}
+        <div className="space-y-6">
+          
+          {/* RAPPELS RAPIDES */}
+          <div className="bg-white rounded-2xl shadow-sm border border-rose-100 p-6 bg-gradient-to-b from-white to-rose-50/30">
+            <h2 className="text-sm font-bold text-rose-800 flex items-center gap-2 mb-4 border-b border-rose-100 pb-3">
+              <Bell className="text-rose-500" size={18} /> Rappels importants
+            </h2>
+            <ul className="space-y-3">
+              <li className="flex items-start gap-2 text-sm text-slate-600 bg-white p-3 rounded-xl border border-rose-100 shadow-sm">
+                <div className="w-1.5 h-1.5 rounded-full bg-rose-500 mt-1.5 shrink-0"></div>
+                <span>Merci de remplir les <b>fiches travaux</b> avant le 15 Septembre.</span>
+              </li>
+              <li className="flex items-start gap-2 text-sm text-slate-600 bg-white p-3 rounded-xl border border-rose-100 shadow-sm">
+                <div className="w-1.5 h-1.5 rounded-full bg-rose-500 mt-1.5 shrink-0"></div>
+                <span>Pensez à vérifier vos créneaux pour le <b>ménage du week-end</b>.</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* ÉVÉNEMENTS */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
+              <Calendar className="text-blue-500" size={18} /> Prochains événements
+            </h2>
+            <div className="space-y-4">
+              <div className="flex gap-4 items-center group">
+                <div className="bg-blue-50 text-blue-700 px-3 py-2 rounded-xl text-center min-w-[50px] group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                  <span className="block text-xs font-bold uppercase">Sep</span>
+                  <span className="block text-lg font-black">12</span>
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-800">Réunion de Rentrée</h4>
+                  <p className="text-xs text-slate-500 mt-0.5">18h30 - Salles de classe</p>
+                </div>
+              </div>
+              <div className="flex gap-4 items-center group">
+                <div className="bg-blue-50 text-blue-700 px-3 py-2 rounded-xl text-center min-w-[50px] group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                  <span className="block text-xs font-bold uppercase">Oct</span>
+                  <span className="block text-lg font-black">20</span>
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-800">Cross de l'école</h4>
+                  <p className="text-xs text-slate-500 mt-0.5">Matinée - Stade municipal</p>
+                </div>
+              </div>
+              <div className="flex gap-4 items-center group">
+                <div className="bg-blue-50 text-blue-700 px-3 py-2 rounded-xl text-center min-w-[50px] group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                  <span className="block text-xs font-bold uppercase">Déc</span>
+                  <span className="block text-lg font-black">15</span>
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-800">Fête de Noël</h4>
+                  <p className="text-xs text-slate-500 mt-0.5">16h00 - Cour de récréation</p>
+                </div>
+              </div>
+            </div>
+            <button className="w-full mt-5 bg-slate-50 hover:bg-slate-100 text-slate-600 py-2 rounded-xl text-xs font-bold transition-colors">
+              Voir tout l'agenda
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- MODULE : VIE DE L'ÉCOLE ---
+const VieEcole = () => (
+  <div className="space-y-6 max-w-6xl mx-auto pb-10 font-sans animate-fade-in">
+    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mt-6">
+      <div>
+        <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+          <Newspaper className="text-indigo-600" /> Vie de l'école
+        </h2>
+        <p className="text-slate-500 text-sm mt-1">Retrouvez les dernières lettres aux parents, les photos et les actualités des classes.</p>
+      </div>
+    </div>
+
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Lettres aux parents */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+         <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
+          <FileText className="text-blue-500" size={20} /> Lettres aux parents
+         </h3>
+         <div className="space-y-3">
+           <div className="flex justify-between items-center p-3 hover:bg-slate-50 rounded-xl border border-slate-100 transition-colors cursor-pointer group">
+             <div className="flex items-center gap-3">
+               <div className="bg-blue-100 text-blue-600 p-2 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors"><FileText size={16} /></div>
+               <div>
+                 <p className="font-bold text-sm text-slate-700">Lettre de rentrée - Période 1</p>
+                 <p className="text-[10px] text-slate-400">Exemple de document</p>
+               </div>
+             </div>
+             <Download size={16} className="text-slate-400 group-hover:text-blue-600 transition-colors" />
+           </div>
+           <div className="text-center mt-4">
+             <p className="text-xs text-slate-400 italic">Espace d'administration à venir pour déposer vos PDF...</p>
+           </div>
+         </div>
+      </div>
+
+      {/* Photos */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+         <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
+          <Camera className="text-emerald-500" size={20} /> Galerie Photos
+         </h3>
+         <div className="grid grid-cols-2 gap-3">
+           <div className="aspect-video bg-slate-50 rounded-xl flex items-center justify-center border border-slate-200 border-dashed hover:bg-slate-100 cursor-pointer transition-colors">
+             <span className="text-xs text-slate-400 font-medium text-center px-2">Sortie Forêt<br/>(Album vide)</span>
+           </div>
+           <div className="aspect-video bg-slate-50 rounded-xl flex items-center justify-center border border-slate-200 border-dashed hover:bg-slate-100 cursor-pointer transition-colors">
+             <span className="text-xs text-slate-400 font-medium text-center px-2">Atelier Peinture<br/>(Album vide)</span>
+           </div>
+         </div>
+      </div>
+    </div>
+  </div>
+);
+
+// --- MODULE : CONTACT ---
+const InfosContact = () => (
+  <div className="space-y-6 max-w-6xl mx-auto animate-fade-in pb-10">
+    <div className="bg-blue-600 p-8 rounded-xl shadow-md text-white mt-6">
+      <h1 className="text-3xl font-bold mb-2">Bienvenue sur le portail du Cours Tom Morel</h1>
+      <p className="text-blue-100">Retrouvez ici toutes les informations de scolarité.</p>
+    </div>
+
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center">
+        <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center mb-4">
+          <Globe size={24} />
+        </div>
+        <h3 className="text-lg font-bold text-slate-800 mb-1">Le Cours Tom Morel</h3>
+        <p className="text-blue-500 text-sm mb-6">24 rue de la Chapelle, Saint-Chef</p>
+        <div className="flex-1"></div>
+        <a href="https://sites.google.com/view/courstommorel/cours-tom-morel" target="_blank" rel="noreferrer" className="w-full inline-flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-600 px-4 py-2.5 rounded-lg transition-colors font-medium text-sm">
+          <Globe size={18} /> Visiter le site
+        </a>
+      </div>
+
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center">
+        <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center mb-4">
+          <Mail size={24} />
+        </div>
+        <h3 className="text-lg font-bold text-slate-800 mb-1">Direction de l'École</h3>
+        <p className="text-slate-600 text-sm font-medium mb-1">Mme Laurence Gérard</p>
+        <p className="text-slate-400 text-xs mb-5">Équipe enseignante: Mme Cécile Sublet & Mme Florence Hervet</p>
+        
+        <a href="tel:0667909576" className="w-full border border-slate-200 hover:bg-slate-50 rounded-lg py-2 mb-3 flex items-center justify-center gap-2 text-slate-600 text-sm font-bold transition-colors">
+          <Phone size={16} /> 06 67 90 95 76
+        </a>
+        
+        <a href="mailto:direction.tom.morel@gmail.com" className="w-full inline-flex items-center justify-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 px-4 py-2.5 rounded-lg transition-colors font-medium text-sm">
+          <Mail size={18} /> Écrire
+        </a>
+      </div>
+
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center">
+        <div className="w-12 h-12 rounded-full bg-purple-50 text-purple-500 flex items-center justify-center mb-4">
+          <Building size={24} />
+        </div>
+        <h3 className="text-lg font-bold text-slate-800 mb-1">Association (Bureau)</h3>
+        <p className="text-purple-500 text-sm mb-6">Mon École en Dauphiné</p>
+        <div className="flex-1"></div>
+        <div className="w-full border border-slate-200 rounded-lg py-2 mb-3 flex items-center justify-center gap-2 text-slate-400 text-sm font-medium">
+          <Phone size={16} /> -
+        </div>
+        <a href="mailto:monecoleendauphine@gmail.com" className="w-full inline-flex items-center justify-center gap-2 bg-purple-50 hover:bg-purple-100 text-purple-600 px-4 py-2.5 rounded-lg transition-colors font-medium text-sm">
+          <Mail size={18} /> Écrire
+        </a>
+      </div>
+    </div>
+
+    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row items-center justify-between gap-6">
+      <div className="flex items-center gap-4 text-center md:text-left">
+        <div className="hidden md:flex w-12 h-12 rounded-full bg-amber-50 text-amber-500 items-center justify-center shrink-0">
+          <AlertTriangle size={24} />
+        </div>
+        <div>
+          <h3 className="text-lg font-bold text-slate-800">Support Technique ERP</h3>
+          <p className="text-slate-500 text-sm mt-1">Un souci avec l'application, un bug ou une erreur dans vos données ? Contactez l'administrateur (L. Le Lezec).</p>
+        </div>
+      </div>
+      
+      <div className="flex flex-wrap items-center justify-center md:justify-end gap-3 w-full md:w-auto shrink-0">
+        <a href="https://wa.me/33783424110" target="_blank" rel="noreferrer" className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-4 py-2.5 rounded-xl transition-colors font-bold text-sm">
+          <MessageCircle size={16} /> WhatsApp
+        </a>
+        <a href="sms:0783424110" className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl transition-colors font-bold text-sm">
+          <MessageCircle size={16} /> SMS
+        </a>
+        <a href="mailto:lvlelezec@gmail.com" className="w-full md:w-auto inline-flex items-center justify-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-4 py-2.5 rounded-xl transition-colors font-bold text-sm">
+          <Mail size={16} /> E-mail
+        </a>
+      </div>
+    </div>
+  </div>
+);
 // --- MODULE : PLANNINGS (Cantine & Ménage) ---
 const ModulePlannings = ({ defaultTab = 'cantine' }) => {
   const [activeTab, setActiveTab] = useState(defaultTab);
@@ -1037,7 +1348,6 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
     </div>
   );
 };
-
 // --- TABLEAU DE BORD (DASHBOARD) ---
 const TableauBord = ({ transactionsGlobales }) => {
   const [anneeFiltre, setAnneeFiltre] = useState('TOTAL');
@@ -4696,318 +5006,6 @@ const DonsRecus = ({ transactionsGlobales }) => {
   );
 };
 
-// --- MODULE : ACCUEIL FAMILLE (Tableau de Bord Parents) ---
-const AccueilFamille = () => {
-  const [dons, setDons] = useState([]);
-  const budgetGoal = 58724; // L'objectif que vous aviez fixé
-
-  // Récupération des dons en temps réel pour la jauge
-  useEffect(() => {
-    const q = collection(db, 'artifacts', appId, 'public', 'data', 'dons');
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const liste = [];
-      snapshot.forEach((doc) => { liste.push({ id: doc.id, ...doc.data() }); });
-      setDons(liste);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // Calculs pour la jauge
-  const totalDons = dons.reduce((acc, d) => acc + (Number(d.montant) || 0), 0);
-  const pctProgression = budgetGoal > 0 ? Math.min((totalDons / budgetGoal) * 100, 100).toFixed(2) : 0;
-  const resteCollecter = Math.max(0, budgetGoal - totalDons);
-  const formatMontant = (val) => new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val || 0);
-
-  // Données fictives (Trombinoscope)
-  const equipe = [
-    { nom: "Laurence Gérard", role: "Direction", img: "https://ui-avatars.com/api/?name=Laurence+Gérard&background=4f46e5&color=fff&size=128" },
-    { nom: "Cécile Sublet", role: "Enseignante", img: "https://ui-avatars.com/api/?name=Cécile+Sublet&background=0ea5e9&color=fff&size=128" },
-    { nom: "Florence Hervet", role: "Enseignante", img: "https://ui-avatars.com/api/?name=Florence+ Hervet&background=10b981&color=fff&size=128" },
-    { nom: "Laurent Fauvain", role: "Président Asso.", img: "https://ui-avatars.com/api/?name=Laurent+Fauvain&background=8b5cf6&color=fff&size=128" },
-    { nom: "Louis-Vianney Le Lézec", role: "Trésorier", img: "https://ui-avatars.com/api/?name=Le+Lezec&background=f59e0b&color=fff&size=128" },
-  ];
-
-  return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-10 font-sans animate-fade-in">
-      
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-8 rounded-2xl shadow-md text-white flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-black mb-2">Bienvenue sur le portail Familles</h1>
-          <p className="text-blue-100 text-sm">Toutes les informations, plannings et actualités du Cours Tom Morel centralisées ici.</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* COLONNE GAUCHE (Plus large) */}
-        <div className="lg:col-span-2 space-y-6">
-          
-          {/* ACTUALITÉS */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
-              <Megaphone className="text-indigo-500" size={20} /> Le mot de l'équipe
-            </h2>
-            <div className="bg-indigo-50/50 border border-indigo-100 p-4 rounded-xl">
-              <h3 className="font-bold text-indigo-900 mb-2">Préparation de la rentrée 2026/2027</h3>
-              <p className="text-sm text-slate-600 leading-relaxed">
-                Chers parents, nous sommes impatients de retrouver vos enfants. N'oubliez pas de vérifier vos plannings de ménage et de cantine dans le menu de gauche. Les fournitures scolaires ont été commandées.
-              </p>
-              <p className="text-xs text-slate-400 mt-3 text-right">Publié par La Direction, hier à 14:30</p>
-            </div>
-          </div>
-
-          {/* JAUGE DES DONS (Design type HelloAsso/Dashboard) */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
-              <Target className="text-rose-500" size={20} /> Objectif de la Période 2025/2026
-            </h2>
-            
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-center">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">Objectif</span>
-                <p className="text-xl font-black text-indigo-600">{formatMontant(budgetGoal)} €</p>
-              </div>
-              <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 text-center">
-                <span className="text-[10px] font-bold text-emerald-600 uppercase">Dons Actuels</span>
-                <p className="text-xl font-black text-emerald-700">{formatMontant(totalDons)} €</p>
-              </div>
-              <div className="bg-rose-50 p-4 rounded-xl border border-rose-100 text-center">
-                <span className="text-[10px] font-bold text-rose-600 uppercase">Reste à collecter</span>
-                <p className="text-xl font-black text-rose-700">{formatMontant(resteCollecter)} €</p>
-              </div>
-            </div>
-
-            <div className="mb-2 flex justify-between items-end">
-              <span className="text-xs font-bold text-slate-500">Progression de l'Objectif :</span>
-              <span className="text-xl font-black text-indigo-600">{pctProgression}%</span>
-            </div>
-            <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden shadow-inner">
-              <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 h-full rounded-full transition-all duration-1000" style={{ width: `${pctProgression}%` }}></div>
-            </div>
-            <div className="flex justify-between items-center mt-2 text-[10px] font-bold text-slate-400">
-              <span>0 €</span>
-              <span>{formatMontant(budgetGoal)} €</span>
-            </div>
-          </div>
-
-          {/* TROMBINOSCOPE */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
-              <Users className="text-emerald-500" size={20} /> L'équipe (Trombinoscope)
-            </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-              {equipe.map((membre, idx) => (
-                <div key={idx} className="flex flex-col items-center p-3 hover:bg-slate-50 rounded-xl transition-colors text-center border border-transparent hover:border-slate-100">
-                  <img src={membre.img} alt={membre.nom} className="w-16 h-16 rounded-full shadow-sm mb-3 border-2 border-white" />
-                  <span className="text-sm font-bold text-slate-800 leading-tight">{membre.nom}</span>
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mt-1">{membre.role}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-        </div>
-
-        {/* COLONNE DROITE (Plus fine) */}
-        <div className="space-y-6">
-          
-          {/* RAPPELS RAPIDES */}
-          <div className="bg-white rounded-2xl shadow-sm border border-rose-100 p-6 bg-gradient-to-b from-white to-rose-50/30">
-            <h2 className="text-sm font-bold text-rose-800 flex items-center gap-2 mb-4 border-b border-rose-100 pb-3">
-              <Bell className="text-rose-500" size={18} /> Rappels importants
-            </h2>
-            <ul className="space-y-3">
-              <li className="flex items-start gap-2 text-sm text-slate-600 bg-white p-3 rounded-xl border border-rose-100 shadow-sm">
-                <div className="w-1.5 h-1.5 rounded-full bg-rose-500 mt-1.5 shrink-0"></div>
-                <span>Merci de remplir les <b>fiches travaux</b> avant le 15 Septembre.</span>
-              </li>
-              <li className="flex items-start gap-2 text-sm text-slate-600 bg-white p-3 rounded-xl border border-rose-100 shadow-sm">
-                <div className="w-1.5 h-1.5 rounded-full bg-rose-500 mt-1.5 shrink-0"></div>
-                <span>Pensez à vérifier vos créneaux pour le <b>ménage du week-end</b>.</span>
-              </li>
-            </ul>
-          </div>
-
-          {/* ÉVÉNEMENTS */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-            <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
-              <Calendar className="text-blue-500" size={18} /> Prochains événements
-            </h2>
-            <div className="space-y-4">
-              <div className="flex gap-4 items-center group">
-                <div className="bg-blue-50 text-blue-700 px-3 py-2 rounded-xl text-center min-w-[50px] group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                  <span className="block text-xs font-bold uppercase">Sep</span>
-                  <span className="block text-lg font-black">12</span>
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-slate-800">Réunion de Rentrée</h4>
-                  <p className="text-xs text-slate-500 mt-0.5">18h30 - Salles de classe</p>
-                </div>
-              </div>
-              <div className="flex gap-4 items-center group">
-                <div className="bg-blue-50 text-blue-700 px-3 py-2 rounded-xl text-center min-w-[50px] group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                  <span className="block text-xs font-bold uppercase">Oct</span>
-                  <span className="block text-lg font-black">20</span>
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-slate-800">Cross de l'école</h4>
-                  <p className="text-xs text-slate-500 mt-0.5">Matinée - Stade municipal</p>
-                </div>
-              </div>
-              <div className="flex gap-4 items-center group">
-                <div className="bg-blue-50 text-blue-700 px-3 py-2 rounded-xl text-center min-w-[50px] group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                  <span className="block text-xs font-bold uppercase">Déc</span>
-                  <span className="block text-lg font-black">15</span>
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-slate-800">Fête de Noël</h4>
-                  <p className="text-xs text-slate-500 mt-0.5">16h00 - Cour de récréation</p>
-                </div>
-              </div>
-            </div>
-            <button className="w-full mt-5 bg-slate-50 hover:bg-slate-100 text-slate-600 py-2 rounded-xl text-xs font-bold transition-colors">
-              Voir tout l'agenda
-            </button>
-          </div>
-
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// --- MODULE : VIE DE L'ÉCOLE ---
-const VieEcole = () => (
-  <div className="space-y-6 max-w-6xl mx-auto pb-10 font-sans animate-fade-in">
-    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mt-6">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-          <Newspaper className="text-indigo-600" /> Vie de l'école
-        </h2>
-        <p className="text-slate-500 text-sm mt-1">Retrouvez les dernières lettres aux parents, les photos et les actualités des classes.</p>
-      </div>
-    </div>
-
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {/* Lettres aux parents */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-         <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
-          <FileText className="text-blue-500" size={20} /> Lettres aux parents
-         </h3>
-         <div className="space-y-3">
-           <div className="flex justify-between items-center p-3 hover:bg-slate-50 rounded-xl border border-slate-100 transition-colors cursor-pointer group">
-             <div className="flex items-center gap-3">
-               <div className="bg-blue-100 text-blue-600 p-2 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors"><FileText size={16} /></div>
-               <div>
-                 <p className="font-bold text-sm text-slate-700">Lettre de rentrée - Période 1</p>
-                 <p className="text-[10px] text-slate-400">Exemple de document</p>
-               </div>
-             </div>
-             <Download size={16} className="text-slate-400 group-hover:text-blue-600 transition-colors" />
-           </div>
-           <div className="text-center mt-4">
-             <p className="text-xs text-slate-400 italic">Espace d'administration à venir pour déposer vos PDF...</p>
-           </div>
-         </div>
-      </div>
-
-      {/* Photos */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-         <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
-          <Camera className="text-emerald-500" size={20} /> Galerie Photos
-         </h3>
-         <div className="grid grid-cols-2 gap-3">
-           <div className="aspect-video bg-slate-50 rounded-xl flex items-center justify-center border border-slate-200 border-dashed hover:bg-slate-100 cursor-pointer transition-colors">
-             <span className="text-xs text-slate-400 font-medium text-center px-2">Sortie Forêt<br/>(Album vide)</span>
-           </div>
-           <div className="aspect-video bg-slate-50 rounded-xl flex items-center justify-center border border-slate-200 border-dashed hover:bg-slate-100 cursor-pointer transition-colors">
-             <span className="text-xs text-slate-400 font-medium text-center px-2">Atelier Peinture<br/>(Album vide)</span>
-           </div>
-         </div>
-      </div>
-    </div>
-  </div>
-);
-
-// --- MODULE : CONTACT ---
-const InfosContact = () => (
-  <div className="space-y-6 max-w-6xl mx-auto animate-fade-in pb-10">
-    <div className="bg-blue-600 p-8 rounded-xl shadow-md text-white mt-6">
-      <h1 className="text-3xl font-bold mb-2">Bienvenue sur le portail du Cours Tom Morel</h1>
-      <p className="text-blue-100">Retrouvez ici toutes les informations de scolarité.</p>
-    </div>
-
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center">
-        <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center mb-4">
-          <Globe size={24} />
-        </div>
-        <h3 className="text-lg font-bold text-slate-800 mb-1">Le Cours Tom Morel</h3>
-        <p className="text-blue-500 text-sm mb-6">24 rue de la Chapelle, Saint-Chef</p>
-        <div className="flex-1"></div>
-        <a href="https://sites.google.com/view/courstommorel/cours-tom-morel" target="_blank" rel="noreferrer" className="w-full inline-flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-600 px-4 py-2.5 rounded-lg transition-colors font-medium text-sm">
-          <Globe size={18} /> Visiter le site
-        </a>
-      </div>
-
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center">
-        <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center mb-4">
-          <Mail size={24} />
-        </div>
-        <h3 className="text-lg font-bold text-slate-800 mb-1">Direction de l'École</h3>
-        <p className="text-slate-600 text-sm font-medium mb-1">Mme Laurence Gérard</p>
-        <p className="text-slate-400 text-xs mb-5">Équipe enseignante: Mme Cécile Sublet & Mme Florence Hervet</p>
-        
-        <a href="tel:0667909576" className="w-full border border-slate-200 hover:bg-slate-50 rounded-lg py-2 mb-3 flex items-center justify-center gap-2 text-slate-600 text-sm font-bold transition-colors">
-          <Phone size={16} /> 06 67 90 95 76
-        </a>
-        
-        <a href="mailto:direction.tom.morel@gmail.com" className="w-full inline-flex items-center justify-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 px-4 py-2.5 rounded-lg transition-colors font-medium text-sm">
-          <Mail size={18} /> Écrire
-        </a>
-      </div>
-
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center">
-        <div className="w-12 h-12 rounded-full bg-purple-50 text-purple-500 flex items-center justify-center mb-4">
-          <Building size={24} />
-        </div>
-        <h3 className="text-lg font-bold text-slate-800 mb-1">Association (Bureau)</h3>
-        <p className="text-purple-500 text-sm mb-6">Mon École en Dauphiné</p>
-        <div className="flex-1"></div>
-        <div className="w-full border border-slate-200 rounded-lg py-2 mb-3 flex items-center justify-center gap-2 text-slate-400 text-sm font-medium">
-          <Phone size={16} /> -
-        </div>
-        <a href="mailto:monecoleendauphine@gmail.com" className="w-full inline-flex items-center justify-center gap-2 bg-purple-50 hover:bg-purple-100 text-purple-600 px-4 py-2.5 rounded-lg transition-colors font-medium text-sm">
-          <Mail size={18} /> Écrire
-        </a>
-      </div>
-    </div>
-
-    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row items-center justify-between gap-6">
-      <div className="flex items-center gap-4 text-center md:text-left">
-        <div className="hidden md:flex w-12 h-12 rounded-full bg-amber-50 text-amber-500 items-center justify-center shrink-0">
-          <AlertTriangle size={24} />
-        </div>
-        <div>
-          <h3 className="text-lg font-bold text-slate-800">Support Technique ERP</h3>
-          <p className="text-slate-500 text-sm mt-1">Un souci avec l'application, un bug ou une erreur dans vos données ? Contactez l'administrateur (L. Le Lezec).</p>
-        </div>
-      </div>
-      
-      <div className="flex flex-wrap items-center justify-center md:justify-end gap-3 w-full md:w-auto shrink-0">
-        <a href="https://wa.me/33783424110" target="_blank" rel="noreferrer" className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-4 py-2.5 rounded-xl transition-colors font-bold text-sm">
-          <MessageCircle size={16} /> WhatsApp
-        </a>
-        <a href="sms:0783424110" className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl transition-colors font-bold text-sm">
-          <MessageCircle size={16} /> SMS
-        </a>
-        <a href="mailto:lvlelezec@gmail.com" className="w-full md:w-auto inline-flex items-center justify-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-4 py-2.5 rounded-xl transition-colors font-bold text-sm">
-          <Mail size={16} /> E-mail
-        </a>
-      </div>
-    </div>
-  </div>
-);
 
 // --- MODULE : GESTION DES ÉVÉNEMENTS ---
 const GestionEvenements = () => {
