@@ -2356,12 +2356,13 @@ const GrandLivre = ({ transactionsGlobales }) => {
   
   const [showProjetModal, setShowProjetModal] = useState(false);
   const [nouveauProjet, setNouveauProjet] = useState('');
+  const [pendingProjetTarget, setPendingProjetTarget] = useState(null); // Pour auto-assigner le projet à une ligne
 
   const [activeTab, setActiveTab] = useState(null);
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetAnnee, setResetAnnee] = useState('TOTAL');
 
-  // NOUVEAU: Masquer/Afficher les colonnes techniques
+  // Masquer/Afficher les colonnes techniques
   const [showAdvancedCols, setShowAdvancedCols] = useState(false);
 
   const [odFormDate, setOdFormDate] = useState('');
@@ -2518,13 +2519,27 @@ const GrandLivre = ({ transactionsGlobales }) => {
   };
 
   const handleSaveProjet = async () => {
-    if (!nouveauProjet.trim()) return;
+    const nomProjet = nouveauProjet.trim();
+    if (!nomProjet) return;
     try {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'projets'), {
-        nom: nouveauProjet.trim()
+        nom: nomProjet
       });
+      
+      // Auto-assignation intelligente du projet à la ligne en cours d'édition
+      if (pendingProjetTarget) {
+         if (pendingProjetTarget.type === 'OD_FORM') {
+             setOdFormProjet(nomProjet);
+         } else if (pendingProjetTarget.type === 'SAS_ROW') {
+             setLignesEnAttente(prev => prev.map(l => l.id === pendingProjetTarget.id ? { ...l, projet: nomProjet } : l));
+         } else if (pendingProjetTarget.type === 'GL_ROW') {
+             handleUpdateField(pendingProjetTarget.id, nomProjet, 'projet');
+         }
+      }
+
       setShowProjetModal(false);
       setNouveauProjet('');
+      setPendingProjetTarget(null);
     } catch (e) {
       alert("Erreur lors de la création du projet.");
     }
@@ -3315,7 +3330,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
                   <p className="text-indigo-200 text-xs mt-0.5">Ajouter un axe analytique (Événements...)</p>
                 </div>
               </div>
-              <button onClick={() => setShowProjetModal(false)} className="text-white/70 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-colors">
+              <button onClick={() => { setShowProjetModal(false); setPendingProjetTarget(null); }} className="text-white/70 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-colors">
                 <XCircle size={20} />
               </button>
             </div>
@@ -3328,7 +3343,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
             </div>
 
             <div className="p-4 bg-slate-50/80 border-t border-slate-100 flex justify-end gap-3">
-              <button onClick={() => setShowProjetModal(false)} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-200/60 transition-colors">Annuler</button>
+              <button onClick={() => { setShowProjetModal(false); setPendingProjetTarget(null); }} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-200/60 transition-colors">Annuler</button>
               <button onClick={handleSaveProjet} disabled={!nouveauProjet.trim()} className={`px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all flex items-center gap-2 ${nouveauProjet.trim() ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 cursor-pointer' : 'bg-indigo-300 cursor-not-allowed shadow-none'}`}>
                 <CheckCircle2 size={16} /> Créer le projet
               </button>
@@ -3532,9 +3547,22 @@ const GrandLivre = ({ transactionsGlobales }) => {
                     <input type="text" placeholder="Libellé OD..." value={odFormLibelle} onChange={e => setOdFormLibelle(e.target.value)} className="flex-1 border border-slate-200 rounded-xl p-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-purple-600 font-medium shadow-sm" />
                   </div>
                   <div className="flex gap-3 mt-1">
-                    <select value={odFormProjet} onChange={e => setOdFormProjet(e.target.value)} className="w-1/3 border border-slate-200 rounded-xl p-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-purple-600 shadow-sm text-slate-600 font-medium cursor-pointer">
+                    <select 
+                      value={odFormProjet} 
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (val === '_NEW_') {
+                          setPendingProjetTarget({ type: 'OD_FORM' });
+                          setShowProjetModal(true);
+                        } else {
+                          setOdFormProjet(val);
+                        }
+                      }} 
+                      className="w-1/3 border border-slate-200 rounded-xl p-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-purple-600 shadow-sm text-slate-600 font-medium cursor-pointer"
+                    >
                       <option value="">-- Aucun projet (Optionnel) --</option>
                       {projetsList.map(p => <option key={`od-${p.id}`} value={p.nom}>{p.nom}</option>)}
+                      <option value="_NEW_" className="font-bold text-indigo-600">➕ Créer un nouveau projet...</option>
                     </select>
                     <input type="text" placeholder="Commentaire ou référence optionnelle..." value={odFormCommentaire} onChange={e => setOdFormCommentaire(e.target.value)} className="flex-1 border border-slate-200 rounded-xl p-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-purple-600 shadow-sm" />
                   </div>
@@ -3630,9 +3658,22 @@ const GrandLivre = ({ transactionsGlobales }) => {
                     </td>
                     <td className="py-3 px-4 min-w-[200px]">
                       <div className="flex flex-col gap-1.5">
-                        <select value={ligne.projet || ''} onChange={(e) => { const val = e.target.value; setLignesEnAttente(prev => prev.map(l => l.id === ligne.id ? { ...l, projet: val } : l)); }} className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px] w-full outline-none focus:border-indigo-500 bg-white text-slate-600 cursor-pointer shadow-sm">
+                        <select 
+                          value={ligne.projet || ''} 
+                          onChange={(e) => { 
+                            const val = e.target.value; 
+                            if (val === '_NEW_') {
+                              setPendingProjetTarget({ type: 'SAS_ROW', id: ligne.id });
+                              setShowProjetModal(true);
+                            } else {
+                              setLignesEnAttente(prev => prev.map(l => l.id === ligne.id ? { ...l, projet: val } : l)); 
+                            }
+                          }} 
+                          className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px] w-full outline-none focus:border-indigo-500 bg-white text-slate-600 cursor-pointer shadow-sm"
+                        >
                           <option value="">Aucun projet</option>
                           {projetsList.map(p => <option key={`sas-${p.id}`} value={p.nom}>{p.nom}</option>)}
+                          <option value="_NEW_" className="font-bold text-indigo-600">➕ Créer un projet...</option>
                         </select>
                         <input type="text" placeholder="Ajouter un commentaire..." value={ligne.commentaire || ''} onChange={(e) => { const val = e.target.value; setLignesEnAttente(prev => prev.map(l => l.id === ligne.id ? { ...l, commentaire: val } : l)); }} className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px] w-full outline-none focus:border-indigo-500 bg-slate-50/50 shadow-inner" />
                       </div>
@@ -3687,21 +3728,18 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
             
-            <button onClick={() => setShowProjetModal(true)} className="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-2 active:scale-95" title="Créer un nouveau projet analytique">
+            <button onClick={() => { setPendingProjetTarget(null); setShowProjetModal(true); }} className="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-2 active:scale-95" title="Créer un nouveau projet analytique">
               <PlusCircle size={14} /> Nouveau Projet
             </button>
 
-            {/* NOUVEAU BOUTON : EXPORT CSV */}
             <button onClick={handleExportCSV} className="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-2 active:scale-95" title="Exporter le tableau actuel sur Excel (CSV)">
               <Download size={14} /> Exporter (.csv)
             </button>
 
-            {/* BOUTON D'OUVERTURE DE LA MODALE DE SUPPRESSION SÉLECTIVE */}
             <button onClick={() => setShowResetModal(true)} className="text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-2 active:scale-95" title="Vider le Grand Livre de manière sélective">
               <Trash2 size={14} /> Vider le Grand Livre (Filtre)
             </button>
 
-            {/* BOUTON AFFICHER/MASQUER COLONNES TECHNIQUES */}
             <button onClick={() => setShowAdvancedCols(!showAdvancedCols)} className={`text-xs px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-2 active:scale-95 ${showAdvancedCols ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'}`} title="Afficher ou masquer les colonnes techniques (ID, Référence, Type d'opération)">
               <Menu size={14} /> {showAdvancedCols ? "Masquer détails" : "Plus de détails"}
             </button>
@@ -3815,12 +3853,25 @@ const GrandLivre = ({ transactionsGlobales }) => {
                     {showAdvancedCols && <td className="py-3.5 px-3 text-slate-500 text-xs whitespace-normal max-w-[140px]">{t.reference || <span className="text-slate-300 italic">-</span>}</td>}
                     {showAdvancedCols && <td className="py-3.5 px-3 text-slate-500 text-xs whitespace-nowrap">{t.typeOp || <span className="text-slate-300 italic">-</span>}</td>}
                     
-                    {/* CELLULE PROJET AVEC ÉDITION RAPIDE */}
+                    {/* CELLULE PROJET AVEC ÉDITION RAPIDE & CRÉATION */}
                     <td className="py-3.5 px-4 text-indigo-700 text-[11px] font-bold whitespace-nowrap">
                       {editingRowId === t.id ? (
-                        <select value={t.projet || ''} onChange={(e) => handleUpdateField(t.id, e.target.value, 'projet')} className="border border-indigo-300 rounded-lg p-1.5 text-xs bg-indigo-50/50 w-full outline-none text-slate-600 cursor-pointer">
+                        <select 
+                          value={t.projet || ''} 
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === '_NEW_') {
+                              setPendingProjetTarget({ type: 'GL_ROW', id: t.id });
+                              setShowProjetModal(true);
+                            } else {
+                              handleUpdateField(t.id, val, 'projet');
+                            }
+                          }} 
+                          className="border border-indigo-300 rounded-lg p-1.5 text-xs bg-indigo-50/50 w-full outline-none text-slate-600 cursor-pointer"
+                        >
                           <option value="">-- Aucun --</option>
                           {projetsList.map(p => <option key={`tbl-${p.id}`} value={p.nom}>{p.nom}</option>)}
+                          <option value="_NEW_" className="font-bold text-indigo-600">➕ Nouveau projet...</option>
                         </select>
                       ) : ( 
                         t.projet ? <span className="bg-indigo-50 border border-indigo-100 px-2 py-1 rounded-md">{t.projet}</span> : <span className="text-slate-300 italic font-normal">-</span> 
