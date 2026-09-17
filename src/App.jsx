@@ -5285,6 +5285,7 @@ const GestionEvenements = () => {
     </div>
   );
 };
+};
 export default function App() {
   // 1. On lit l'URL pour voir si on ouvre un nouvel onglet sur un module précis
 const [activeTab, setActiveTab] = useState(() => {
