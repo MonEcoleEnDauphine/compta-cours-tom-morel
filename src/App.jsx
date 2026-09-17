@@ -289,7 +289,7 @@ const InfosContact = () => (
           <Globe size={24} />
         </div>
         <h3 className="text-lg font-bold text-slate-800 mb-1">Le Cours Tom Morel</h3>
-        <p className="text-blue-500 text-sm mb-6">24, rue de la Chapelle 38890 Saint-Chef-en-Dauphiné</p>
+        <p className="text-blue-500 text-sm mb-6">24, rue de la Chapelle <br /> 38890 Saint-Chef-en-Dauphiné</p>
         <div className="flex-1"></div>
         <a href="https://sites.google.com/view/courstommorel/cours-tom-morel" target="_blank" rel="noreferrer" className="w-full inline-flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-600 px-4 py-2.5 rounded-lg transition-colors font-medium text-sm">
           <Globe size={18} /> Visiter le site
@@ -302,7 +302,7 @@ const InfosContact = () => (
         </div>
         <h3 className="text-lg font-bold text-slate-800 mb-1">Direction de l'École</h3>
         <p className="text-slate-600 text-sm font-medium mb-1">Mme Laurence Gérard</p>
-        <p className="text-slate-400 text-xs mb-5">Équipe enseignante: Mme Cécile Sublet & Mme Florence Hervet</p>
+        <p className="text-slate-400 text-xs mb-5">Équipe enseignante: Mme Cécile Sublet <br /> & <br /> Mme Florence Hervet</p>
         
         <a href="tel:0667909576" className="w-full border border-slate-200 hover:bg-slate-50 rounded-lg py-2 mb-3 flex items-center justify-center gap-2 text-slate-600 text-sm font-bold transition-colors">
           <Phone size={16} /> 06 67 90 95 76
