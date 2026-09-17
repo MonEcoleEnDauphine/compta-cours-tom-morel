@@ -1954,6 +1954,81 @@ const EtatFinancier = ({ transactionsGlobales }) => {
   );
 };
 
+// --- COMPOSANT ISOLÉ : RECHERCHE DE COMPTE ---
+const SearchableCompteSelect = ({ value, onChange, comptesList, placeholder = "Sélectionner un compte..." }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setIsOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const normalizeStr = (str) => String(str || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+  const filteredComptes = useMemo(() => {
+    if (!search.trim()) return comptesList;
+    const term = normalizeStr(search);
+    return comptesList.filter(c => normalizeStr(c.code).includes(term) || normalizeStr(c.libelle).includes(term));
+  }, [comptesList, search]);
+
+  const selectedCompte = comptesList.find(c => c.code === value);
+
+  return (
+    <div className="relative w-full" ref={dropdownRef}>
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full text-left border rounded-xl px-3 py-2 text-xs font-mono font-bold flex justify-between items-center transition-all bg-white shadow-2xs cursor-pointer ${
+          value ? 'border-indigo-300 bg-indigo-50/80 text-indigo-900' : 'border-slate-200 text-slate-400'
+        }`}
+      >
+        <span className="truncate">
+          {selectedCompte ? `${selectedCompte.code} - ${selectedCompte.libelle}` : (value ? `${value} (Suggéré)` : placeholder)}
+        </span>
+        <ChevronDown size={14} className="text-slate-400 shrink-0 ml-1" />
+      </div>
+
+      {isOpen && (
+        <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-2xl shadow-2xl p-2 max-h-60 overflow-y-auto">
+          <div className="relative mb-2">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input 
+              type="text" 
+              placeholder="Code ou libellé..." 
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-9 pr-3 py-1.5 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-600 font-sans"
+              autoFocus
+            />
+          </div>
+          <div className="space-y-0.5">
+            {filteredComptes.length > 0 ? (
+              filteredComptes.map(c => (
+                <div 
+                  key={c.id}
+                  onClick={() => { onChange(c.code); setIsOpen(false); setSearch(''); }}
+                  className={`px-3 py-2 rounded-xl text-xs cursor-pointer flex justify-between items-center transition-colors ${
+                    c.code === value ? 'bg-indigo-100 text-indigo-950 font-extrabold' : 'hover:bg-slate-100/80 text-slate-700 font-medium'
+                  }`}
+                >
+                  <span className="font-mono font-extrabold text-indigo-700 shrink-0">{c.code}</span>
+                  <span className="truncate text-slate-600 ml-2 text-right flex-1">{c.libelle}</span>
+                </div>
+              ))
+            ) : (
+              <div className="text-xs text-slate-400 text-center py-3">Aucun compte correspondant</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // --- GRAND LIVRE (Import CSV/XLSX, OD, Validations) ---
 const GrandLivre = ({ transactionsGlobales }) => {
   const [lignesEnAttente, setLignesEnAttente] = useState([]);
@@ -1997,7 +2072,8 @@ const GrandLivre = ({ transactionsGlobales }) => {
       snapshot.forEach((doc) => {
         liste.push({ id: doc.id, ...doc.data() });
       });
-      liste.sort((a, b) => a.code.localeCompare(b.code));
+      // TRI SÉCURISÉ
+      liste.sort((a, b) => String(a.code || '').localeCompare(String(b.code || '')));
       setComptesList(liste);
     });
     return () => unsubscribe();
@@ -2016,6 +2092,42 @@ const GrandLivre = ({ transactionsGlobales }) => {
       '7': 'Classe 7 — Produits (Recettes)'
     };
     return map[root] || 'Compte Général';
+  };
+
+  const normaliserDateFR = (rawVal) => {
+    if (!rawVal) return '';
+    if (rawVal instanceof Date && !isNaN(rawVal)) {
+      const safeDate = new Date(rawVal.getTime() + (12 * 60 * 60 * 1000));
+      const d = String(safeDate.getUTCDate()).padStart(2, '0');
+      const m = String(safeDate.getUTCMonth() + 1).padStart(2, '0');
+      const y = safeDate.getUTCFullYear();
+      return `${d}/${m}/${y}`;
+    }
+    if (typeof rawVal === 'number') {
+      const jsDate = new Date(Math.round((rawVal - 25569) * 86400 * 1000));
+      const safeDate = new Date(jsDate.getTime() + (12 * 60 * 60 * 1000));
+      const d = String(safeDate.getUTCDate()).padStart(2, '0');
+      const m = String(safeDate.getUTCMonth() + 1).padStart(2, '0');
+      const y = safeDate.getUTCFullYear();
+      return `${d}/${m}/${y}`;
+    }
+    let str = String(rawVal).trim();
+    str = str.split('T')[0];
+    str = str.replace(/-/g, '/');
+    if (str.includes('/')) {
+      const parts = str.split('/');
+      if (parts.length === 3) {
+        if (parts[0].length === 4) { 
+          const [y, m, d] = parts;
+          return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+        } else { 
+          let [d, m, y] = parts;
+          if (y.length === 2) y = '20' + y;
+          return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+        }
+      }
+    }
+    return str;
   };
 
   const parseDateForSort = (dStr) => {
@@ -2961,7 +3073,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
         
         {/* ONGLET BANQUE */}
         <div className={`bg-white border rounded-3xl shadow-sm flex flex-col transition-all overflow-hidden ${activeTab === 'banque' ? 'border-indigo-400 ring-4 ring-indigo-50' : 'border-slate-200/80 hover:border-indigo-300'}`}>
-          <button onClick={() => setActiveTab(activeTab === 'banque' ? null : 'banque')} className={`w-full text-left p-5 flex justify-between items-center transition-colors ${activeTab === 'banque' ? 'bg-indigo-50/50' : 'hover:bg-slate-50/50'}`}>
+          <div onClick={() => setActiveTab(activeTab === 'banque' ? null : 'banque')} className={`w-full text-left p-5 cursor-pointer flex justify-between items-center transition-colors ${activeTab === 'banque' ? 'bg-indigo-50/50' : 'hover:bg-slate-50/50'}`}>
             <div className="flex items-center gap-4">
               <div className={`p-2.5 rounded-2xl transition-colors ${activeTab === 'banque' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'bg-indigo-50 text-indigo-600'}`}>
                 <Download size={20} />
@@ -2972,7 +3084,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
               </div>
             </div>
             <ChevronDown size={20} className={`text-slate-400 transition-transform duration-300 ${activeTab === 'banque' ? 'rotate-180 text-indigo-600' : ''}`} />
-          </button>
+          </div>
           {activeTab === 'banque' && (
             <div className="p-5 pt-0 animate-fade-in flex-1 flex flex-col justify-end">
               <div className="bg-indigo-50/50 rounded-2xl p-4 border border-indigo-100 flex flex-col gap-4 text-center mt-4">
@@ -2987,7 +3099,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
         {/* ONGLET PAIE */}
         <div className={`bg-white border rounded-3xl shadow-sm flex flex-col transition-all overflow-hidden ${activeTab === 'paie' ? 'border-pink-400 ring-4 ring-pink-50' : 'border-slate-200/80 hover:border-pink-300'}`}>
-          <button onClick={() => setActiveTab(activeTab === 'paie' ? null : 'paie')} className={`w-full text-left p-5 flex justify-between items-center transition-colors ${activeTab === 'paie' ? 'bg-pink-50/50' : 'hover:bg-slate-50/50'}`}>
+          <div onClick={() => setActiveTab(activeTab === 'paie' ? null : 'paie')} className={`w-full text-left p-5 cursor-pointer flex justify-between items-center transition-colors ${activeTab === 'paie' ? 'bg-pink-50/50' : 'hover:bg-slate-50/50'}`}>
             <div className="flex items-center gap-4">
               <div className={`p-2.5 rounded-2xl transition-colors ${activeTab === 'paie' ? 'bg-pink-600 text-white shadow-md shadow-pink-200' : 'bg-pink-50 text-pink-600'}`}>
                 <Users size={20} />
@@ -2998,7 +3110,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
               </div>
             </div>
             <ChevronDown size={20} className={`text-slate-400 transition-transform duration-300 ${activeTab === 'paie' ? 'rotate-180 text-pink-600' : ''}`} />
-          </button>
+          </div>
           {activeTab === 'paie' && (
             <div className="p-5 pt-0 animate-fade-in flex-1 flex flex-col justify-end">
               <div className="bg-pink-50/50 rounded-2xl p-4 border border-pink-100 flex flex-col gap-4 text-center mt-4">
@@ -3013,7 +3125,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
         {/* ONGLET OD */}
         <div className={`bg-white border rounded-3xl shadow-sm flex flex-col transition-all overflow-hidden lg:col-span-1 md:col-span-2 ${activeTab === 'od' ? 'border-purple-400 ring-4 ring-purple-50 lg:col-span-3' : 'border-slate-200/80 hover:border-purple-300'}`}>
-          <button onClick={() => setActiveTab(activeTab === 'od' ? null : 'od')} className={`w-full text-left p-5 flex justify-between items-center transition-colors ${activeTab === 'od' ? 'bg-purple-50/50' : 'hover:bg-slate-50/50'}`}>
+          <div onClick={() => setActiveTab(activeTab === 'od' ? null : 'od')} className={`w-full text-left p-5 cursor-pointer flex justify-between items-center transition-colors ${activeTab === 'od' ? 'bg-purple-50/50' : 'hover:bg-slate-50/50'}`}>
             <div className="flex items-center gap-4">
               <div className={`p-2.5 rounded-2xl transition-colors ${activeTab === 'od' ? 'bg-purple-600 text-white shadow-md shadow-purple-200' : 'bg-purple-50 text-purple-600'}`}>
                 <FileText size={20} />
@@ -3029,7 +3141,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
               </button>
               <ChevronDown size={20} className={`text-slate-400 transition-transform duration-300 ${activeTab === 'od' ? 'rotate-180 text-purple-600' : ''}`} />
             </div>
-          </button>
+          </div>
           
           {activeTab === 'od' && (
             <div className="p-5 pt-0 animate-fade-in bg-purple-50/30">
