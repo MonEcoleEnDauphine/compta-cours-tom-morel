@@ -5329,7 +5329,7 @@ const [activeTab, setActiveTab] = useState(() => {
       case 'scolarite': return <PlaceholderPage title="Scolarité" />;
       case 'factures_parents': return <PlaceholderPage title="Mes Factures (Parents)" />;
       case 'plannings': return <ModulePlannings defaultTab="cantine" />;
-      case 'fiche_travaux': return <FicheTravaux />;
+      case 'fiche_travaux': return <PlaceholderPage title="Fiche_travaux" />;
       case 'budget': return <BudgetPrevisionnel transactionsGlobales={transactionsGlobales} />;
       case 'notes_frais': return <NotesFrais transactionsGlobales={transactionsGlobales} />;
       case 'dons_recus': return <DonsRecus transactionsGlobales={transactionsGlobales} />;
