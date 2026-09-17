@@ -4790,14 +4790,135 @@ const DonsRecus = ({ transactionsGlobales }) => {
   const pctPrive = stats.total > 0 ? ((stats.priveTotal / stats.total) * 100).toFixed(0) : 0;
   const pctPro = stats.total > 0 ? ((stats.proTotal / stats.total) * 100).toFixed(0) : 0;
 
-  // --- RAPPROCHEMENT COMPTABLE (Compte 754000) ---
+// --- MODULE : DONS & REÇUS FISCAUX ---
+const DonsRecus = ({ transactionsGlobales }) => {
+  const [activeView, setActiveView] = useState('dashboard');
+  const [dons, setDons] = useState([]);
+  
+  // Filtre de période
+  const [anneeFiltre, setAnneeFiltre] = useState('TOTAL');
+
+  // Objectif de dons modifiable
+  const [budgetGoal, setBudgetGoal] = useState(58724);
+  const [isEditingGoal, setIsEditingGoal] = useState(false);
+  const [tempGoal, setTempGoal] = useState(58724);
+
+  const [formData, setFormData] = useState({
+    nom: '', prenom: '', type: 'Privé', frequence: 'Ponctuel', mail: '', adresse: '', date: '', montant: '', provenance: 'Virement', commentaire: '', apporteur: ''
+  });
+
+  const fileInputExcelRef = useRef(null);
+  const fileInputHelloAssoRef = useRef(null);
+
+  useEffect(() => {
+    const q = collection(db, 'artifacts', appId, 'public', 'data', 'dons');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const liste = [];
+      snapshot.forEach((doc) => { liste.push({ id: doc.id, ...doc.data() }); });
+      liste.sort((a, b) => new Date(b.date_creation) - new Date(a.date_creation));
+      setDons(liste);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const parseAmt = (rawVal) => {
+    if (!rawVal) return 0;
+    if (typeof rawVal === 'number') return rawVal;
+    let s = String(rawVal).replace(/[\s\u00A0\u202F€]/g, '');
+    if (s.includes(',') && s.includes('.')) s = s.indexOf(',') < s.indexOf('.') ? s.replace(/,/g, '') : s.replace(/\./g, '').replace(',', '.');
+    else if (s.includes(',')) s = s.replace(/,/g, '.');
+    return parseFloat(s) || 0;
+  };
+
+  const extractExercice = (dateStr) => {
+    if (!dateStr) return null;
+    const str = String(dateStr).trim();
+    let m, y;
+    if (str.includes('/')) {
+      const parts = str.split('/');
+      if (parts.length === 3) { m = parseInt(parts[1], 10); y = parseInt(parts[2], 10); }
+    } else if (str.includes('-')) {
+      const parts = str.split('-');
+      if (parts.length === 3) {
+        if (parts[0].length === 4) { y = parseInt(parts[0], 10); m = parseInt(parts[1], 10); }
+        else { y = parseInt(parts[2], 10); m = parseInt(parts[1], 10); }
+      }
+    }
+    if (m && y) {
+      if (y < 100) y += 2000;
+      return m >= 9 ? y : y - 1;
+    }
+    return null;
+  };
+
+  const filteredDons = useMemo(() => {
+    if (anneeFiltre === 'TOTAL') return dons;
+    return dons.filter(d => extractExercice(d.date) === Number(anneeFiltre));
+  }, [dons, anneeFiltre]);
+
+  const filteredTx = useMemo(() => {
+    if (anneeFiltre === 'TOTAL') return transactionsGlobales || [];
+    return (transactionsGlobales || []).filter(t => extractExercice(t.date) === Number(anneeFiltre));
+  }, [transactionsGlobales, anneeFiltre]);
+
+  const yearlyStats = useMemo(() => {
+    const statsObj = { 2021: 0, 2022: 0, 2023: 0, 2024: 0, 2025: 0, 2026: 0 };
+    dons.forEach(d => {
+      const ex = extractExercice(d.date);
+      if (ex && statsObj[ex] !== undefined) {
+        statsObj[ex] += (Number(d.montant) || 0);
+      }
+    });
+    return Object.entries(statsObj)
+      .map(([year, total]) => ({ year: Number(year), total }))
+      .sort((a, b) => b.year - a.year);
+  }, [dons]);
+
+  const stats = useMemo(() => {
+    let priveTotal = 0; let proTotal = 0;
+    const priveDonors = new Set(); const proDonors = new Set();
+    const regPriveDonors = new Set(); const regProDonors = new Set();
+    const apporteursMap = {};
+
+    filteredDons.forEach(d => {
+      const mt = Number(d.montant) || 0;
+      const isPro = String(d.type).toLowerCase().includes('pro');
+      const identifier = (d.nom + (d.prenom || '') + (d.mail || '')).toLowerCase().trim();
+      const isRegulier = String(d.frequence).toLowerCase().includes('mensuel') || String(d.provenance).toLowerCase().includes('mensuel');
+      const apporteurNom = String(d.apporteur || '').trim();
+
+      if (isPro) {
+        proTotal += mt; proDonors.add(identifier);
+        if (isRegulier) regProDonors.add(identifier);
+      } else {
+        priveTotal += mt; priveDonors.add(identifier);
+        if (isRegulier) regPriveDonors.add(identifier);
+      }
+
+      if (apporteurNom && apporteurNom.toLowerCase() !== 'non') {
+        apporteursMap[apporteurNom] = (apporteursMap[apporteurNom] || 0) + mt;
+      }
+    });
+
+    const topApporteurs = Object.entries(apporteursMap)
+      .map(([nom, montant]) => ({ nom, montant })).sort((a, b) => b.montant - a.montant).slice(0, 3);
+
+    const total = priveTotal + proTotal;
+    return { total, priveTotal, proTotal, priveCount: priveDonors.size, proCount: proDonors.size, priveReguliers: regPriveDonors.size, proReguliers: regProDonors.size, topApporteurs };
+  }, [filteredDons]);
+
+  const pctProgression = budgetGoal > 0 ? Math.min((stats.total / budgetGoal) * 100, 100).toFixed(1) : 0;
+  const resteCollecter = Math.max(0, budgetGoal - stats.total);
+  const pctPrive = stats.total > 0 ? ((stats.priveTotal / stats.total) * 100).toFixed(0) : 0;
+  const pctPro = stats.total > 0 ? ((stats.proTotal / stats.total) * 100).toFixed(0) : 0;
+
   const totalGL754 = filteredTx.reduce((acc, t) => {
     let mt = 0;
     if (t.type === 'od') {
-      if (t.compteCredit && String(t.compteCredit).startsWith('754')) mt += Math.abs(t.montant);
-      if (t.compteDebit && String(t.compteDebit).startsWith('754')) mt -= Math.abs(t.montant);
+      if (t.compteCredit && String(t.compteCredit).startsWith('754')) mt += Math.abs(t.montant || 0);
+      if (t.compteDebit && String(t.compteDebit).startsWith('754')) mt -= Math.abs(t.montant || 0);
     } else {
-      if (String(t.compte).startsWith('754')) mt += (t.montant > 0 ? Math.abs(t.montant) : -Math.abs(t.montant));
+      if (String(t.compte || '').startsWith('754')) mt += ((t.montant || 0) > 0 ? Math.abs(t.montant) : -Math.abs(t.montant));
     }
     return acc + mt;
   }, 0);
@@ -4965,7 +5086,6 @@ const DonsRecus = ({ transactionsGlobales }) => {
       <input type="file" accept=".xlsx,.xls" className="hidden" ref={fileInputExcelRef} onChange={(e) => handleImport(e, false)} />
       <input type="file" accept=".csv" className="hidden" ref={fileInputHelloAssoRef} onChange={(e) => handleImport(e, true)} />
 
-      {/* NOUVEAU : ZONE DES ONGLETS ET FILTRE */}
       <div className="flex flex-col sm:flex-row bg-slate-100 p-1 rounded-xl w-fit mt-4 items-center gap-2 mx-auto sm:mx-0">
         <button onClick={() => setActiveView('dashboard')} className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'dashboard' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Tableau de bord & Base</button>
         <button onClick={() => setActiveView('saisie')} className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeView === 'saisie' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}>Saisie Manuelle (+)</button>
@@ -4990,8 +5110,6 @@ const DonsRecus = ({ transactionsGlobales }) => {
 
       {activeView === 'dashboard' && (
         <div className="space-y-4 animate-fade-in">
-          
-          {/* AFFICHAGE CONDITIONNEL : HISTORIQUE vs ANNÉE SPÉCIFIQUE */}
           {anneeFiltre === 'TOTAL' ? (
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8">
               <div className="flex justify-between items-end border-b border-slate-100 pb-4 mb-6">
@@ -5026,149 +5144,143 @@ const DonsRecus = ({ transactionsGlobales }) => {
           ) : (
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
               <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-4 border-b border-slate-100 pb-4">
-                 <div className="flex flex-wrap items-center gap-4 md:gap-6">
-                    <div>
-                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1"><Target size={12}/> Objectif</p>
-                       {isEditingGoal ? (
-                          <div className="flex items-center gap-2">
-                            <input type="number" value={tempGoal} onChange={(e) => setTempGoal(Number(e.target.value))} className="w-24 border border-indigo-200 rounded px-2 py-0.5 text-sm font-black text-indigo-900 outline-none" autoFocus />
-                            <button onClick={saveGoal} className="text-[10px] bg-indigo-600 text-white px-2 py-1 rounded font-bold hover:bg-indigo-700">OK</button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <p className="text-xl font-black text-indigo-900">{formatMontant(budgetGoal)} €</p>
-                            <button onClick={() => setIsEditingGoal(true)} className="text-indigo-300 hover:text-indigo-600 transition-colors"><Edit2 size={12}/></button>
-                          </div>
-                        )}
-                    </div>
-                    <div className="hidden md:block h-8 w-px bg-slate-200"></div>
-                    <div>
-                       <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1 flex items-center gap-1"><Euro size={12}/> Collectés</p>
-                       <p className="text-xl font-black text-emerald-700">{formatMontant(stats.total)} €</p>
-                    </div>
-                    <div className="hidden md:block h-8 w-px bg-slate-200"></div>
-                    <div>
-                       <p className="text-[10px] font-bold text-rose-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Clock size={12}/> Reste</p>
-                       <p className="text-xl font-black text-rose-600">{formatMontant(resteCollecter)} €</p>
-                    </div>
-                 </div>
+                <div className="flex flex-wrap items-center gap-4 md:gap-6">
+                   <div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1"><Target size={12}/> Objectif</p>
+                      {isEditingGoal ? (
+                         <div className="flex items-center gap-2">
+                           <input type="number" value={tempGoal} onChange={(e) => setTempGoal(Number(e.target.value))} className="w-24 border border-indigo-200 rounded px-2 py-0.5 text-sm font-black text-indigo-900 outline-none" autoFocus />
+                           <button onClick={saveGoal} className="text-[10px] bg-indigo-600 text-white px-2 py-1 rounded font-bold hover:bg-indigo-700">OK</button>
+                         </div>
+                       ) : (
+                         <div className="flex items-center gap-2">
+                           <p className="text-xl font-black text-indigo-900">{formatMontant(budgetGoal)} €</p>
+                           <button onClick={() => setIsEditingGoal(true)} className="text-indigo-300 hover:text-indigo-600 transition-colors"><Edit2 size={12}/></button>
+                        </div>
+                       )}
+                   </div>
+                   <div className="hidden md:block h-8 w-px bg-slate-200"></div>
+                   <div>
+                      <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1 flex items-center gap-1"><Euro size={12}/> Collectés</p>
+                      <p className="text-xl font-black text-emerald-700">{formatMontant(stats.total)} €</p>
+                   </div>
+                   <div className="hidden md:block h-8 w-px bg-slate-200"></div>
+                   <div>
+                      <p className="text-[10px] font-bold text-rose-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Clock size={12}/> Reste</p>
+                      <p className="text-xl font-black text-rose-600">{formatMontant(resteCollecter)} €</p>
+                   </div>
+                </div>
                  
-                 <div className="flex gap-6 text-right border-t md:border-t-0 pt-3 md:pt-0 border-slate-100 w-full md:w-auto justify-end">
-                    <div className="bg-blue-50/50 px-3 py-1.5 rounded-lg border border-blue-100/50">
-                       <p className="text-[9px] font-bold text-blue-600 uppercase">Privé ({pctPrive}%)</p>
-                       <p className="text-sm font-black text-slate-800">{formatMontant(stats.priveTotal)} €</p>
-                    </div>
-                    <div className="bg-emerald-50/50 px-3 py-1.5 rounded-lg border border-emerald-100/50">
-                       <p className="text-[9px] font-bold text-emerald-600 uppercase">Pro ({pctPro}%)</p>
-                       <p className="text-sm font-black text-slate-800">{formatMontant(stats.proTotal)} €</p>
-                    </div>
+                <div className="flex gap-6 text-right border-t md:border-t-0 pt-3 md:pt-0 border-slate-100 w-full md:w-auto justify-end">
+                   <div className="bg-blue-50/50 px-3 py-1.5 rounded-lg border border-blue-100/50">
+                      <p className="text-[9px] font-bold text-blue-600 uppercase">Privé ({pctPrive}%)</p>
+                      <p className="text-sm font-black text-slate-800">{formatMontant(stats.priveTotal)} €</p>
+                   </div>
+                   <div className="bg-emerald-50/50 px-3 py-1.5 rounded-lg border border-emerald-100/50">
+                      <p className="text-[9px] font-bold text-emerald-600 uppercase">Pro ({pctPro}%)</p>
+                      <p className="text-sm font-black text-slate-800">{formatMontant(stats.proTotal)} €</p>
+                   </div>
                  </div>
-              </div>
+             </div>
               
               <div className="flex items-center gap-3">
-                <span className="text-xs font-black text-indigo-600 w-12 text-right">{pctProgression}%</span>
-                <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden shadow-inner">
-                  <div className="bg-gradient-to-r from-indigo-400 to-indigo-600 h-full rounded-full transition-all duration-1000" style={{ width: `${pctProgression}%` }}></div>
-                </div>
-              </div>
-            </div>
+               <span className="text-xs font-black text-indigo-600 w-12 text-right">{pctProgression}%</span>
+               <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden shadow-inner">
+                 <div className="bg-gradient-to-r from-indigo-400 to-indigo-600 h-full rounded-full transition-all duration-1000" style={{ width: `${pctProgression}%` }}></div>
+               </div>
+             </div>
+           </div>
           )}
 
-          {/* WIDGETS D'ADMINISTRATION COMPACTS */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            
-            {/* Contrôle Comptable (Rapprochement Filtré) */}
             <div className={`p-4 rounded-2xl shadow-sm border flex items-center gap-4 bg-white ${ecartComptable === 0 ? 'border-l-4 border-l-emerald-500' : 'border-l-4 border-l-rose-500 animate-pulse'}`}>
               <div className={`p-3 rounded-xl ${ecartComptable === 0 ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
-                {ecartComptable === 0 ? <CheckCircle2 size={24}/> : <AlertTriangle size={24}/>}
+               {ecartComptable === 0 ? <CheckCircle2 size={24}/> : <AlertTriangle size={24}/>}
               </div>
-              <div>
+             <div>
                 <h3 className={`text-[10px] font-bold uppercase tracking-wider ${ecartComptable === 0 ? 'text-emerald-700' : 'text-rose-700'}`}>Écart Cpt. 754000</h3>
                 <p className={`text-xl font-black leading-none mt-1 ${ecartComptable === 0 ? 'text-slate-800' : 'text-rose-800'}`}>{formatMontant(ecartComptable)} €</p>
-              </div>
-            </div>
+             </div>
+           </div>
 
-            {/* Top Ambassadeurs Compact */}
             <div className="bg-amber-50/50 p-4 rounded-2xl border border-amber-200/60 flex flex-col justify-center">
               <h4 className="text-[10px] font-black text-amber-800 mb-2 flex items-center gap-1.5 uppercase tracking-wider">
-                <Sparkles className="text-amber-500" size={14} /> Top Ambassadeurs
-              </h4>
+               <Sparkles className="text-amber-500" size={14} /> Top Ambassadeurs
+             </h4>
               <div className="space-y-1.5">
-                {stats.topApporteurs.length === 0 ? <p className="text-[10px] text-amber-600/70 italic">Aucun apporteur renseigné.</p> : null}
-                {stats.topApporteurs.map((app, idx) => (
-                  <div key={idx} className="flex justify-between items-center text-xs border-b border-amber-100/50 pb-1 last:border-0 last:pb-0">
-                    <span className="font-bold text-amber-900 truncate pr-2"><span className="text-amber-500 mr-1">#{idx + 1}</span> {app.nom}</span>
-                    <span className="font-black text-amber-700 whitespace-nowrap">{formatMontant(app.montant)} €</span>
-                  </div>
+               {stats.topApporteurs.length === 0 ? <p className="text-[10px] text-amber-600/70 italic">Aucun apporteur renseigné.</p> : null}
+               {stats.topApporteurs.map((app, idx) => (
+                 <div key={idx} className="flex justify-between items-center text-xs border-b border-amber-100/50 pb-1 last:border-0 last:pb-0">
+                   <span className="font-bold text-amber-900 truncate pr-2"><span className="text-amber-500 mr-1">#{idx + 1}</span> {app.nom}</span>
+                   <span className="font-black text-amber-700 whitespace-nowrap">{formatMontant(app.montant)} €</span>
+                 </div>
                 ))}
-              </div>
-            </div>
+             </div>
+           </div>
 
-            {/* Imports */}
             <div className="bg-slate-900 p-4 rounded-2xl shadow-lg border border-slate-800 flex flex-col justify-center text-white">
               <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Importations</h3>
               <div className="space-y-2">
-                <button onClick={() => fileInputExcelRef.current.click()} className="w-full bg-white/10 hover:bg-white/20 border border-white/20 px-3 py-1.5 rounded-lg text-[11px] font-bold flex items-center justify-between transition-colors">
-                  <span>Excel (Historique)</span> <FileSpreadsheet size={14}/>
-                </button>
-                <button onClick={() => fileInputHelloAssoRef.current.click()} className="w-full bg-emerald-500/20 hover:bg-emerald-500/40 border border-emerald-500/30 text-emerald-100 px-3 py-1.5 rounded-lg text-[11px] font-bold flex items-center justify-between transition-colors">
-                  <span>HelloAsso (CSV)</span> <Download size={14}/>
-                </button>
-              </div>
-            </div>
+               <button onClick={() => fileInputExcelRef.current.click()} className="w-full bg-white/10 hover:bg-white/20 border border-white/20 px-3 py-1.5 rounded-lg text-[11px] font-bold flex items-center justify-between transition-colors">
+                 <span>Excel (Historique)</span> <FileSpreadsheet size={14}/>
+               </button>
+               <button onClick={() => fileInputHelloAssoRef.current.click()} className="w-full bg-emerald-500/20 hover:bg-emerald-500/40 border border-emerald-500/30 text-emerald-100 px-3 py-1.5 rounded-lg text-[11px] font-bold flex items-center justify-between transition-colors">
+                 <span>HelloAsso (CSV)</span> <Download size={14}/>
+               </button>
+             </div>
+           </div>
           </div>
 
-          {/* TABLEAU BASE DE DONNÉES FILTRÉ */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-4">
             <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[10px] sticky top-0 border-b border-slate-200 shadow-sm z-10">
-                  <tr>
-                    <th className="p-4">Date</th>
-                    <th className="p-4">Donateur</th>
-                    <th className="p-4">Apporteur</th>
-                    <th className="p-4 min-w-[200px]">Coordonnées (Cerfa)</th>
-                    <th className="p-4">Provenance</th>
-                    <th className="p-4 text-right">Montant</th>
-                    <th className="p-4 text-center">Reçu Fiscal</th>
-                    <th className="p-4 text-center">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredDons.map(don => (
-                    <tr key={don.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="p-4 font-mono font-medium text-slate-600 whitespace-nowrap">{normaliserDateFR(don.date)}</td>
-                      <td className="p-4 font-bold text-slate-800">
+             <table className="w-full text-left text-xs">
+               <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[10px] sticky top-0 border-b border-slate-200 shadow-sm z-10">
+                 <tr>
+                   <th className="p-4">Date</th>
+                   <th className="p-4">Donateur</th>
+                   <th className="p-4">Apporteur</th>
+                   <th className="p-4 min-w-[200px]">Coordonnées (Cerfa)</th>
+                   <th className="p-4">Provenance</th>
+                   <th className="p-4 text-right">Montant</th>
+                   <th className="p-4 text-center">Reçu Fiscal</th>
+                   <th className="p-4 text-center">Action</th>
+                 </tr>
+               </thead>
+               <tbody className="divide-y divide-slate-100">
+                 {filteredDons.map(don => (
+                   <tr key={don.id} className="hover:bg-slate-50/50 transition-colors">
+                     <td className="p-4 font-mono font-medium text-slate-600 whitespace-nowrap">{normaliserDateFR(don.date)}</td>
+                     <td className="p-4 font-bold text-slate-800">
                         {don.nom} {don.prenom}
-                        <span className="block mt-1 text-[9px] text-slate-400 font-medium">{don.type} - {don.frequence || 'Ponctuel'}</span>
+                       <span className="block mt-1 text-[9px] text-slate-400 font-medium">{don.type} - {don.frequence || 'Ponctuel'}</span>
+                     </td>
+                     <td className="p-4 font-semibold text-amber-600 truncate max-w-[120px]" title={don.apporteur}>{don.apporteur || '-'}</td>
+                     <td className="p-4 text-slate-600">
+                       <div className="truncate max-w-[200px]" title={don.adresse}>{don.adresse || <span className="italic text-rose-500 text-[10px]">Adresse manquante</span>}</div>
+                       <div className="text-[10px] text-slate-400 mt-0.5">{don.mail}</div>
+                     </td>
+                     <td className="p-4"><span className="bg-slate-100 px-2 py-1 rounded text-[10px] font-bold text-slate-600 border border-slate-200">{don.provenance}</span></td>
+                     <td className="p-4 text-right font-black text-indigo-700 whitespace-nowrap">{formatMontant(don.montant)} €</td>
+                     <td className="p-4 text-center">
+                       {don.provenance === 'HelloAsso' ? (
+                         <span className="bg-emerald-50 text-emerald-600 px-2 py-1 rounded text-[10px] font-bold border border-emerald-100">Géré par HelloAsso</span>
+                       ) : don.recu_emis ? (
+                         <span className="bg-purple-50 text-purple-700 px-2 py-1 rounded text-[10px] font-bold flex items-center justify-center gap-1 w-fit mx-auto border border-purple-100"><CheckCircle2 size={12}/> Émis</span>
+                       ) : (
+                         <button onClick={() => generateCerfaDon(don)} className="bg-indigo-600 text-white hover:bg-indigo-700 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors shadow-sm flex items-center justify-center gap-1 mx-auto active:scale-95">
+                           <FileSignature size={12}/> Créer Cerfa
+                         </button>
+                       )}
+                     </td>
+                     <td className="p-4 text-center">
+                       <button onClick={() => handleDelete(don.id)} className="text-slate-300 hover:text-rose-600 p-1.5 rounded-lg transition-colors"><Trash2 size={16}/></button>
                       </td>
-                      <td className="p-4 font-semibold text-amber-600 truncate max-w-[120px]" title={don.apporteur}>{don.apporteur || '-'}</td>
-                      <td className="p-4 text-slate-600">
-                        <div className="truncate max-w-[200px]" title={don.adresse}>{don.adresse || <span className="italic text-rose-500 text-[10px]">Adresse manquante</span>}</div>
-                        <div className="text-[10px] text-slate-400 mt-0.5">{don.mail}</div>
-                      </td>
-                      <td className="p-4"><span className="bg-slate-100 px-2 py-1 rounded text-[10px] font-bold text-slate-600 border border-slate-200">{don.provenance}</span></td>
-                      <td className="p-4 text-right font-black text-indigo-700 whitespace-nowrap">{formatMontant(don.montant)} €</td>
-                      <td className="p-4 text-center">
-                        {don.provenance === 'HelloAsso' ? (
-                          <span className="bg-emerald-50 text-emerald-600 px-2 py-1 rounded text-[10px] font-bold border border-emerald-100">Géré par HelloAsso</span>
-                        ) : don.recu_emis ? (
-                          <span className="bg-purple-50 text-purple-700 px-2 py-1 rounded text-[10px] font-bold flex items-center justify-center gap-1 w-fit mx-auto border border-purple-100"><CheckCircle2 size={12}/> Émis</span>
-                        ) : (
-                          <button onClick={() => generateCerfaDon(don)} className="bg-indigo-600 text-white hover:bg-indigo-700 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors shadow-sm flex items-center justify-center gap-1 mx-auto active:scale-95">
-                            <FileSignature size={12}/> Créer Cerfa
-                          </button>
-                        )}
-                      </td>
-                      <td className="p-4 text-center">
-                        <button onClick={() => handleDelete(don.id)} className="text-slate-300 hover:text-rose-600 p-1.5 rounded-lg transition-colors"><Trash2 size={16}/></button>
-                      </td>
-                    </tr>
+                   </tr>
                   ))}
-                  {filteredDons.length === 0 && <tr><td colSpan="8" className="p-10 text-center text-slate-400 italic">Aucun don enregistré pour cette période.</td></tr>}
-                </tbody>
-              </table>
-            </div>
+                 {filteredDons.length === 0 && <tr><td colSpan="8" className="p-10 text-center text-slate-400 italic">Aucun don enregistré pour cette période.</td></tr>}
+               </tbody>
+             </table>
+           </div>
           </div>
         </div>
       )}
@@ -5178,75 +5290,74 @@ const DonsRecus = ({ transactionsGlobales }) => {
           <h3 className="font-black text-lg text-slate-800 mb-6 border-b border-slate-100 pb-4">Enregistrer un nouveau don</h3>
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="grid grid-cols-2 gap-4">
-              <div>
+             <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Nom *</label>
-                <input type="text" required value={formData.nom} onChange={e => setFormData({...formData, nom: e.target.value})} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Prénom</label>
-                <input type="text" value={formData.prenom} onChange={e => setFormData({...formData, prenom: e.target.value})} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
-              </div>
+               <input type="text" required value={formData.nom} onChange={e => setFormData({...formData, nom: e.target.value})} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
+             </div>
+             <div>
+               <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Prénom</label>
+               <input type="text" value={formData.prenom} onChange={e => setFormData({...formData, prenom: e.target.value})} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
+             </div>
             </div>
             
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Type</label>
-                <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500">
-                  <option value="Privé">Privé</option><option value="Professionnel">Professionnel</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Fréquence</label>
+             <div>
+               <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Type</label>
+               <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500">
+                 <option value="Privé">Privé</option><option value="Professionnel">Professionnel</option>
+               </select>
+             </div>
+             <div>
+               <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Fréquence</label>
                 <select value={formData.frequence} onChange={e => setFormData({...formData, frequence: e.target.value})} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500">
-                  <option value="Ponctuel">Ponctuel</option><option value="Mensuel">Mensuel</option>
-                </select>
-              </div>
-            </div>
+                 <option value="Ponctuel">Ponctuel</option><option value="Mensuel">Mensuel</option>
+               </select>
+             </div>
+           </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Adresse Postale * (Pour le Cerfa)</label>
-              <input type="text" required value={formData.adresse} onChange={e => setFormData({...formData, adresse: e.target.value})} placeholder="Ex: 12 rue de la Paix, 38110 La Tour-du-Pin" className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
-            </div>
+           <div>
+             <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Adresse Postale * (Pour le Cerfa)</label>
+             <input type="text" required value={formData.adresse} onChange={e => setFormData({...formData, adresse: e.target.value})} placeholder="Ex: 12 rue de la Paix, 38110 La Tour-du-Pin" className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
+           </div>
             
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Montant (€) *</label>
-                <input type="number" step="0.01" required value={formData.montant} onChange={e => setFormData({...formData, montant: e.target.value})} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-700" />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Date *</label>
+             <div>
+               <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Montant (€) *</label>
+               <input type="number" step="0.01" required value={formData.montant} onChange={e => setFormData({...formData, montant: e.target.value})} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-700" />
+             </div>
+             <div>
+               <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Date *</label>
                 <input type="date" required value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
-              </div>
-            </div>
+             </div>
+          </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Provenance</label>
-                <select value={formData.provenance} onChange={e => setFormData({...formData, provenance: e.target.value})} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500">
-                  <option value="Virement">Virement Bancaire</option><option value="Chèque">Chèque</option><option value="Espèces">Espèces</option>
+             <div>
+               <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Provenance</label>
+               <select value={formData.provenance} onChange={e => setFormData({...formData, provenance: e.target.value})} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500">
+                 <option value="Virement">Virement Bancaire</option><option value="Chèque">Chèque</option><option value="Espèces">Espèces</option>
                 </select>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">E-mail</label>
-                <input type="email" value={formData.mail} onChange={e => setFormData({...formData, mail: e.target.value})} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-amber-600 uppercase mb-2">Apporteur (Famille)</label>
-                <input type="text" placeholder="Ex: DUPONT" value={formData.apporteur} onChange={e => setFormData({...formData, apporteur: e.target.value})} className="w-full border border-amber-200 bg-amber-50/50 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-amber-500" />
-              </div>
-            </div>
+             </div>
+             <div>
+               <label className="block text-xs font-bold text-slate-500 uppercase mb-2">E-mail</label>
+               <input type="email" value={formData.mail} onChange={e => setFormData({...formData, mail: e.target.value})} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
+             </div>
+             <div>
+               <label className="block text-xs font-bold text-amber-600 uppercase mb-2">Apporteur (Famille)</label>
+               <input type="text" placeholder="Ex: DUPONT" value={formData.apporteur} onChange={e => setFormData({...formData, apporteur: e.target.value})} className="w-full border border-amber-200 bg-amber-50/50 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-amber-500" />
+             </div>
+           </div>
             
             <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 rounded-xl font-bold transition-all shadow-md active:scale-95 flex items-center justify-center gap-2">
-              <PlusCircle size={18}/> Enregistrer dans la base
-            </button>
-          </form>
+             <PlusCircle size={18}/> Enregistrer dans la base
+           </button>
+         </form>
         </div>
       )}
     </div>
   );
 };
-
-
+  
 // --- MODULE : GESTION DES ÉVÉNEMENTS ---
 const GestionEvenements = () => {
   const [activeView, setActiveView] = useState('organisation');
