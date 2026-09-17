@@ -45,6 +45,33 @@ const PlaceholderPage = ({ title }) => (
     <p className="text-slate-500">Cette page est en cours de construction. Le module sera bientôt disponible.</p>
   </div>
 );
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState(() => {
+    const hash = window.location.hash.replace('#', '');
+    return hash || 'accueil_famille'; 
+  });
+  
+  const [transactionsGlobales, setTransactionsGlobales] = useState([]);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // ---> AJOUTEZ CE BLOC POUR FORCER LE FAVICON <---
+  useEffect(() => {
+    let link = document.querySelector("link[rel~='icon']");
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'icon';
+      document.head.appendChild(link);
+    }
+    link.href = LOGO_URL; // Utilise le logo Base64 comme icône d'onglet
+    document.title = "Cours Tom Morel - ERP"; // Force le titre de l'onglet
+  }, []);
+  // ------------------------------------------------
+
+  useEffect(() => {
+    const fetchTx = () => {
+
+
 // --- MODULE : ACCUEIL FAMILLE (Tableau de Bord Parents) ---
 const AccueilFamille = () => {
   const [dons, setDons] = useState([]);
