@@ -2340,6 +2340,17 @@ const SearchableCompteSelect = ({ value, onChange, comptesList, placeholder = "S
 
 // --- GRAND LIVRE (Import CSV/XLSX, OD, Validations) ---
 const GrandLivre = ({ transactionsGlobales }) => {
+  // Liste des projets pour l'analytique
+  const LISTE_PROJETS = [
+    "Kermesse", 
+    "Marché de Noël", 
+    "Loto", 
+    "Spectacle de fin d'année", 
+    "Bourse aux vêtements",
+    "Sortie Scolaire",
+    "Autre"
+  ];
+
   const [lignesEnAttente, setLignesEnAttente] = useState([]);
   const [comptesList, setComptesList] = useState([]);
   const [editingRowId, setEditingRowId] = useState(null);
@@ -2359,6 +2370,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
   const [odFormDate, setOdFormDate] = useState('');
   const [odFormLibelle, setOdFormLibelle] = useState('');
   const [odFormCommentaire, setOdFormCommentaire] = useState('');
+  const [odFormProjet, setOdFormProjet] = useState(''); // Nouveau state pour le projet
   const [odLines, setOdLines] = useState([
     { id: 1, compte: '', debit: '', credit: '' },
     { id: 2, compte: '', debit: '', credit: '' }
@@ -2381,7 +2393,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
       snapshot.forEach((doc) => {
         liste.push({ id: doc.id, ...doc.data() });
       });
-      // TRI SÉCURISÉ
       liste.sort((a, b) => String(a.code || '').localeCompare(String(b.code || '')));
       setComptesList(liste);
     });
@@ -2648,7 +2659,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
         return ligne;
       }));
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transactionsGlobales, comptesList]);
 
   const parseMontant = (rawVal) => {
@@ -2724,6 +2734,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
               reference: cols[2] ? String(cols[2]) : '', 
               typeOp: cols[4] ? String(cols[4]) : '',
               commentaire: '',
+              projet: '', // Initialise le champ projet
               montant: mt,
               comptePropose: devinerCompte(libelleExtrait),
               statut: 'attente'
@@ -2812,6 +2823,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
               compteCredit: credit > 0 ? compteNum : '',
               reference: pieceRef,
               typeOp: 'Paie',
+              projet: '',
               commentaire: '',
               date_creation: new Date().toISOString()
             };
@@ -2892,6 +2904,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
               compteCredit: !isDebit ? compteNum : '',
               reference: pieceRef,
               typeOp: journal || 'OD', 
+              projet: '',
               commentaire: commentaire,
               date_creation: new Date().toISOString()
             };
@@ -2939,7 +2952,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
     }
   };
 
-  const validerLigneBank = async (ligneId, compteCode, commentaireTxt) => {
+  const validerLigneBank = async (ligneId, compteCode, commentaireTxt, projetTxt) => {
     const ligne = lignesEnAttente.find(l => l.id === ligneId);
     if (!ligne || !compteCode) {
       alert("Veuillez sélectionner un compte avant de valider.");
@@ -2954,6 +2967,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
       reference: ligne.reference || '',
       typeOp: ligne.typeOp || '',
       commentaire: commentaireTxt || '',
+      projet: projetTxt || '',
       type: ligne.montant < 0 ? 'depense' : 'recette',
       date_creation: new Date().toISOString()
     };
@@ -3011,6 +3025,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
             compteDebit: debit > 0 ? line.compte : '',
             compteCredit: credit > 0 ? line.compte : '',
             typeOp: 'OD',
+            projet: odFormProjet, // On ajoute le projet ici
             commentaire: odFormCommentaire,
             date_creation: new Date().toISOString()
           };
@@ -3020,6 +3035,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
       setOdFormDate('');
       setOdFormLibelle('');
       setOdFormCommentaire('');
+      setOdFormProjet(''); // On vide le projet
       setOdLines([{ id: 1, compte: '', debit: '', credit: '' }, { id: 2, compte: '', debit: '', credit: '' }]);
       alert("OD enregistrée et ventilée avec succès !");
       setActiveTab(null);
@@ -3094,6 +3110,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
         (t.compteDebit && String(t.compteDebit).toLowerCase().includes(lowerTerm)) ||
         (t.compteCredit && String(t.compteCredit).toLowerCase().includes(lowerTerm)) ||
         (t.reference && String(t.reference).toLowerCase().includes(lowerTerm)) ||
+        (t.projet && String(t.projet).toLowerCase().includes(lowerTerm)) ||
         (t.commentaire && String(t.commentaire).toLowerCase().includes(lowerTerm))
       );
     }
@@ -3163,7 +3180,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
       return;
     }
 
-    const headers = ["Date", "ID", "Source", "Libellé", "Référence", "Type Op.", "Commentaire", "Débit", "Crédit", "Compte"];
+    const headers = ["Date", "ID", "Source", "Libellé", "Référence", "Type Op.", "Projet", "Commentaire", "Débit", "Crédit", "Compte"];
 
     const rows = filteredAndSortedTransactions.map(t => {
       let source = 'Banque';
@@ -3192,6 +3209,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
         `"${String(t.libelle || '').replace(/"/g, '""')}"`,
         `"${String(t.reference || '').replace(/"/g, '""')}"`,
         t.typeOp || '',
+        `"${String(t.projet || '').replace(/"/g, '""')}"`,
         `"${String(t.commentaire || '').replace(/"/g, '""')}"`,
         debit,
         credit,
@@ -3305,27 +3323,27 @@ const GrandLivre = ({ transactionsGlobales }) => {
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">2. Choisir la source à effacer</label>
                 <div className="space-y-2.5">
-                  <button onClick={() => handleResetPartiel('banque')} className="w-full text-left px-4 py-3 border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded-xl font-bold text-sm flex items-center justify-between transition-colors">
+                  <div onClick={() => handleResetPartiel('banque')} className="w-full text-left px-4 py-3 border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded-xl font-bold text-sm flex items-center justify-between transition-colors cursor-pointer">
                     <span>Journal de Banque</span>
                     <Trash2 size={16} className="text-blue-500"/>
-                  </button>
-                  <button onClick={() => handleResetPartiel('paie')} className="w-full text-left px-4 py-3 border border-pink-200 bg-pink-50 hover:bg-pink-100 text-pink-900 rounded-xl font-bold text-sm flex items-center justify-between transition-colors">
+                  </div>
+                  <div onClick={() => handleResetPartiel('paie')} className="w-full text-left px-4 py-3 border border-pink-200 bg-pink-50 hover:bg-pink-100 text-pink-900 rounded-xl font-bold text-sm flex items-center justify-between transition-colors cursor-pointer">
                     <span>Fiches de Paie</span>
                     <Trash2 size={16} className="text-pink-500"/>
-                  </button>
-                  <button onClick={() => handleResetPartiel('od')} className="w-full text-left px-4 py-3 border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-900 rounded-xl font-bold text-sm flex items-center justify-between transition-colors">
+                  </div>
+                  <div onClick={() => handleResetPartiel('od')} className="w-full text-left px-4 py-3 border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-900 rounded-xl font-bold text-sm flex items-center justify-between transition-colors cursor-pointer">
                     <span>Opérations Diverses (OD)</span>
                     <Trash2 size={16} className="text-purple-500"/>
-                  </button>
-                  <button onClick={() => handleResetPartiel('ndf')} className="w-full text-left px-4 py-3 border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-xl font-bold text-sm flex items-center justify-between transition-colors">
+                  </div>
+                  <div onClick={() => handleResetPartiel('ndf')} className="w-full text-left px-4 py-3 border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-xl font-bold text-sm flex items-center justify-between transition-colors cursor-pointer">
                     <span>Notes de Frais (NDF)</span>
                     <Trash2 size={16} className="text-amber-500"/>
-                  </button>
+                  </div>
                   <div className="h-px bg-slate-200 my-4 w-full"></div>
-                  <button onClick={() => handleResetPartiel('tout')} className="w-full text-left px-4 py-3 border border-rose-300 bg-rose-100 hover:bg-rose-600 hover:text-white text-rose-900 rounded-xl font-black text-sm flex items-center justify-between transition-colors group">
+                  <div onClick={() => handleResetPartiel('tout')} className="w-full text-left px-4 py-3 border border-rose-300 bg-rose-100 hover:bg-rose-600 hover:text-white text-rose-900 rounded-xl font-black text-sm flex items-center justify-between transition-colors group cursor-pointer">
                     <span>⚠️ TOUTES LES SOURCES</span>
                     <AlertTriangle size={18} className="text-rose-500 group-hover:text-white"/>
-                  </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -3460,7 +3478,13 @@ const GrandLivre = ({ transactionsGlobales }) => {
                     <input type="date" value={odFormDate} onChange={e => setOdFormDate(e.target.value)} className="w-1/3 border border-slate-200 rounded-xl p-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-purple-600 font-mono font-semibold shadow-sm" />
                     <input type="text" placeholder="Libellé OD..." value={odFormLibelle} onChange={e => setOdFormLibelle(e.target.value)} className="flex-1 border border-slate-200 rounded-xl p-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-purple-600 font-medium shadow-sm" />
                   </div>
-                  <input type="text" placeholder="Commentaire ou référence optionnelle..." value={odFormCommentaire} onChange={e => setOdFormCommentaire(e.target.value)} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-purple-600 shadow-sm" />
+                  <div className="flex gap-3 mt-1">
+                    <select value={odFormProjet} onChange={e => setOdFormProjet(e.target.value)} className="w-1/3 border border-slate-200 rounded-xl p-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-purple-600 shadow-sm text-slate-600 font-medium cursor-pointer">
+                      <option value="">-- Aucun projet (Optionnel) --</option>
+                      {LISTE_PROJETS.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                    <input type="text" placeholder="Commentaire ou référence optionnelle..." value={odFormCommentaire} onChange={e => setOdFormCommentaire(e.target.value)} className="flex-1 border border-slate-200 rounded-xl p-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-purple-600 shadow-sm" />
+                  </div>
                 </div>
 
                 <div className="space-y-3 mt-2">
@@ -3521,7 +3545,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
 
             <div className="flex items-center gap-3 w-full md:w-auto">
               {nbLignesPretes > 0 && (
-                <button onClick={() => { lignesEnAttente.forEach(l => { if(l.comptePropose) validerLigneBank(l.id, l.comptePropose, l.commentaire); }); }} className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-bold transition-all flex items-center gap-2 shadow-md shadow-emerald-200">
+                <button onClick={() => { lignesEnAttente.forEach(l => { if(l.comptePropose) validerLigneBank(l.id, l.comptePropose, l.commentaire, l.projet); }); }} className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-bold transition-all flex items-center gap-2 shadow-md shadow-emerald-200">
                   <CheckCircle2 size={16} /> Tout Valider ({nbLignesPretes})
                 </button>
               )}
@@ -3538,7 +3562,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
                   <th className="py-3 px-4">Date</th>
                   <th className="py-3 px-4">Libellé</th>
                   <th className="py-3 px-4 text-right">Montant</th>
-                  <th className="py-3 px-4">Commentaire</th>
+                  <th className="py-3 px-4">Projet & Commentaire</th>
                   <th className="py-3 px-4 min-w-[280px]">Compte comptable (Recherchable)</th>
                   <th className="py-3 px-4 text-center">Action</th>
                 </tr>
@@ -3551,10 +3575,16 @@ const GrandLivre = ({ transactionsGlobales }) => {
                     <td className={`py-3 px-4 text-right font-extrabold font-mono whitespace-nowrap ${ligne.montant > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                       {ligne.montant > 0 ? '+' : ''}{formatMontantTableau(Math.abs(ligne.montant))} €
                     </td>
-                    <td className="py-3 px-4">
-                      <input type="text" placeholder="Ajouter un commentaire..." value={ligne.commentaire || ''} onChange={(e) => { const val = e.target.value; setLignesEnAttente(prev => prev.map(l => l.id === ligne.id ? { ...l, commentaire: val } : l)); }} className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs w-full outline-none focus:border-indigo-500 bg-slate-50/50" />
+                    <td className="py-3 px-4 min-w-[200px]">
+                      <div className="flex flex-col gap-1.5">
+                        <select value={ligne.projet || ''} onChange={(e) => { const val = e.target.value; setLignesEnAttente(prev => prev.map(l => l.id === ligne.id ? { ...l, projet: val } : l)); }} className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px] w-full outline-none focus:border-indigo-500 bg-white text-slate-600 cursor-pointer shadow-sm">
+                          <option value="">Aucun projet</option>
+                          {LISTE_PROJETS.map(p => <option key={p} value={p}>{p}</option>)}
+                        </select>
+                        <input type="text" placeholder="Ajouter un commentaire..." value={ligne.commentaire || ''} onChange={(e) => { const val = e.target.value; setLignesEnAttente(prev => prev.map(l => l.id === ligne.id ? { ...l, commentaire: val } : l)); }} className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px] w-full outline-none focus:border-indigo-500 bg-slate-50/50 shadow-inner" />
+                      </div>
                     </td>
-                    <td className="py-3 px-4 min-w-[280px]">
+                    <td className="py-3 px-4 min-w-[280px] align-top pt-4">
                       <SearchableCompteSelect 
                         value={ligne.comptePropose || ''} 
                         comptesList={comptesList} 
@@ -3576,9 +3606,9 @@ const GrandLivre = ({ transactionsGlobales }) => {
                         </div>
                       )}
                     </td>
-                    <td className="py-3 px-4 text-center">
+                    <td className="py-3 px-4 text-center align-top pt-4">
                       <div className="flex justify-center items-center gap-2">
-                        <button onClick={() => validerLigneBank(ligne.id, ligne.comptePropose, ligne.commentaire)} disabled={!ligne.comptePropose} className={`p-2 rounded-xl transition-all shadow-sm ${ligne.comptePropose ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-slate-100 text-slate-300 cursor-not-allowed'}`}>
+                        <button onClick={() => validerLigneBank(ligne.id, ligne.comptePropose, ligne.commentaire, ligne.projet)} disabled={!ligne.comptePropose} className={`p-2 rounded-xl transition-all shadow-sm ${ligne.comptePropose ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-slate-100 text-slate-300 cursor-not-allowed'}`}>
                           <CheckCircle2 size={16} />
                         </button>
                         <button onClick={() => setLignesEnAttente(prev => prev.filter(l => l.id !== ligne.id))} className="p-2 rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-rose-600 transition-colors">
@@ -3614,7 +3644,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
               <Trash2 size={14} /> Vider le Grand Livre (Filtre)
             </button>
 
-            {/* NOUVEAU FILTRE PAR ANNÉE SCOLAIRE */}
             <select 
               value={anneeFiltre} 
               onChange={(e) => setAnneeFiltre(e.target.value)}
@@ -3628,7 +3657,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
               ))}
             </select>
 
-            {/* NOUVEAU FILTRE PAR SOURCE */}
             <select 
               value={selectedSourceFilter} 
               onChange={(e) => setSelectedSourceFilter(e.target.value)}
@@ -3646,7 +3674,6 @@ const GrandLivre = ({ transactionsGlobales }) => {
               {comptesList.map(c => <option key={`filter-${c.id}`} value={c.code}>{c.code} - {c.libelle}</option>)}
             </select>
 
-            {/* BOUTON DE RÉINITIALISATION DYNAMIQUE DES FILTRES */}
             {(selectedCompteFilter !== '' || selectedSourceFilter !== '' || anneeFiltre !== 'TOTAL') && (
               <button onClick={() => { setSelectedCompteFilter(''); setSelectedSourceFilter(''); setAnneeFiltre('TOTAL'); }} className="text-xs text-indigo-600 font-bold hover:underline">
                 Réinitialiser
@@ -3660,7 +3687,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
           </div>
         </div>
 
-        <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+        <div className="overflow-x-auto max-h-[600px] overflow-y-auto custom-scrollbar">
           <table className="w-full text-xs text-left min-w-max">
             <thead className="bg-slate-100/70 text-slate-500 uppercase font-extrabold text-[10px] tracking-wider sticky top-0 backdrop-blur-md shadow-sm z-10">
               <tr>
@@ -3676,6 +3703,12 @@ const GrandLivre = ({ transactionsGlobales }) => {
                 </th>
                 <th className="py-3.5 px-3 text-slate-400 min-w-[140px]">Référence</th>
                 <th className="py-3.5 px-3 text-slate-400">Type Op.</th>
+                
+                {/* NOUVELLE COLONNE PROJET */}
+                <th className="py-3.5 px-4 cursor-pointer hover:bg-slate-200/50 transition-colors" onClick={() => handleSort('projet')}>
+                  <div className="flex items-center gap-1 text-indigo-500">Projet {sortConfig.key === 'projet' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
+                </th>
+
                 <th className="py-3.5 px-4 text-slate-400 min-w-[180px]">Commentaire</th>
                 <th className="py-3.5 px-4 text-right cursor-pointer hover:bg-slate-200/50 transition-colors" onClick={() => handleSort('debit')}>
                   <div className="flex items-center justify-end gap-1">Débit {sortConfig.key === 'debit' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
@@ -3714,6 +3747,19 @@ const GrandLivre = ({ transactionsGlobales }) => {
                     <td className="py-3.5 px-4 text-slate-800 font-semibold whitespace-normal max-w-xs leading-snug">{t.libelle}</td>
                     <td className="py-3.5 px-3 text-slate-500 text-xs whitespace-normal max-w-[140px]">{t.reference || <span className="text-slate-300 italic">-</span>}</td>
                     <td className="py-3.5 px-3 text-slate-500 text-xs whitespace-nowrap">{t.typeOp || <span className="text-slate-300 italic">-</span>}</td>
+                    
+                    {/* CELLULE PROJET AVEC ÉDITION RAPIDE */}
+                    <td className="py-3.5 px-4 text-indigo-700 text-[11px] font-bold whitespace-nowrap">
+                      {editingRowId === t.id ? (
+                        <select value={t.projet || ''} onChange={(e) => handleUpdateField(t.id, e.target.value, 'projet')} className="border border-indigo-300 rounded-lg p-1.5 text-xs bg-indigo-50/50 w-full outline-none text-slate-600 cursor-pointer">
+                          <option value="">-- Aucun --</option>
+                          {LISTE_PROJETS.map(p => <option key={`tbl-${p}`} value={p}>{p}</option>)}
+                        </select>
+                      ) : ( 
+                        t.projet ? <span className="bg-indigo-50 border border-indigo-100 px-2 py-1 rounded-md">{t.projet}</span> : <span className="text-slate-300 italic font-normal">-</span> 
+                      )}
+                    </td>
+
                     <td className="py-3.5 px-4 text-slate-600 text-xs whitespace-normal max-w-[180px]">
                       {editingRowId === t.id ? (
                         <input type="text" defaultValue={t.commentaire || ''} onBlur={(e) => handleUpdateField(t.id, e.target.value, 'commentaire')} className="border border-indigo-300 rounded-lg p-1.5 text-xs bg-indigo-50/50 w-full outline-none" placeholder="Modifier commentaire..." autoFocus />
@@ -3754,7 +3800,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
                           <button onClick={() => setEditingRowId(null)} className="text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1 rounded-xl text-xs font-bold transition-colors shadow-sm">OK</button>
                         ) : (
                           <>
-                            <button onClick={() => setEditingRowId(t.id)} className="text-slate-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-indigo-50 transition-colors" title="Modifier"><span className="font-bold text-base leading-none">✎</span></button>
+                            <button onClick={() => setEditingRowId(t.id)} className="text-slate-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-indigo-50 transition-colors" title="Modifier la ligne (Compte, Projet, Commentaire)"><span className="font-bold text-base leading-none">✎</span></button>
                             {t.pdfData ? (
                               <div className="relative group/pdf inline-block">
                                 <button onClick={() => { const win = window.open(); if (win) { win.document.write(`<iframe src="${t.pdfData}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`); } }} className="text-indigo-600 hover:text-indigo-800 p-1.5 rounded-xl bg-indigo-50 border border-indigo-200 transition-all shadow-2xs" title={`Voir la facture/justificatif : ${t.pdfName || 'Pièce jointe'}`}>
@@ -3779,7 +3825,7 @@ const GrandLivre = ({ transactionsGlobales }) => {
               })}
               {filteredAndSortedTransactions.length === 0 && (
                 <tr>
-                  <td colSpan="11" className="py-16 text-center bg-slate-50/40">
+                  <td colSpan="12" className="py-16 text-center bg-slate-50/40">
                     <div className="flex flex-col items-center justify-center max-w-sm mx-auto space-y-3">
                       <div className="p-4 bg-slate-100 text-slate-400 rounded-3xl"><BookOpen size={32} /></div>
                       <h4 className="font-bold text-slate-700 text-base">Aucune écriture au Grand Livre</h4>
