@@ -286,231 +286,430 @@ const GestionInscriptions = () => {
   const [isRenewal, setIsRenewal] = useState(false);
   const [etape, setEtape] = useState(1);
 
-  // État global du formulaire
+  // État global du formulaire extrêmement détaillé
   const [formData, setFormData] = useState({
-    // 1. Infos Générales
-    enfantNom: '', enfantPrenom: '', enfantDateNaissance: '',
-    parent1Nom: '', parent1Profession: '', parent1Tel: '',
-    parent2Nom: '', parent2Profession: '', parent2Tel: '',
+    // ÉTAPE 1 : L'Élève
+    classeDemandee: '',
+    enfantNom: '', enfantPrenom: '', enfantSexe: 'M', enfantNationalite: 'Française',
+    enfantDateNaissance: '', enfantLieuNaissance: '',
+    enfantAdresse: '', enfantCP: '', enfantVille: '',
+    fratrie: [{ nom: '', prenom: '', dateNaissance: '', classe: '', etablissement: '' }],
+    
+    // ÉTAPE 2 : Les Parents & Situation
     situationFamiliale: 'conjointe',
-    fratrieInscrite: 1, // Utilisé pour le calcul automatique des tarifs
+    gardeEnfant: 'parents', // parents, pere, mere, tuteur
+    pereNom: '', perePrenom: '', pereProfession: '', pereEmployeur: '',
+    pereTelFixe: '', pereTelPro: '', pereTelPort: '', pereEmail: '', pereAdresse: '',
+    mereNom: '', merePrenom: '', mereProfession: '', mereEmployeur: '',
+    mereTelFixe: '', mereTelPro: '', mereTelPort: '', mereEmail: '', mereAdresse: '',
     
-    // 2. Santé & Repas
-    vaccinsAJour: false, allergies: '',
-    accordPanierRepas: false, // Décharge obligatoire
+    // ÉTAPE 3 : Santé & Contacts d'urgence
+    contactsUrgence: [
+      { nom: '', lien: '', telFixe: '', telPort: '', urgence: false, recupere: false },
+      { nom: '', lien: '', telFixe: '', telPort: '', urgence: false, recupere: false },
+      { nom: '', lien: '', telFixe: '', telPort: '', urgence: false, recupere: false }
+    ],
+    medecinNom: '', medecinTel: '',
+    vaccinsAJour: false,
+    traitementMedical: '', allergiesDetails: '', problemesSante: '', recommandations: '',
     
-    // 3. Autorisations & Engagements
-    droitImage: false, sortieSeul: false, urgenceMedicale: false,
+    // ÉTAPE 4 : Autorisations (Oui/Non explicites)
+    droitImage: '', transportTiers: '', urgenceMedicale: '', sortieSeule: '',
+    
+    // ÉTAPE 5 : Règlements & Engagements
+    accordReglementInterieur: false,
+    accordPanierRepas: false,
+    accordCharteEleve: false,
+    engagementMenageTravaux: false,
     dispoSurveillance: { lundi: false, mardi: false, jeudi: false, vendredi: false },
-    accordReglement: false, accordTravaux: false,
     
-    // 4. Finances & Matériel
-    trancheRevenu: 'tranche3', // tranche1, tranche2, tranche3, soutien, reel, boursier
-    nbUniformes: 1,
-    donAssociation: 0
+    // ÉTAPE 6 : Finances & Matériel
+    trancheRevenu: 'tranche3', 
+    fratrieInscrite: 1,
+    nbUniformes: 1, taillesUniformes: [''],
+    donAssociation: 0, recuFiscal: false
   });
 
   const updateForm = (field, value) => setFormData({ ...formData, [field]: value });
-  const nextStep = () => setEtape(e => Math.min(e + 1, 5));
+  
+  const handleFratrieChange = (index, field, value) => {
+    const newFratrie = [...formData.fratrie];
+    newFratrie[index][field] = value;
+    updateForm('fratrie', newFratrie);
+  };
+
+  const handleContactChange = (index, field, value) => {
+    const newContacts = [...formData.contactsUrgence];
+    newContacts[index][field] = value;
+    updateForm('contactsUrgence', newContacts);
+  };
+
+  const nextStep = () => setEtape(e => Math.min(e + 1, 6));
   const prevStep = () => setEtape(e => Math.max(e - 1, 1));
 
   // --- CALCULATEUR FINANCIER AUTOMATIQUE ---
   const devisMensuel = useMemo(() => {
-    const grilleMensualite = {
-      tranche1: 180, // < 5780 €
-      tranche2: 200, // < 14570 €
-      tranche3: 220, // Sans condition
-      soutien: 250,
-      reel: 500,
-      boursier: 60
-    };
-
+    const grilleMensualite = { tranche1: 180, tranche2: 200, tranche3: 220, soutien: 250, reel: 500, boursier: 60 };
     let tarifBase = grilleMensualite[formData.trancheRevenu] || 220;
-    let reduction = 1; // 1 = 100% à payer
-
-    // Application des réductions de fratrie (10%, 15%, 20%)
+    let reduction = 1; 
     if (formData.fratrieInscrite === 2) reduction = 0.90;
     if (formData.fratrieInscrite === 3) reduction = 0.85;
     if (formData.fratrieInscrite >= 4) reduction = 0.80;
-
     return (tarifBase * reduction).toFixed(2);
   }, [formData.trancheRevenu, formData.fratrieInscrite]);
 
   const fraisAnnexes = useMemo(() => {
-    let tarifUniforme = 0;
-    if (formData.nbUniformes === 1) tarifUniforme = 70;
-    if (formData.nbUniformes === 2) tarifUniforme = 126;
-    if (formData.nbUniformes === 3) tarifUniforme = 165;
-
+    let tarifUniforme = formData.nbUniformes === 1 ? 70 : formData.nbUniformes === 2 ? 126 : formData.nbUniformes === 3 ? 165 : 0;
     return {
-      inscription: 50, // Par famille
-      fournitures: 40 * formData.fratrieInscrite, // Par enfant
-      cautionLivres: 50 * formData.fratrieInscrite, // Par enfant (Non encaissé)
+      inscription: 50,
+      fournitures: 40 * formData.fratrieInscrite,
+      cautionLivres: 50 * formData.fratrieInscrite,
       uniforme: tarifUniforme
     };
   }, [formData.nbUniformes, formData.fratrieInscrite]);
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-10 font-sans animate-fade-in mt-6">
+    <div className="space-y-6 max-w-6xl mx-auto pb-10 font-sans animate-fade-in mt-6">
       
-      {/* HEADER */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2">
-            <GraduationCap className="text-indigo-600" /> Dossier d'Inscription
+            <GraduationCap className="text-indigo-600" /> Dossier d'Inscription Complet
           </h2>
-          <p className="text-slate-500 text-sm mt-1">Plateforme de saisie dématérialisée pour les familles.</p>
+          <p className="text-slate-500 text-sm mt-1">Saisie exhaustive des informations légales, médicales et financières.</p>
         </div>
-        <div className="flex bg-slate-100 p-1 rounded-xl">
-          <select value={anneeScolaire} onChange={e => setAnneeScolaire(e.target.value)} className="bg-transparent border-none text-sm font-bold text-indigo-700 outline-none cursor-pointer pl-3 pr-8 py-1">
-            <option value="2025-2026">Période 2025-2026</option>
-            <option value="2026-2027">Période 2026-2027</option>
-          </select>
-        </div>
+        <select value={anneeScolaire} onChange={e => setAnneeScolaire(e.target.value)} className="bg-indigo-50 border border-indigo-100 rounded-xl text-sm font-bold text-indigo-700 outline-none p-3 shadow-sm">
+          <option value="2025-2026">Année 2025-2026</option>
+          <option value="2026-2027">Année 2026-2027</option>
+        </select>
       </div>
 
-      {/* BARRE DE PROGRESSION */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-        <div className="flex justify-between items-center mb-8 relative">
-          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-slate-100 -z-10"></div>
-          <div className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-indigo-600 -z-10 transition-all duration-500" style={{ width: `${(etape - 1) * 25}%` }}></div>
+      <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 md:p-8">
+        
+        {/* BARRE DE PROGRESSION (6 ÉTAPES) */}
+        <div className="flex justify-between items-center mb-10 relative px-4">
+          <div className="absolute left-4 right-4 top-1/2 -translate-y-1/2 h-1.5 bg-slate-100 rounded-full -z-10"></div>
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 h-1.5 bg-indigo-600 rounded-full -z-10 transition-all duration-500" style={{ width: `calc(${(etape - 1) * 20}% + 1rem)` }}></div>
           
           {[
-            { step: 1, icon: <Users size={16} />, label: "État Civil" },
-            { step: 2, icon: <Heart size={16} />, label: "Santé & Repas" },
-            { step: 3, icon: <FileSignature size={16} />, label: "Engagements" },
-            { step: 4, icon: <Euro size={16} />, label: "Finances" },
-            { step: 5, icon: <Paperclip size={16} />, label: "Pièces Jointes" }
+            { step: 1, icon: <Baby size={18} />, label: "L'Élève" },
+            { step: 2, icon: <Users size={18} />, label: "La Famille" },
+            { step: 3, icon: <Heart size={18} />, label: "Santé & Contacts" },
+            { step: 4, icon: <AlertCircle size={18} />, label: "Règlements" },
+            { step: 5, icon: <FileSignature size={18} />, label: "Engagements" },
+            { step: 6, icon: <Euro size={18} />, label: "Finances & PDF" }
           ].map((item) => (
             <div key={item.step} className="flex flex-col items-center gap-2 bg-white px-2">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold border-2 transition-all ${etape >= item.step ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' : 'bg-white border-slate-200 text-slate-400'}`}>
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold border-2 transition-all ${etape >= item.step ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200' : 'bg-white border-slate-200 text-slate-400'}`}>
                 {item.icon}
               </div>
-              <span className={`text-[10px] uppercase font-bold tracking-wider hidden md:block ${etape >= item.step ? 'text-indigo-900' : 'text-slate-400'}`}>{item.label}</span>
+              <span className={`text-[10px] uppercase font-black tracking-wider hidden md:block text-center w-20 ${etape >= item.step ? 'text-indigo-900' : 'text-slate-400'}`}>{item.label}</span>
             </div>
           ))}
         </div>
 
-        {/* CONTENU DE L'ÉTAPE 1 : RENSEIGNEMENTS GÉNÉRAUX */}
+        {/* --- ÉTAPE 1 : L'ÉLÈVE --- */}
         {etape === 1 && (
-          <div className="space-y-6 animate-fade-in">
-            <div className="flex items-center gap-4 bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-6">
-              <label className="flex items-center gap-2 text-sm font-bold text-indigo-900 cursor-pointer">
-                <input type="radio" checked={!isRenewal} onChange={() => setIsRenewal(false)} className="w-4 h-4 text-indigo-600" /> Nouvelle Inscription
-              </label>
-              <label className="flex items-center gap-2 text-sm font-bold text-indigo-900 cursor-pointer">
-                <input type="radio" checked={isRenewal} onChange={() => setIsRenewal(true)} className="w-4 h-4 text-indigo-600" /> Renouvellement
-              </label>
-              {isRenewal && <span className="text-xs text-indigo-600 bg-white px-2 py-1 rounded-md border border-indigo-200 ml-auto">Les données de l'an dernier seront pré-remplies.</span>}
+          <div className="space-y-8 animate-fade-in">
+            <div className="bg-indigo-50/50 p-6 rounded-2xl border border-indigo-100">
+              <div className="flex flex-col md:flex-row gap-6 mb-6">
+                <label className="flex-1 flex items-center gap-3 p-4 bg-white border border-indigo-200 rounded-xl cursor-pointer hover:shadow-md transition-all">
+                  <input type="radio" checked={!isRenewal} onChange={() => setIsRenewal(false)} className="w-5 h-5 text-indigo-600" />
+                  <span className="font-bold text-indigo-900">Nouvelle Inscription</span>
+                </label>
+                <label className="flex-1 flex items-center gap-3 p-4 bg-white border border-indigo-200 rounded-xl cursor-pointer hover:shadow-md transition-all">
+                  <input type="radio" checked={isRenewal} onChange={() => setIsRenewal(true)} className="w-5 h-5 text-indigo-600" />
+                  <span className="font-bold text-indigo-900">Renouvellement</span>
+                </label>
+              </div>
+              
+              <div className="w-full md:w-1/2">
+                <label className="block text-xs font-black text-indigo-900 mb-2 uppercase tracking-wider">Classe demandée pour {anneeScolaire} :</label>
+                <select value={formData.classeDemandee} onChange={e => updateForm('classeDemandee', e.target.value)} className="w-full border border-indigo-200 rounded-xl p-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-600 shadow-sm bg-white">
+                  <option value="">-- Sélectionner une classe --</option>
+                  <option value="CP">CP</option><option value="CE1">CE1</option><option value="CE2">CE2</option>
+                  <option value="CM1">CM1</option><option value="CM2">CM2</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-5">
+              <h3 className="font-black text-slate-800 flex items-center gap-2 text-lg border-b border-slate-200 pb-3"><Baby className="text-indigo-500"/> État civil de l'enfant</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div><label className="block text-xs font-bold text-slate-500 mb-1">Nom de famille</label><input type="text" className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" value={formData.enfantNom} onChange={e => updateForm('enfantNom', e.target.value)} /></div>
+                <div><label className="block text-xs font-bold text-slate-500 mb-1">Prénom</label><input type="text" className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" value={formData.enfantPrenom} onChange={e => updateForm('enfantPrenom', e.target.value)} /></div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">Sexe</label>
+                  <select value={formData.enfantSexe} onChange={e => updateForm('enfantSexe', e.target.value)} className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm bg-white">
+                    <option value="M">Garçon</option><option value="F">Fille</option>
+                  </select>
+                </div>
+                <div><label className="block text-xs font-bold text-slate-500 mb-1">Date de naissance</label><input type="date" className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" value={formData.enfantDateNaissance} onChange={e => updateForm('enfantDateNaissance', e.target.value)} /></div>
+                <div><label className="block text-xs font-bold text-slate-500 mb-1">Lieu de naissance</label><input type="text" className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" value={formData.enfantLieuNaissance} onChange={e => updateForm('enfantLieuNaissance', e.target.value)} /></div>
+                <div><label className="block text-xs font-bold text-slate-500 mb-1">Nationalité</label><input type="text" className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" value={formData.enfantNationalite} onChange={e => updateForm('enfantNationalite', e.target.value)} /></div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+                <div className="md:col-span-2"><label className="block text-xs font-bold text-slate-500 mb-1">Adresse complète de l'enfant</label><input type="text" className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" value={formData.enfantAdresse} onChange={e => updateForm('enfantAdresse', e.target.value)} /></div>
+                <div><label className="block text-xs font-bold text-slate-500 mb-1">Code Postal</label><input type="text" className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" value={formData.enfantCP} onChange={e => updateForm('enfantCP', e.target.value)} /></div>
+                <div><label className="block text-xs font-bold text-slate-500 mb-1">Ville</label><input type="text" className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" value={formData.enfantVille} onChange={e => updateForm('enfantVille', e.target.value)} /></div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- ÉTAPE 2 : LA FAMILLE --- */}
+        {etape === 2 && (
+          <div className="space-y-8 animate-fade-in">
+            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+              <h3 className="font-black text-slate-800 flex items-center gap-2 text-lg border-b border-slate-200 pb-3 mb-5"><Users className="text-indigo-500"/> Situation Familiale</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-2 uppercase">Autorité Parentale</label>
+                  <select value={formData.situationFamiliale} onChange={e => updateForm('situationFamiliale', e.target.value)} className="w-full border border-slate-300 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm bg-white font-medium">
+                    <option value="conjointe">Conjointe (Parents mariés/pacsés/concubins)</option>
+                    <option value="separee">Séparés / Divorcés (Copie du jugement requise)</option>
+                    <option value="autre">Autre (Tuteur légal...)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-2 uppercase">L'enfant vit avec :</label>
+                  <select value={formData.gardeEnfant} onChange={e => updateForm('gardeEnfant', e.target.value)} className="w-full border border-slate-300 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm bg-white font-medium">
+                    <option value="parents">Ses deux parents</option>
+                    <option value="mere">Sa mère</option>
+                    <option value="pere">Son père</option>
+                    <option value="alternee">Garde alternée</option>
+                    <option value="autre">Autre</option>
+                  </select>
+                </div>
+              </div>
+              {formData.situationFamiliale === 'separee' && (
+                <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-xl flex items-start gap-3">
+                  <AlertTriangle size={20} className="text-orange-500 shrink-0" />
+                  <p className="text-sm text-orange-900 font-medium">En cas d'autorité parentale non conjointe, la copie du jugement précisant le lieu de résidence et l'autorité est <strong>obligatoire</strong>.</p>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4 bg-slate-50 p-5 rounded-2xl border border-slate-100">
-                <h3 className="font-black text-slate-700 flex items-center gap-2"><Baby size={18}/> L'Élève</h3>
-                <div><label className="block text-xs font-bold text-slate-500 mb-1">Nom de famille</label><input type="text" className="w-full border rounded-lg p-2 text-sm outline-none focus:border-indigo-500" value={formData.enfantNom} onChange={e => updateForm('enfantNom', e.target.value)} /></div>
-                <div><label className="block text-xs font-bold text-slate-500 mb-1">Prénom</label><input type="text" className="w-full border rounded-lg p-2 text-sm outline-none focus:border-indigo-500" value={formData.enfantPrenom} onChange={e => updateForm('enfantPrenom', e.target.value)} /></div>
-              </div>
-              <div className="space-y-4 bg-slate-50 p-5 rounded-2xl border border-slate-100">
-                <h3 className="font-black text-slate-700 flex items-center gap-2"><Users size={18}/> Les Parents</h3>
-                <div><label className="block text-xs font-bold text-slate-500 mb-1">Autorité parentale</label>
-                  <select value={formData.situationFamiliale} onChange={e => updateForm('situationFamiliale', e.target.value)} className="w-full border rounded-lg p-2 text-sm outline-none focus:border-indigo-500">
-                    <option value="conjointe">Conjointe (Parents mariés/pacsés/concubins)</option>
-                    <option value="separee">Séparés / Divorcés (Copie du jugement requise)</option>
-                  </select>
-                </div>
+              {/* PÈRE */}
+              <div className="bg-blue-50/50 p-6 rounded-2xl border border-blue-100 space-y-4">
+                <h4 className="font-black text-blue-900 text-base border-b border-blue-200 pb-2">Informations du Père</h4>
                 <div className="grid grid-cols-2 gap-3">
-                  <div><label className="block text-xs font-bold text-slate-500 mb-1">Téléphone P1</label><input type="tel" className="w-full border rounded-lg p-2 text-sm outline-none focus:border-indigo-500" /></div>
-                  <div><label className="block text-xs font-bold text-slate-500 mb-1">Téléphone P2</label><input type="tel" className="w-full border rounded-lg p-2 text-sm outline-none focus:border-indigo-500" /></div>
+                  <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Nom</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white" value={formData.pereNom} onChange={e => updateForm('pereNom', e.target.value)} /></div>
+                  <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Prénom</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white" value={formData.perePrenom} onChange={e => updateForm('perePrenom', e.target.value)} /></div>
+                  <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Profession</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white" value={formData.pereProfession} onChange={e => updateForm('pereProfession', e.target.value)} /></div>
+                  <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Employeur</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white" value={formData.pereEmployeur} onChange={e => updateForm('pereEmployeur', e.target.value)} /></div>
+                  <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Tél. Portable</label><input type="tel" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white" value={formData.pereTelPort} onChange={e => updateForm('pereTelPort', e.target.value)} /></div>
+                  <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Tél. Fixe</label><input type="tel" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white" value={formData.pereTelFixe} onChange={e => updateForm('pereTelFixe', e.target.value)} /></div>
+                  <div className="col-span-2"><label className="block text-[10px] font-bold text-slate-500 uppercase">Tél. Professionnel</label><input type="tel" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white" value={formData.pereTelPro} onChange={e => updateForm('pereTelPro', e.target.value)} /></div>
+                  <div className="col-span-2"><label className="block text-[10px] font-bold text-slate-500 uppercase">Email</label><input type="email" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white" value={formData.pereEmail} onChange={e => updateForm('pereEmail', e.target.value)} /></div>
+                  <div className="col-span-2"><label className="block text-[10px] font-bold text-slate-500 uppercase">Adresse (si différente de l'enfant)</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white" placeholder="Laisser vide si identique" value={formData.pereAdresse} onChange={e => updateForm('pereAdresse', e.target.value)} /></div>
+                </div>
+              </div>
+
+              {/* MÈRE */}
+              <div className="bg-pink-50/50 p-6 rounded-2xl border border-pink-100 space-y-4">
+                <h4 className="font-black text-pink-900 text-base border-b border-pink-200 pb-2">Informations de la Mère</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Nom de jeune fille / Nom</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500 bg-white" value={formData.mereNom} onChange={e => updateForm('mereNom', e.target.value)} /></div>
+                  <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Prénom</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500 bg-white" value={formData.merePrenom} onChange={e => updateForm('merePrenom', e.target.value)} /></div>
+                  <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Profession</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500 bg-white" value={formData.mereProfession} onChange={e => updateForm('mereProfession', e.target.value)} /></div>
+                  <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Employeur</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500 bg-white" value={formData.mereEmployeur} onChange={e => updateForm('mereEmployeur', e.target.value)} /></div>
+                  <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Tél. Portable</label><input type="tel" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500 bg-white" value={formData.mereTelPort} onChange={e => updateForm('mereTelPort', e.target.value)} /></div>
+                  <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Tél. Fixe</label><input type="tel" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500 bg-white" value={formData.mereTelFixe} onChange={e => updateForm('mereTelFixe', e.target.value)} /></div>
+                  <div className="col-span-2"><label className="block text-[10px] font-bold text-slate-500 uppercase">Tél. Professionnel</label><input type="tel" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500 bg-white" value={formData.mereTelPro} onChange={e => updateForm('mereTelPro', e.target.value)} /></div>
+                  <div className="col-span-2"><label className="block text-[10px] font-bold text-slate-500 uppercase">Email</label><input type="email" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500 bg-white" value={formData.mereEmail} onChange={e => updateForm('mereEmail', e.target.value)} /></div>
+                  <div className="col-span-2"><label className="block text-[10px] font-bold text-slate-500 uppercase">Adresse (si différente)</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500 bg-white" placeholder="Laisser vide si identique" value={formData.mereAdresse} onChange={e => updateForm('mereAdresse', e.target.value)} /></div>
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* CONTENU DE L'ÉTAPE 2 : SANTÉ & REPAS */}
-        {etape === 2 && (
-          <div className="space-y-6 animate-fade-in">
-            <div className="bg-amber-50 p-5 rounded-2xl border border-amber-200">
-              <h3 className="font-black text-amber-900 flex items-center gap-2 mb-3"><Heart size={18}/> Fiche Sanitaire de Liaison</h3>
-              <div className="space-y-3">
-                <label className="flex items-start gap-3 cursor-pointer p-3 bg-white rounded-xl border border-amber-100 hover:border-amber-300">
-                  <input type="checkbox" checked={formData.vaccinsAJour} onChange={e => updateForm('vaccinsAJour', e.target.checked)} className="mt-1 w-4 h-4 text-amber-600" />
-                  <span className="text-sm text-slate-700 font-medium">Je certifie que les <strong>vaccinations obligatoires</strong> (DTP, etc.) sont à jour. Je fournirai la copie du carnet à l'étape 5.</span>
-                </label>
-                <div>
-                  <label className="block text-xs font-bold text-amber-800 mb-1">Allergies (Alimentaires, Médicamenteuses...) ou P.A.I :</label>
-                  <textarea rows="2" className="w-full border rounded-lg p-2 text-sm outline-none focus:border-amber-500" placeholder="Précisez si nécessaire. Si oui, un certificat médical détaillé sera exigé..." value={formData.allergies} onChange={e => updateForm('allergies', e.target.value)}></textarea>
+        {/* --- ÉTAPE 3 : SANTÉ & CONTACTS --- */}
+        {etape === 3 && (
+          <div className="space-y-8 animate-fade-in">
+            
+            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-4">
+              <h3 className="font-black text-slate-800 flex items-center gap-2 text-lg border-b border-slate-200 pb-3 mb-2"><Phone className="text-indigo-500"/> Personnes autorisées & Contacts d'urgence</h3>
+              <p className="text-xs text-slate-500">Personnes à contacter en cas d'urgence et/ou autorisées à venir récupérer l'enfant à la sortie de l'école.</p>
+              
+              {formData.contactsUrgence.map((contact, index) => (
+                <div key={index} className="flex flex-col md:flex-row gap-3 bg-white p-4 rounded-xl border border-slate-200 items-center">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 flex-1 w-full">
+                    <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Nom & Prénom</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={contact.nom} onChange={e => handleContactChange(index, 'nom', e.target.value)} /></div>
+                    <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Lien (ex: Grand-mère)</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={contact.lien} onChange={e => handleContactChange(index, 'lien', e.target.value)} /></div>
+                    <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Tél. Fixe</label><input type="tel" className="w-full border border-slate-200 rounded-lg p-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={contact.telFixe} onChange={e => handleContactChange(index, 'telFixe', e.target.value)} /></div>
+                    <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Tél. Portable</label><input type="tel" className="w-full border border-slate-200 rounded-lg p-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={contact.telPort} onChange={e => handleContactChange(index, 'telPort', e.target.value)} /></div>
+                  </div>
+                  <div className="flex md:flex-col gap-2 w-full md:w-auto shrink-0 border-t md:border-t-0 border-slate-100 pt-3 md:pt-0 mt-2 md:mt-0 md:pl-3 md:border-l">
+                    <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-rose-600">
+                      <input type="checkbox" checked={contact.urgence} onChange={e => handleContactChange(index, 'urgence', e.target.checked)} className="w-4 h-4 text-rose-600" /> Appel Urgence
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-emerald-600">
+                      <input type="checkbox" checked={contact.recupere} onChange={e => handleContactChange(index, 'recupere', e.target.checked)} className="w-4 h-4 text-emerald-600" /> Autorisé Sortie
+                    </label>
+                  </div>
+                </div>
+              ))}
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4 bg-white p-4 rounded-xl border border-slate-200">
+                <div className="md:col-span-2"><p className="text-sm font-bold text-slate-700">Droit à l'image (Photos internes/promo) :</p></div>
+                <div className="flex gap-4 md:col-span-2">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-slate-700"><input type="radio" name="img" checked={formData.droitImage === 'oui'} onChange={() => updateForm('droitImage', 'oui')} className="w-4 h-4" /> J'autorise</label>
+                  <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-slate-700"><input type="radio" name="img" checked={formData.droitImage === 'non'} onChange={() => updateForm('droitImage', 'non')} className="w-4 h-4" /> Je n'autorise pas</label>
+                </div>
+
+                <div className="md:col-span-2"><p className="text-sm font-bold text-slate-700">Sortie seul(e) après les cours (Dès le CM2) :</p></div>
+                <div className="flex gap-4 md:col-span-2">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-slate-700"><input type="radio" name="sort" checked={formData.sortieSeule === 'oui'} onChange={() => updateForm('sortieSeule', 'oui')} className="w-4 h-4" /> J'autorise</label>
+                  <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-slate-700"><input type="radio" name="sort" checked={formData.sortieSeule === 'non'} onChange={() => updateForm('sortieSeule', 'non')} className="w-4 h-4" /> Je n'autorise pas</label>
+                </div>
+
+                <div className="md:col-span-2"><p className="text-sm font-bold text-slate-700">Transport par tiers (membres école/parents) lors de sorties :</p></div>
+                <div className="flex gap-4 md:col-span-2">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-slate-700"><input type="radio" name="trans" checked={formData.transportTiers === 'oui'} onChange={() => updateForm('transportTiers', 'oui')} className="w-4 h-4" /> J'accepte</label>
+                  <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-slate-700"><input type="radio" name="trans" checked={formData.transportTiers === 'non'} onChange={() => updateForm('transportTiers', 'non')} className="w-4 h-4" /> Je n'accepte pas</label>
+                </div>
+                
+                <div className="md:col-span-2"><p className="text-sm font-bold text-slate-700">Décisions d'urgence médicale si parents injoignables :</p></div>
+                <div className="flex gap-4 md:col-span-2">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-slate-700"><input type="radio" name="urg" checked={formData.urgenceMedicale === 'oui'} onChange={() => updateForm('urgenceMedicale', 'oui')} className="w-4 h-4" /> J'autorise</label>
+                  <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-slate-700"><input type="radio" name="urg" checked={formData.urgenceMedicale === 'non'} onChange={() => updateForm('urgenceMedicale', 'non')} className="w-4 h-4" /> Je n'autorise pas</label>
                 </div>
               </div>
             </div>
 
-            <div className="bg-blue-50 p-5 rounded-2xl border border-blue-200">
-              <h3 className="font-black text-blue-900 flex items-center gap-2 mb-3"><Utensils size={18}/> Protocole des Paniers-Repas</h3>
-              <p className="text-xs text-blue-800 mb-4 leading-relaxed">Conformément à la réglementation sur l'accueil déjeuner, l'école ne dispose pas de service de restauration. Les repas sont préparés par vos soins.</p>
-              <label className="flex items-start gap-3 cursor-pointer p-3 bg-white rounded-xl border border-blue-100 hover:border-blue-300 shadow-sm">
+            <div className="bg-amber-50 p-6 rounded-2xl border border-amber-200">
+              <h3 className="font-black text-amber-900 flex items-center gap-2 mb-5 text-lg border-b border-amber-200 pb-3"><Heart className="text-amber-500"/> Fiche Sanitaire de Liaison</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="flex items-start gap-3 cursor-pointer p-4 bg-white rounded-xl border border-amber-100 shadow-sm h-full">
+                    <input type="checkbox" checked={formData.vaccinsAJour} onChange={e => updateForm('vaccinsAJour', e.target.checked)} className="mt-1 w-5 h-5 text-amber-600 shrink-0" />
+                    <span className="text-sm text-slate-700 font-medium">Je certifie que les <strong>vaccinations obligatoires</strong> (Diphtérie, Tétanos, Poliomyélite, etc.) sont à jour. <em>Le carnet devra être fourni en pièce jointe.</em></span>
+                  </label>
+                </div>
+                <div className="bg-white p-4 rounded-xl border border-amber-100 shadow-sm">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="col-span-2"><label className="block text-[10px] font-bold text-amber-800 uppercase">Médecin Traitant (Nom)</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-amber-500 bg-slate-50" value={formData.medecinNom} onChange={e => updateForm('medecinNom', e.target.value)} /></div>
+                    <div className="col-span-2"><label className="block text-[10px] font-bold text-amber-800 uppercase">Téléphone du Médecin</label><input type="tel" className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-amber-500 bg-slate-50" value={formData.medecinTel} onChange={e => updateForm('medecinTel', e.target.value)} /></div>
+                  </div>
+                </div>
+                <div className="md:col-span-2 space-y-4 bg-white p-5 rounded-xl border border-amber-100 shadow-sm">
+                  <div>
+                    <label className="block text-xs font-bold text-amber-900 mb-1">Traitements médicaux en cours :</label>
+                    <input type="text" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-amber-500 bg-slate-50" placeholder="Non, ou préciser... (Ordonnance exigée si administration à l'école)" value={formData.traitementMedical} onChange={e => updateForm('traitementMedical', e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-amber-900 mb-1">Allergies (Alimentaires, Médicamenteuses...) ou Asthme :</label>
+                    <textarea rows="2" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-amber-500 bg-slate-50" placeholder="Si oui, un P.A.I. ou certificat médical sera exigé..." value={formData.allergiesDetails} onChange={e => updateForm('allergiesDetails', e.target.value)}></textarea>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-amber-900 mb-1">Recommandations utiles (Lunettes, audition, comportement...) :</label>
+                    <input type="text" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-amber-500 bg-slate-50" value={formData.recommandations} onChange={e => updateForm('recommandations', e.target.value)} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- ÉTAPE 4 : RÈGLEMENTS --- */}
+        {etape === 4 && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+              <h3 className="font-black text-slate-800 flex items-center gap-2 text-lg mb-4"><BookOpen className="text-indigo-500"/> Règlement Intérieur (Extrait)</h3>
+              <div className="bg-white p-5 rounded-xl border border-slate-200 text-sm text-slate-600 leading-relaxed max-h-60 overflow-y-auto mb-4 custom-scrollbar">
+                <ul className="list-disc pl-5 space-y-2">
+                  <li><strong>Horaires :</strong> Cours Lundi au Vendredi de 9h à 16h30. Établissement ouvert à 8h45. Périscolaire : 8h30-8h45, 12h-13h30, 16h30-17h30.</li>
+                  <li><strong>Objets interdits :</strong> Jeux électroniques, armes/imitations, cutters, MP3, téléphones portables, smartphones, appareils photos. Livres personnels soumis à accord. Confiscation en cas d'infraction.</li>
+                  <li><strong>Assiduité & Retards :</strong> Les retards ne sont pas tolérés. Les absences justifiées sont : médicales (enfant malade refusé), événements familiaux exceptionnels. Prévenir avant les cours. Certificat médical exigé après 48h.</li>
+                  <li><strong>Politesse :</strong> Vouvoiement de rigueur envers les adultes. On se lève à l'entrée d'un adulte. Respect mutuel exigé.</li>
+                  <li><strong>Livres scolaires :</strong> Prêtés contre caution. Tout livre abîmé devra être remplacé par la famille.</li>
+                  <li><strong>Sécurité & Sanctions :</strong> En cas de manquement, sanctions applicables : punitions, TIG, avertissement, exclusion temporaire ou renvoi.</li>
+                </ul>
+              </div>
+              <label className="flex items-center gap-3 cursor-pointer p-4 bg-indigo-50 border border-indigo-200 rounded-xl hover:bg-indigo-100 transition-colors">
+                <input type="checkbox" checked={formData.accordReglementInterieur} onChange={e => updateForm('accordReglementInterieur', e.target.checked)} className="w-5 h-5 text-indigo-600 shrink-0" />
+                <span className="text-sm text-indigo-900 font-bold">J'atteste avoir lu le règlement intérieur complet de l'école et je m'engage à le respecter.</span>
+              </label>
+            </div>
+
+            <div className="bg-blue-50 p-6 rounded-2xl border border-blue-200">
+              <h3 className="font-black text-blue-900 flex items-center gap-2 text-lg mb-4"><Utensils className="text-blue-500"/> Réglementation des Paniers-Repas</h3>
+              <div className="bg-white p-5 rounded-xl border border-blue-100 text-sm text-slate-600 leading-relaxed max-h-60 overflow-y-auto mb-4 custom-scrollbar">
+                <ul className="list-disc pl-5 space-y-2">
+                  <li><strong>Responsabilité Unique :</strong> Les parents sont les uniques responsables de la fourniture et du transport. Ils veillent au respect des évictions (allergies), utilisent des produits frais, et respectent la <strong>chaîne du froid</strong>.</li>
+                  <li><strong>Interdictions :</strong> Lait cru, mousse au chocolat maison, crème anglaise/chantilly interdits. Œufs autorisés uniquement durs et épluchés. Pas de sucreries, bonbons ou barres chocolatées. Eau seule boisson autorisée. Desserts lactés proscrits si > 25°C.</li>
+                  <li><strong>Conditionnement :</strong> Boîte hermétique (entrées), boîte thermos (pour manger chaud), pain de glace obligatoire pour le frais. Sac propre identifié au Nom/Prénom de l'enfant.</li>
+                  <li><strong>Retour :</strong> La vaisselle n'est pas lavée sur place et est retournée le soir dans le sac. Nettoyage à la charge des parents.</li>
+                </ul>
+              </div>
+              <label className="flex items-start gap-3 cursor-pointer p-4 bg-white border border-blue-200 rounded-xl shadow-sm hover:border-blue-400 transition-colors">
                 <input type="checkbox" checked={formData.accordPanierRepas} onChange={e => updateForm('accordPanierRepas', e.target.checked)} className="mt-1 w-5 h-5 text-blue-600 shrink-0" />
-                <span className="text-sm text-slate-700 font-medium leading-relaxed">
-                  <strong>J'assume l'entière responsabilité</strong> de la fourniture et du transport du panier-repas de mon enfant. Je m'engage à respecter scrupuleusement la chaîne du froid (utilisation de pains de glace obligatoires), les évictions alimentaires, et à ne fournir aucun produit à base de lait cru. Je décharge le Cours Tom Morel de toute responsabilité sanitaire liée aux aliments préparés par mes soins.
+                <span className="text-sm text-blue-900 font-bold leading-relaxed">
+                  J'assure moi-même la préparation des paniers-repas et en assume la qualité et le respect de la chaîne du froid. J'assume les conséquences dommageables d'un non-respect. La responsabilité de l'école ne saurait être mise en cause.
                 </span>
               </label>
             </div>
+            
+            <div className="bg-emerald-50 p-6 rounded-2xl border border-emerald-200">
+              <h3 className="font-black text-emerald-900 flex items-center gap-2 text-lg mb-3"><Sparkles className="text-emerald-500"/> Charte de l'élève</h3>
+              <p className="text-sm text-emerald-800 mb-4">À valider après lecture avec l'enfant : Je m'engage à être à l'heure, respecter et vouvoyer les adultes, porter mon uniforme propre, participer aux tâches, et travailler de mon mieux.</p>
+              <label className="flex items-center gap-3 cursor-pointer p-4 bg-white border border-emerald-200 rounded-xl hover:border-emerald-400 transition-colors">
+                <input type="checkbox" checked={formData.accordCharteEleve} onChange={e => updateForm('accordCharteEleve', e.target.checked)} className="w-5 h-5 text-emerald-600 shrink-0" />
+                <span className="text-sm text-emerald-900 font-bold">L'enfant a pris connaissance de la Charte de l'élève et s'engage à la respecter.</span>
+              </label>
+            </div>
           </div>
         )}
 
-        {/* CONTENU DE L'ÉTAPE 3 : ENGAGEMENTS & AUTORISATIONS */}
-        {etape === 3 && (
+        {/* --- ÉTAPE 5 : ENGAGEMENTS --- */}
+        {etape === 5 && (
           <div className="space-y-6 animate-fade-in">
-            <h3 className="font-black text-slate-800 flex items-center gap-2 text-lg"><BookOpen size={18}/> Vie Scolaire & Règlement Intérieur</h3>
+            <h3 className="font-black text-slate-800 flex items-center gap-2 text-xl mb-6"><FileSignature className="text-indigo-600"/> Engagements des Parents</h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <label className="flex items-center gap-3 cursor-pointer p-4 bg-slate-50 rounded-xl border hover:bg-slate-100">
-                <input type="checkbox" className="w-4 h-4 text-indigo-600" />
-                <span className="text-sm text-slate-700 font-medium">J'ai lu et j'accepte le <strong>Règlement Intérieur</strong> (horaires 9h-16h30, tenue, comportement).</span>
-              </label>
-              <label className="flex items-center gap-3 cursor-pointer p-4 bg-slate-50 rounded-xl border hover:bg-slate-100">
-                <input type="checkbox" className="w-4 h-4 text-indigo-600" />
-                <span className="text-sm text-slate-700 font-medium">J'autorise l'école à utiliser des <strong>photographies</strong> de mon enfant (usage interne/promo).</span>
-              </label>
-            </div>
+            <label className="flex items-start gap-4 cursor-pointer p-5 bg-indigo-50 border border-indigo-200 rounded-2xl shadow-sm hover:shadow-md transition-all">
+              <input type="checkbox" checked={formData.engagementMenageTravaux} onChange={e => updateForm('engagementMenageTravaux', e.target.checked)} className="mt-1 w-6 h-6 text-indigo-600 shrink-0" />
+              <span className="text-sm text-indigo-900 font-medium leading-relaxed">
+                <strong className="block text-base mb-1">Ménage et Travaux (Obligatoire)</strong>
+                Je m'engage à assurer, à tour de rôle, le <strong>ménage hebdomadaire</strong> des locaux ainsi que le lavage du linge de l'école (torchons). Je m'engage également à participer aux <strong>3 demi-journées de travaux</strong> annuels nécessaires au fonctionnement de l'école, et à assister aux réunions parents-professeurs et événements conviviaux de l'école.
+              </span>
+            </label>
 
-            <div className="bg-indigo-50 p-5 rounded-2xl border border-indigo-100">
-              <h4 className="font-bold text-indigo-900 mb-2 text-sm">Engagement de surveillance de la pause méridienne (12h - 13h30)</h4>
-              <p className="text-xs text-indigo-800 mb-3">Veuillez indiquer vos jours de disponibilité. Un roulement sera établi pour l'année entière.</p>
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mt-6">
+              <h4 className="font-bold text-slate-800 mb-2 flex items-center gap-2"><Clock size={18} className="text-indigo-500"/> Surveillance de la pause méridienne (12h - 13h30)</h4>
+              <p className="text-xs text-slate-500 mb-5">La surveillance est assurée par les parents. Veuillez entourer/sélectionner vos jours de disponibilité. Un roulement sera établi en septembre pour toute l'année.</p>
+              
               <div className="flex flex-wrap gap-4">
                 {['lundi', 'mardi', 'jeudi', 'vendredi'].map(jour => (
-                  <label key={jour} className={`flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer font-bold capitalize text-sm transition-colors ${formData.dispoSurveillance[jour] ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-300'}`}>
+                  <label key={jour} className={`flex-1 min-w-[120px] flex items-center justify-center gap-2 px-5 py-4 rounded-xl border-2 cursor-pointer font-black capitalize text-base transition-all ${formData.dispoSurveillance[jour] ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-200' : 'bg-slate-50 text-slate-400 border-slate-200 hover:border-indigo-300'}`}>
                     <input type="checkbox" className="hidden" checked={formData.dispoSurveillance[jour]} onChange={e => updateForm('dispoSurveillance', { ...formData.dispoSurveillance, [jour]: e.target.checked })} />
                     {jour}
                   </label>
                 ))}
               </div>
             </div>
-
-            <label className="flex items-start gap-3 cursor-pointer p-4 bg-emerald-50 rounded-xl border border-emerald-200">
-              <input type="checkbox" className="mt-1 w-4 h-4 text-emerald-600" />
-              <span className="text-sm text-emerald-900 font-medium">
-                Je m'engage à assurer, à tour de rôle, le <strong>ménage hebdomadaire</strong> des locaux ainsi qu'à participer aux <strong>3 demi-journées de travaux</strong> annuels nécessaires au bon fonctionnement de notre école associative.
-              </span>
-            </label>
           </div>
         )}
 
-        {/* CONTENU DE L'ÉTAPE 4 : FINANCES */}
-        {etape === 4 && (
+        {/* --- ÉTAPE 6 : FINANCES & PDF --- */}
+        {etape === 6 && (
           <div className="space-y-6 animate-fade-in grid grid-cols-1 lg:grid-cols-5 gap-8">
             <div className="lg:col-span-3 space-y-6">
-              <h3 className="font-black text-slate-800 flex items-center gap-2 text-lg"><Euro size={18}/> Calcul de Scolarité & Trousseau</h3>
+              <h3 className="font-black text-slate-800 flex items-center gap-2 text-lg"><Euro size={18}/> Paramétrage Financier</h3>
               
               <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200">
-                <label className="block text-sm font-bold text-slate-700 mb-3">Déterminez votre tarification (Revenu Fiscal de Référence / part) :</label>
+                <label className="block text-sm font-bold text-slate-700 mb-3">Tarification selon Revenu Fiscal de Référence / part :</label>
                 <select value={formData.trancheRevenu} onChange={e => updateForm('trancheRevenu', e.target.value)} className="w-full border border-slate-300 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-medium bg-white">
-                  <option value="tranche1">Tranche 1 (RFR &lt; 5780 €) — L'avis d'imposition sera exigé</option>
-                  <option value="tranche2">Tranche 2 (RFR &lt; 14570 €) — L'avis d'imposition sera exigé</option>
-                  <option value="tranche3">Tranche 3 — Tarif Standard (Sans conditions de revenus)</option>
-                  <option value="soutien">Tarif Soutien — Optionnel, pour soutenir le développement de l'école</option>
-                  <option value="reel">Tarif Réel — Optionnel, couvre le coût réel complet de la scolarité</option>
-                  <option value="boursier">Tarif Boursier (Minimum 60€) — Processus de bourse en cours</option>
+                  <option value="tranche1">Tranche 1 (RFR &lt; 5780 €) — 180€ / mois</option>
+                  <option value="tranche2">Tranche 2 (RFR &lt; 14570 €) — 200€ / mois</option>
+                  <option value="tranche3">Tranche 3 — Tarif Standard — 220€ / mois</option>
+                  <option value="soutien">Tarif Soutien — 250€ / mois</option>
+                  <option value="reel">Tarif Réel — Couvre le coût réel complet — 500€ / mois</option>
+                  <option value="boursier">Tarif Boursier — Processus de bourse en cours — 60€ / mois</option>
                 </select>
+                {(formData.trancheRevenu === 'tranche1' || formData.trancheRevenu === 'tranche2') && <p className="text-xs font-bold text-rose-500 mt-2">⚠️ L'avis d'imposition complet devra être fourni en pièce jointe.</p>}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -524,13 +723,49 @@ const GestionInscriptions = () => {
                   </select>
                 </div>
                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                  <label className="block text-xs font-bold text-slate-500 mb-2 uppercase">Uniformes du primaire</label>
+                  <label className="block text-xs font-bold text-slate-500 mb-2 uppercase">Achat Uniformes Primaire</label>
                   <select value={formData.nbUniformes} onChange={e => updateForm('nbUniformes', Number(e.target.value))} className="w-full border border-slate-300 rounded-lg p-2 text-sm bg-white outline-none">
-                    <option value={0}>J'ai déjà l'uniforme (Renouvellement)</option>
+                    <option value={0}>Aucun (J'ai déjà l'uniforme)</option>
                     <option value={1}>1 Trousseau complet (70 €)</option>
                     <option value={2}>2 Trousseaux (126 €)</option>
                     <option value={3}>3 Trousseaux (165 €)</option>
                   </select>
+                </div>
+              </div>
+
+              {formData.nbUniformes > 0 && (
+                <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100 flex gap-4">
+                  {Array.from({ length: formData.nbUniformes }).map((_, i) => (
+                    <div key={i} className="flex-1">
+                      <label className="block text-[10px] font-bold text-indigo-800 uppercase mb-1">Taille Trousseau {i+1} (Âge)</label>
+                      <input type="text" placeholder="ex: 8 ans" className="w-full border border-indigo-200 rounded-lg p-2 text-sm outline-none bg-white" />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="bg-blue-50 p-5 rounded-2xl border border-blue-200 text-center">
+                <UploadCloud size={32} className="mx-auto text-blue-500 mb-2" />
+                <h3 className="font-bold text-blue-900 text-base mb-3">Dépôt Sécurisé des Justificatifs</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-left">
+                  {[
+                    { nom: "Livret de Famille", req: true },
+                    { nom: "Carnet Vaccinations", req: true },
+                    { nom: "Photo d'identité", req: true },
+                    { nom: "Attestation RC", req: true },
+                    { nom: "Extrait Casier Judiciaire", req: true },
+                    { nom: "Avis Imposition", req: formData.trancheRevenu === 'tranche1' || formData.trancheRevenu === 'tranche2' },
+                    { nom: "Jugement Séparation", req: formData.situationFamiliale === 'separee' },
+                    { nom: "Bulletins & Radiation", req: false }
+                  ].map((doc, i) => (
+                    <div key={i} className="flex justify-between items-center p-3 bg-white border border-slate-200 rounded-xl">
+                      <div>
+                        <span className="text-xs font-bold text-slate-700 block">{doc.nom}</span>
+                        {doc.req ? <span className="text-[9px] uppercase font-black text-rose-500">Requis</span> : <span className="text-[9px] uppercase font-bold text-slate-400">Facultatif</span>}
+                      </div>
+                      <button className="bg-slate-100 text-indigo-600 px-2.5 py-1 rounded-lg text-xs font-bold border border-slate-200">Uploader</button>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -558,64 +793,28 @@ const GestionInscriptions = () => {
                   </div>
                 </div>
                 
-                <div className="bg-white/10 p-3 rounded-xl text-[10px] text-slate-300 leading-relaxed">
-                  Règlement de la scolarité possible par virement automatique le 10 du mois suivant ou par chèque. Le mandat de prélèvement SEPA sera généré à la validation.
+                <div className="bg-white/10 p-4 rounded-xl text-center space-y-4">
+                  <p className="text-[10px] text-slate-300 leading-relaxed text-left">
+                    En soumettant ce dossier, je certifie sur l'honneur l'exactitude de toutes les informations fournies. L'inscription ne devient effective qu'après acceptation définitive par la direction.
+                  </p>
+                  <button className="w-full bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-xl font-black text-base transition-all shadow-lg active:scale-95 flex justify-center items-center gap-2">
+                    <CheckCircle2 size={20} /> Soumettre Dossier
+                  </button>
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* CONTENU DE L'ÉTAPE 5 : UPLOAD & VALIDATION */}
-        {etape === 5 && (
-          <div className="space-y-6 animate-fade-in">
-            <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100 text-center">
-              <UploadCloud size={40} className="mx-auto text-blue-500 mb-3" />
-              <h3 className="font-black text-blue-900 text-lg">Dépôt Sécurisé des Justificatifs</h3>
-              <p className="text-xs text-blue-800 mt-1 max-w-lg mx-auto">Veuillez scanner ou photographier lisiblement les documents requis ci-dessous pour finaliser l'inscription administrative.</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[
-                { nom: "Livret de Famille (Copie)", obligatoire: true },
-                { nom: "Carnet de Santé (Pages Vaccins)", obligatoire: true },
-                { nom: "Photo d'identité de l'enfant", obligatoire: true },
-                { nom: "Attestation Responsabilité Civile", obligatoire: true },
-                { nom: "Extrait Casier Judiciaire (Sept. 2026)", obligatoire: true },
-                { nom: "Bulletins Scolaires (Année N & N-1)", obligatoire: false },
-                { nom: "Certificat de Radiation", obligatoire: false },
-                { nom: "Jugement de Divorce / Séparation", obligatoire: formData.situationFamiliale === 'separee' }
-              ].map((doc, i) => (
-                <div key={i} className="flex justify-between items-center p-4 bg-white border border-slate-200 rounded-xl hover:border-indigo-300 transition-colors">
-                  <div>
-                    <span className="text-sm font-bold text-slate-700 block">{doc.nom}</span>
-                    {doc.obligatoire ? <span className="text-[9px] uppercase font-black text-rose-500">Requis</span> : <span className="text-[9px] uppercase font-black text-slate-400">Facultatif</span>}
-                  </div>
-                  <button className="bg-slate-100 hover:bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors border border-slate-200 hover:border-indigo-200">
-                    Parcourir...
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200 mt-6 text-center space-y-4">
-              <p className="text-sm font-bold text-emerald-900">En cliquant sur "Soumettre le dossier", je certifie sur l'honneur l'exactitude des renseignements fournis.</p>
-              <button className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3 rounded-xl font-black text-lg transition-all shadow-lg active:scale-95 inline-flex items-center gap-2">
-                <CheckCircle2 size={20} /> Soumettre le dossier complet
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* NAVIGATION DU WIZARD */}
-        <div className="flex justify-between mt-8 pt-6 border-t border-slate-100">
-          <button onClick={prevStep} disabled={etape === 1} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-colors ${etape === 1 ? 'opacity-0 pointer-events-none' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-            <ChevronLeft size={16} /> Précédent
+        {/* NAVIGATION INTER-ÉTAPES */}
+        <div className="flex justify-between mt-10 pt-6 border-t border-slate-100">
+          <button onClick={prevStep} disabled={etape === 1} className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-colors ${etape === 1 ? 'opacity-0 pointer-events-none' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+            <ChevronLeft size={18} /> Retour
           </button>
           
-          {etape < 5 && (
-            <button onClick={nextStep} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm transition-all shadow-md active:scale-95">
-              Étape suivante <ChevronRight size={16} />
+          {etape < 6 && (
+            <button onClick={nextStep} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-bold text-sm transition-all shadow-md shadow-indigo-200 active:scale-95">
+              Étape suivante <ChevronRight size={18} />
             </button>
           )}
         </div>
