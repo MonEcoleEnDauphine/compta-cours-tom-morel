@@ -631,7 +631,6 @@ const GestionInscriptions = () => {
     </div>
   );
 };
-export default GestionInscriptions;
 
 // --- MODULE : CONTACT ---
 const InfosContact = () => (
