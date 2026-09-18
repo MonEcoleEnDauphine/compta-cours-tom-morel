@@ -281,13 +281,6 @@ const VieEcole = () => (
 );
 
 // --- MODULE : GESTION DES INSCRIPTIONS (DÉMATÉRIALISATION) ---
-import React, { useState, useMemo } from 'react';
-import { 
-  Users, FileSignature, Heart, Euro, Paperclip, 
-  CheckCircle2, ChevronRight, ChevronLeft, AlertTriangle, 
-  UploadCloud, Baby, BookOpen, GraduationCap, Utensils
-} from 'lucide-react';
-
 const GestionInscriptions = () => {
   const [anneeScolaire, setAnneeScolaire] = useState('2026-2027');
   const [isRenewal, setIsRenewal] = useState(false);
