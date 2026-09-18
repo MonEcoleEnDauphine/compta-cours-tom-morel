@@ -280,6 +280,8 @@ const VieEcole = () => (
   </div>
 );
 
+// --- MODULE : GESTION DES INSCRIPTIONS
+
 const GestionInscriptions = () => {
   const [anneeScolaire, setAnneeScolaire] = useState('2026-2027');
   const [isRenewal, setIsRenewal] = useState(false);
@@ -658,7 +660,7 @@ const GestionInscriptions = () => {
           </div>
         )}
 
-        {/* --- ÉTAPE 4 : RÈGLEMENTS --- */}
+        {/* --- ÉTAPE 4 : RÈGLEMENTS & PDF --- */}
         {etape === 4 && (
           <div className="space-y-6 animate-fade-in">
             
@@ -666,19 +668,23 @@ const GestionInscriptions = () => {
             <div className="bg-slate-100 p-5 rounded-2xl border border-slate-200 flex flex-col lg:flex-row gap-5 items-center justify-between shadow-sm">
               <div>
                 <h4 className="font-black text-slate-800 flex items-center gap-2"><FileText className="text-indigo-500"/> Documents Complets (PDF)</h4>
-                <p className="text-xs text-slate-500 mt-1">Consultez ou téléchargez les versions intégrales avant de les approuver.</p>
+                <p className="text-xs text-slate-500 mt-1">Cliquez sur les boutons pour lire ou télécharger les documents au format PDF. (Il vous suffit de fermer l'onglet du PDF pour revenir ici).</p>
               </div>
               <div className="flex flex-wrap gap-2 justify-center lg:justify-end">
-                <a href="#" className="flex items-center gap-1.5 bg-white border border-slate-300 text-slate-600 px-3 py-2 rounded-lg text-xs font-bold hover:text-indigo-600 hover:border-indigo-300 transition-colors shadow-sm">
+                {/* 
+                  REMARQUE : Remplacez les liens "/dossiers/..." par les véritables URLs de vos PDF 
+                  une fois qu'ils seront hébergés sur votre site ou sur votre Drive.
+                */}
+                <a href="/dossiers/Reglement_Interieur.pdf" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 bg-white border border-slate-300 text-slate-600 px-3 py-2 rounded-lg text-xs font-bold hover:text-indigo-600 hover:border-indigo-300 transition-colors shadow-sm">
                   <Download size={14}/> Règlement Intérieur
                 </a>
-                <a href="#" className="flex items-center gap-1.5 bg-white border border-slate-300 text-slate-600 px-3 py-2 rounded-lg text-xs font-bold hover:text-indigo-600 hover:border-indigo-300 transition-colors shadow-sm">
+                <a href="/dossiers/Paniers_Repas.pdf" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 bg-white border border-slate-300 text-slate-600 px-3 py-2 rounded-lg text-xs font-bold hover:text-indigo-600 hover:border-indigo-300 transition-colors shadow-sm">
                   <Download size={14}/> Paniers Repas
                 </a>
-                <a href="#" className="flex items-center gap-1.5 bg-white border border-slate-300 text-slate-600 px-3 py-2 rounded-lg text-xs font-bold hover:text-indigo-600 hover:border-indigo-300 transition-colors shadow-sm">
+                <a href="/dossiers/Charte_Eleve.pdf" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 bg-white border border-slate-300 text-slate-600 px-3 py-2 rounded-lg text-xs font-bold hover:text-indigo-600 hover:border-indigo-300 transition-colors shadow-sm">
                   <Download size={14}/> Charte Élève
                 </a>
-                <a href="#" className="flex items-center gap-1.5 bg-indigo-600 text-white px-3 py-2 rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm">
+                <a href="/dossiers/Dossier_Inscription_Complet.pdf" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 bg-indigo-600 text-white px-3 py-2 rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm">
                   <Download size={14}/> Dossier Complet
                 </a>
               </div>
@@ -697,7 +703,7 @@ const GestionInscriptions = () => {
               </div>
               <label className="flex items-center gap-3 cursor-pointer p-4 bg-indigo-50 border border-indigo-200 rounded-xl hover:bg-indigo-100 transition-colors shadow-sm">
                 <input type="checkbox" checked={formData.accordReglementInterieur} onChange={e => updateForm('accordReglementInterieur', e.target.checked)} className="w-5 h-5 text-indigo-600 shrink-0" />
-                <span className="text-sm text-indigo-900 font-bold">J'atteste avoir lu le règlement intérieur de l'école et je m'engage à le respecter.</span>
+                <span className="text-sm text-indigo-900 font-bold">J'atteste avoir lu le règlement intérieur complet (PDF) de l'école et je m'engage à le respecter.</span>
               </label>
             </div>
 
@@ -724,7 +730,7 @@ const GestionInscriptions = () => {
               <p className="text-sm text-emerald-800 mb-4">À valider après lecture avec vos enfants : S'engager à être à l'heure, respecter et vouvoyer les adultes, porter son uniforme propre, participer aux tâches, et travailler de son mieux.</p>
               <label className="flex items-center gap-3 cursor-pointer p-4 bg-white border border-emerald-200 rounded-xl shadow-sm hover:border-emerald-400 transition-colors">
                 <input type="checkbox" checked={formData.accordCharteEleve} onChange={e => updateForm('accordCharteEleve', e.target.checked)} className="w-5 h-5 text-emerald-600 shrink-0" />
-                <span className="text-sm text-emerald-900 font-bold">L'enfant a (Les enfants ont) pris connaissance de la Charte de l'élève et s'engage(nt) à la respecter.</span>
+                <span className="text-sm text-emerald-900 font-bold">L'enfant a (Les enfants ont) pris connaissance de la Charte de l'élève (PDF) et s'engage(nt) à la respecter.</span>
               </label>
             </div>
           </div>
@@ -759,7 +765,7 @@ const GestionInscriptions = () => {
           </div>
         )}
 
-        {/* --- ÉTAPE 6 : FINANCES & PDF --- */}
+        {/* --- ÉTAPE 6 : FINANCES & PAIEMENT --- */}
         {etape === 6 && (
           <div className="space-y-6 animate-fade-in grid grid-cols-1 lg:grid-cols-5 gap-8">
             <div className="lg:col-span-3 space-y-6">
@@ -768,8 +774,8 @@ const GestionInscriptions = () => {
               <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200">
                 <label className="block text-sm font-bold text-slate-700 mb-3">Tarification selon Revenu Fiscal de Référence / part :</label>
                 <select value={formData.trancheRevenu} onChange={e => updateForm('trancheRevenu', e.target.value)} className="w-full border border-slate-300 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-medium bg-white cursor-pointer">
-                  <option value="tranche1">Tranche 1 (RFR &lt; 5780 €) — L'avis d'imposition sera exigé</option>
-                  <option value="tranche2">Tranche 2 (RFR &lt; 14570 €) — L'avis d'imposition sera exigé</option>
+                  <option value="tranche1">Tranche 1 (RFR &lt; 5780 €) — 180€ / mois</option>
+                  <option value="tranche2">Tranche 2 (RFR &lt; 14570 €) — 200€ / mois</option>
                   <option value="tranche3">Tranche 3 — Tarif Standard (Sans conditions)</option>
                   <option value="soutien">Tarif Soutien — Optionnel, pour soutenir le développement</option>
                   <option value="reel">Tarif Réel — Couvre le coût réel complet de la scolarité</option>
@@ -781,7 +787,7 @@ const GestionInscriptions = () => {
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
                 <label className="block text-xs font-bold text-slate-500 mb-2 uppercase">Achat Uniformes Primaire</label>
                 <select value={formData.nbUniformes} onChange={e => updateForm('nbUniformes', Number(e.target.value))} className="w-full border border-slate-300 rounded-lg p-2 text-sm bg-white outline-none cursor-pointer">
-                  <option value={0}>Aucun (J'ai déjà l'uniforme / Renouvellement)</option>
+                  <option value={0}>Aucun (J'ai déjà l'uniforme / Renouvellement / GS)</option>
                   <option value={1}>1 Trousseau complet (70 €)</option>
                   <option value={2}>2 Trousseaux (126 €)</option>
                   <option value={3}>3 Trousseaux (165 €)</option>
@@ -825,7 +831,7 @@ const GestionInscriptions = () => {
               </div>
             </div>
 
-            {/* ENCART DEVIS GÉNÉRÉ AUTOMATIQUEMENT */}
+            {/* ENCART DEVIS GÉNÉRÉ AUTOMATIQUEMENT & RIB */}
             <div className="lg:col-span-2">
               <div className="bg-slate-800 text-white rounded-3xl p-6 shadow-xl sticky top-6">
                 <h4 className="text-sm font-bold uppercase tracking-widest text-slate-400 mb-4 border-b border-slate-700 pb-2">Simulation Financière</h4>
@@ -841,11 +847,29 @@ const GestionInscriptions = () => {
                   </div>
                   
                   <div className="pt-4 border-t border-slate-700 space-y-2">
-                    <p className="text-[10px] font-bold uppercase text-slate-500">Frais Annexes (À régler à l'inscription)</p>
+                    <p className="text-[10px] font-bold uppercase text-slate-500">Frais Annexes de rentrée</p>
                     <div className="flex justify-between text-xs"><span>Frais de dossier famille</span><span>50,00 €</span></div>
                     <div className="flex justify-between text-xs"><span>Achat Uniforme(s)</span><span>{fraisAnnexes.uniforme.toFixed(2)} €</span></div>
                     <div className="flex justify-between text-xs"><span>Participation Fournitures</span><span>{fraisAnnexes.fournitures.toFixed(2)} €</span></div>
                     <div className="flex justify-between text-xs text-amber-300 italic"><span>Caution Livres (Non encaissée)</span><span>{fraisAnnexes.cautionLivres.toFixed(2)} €</span></div>
+                  </div>
+                </div>
+                
+                {/* ÉCHÉANCIER ET RIB OFFICIEL */}
+                <div className="bg-slate-900 p-4 rounded-xl border border-slate-700 mb-6 space-y-4">
+                  <h5 className="text-[10px] font-bold uppercase tracking-widest text-indigo-400 border-b border-slate-700 pb-2">Échéancier de Paiement & RIB</h5>
+                  
+                  <ul className="text-xs text-slate-300 space-y-2">
+                    <li><span className="font-bold text-white">À régler tout de suite :</span> Frais d'inscription (50€).</li>
+                    <li><span className="font-bold text-white">À la rentrée :</span> Frais de fournitures (40€/enfant) & Caution (50€/enfant).</li>
+                    <li><span className="font-bold text-white">À la remise des uniformes :</span> Règlement du ou des trousseaux.</li>
+                    <li><span className="font-bold text-white">Mensualités :</span> À partir du 10 Septembre (par virement auto ou chèque).</li>
+                  </ul>
+
+                  <div className="bg-slate-800 p-3 rounded-lg border border-slate-600 text-[10px] font-mono mt-3">
+                    <p className="text-slate-400 mb-1">MON ECOLE EN DAUPHINE - CAISSE D'EPARGNE</p>
+                    <p className="text-emerald-400 font-bold tracking-wider">FR76 1382 5002 0008 0166 7947 773</p>
+                    <p className="text-slate-400 mt-1">BIC : CEPAFRPP382</p>
                   </div>
                 </div>
                 
@@ -879,6 +903,7 @@ const GestionInscriptions = () => {
     </div>
   );
 };
+
 // --- MODULE : CONTACT ---
 const InfosContact = () => (
   <div className="space-y-6 max-w-6xl mx-auto animate-fade-in pb-10">
