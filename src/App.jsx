@@ -228,6 +228,7 @@ const AccueilFamille = () => {
 };
 
 // --- MODULE : VIE DE L'ÉCOLE ---
+
 const VieEcole = () => (
   <div className="space-y-6 max-w-6xl mx-auto pb-10 font-sans animate-fade-in">
     <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mt-6">
@@ -280,60 +281,81 @@ const VieEcole = () => (
   </div>
 );
 
-// --- MODULE : GESTION DES INSCRIPTIONS
+// --- MODULE : GESTION DES INSCRIPTIONS ---
 
 const GestionInscriptions = () => {
   const [anneeScolaire, setAnneeScolaire] = useState('2026-2027');
   const [isRenewal, setIsRenewal] = useState(false);
   const [etape, setEtape] = useState(1);
 
-  // État global du formulaire mis à jour pour gérer N enfants
+  // --- FONCTIONS DE FORMATAGE STRICT (MASQUES DE SAISIE) ---
+  const formatFrenchPhone = (value) => {
+    if (!value) return value;
+    const digits = value.replace(/[^\d]/g, '');
+    if (digits.length < 3) return digits;
+    if (digits.length < 5) return `${digits.slice(0, 2)} ${digits.slice(2)}`;
+    if (digits.length < 7) return `${digits.slice(0, 2)} ${digits.slice(2, 4)} ${digits.slice(4)}`;
+    if (digits.length < 9) return `${digits.slice(0, 2)} ${digits.slice(2, 4)} ${digits.slice(4, 6)} ${digits.slice(6)}`;
+    return `${digits.slice(0, 2)} ${digits.slice(2, 4)} ${digits.slice(4, 6)} ${digits.slice(6, 8)} ${digits.slice(8, 10)}`;
+  };
+
+  const formatFrenchDate = (value) => {
+    if (!value) return value;
+    const digits = value.replace(/[^\d]/g, '');
+    if (digits.length < 3) return digits;
+    if (digits.length < 5) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4, 8)}`;
+  };
+
+  const formatNom = (val) => val ? val.toUpperCase() : '';
+  
+  const formatPrenom = (val) => {
+    if (!val) return '';
+    return val.toLowerCase().replace(/(^|[\s-])\w/g, match => match.toUpperCase());
+  };
+  
+  const formatCP = (val) => val ? val.replace(/[^\d]/g, '').slice(0, 5) : '';
+  
+  const formatEmail = (val) => val ? val.toLowerCase().replace(/\s/g, '') : '';
+  
+  const formatVille = (val) => val ? val.toUpperCase() : '';
+
+
+  // État global avec individualisation absolue des enfants
   const [formData, setFormData] = useState({
-    // ÉTAPE 1 : Les Enfants (Tableau dynamique)
     enfants: [
       {
-        classeDemandee: '', nom: '', prenom: '', sexe: 'M', nationalite: 'Française',
-        dateNaissance: '', lieuNaissance: '', adresse: '', cp: '', ville: ''
+        id: Date.now(),
+        classeDemandee: '', nom: '', prenom: '', sexe: 'M', nationalite: 'FRANÇAISE',
+        dateNaissance: '', lieuNaissance: '', adresse: '', cp: '', ville: '',
+        vaccinsAJour: false, traitementMedical: '', allergiesDetails: '', recommandations: '',
+        accordCharteEleve: false
       }
     ],
     
-    // ÉTAPE 2 : La Famille
-    situationFamiliale: 'conjointe',
-    gardeEnfant: 'parents', 
+    situationFamiliale: 'conjointe', gardeEnfant: 'parents', 
     pereNom: '', perePrenom: '', pereProfession: '', pereEmployeur: '',
     pereTelFixe: '', pereTelPro: '', pereTelPort: '', pereEmail: '', pereAdresse: '',
     mereNom: '', merePrenom: '', mereProfession: '', mereEmployeur: '',
     mereTelFixe: '', mereTelPro: '', mereTelPort: '', mereEmail: '', mereAdresse: '',
     
-    // ÉTAPE 3 : Santé & Contacts d'urgence
     contactsUrgence: [
       { nom: '', lien: '', telFixe: '', telPort: '', urgence: false, recupere: false },
       { nom: '', lien: '', telFixe: '', telPort: '', urgence: false, recupere: false },
       { nom: '', lien: '', telFixe: '', telPort: '', urgence: false, recupere: false }
     ],
     medecinNom: '', medecinTel: '',
-    vaccinsAJour: false,
-    traitementMedical: '', allergiesDetails: '', problemesSante: '', recommandations: '',
     
-    // ÉTAPE 4 : Autorisations
     droitImage: '', transportTiers: '', urgenceMedicale: '', sortieSeule: '',
     
-    // ÉTAPE 5 : Règlements & Engagements
-    accordReglementInterieur: false,
-    accordPanierRepas: false,
-    accordCharteEleve: false,
-    engagementMenageTravaux: false,
+    accordReglementInterieur: false, accordPanierRepas: false, engagementMenageTravaux: false,
     dispoSurveillance: { lundi: false, mardi: false, jeudi: false, vendredi: false },
     
-    // ÉTAPE 6 : Finances & Matériel
-    trancheRevenu: 'tranche3', 
-    nbUniformes: 1,
-    donAssociation: 0
+    trancheRevenu: 'tranche3', nbUniformes: 1, donAssociation: 0
   });
 
   const updateForm = (field, value) => setFormData({ ...formData, [field]: value });
   
-  // Gestion dynamique des enfants
   const handleEnfantChange = (index, field, value) => {
     const newEnfants = [...formData.enfants];
     newEnfants[index][field] = value;
@@ -345,8 +367,11 @@ const GestionInscriptions = () => {
     updateForm('enfants', [
       ...formData.enfants, 
       { 
-        classeDemandee: '', nom: lastEnfant.nom, prenom: '', sexe: 'M', nationalite: 'Française',
-        dateNaissance: '', lieuNaissance: '', adresse: lastEnfant.adresse, cp: lastEnfant.cp, ville: lastEnfant.ville
+        id: Date.now(),
+        classeDemandee: '', nom: lastEnfant.nom, prenom: '', sexe: 'M', nationalite: 'FRANÇAISE',
+        dateNaissance: '', lieuNaissance: '', adresse: lastEnfant.adresse, cp: lastEnfant.cp, ville: lastEnfant.ville,
+        vaccinsAJour: false, traitementMedical: '', allergiesDetails: '', recommandations: '',
+        accordCharteEleve: false
       }
     ]);
   };
@@ -366,7 +391,7 @@ const GestionInscriptions = () => {
   const nextStep = () => setEtape(e => Math.min(e + 1, 6));
   const prevStep = () => setEtape(e => Math.max(e - 1, 1));
 
-  // --- CALCULATEUR FINANCIER AUTOMATIQUE (Gère la fratrie) ---
+  // --- CALCULATEUR FINANCIER AUTOMATIQUE ---
   const devisMensuel = useMemo(() => {
     const grilleMensualite = { tranche1: 180, tranche2: 200, tranche3: 220, soutien: 250, reel: 500, boursier: 60 };
     let tarifBase = grilleMensualite[formData.trancheRevenu] || 220;
@@ -374,12 +399,11 @@ const GestionInscriptions = () => {
     let total = 0;
     formData.enfants.forEach((_, index) => {
       let reduction = 1; 
-      if (index === 1) reduction = 0.90; // 2ème enfant: -10%
-      if (index === 2) reduction = 0.85; // 3ème enfant: -15%
-      if (index >= 3) reduction = 0.80;  // 4ème enfant et +: -20%
+      if (index === 1) reduction = 0.90; 
+      if (index === 2) reduction = 0.85; 
+      if (index >= 3) reduction = 0.80;  
       total += (tarifBase * reduction);
     });
-
     return total.toFixed(2);
   }, [formData.trancheRevenu, formData.enfants.length]);
 
@@ -411,7 +435,7 @@ const GestionInscriptions = () => {
 
       <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 md:p-8">
         
-        {/* BARRE DE PROGRESSION (6 ÉTAPES) */}
+        {/* BARRE DE PROGRESSION */}
         <div className="flex justify-between items-center mb-10 relative px-4">
           <div className="absolute left-4 right-4 top-1/2 -translate-y-1/2 h-1.5 bg-slate-100 rounded-full -z-10"></div>
           <div className="absolute left-4 top-1/2 -translate-y-1/2 h-1.5 bg-indigo-600 rounded-full -z-10 transition-all duration-500" style={{ width: `calc(${(etape - 1) * 20}% + 1rem)` }}></div>
@@ -450,7 +474,7 @@ const GestionInscriptions = () => {
             </div>
 
             {formData.enfants.map((enfant, index) => (
-              <div key={index} className="bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-5 relative group transition-all hover:border-indigo-300">
+              <div key={enfant.id} className="bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-5 relative group transition-all hover:border-indigo-300 shadow-sm">
                 
                 {formData.enfants.length > 1 && (
                   <button onClick={() => removeEnfant(index)} className="absolute top-4 right-4 text-slate-400 hover:text-rose-600 bg-white p-1.5 rounded-lg shadow-sm border border-slate-200" title="Supprimer cet enfant">
@@ -474,23 +498,23 @@ const GestionInscriptions = () => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  <div><label className="block text-xs font-bold text-slate-500 mb-1">Nom de famille</label><input type="text" className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" value={enfant.nom} onChange={e => handleEnfantChange(index, 'nom', e.target.value)} /></div>
-                  <div><label className="block text-xs font-bold text-slate-500 mb-1">Prénom</label><input type="text" className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" value={enfant.prenom} onChange={e => handleEnfantChange(index, 'prenom', e.target.value)} /></div>
+                  <div><label className="block text-xs font-bold text-slate-500 mb-1">Nom de famille</label><input type="text" className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm bg-white" value={enfant.nom} onChange={e => handleEnfantChange(index, 'nom', formatNom(e.target.value))} /></div>
+                  <div><label className="block text-xs font-bold text-slate-500 mb-1">Prénom</label><input type="text" className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm bg-white" value={enfant.prenom} onChange={e => handleEnfantChange(index, 'prenom', formatPrenom(e.target.value))} /></div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 mb-1">Sexe</label>
                     <select value={enfant.sexe} onChange={e => handleEnfantChange(index, 'sexe', e.target.value)} className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm bg-white">
                       <option value="M">Garçon</option><option value="F">Fille</option>
                     </select>
                   </div>
-                  <div><label className="block text-xs font-bold text-slate-500 mb-1">Date de naissance</label><input type="date" className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" value={enfant.dateNaissance} onChange={e => handleEnfantChange(index, 'dateNaissance', e.target.value)} /></div>
-                  <div><label className="block text-xs font-bold text-slate-500 mb-1">Lieu de naissance</label><input type="text" className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" value={enfant.lieuNaissance} onChange={e => handleEnfantChange(index, 'lieuNaissance', e.target.value)} /></div>
-                  <div><label className="block text-xs font-bold text-slate-500 mb-1">Nationalité</label><input type="text" className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" value={enfant.nationalite} onChange={e => handleEnfantChange(index, 'nationalite', e.target.value)} /></div>
+                  <div><label className="block text-xs font-bold text-slate-500 mb-1">Date de naissance</label><input type="text" placeholder="JJ/MM/AAAA" maxLength="10" className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm bg-white" value={enfant.dateNaissance} onChange={e => handleEnfantChange(index, 'dateNaissance', formatFrenchDate(e.target.value))} /></div>
+                  <div><label className="block text-xs font-bold text-slate-500 mb-1">Lieu de naissance</label><input type="text" className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm bg-white" value={enfant.lieuNaissance} onChange={e => handleEnfantChange(index, 'lieuNaissance', formatVille(e.target.value))} /></div>
+                  <div><label className="block text-xs font-bold text-slate-500 mb-1">Nationalité</label><input type="text" className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm bg-white" value={enfant.nationalite} onChange={e => handleEnfantChange(index, 'nationalite', formatVille(e.target.value))} /></div>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
-                  <div className="md:col-span-2"><label className="block text-xs font-bold text-slate-500 mb-1">Adresse complète</label><input type="text" className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" value={enfant.adresse} onChange={e => handleEnfantChange(index, 'adresse', e.target.value)} /></div>
-                  <div><label className="block text-xs font-bold text-slate-500 mb-1">Code Postal</label><input type="text" className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" value={enfant.cp} onChange={e => handleEnfantChange(index, 'cp', e.target.value)} /></div>
-                  <div><label className="block text-xs font-bold text-slate-500 mb-1">Ville</label><input type="text" className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" value={enfant.ville} onChange={e => handleEnfantChange(index, 'ville', e.target.value)} /></div>
+                  <div className="md:col-span-2"><label className="block text-xs font-bold text-slate-500 mb-1">Adresse complète</label><input type="text" className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm bg-white" value={enfant.adresse} onChange={e => handleEnfantChange(index, 'adresse', e.target.value)} /></div>
+                  <div><label className="block text-xs font-bold text-slate-500 mb-1">Code Postal</label><input type="text" placeholder="38890" maxLength="5" className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm bg-white" value={enfant.cp} onChange={e => handleEnfantChange(index, 'cp', formatCP(e.target.value))} /></div>
+                  <div><label className="block text-xs font-bold text-slate-500 mb-1">Ville</label><input type="text" className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm bg-white" value={enfant.ville} onChange={e => handleEnfantChange(index, 'ville', formatVille(e.target.value))} /></div>
                 </div>
               </div>
             ))}
@@ -541,15 +565,15 @@ const GestionInscriptions = () => {
               <div className="bg-blue-50/50 p-6 rounded-2xl border border-blue-100 space-y-4">
                 <h4 className="font-black text-blue-900 text-base border-b border-blue-200 pb-2">Informations du Père</h4>
                 <div className="grid grid-cols-2 gap-3">
-                  <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Nom</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white" value={formData.pereNom} onChange={e => updateForm('pereNom', e.target.value)} /></div>
-                  <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Prénom</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white" value={formData.perePrenom} onChange={e => updateForm('perePrenom', e.target.value)} /></div>
+                  <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Nom</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white" value={formData.pereNom} onChange={e => updateForm('pereNom', formatNom(e.target.value))} /></div>
+                  <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Prénom</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white" value={formData.perePrenom} onChange={e => updateForm('perePrenom', formatPrenom(e.target.value))} /></div>
                   <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Profession</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white" value={formData.pereProfession} onChange={e => updateForm('pereProfession', e.target.value)} /></div>
                   <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Employeur</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white" value={formData.pereEmployeur} onChange={e => updateForm('pereEmployeur', e.target.value)} /></div>
-                  <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Tél. Portable</label><input type="tel" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white" value={formData.pereTelPort} onChange={e => updateForm('pereTelPort', e.target.value)} /></div>
-                  <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Tél. Fixe</label><input type="tel" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white" value={formData.pereTelFixe} onChange={e => updateForm('pereTelFixe', e.target.value)} /></div>
-                  <div className="col-span-2"><label className="block text-[10px] font-bold text-slate-500 uppercase">Tél. Professionnel</label><input type="tel" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white" value={formData.pereTelPro} onChange={e => updateForm('pereTelPro', e.target.value)} /></div>
-                  <div className="col-span-2"><label className="block text-[10px] font-bold text-slate-500 uppercase">Email</label><input type="email" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white" value={formData.pereEmail} onChange={e => updateForm('pereEmail', e.target.value)} /></div>
-                  <div className="col-span-2"><label className="block text-[10px] font-bold text-slate-500 uppercase">Adresse (si différente)</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white" placeholder="Laisser vide si identique" value={formData.pereAdresse} onChange={e => updateForm('pereAdresse', e.target.value)} /></div>
+                  <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Tél. Portable</label><input type="text" placeholder="06 12 34 56 78" maxLength="14" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white" value={formData.pereTelPort} onChange={e => updateForm('pereTelPort', formatFrenchPhone(e.target.value))} /></div>
+                  <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Tél. Fixe</label><input type="text" placeholder="04 12 34 56 78" maxLength="14" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white" value={formData.pereTelFixe} onChange={e => updateForm('pereTelFixe', formatFrenchPhone(e.target.value))} /></div>
+                  <div className="col-span-2"><label className="block text-[10px] font-bold text-slate-500 uppercase">Tél. Professionnel</label><input type="text" placeholder="04 12 34 56 78" maxLength="14" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white" value={formData.pereTelPro} onChange={e => updateForm('pereTelPro', formatFrenchPhone(e.target.value))} /></div>
+                  <div className="col-span-2"><label className="block text-[10px] font-bold text-slate-500 uppercase">Email</label><input type="email" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white" value={formData.pereEmail} onChange={e => updateForm('pereEmail', formatEmail(e.target.value))} /></div>
+                  <div className="col-span-2"><label className="block text-[10px] font-bold text-slate-500 uppercase">Adresse (si différente)</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white" placeholder="Laisser vide si identique à l'enfant" value={formData.pereAdresse} onChange={e => updateForm('pereAdresse', e.target.value)} /></div>
                 </div>
               </div>
 
@@ -557,15 +581,15 @@ const GestionInscriptions = () => {
               <div className="bg-pink-50/50 p-6 rounded-2xl border border-pink-100 space-y-4">
                 <h4 className="font-black text-pink-900 text-base border-b border-pink-200 pb-2">Informations de la Mère</h4>
                 <div className="grid grid-cols-2 gap-3">
-                  <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Nom de jeune fille / Nom</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500 bg-white" value={formData.mereNom} onChange={e => updateForm('mereNom', e.target.value)} /></div>
-                  <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Prénom</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500 bg-white" value={formData.merePrenom} onChange={e => updateForm('merePrenom', e.target.value)} /></div>
+                  <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Nom de jeune fille / Nom</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500 bg-white" value={formData.mereNom} onChange={e => updateForm('mereNom', formatNom(e.target.value))} /></div>
+                  <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Prénom</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500 bg-white" value={formData.merePrenom} onChange={e => updateForm('merePrenom', formatPrenom(e.target.value))} /></div>
                   <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Profession</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500 bg-white" value={formData.mereProfession} onChange={e => updateForm('mereProfession', e.target.value)} /></div>
                   <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Employeur</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500 bg-white" value={formData.mereEmployeur} onChange={e => updateForm('mereEmployeur', e.target.value)} /></div>
-                  <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Tél. Portable</label><input type="tel" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500 bg-white" value={formData.mereTelPort} onChange={e => updateForm('mereTelPort', e.target.value)} /></div>
-                  <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Tél. Fixe</label><input type="tel" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500 bg-white" value={formData.mereTelFixe} onChange={e => updateForm('mereTelFixe', e.target.value)} /></div>
-                  <div className="col-span-2"><label className="block text-[10px] font-bold text-slate-500 uppercase">Tél. Professionnel</label><input type="tel" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500 bg-white" value={formData.mereTelPro} onChange={e => updateForm('mereTelPro', e.target.value)} /></div>
-                  <div className="col-span-2"><label className="block text-[10px] font-bold text-slate-500 uppercase">Email</label><input type="email" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500 bg-white" value={formData.mereEmail} onChange={e => updateForm('mereEmail', e.target.value)} /></div>
-                  <div className="col-span-2"><label className="block text-[10px] font-bold text-slate-500 uppercase">Adresse (si différente)</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500 bg-white" placeholder="Laisser vide si identique" value={formData.mereAdresse} onChange={e => updateForm('mereAdresse', e.target.value)} /></div>
+                  <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Tél. Portable</label><input type="text" placeholder="06 12 34 56 78" maxLength="14" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500 bg-white" value={formData.mereTelPort} onChange={e => updateForm('mereTelPort', formatFrenchPhone(e.target.value))} /></div>
+                  <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Tél. Fixe</label><input type="text" placeholder="04 12 34 56 78" maxLength="14" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500 bg-white" value={formData.mereTelFixe} onChange={e => updateForm('mereTelFixe', formatFrenchPhone(e.target.value))} /></div>
+                  <div className="col-span-2"><label className="block text-[10px] font-bold text-slate-500 uppercase">Tél. Professionnel</label><input type="text" placeholder="04 12 34 56 78" maxLength="14" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500 bg-white" value={formData.mereTelPro} onChange={e => updateForm('mereTelPro', formatFrenchPhone(e.target.value))} /></div>
+                  <div className="col-span-2"><label className="block text-[10px] font-bold text-slate-500 uppercase">Email</label><input type="email" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500 bg-white" value={formData.mereEmail} onChange={e => updateForm('mereEmail', formatEmail(e.target.value))} /></div>
+                  <div className="col-span-2"><label className="block text-[10px] font-bold text-slate-500 uppercase">Adresse (si différente)</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-pink-500 bg-white" placeholder="Laisser vide si identique à l'enfant" value={formData.mereAdresse} onChange={e => updateForm('mereAdresse', e.target.value)} /></div>
                 </div>
               </div>
             </div>
@@ -578,15 +602,14 @@ const GestionInscriptions = () => {
             
             <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-4">
               <h3 className="font-black text-slate-800 flex items-center gap-2 text-lg border-b border-slate-200 pb-3 mb-2"><Phone className="text-indigo-500"/> Personnes autorisées & Contacts d'urgence</h3>
-              <p className="text-xs text-slate-500">Personnes à contacter en cas d'urgence et/ou autorisées à venir récupérer l'enfant à la sortie de l'école.</p>
               
               {formData.contactsUrgence.map((contact, index) => (
                 <div key={index} className="flex flex-col md:flex-row gap-3 bg-white p-4 rounded-xl border border-slate-200 items-center hover:border-indigo-300 transition-colors">
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 flex-1 w-full">
-                    <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Nom & Prénom</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={contact.nom} onChange={e => handleContactChange(index, 'nom', e.target.value)} /></div>
+                    <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Nom & Prénom</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={contact.nom} onChange={e => handleContactChange(index, 'nom', formatNom(e.target.value))} /></div>
                     <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Lien (ex: Grand-mère)</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={contact.lien} onChange={e => handleContactChange(index, 'lien', e.target.value)} /></div>
-                    <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Tél. Fixe</label><input type="tel" className="w-full border border-slate-200 rounded-lg p-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={contact.telFixe} onChange={e => handleContactChange(index, 'telFixe', e.target.value)} /></div>
-                    <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Tél. Portable</label><input type="tel" className="w-full border border-slate-200 rounded-lg p-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={contact.telPort} onChange={e => handleContactChange(index, 'telPort', e.target.value)} /></div>
+                    <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Tél. Fixe</label><input type="text" placeholder="04 12..." maxLength="14" className="w-full border border-slate-200 rounded-lg p-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={contact.telFixe} onChange={e => handleContactChange(index, 'telFixe', formatFrenchPhone(e.target.value))} /></div>
+                    <div><label className="block text-[10px] font-bold text-slate-500 uppercase">Tél. Portable</label><input type="text" placeholder="06 12..." maxLength="14" className="w-full border border-slate-200 rounded-lg p-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50" value={contact.telPort} onChange={e => handleContactChange(index, 'telPort', formatFrenchPhone(e.target.value))} /></div>
                   </div>
                   <div className="flex md:flex-col gap-2 w-full md:w-auto shrink-0 border-t md:border-t-0 border-slate-100 pt-3 md:pt-0 mt-2 md:mt-0 md:pl-3 md:border-l">
                     <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-rose-600">
@@ -612,13 +635,13 @@ const GestionInscriptions = () => {
                   <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-slate-700"><input type="radio" name="sort" checked={formData.sortieSeule === 'non'} onChange={() => updateForm('sortieSeule', 'non')} className="w-4 h-4 text-indigo-600" /> Je n'autorise pas</label>
                 </div>
 
-                <div className="md:col-span-2"><p className="text-sm font-bold text-slate-700">Transport par tiers (membres école/parents) lors de sorties :</p></div>
+                <div className="md:col-span-2"><p className="text-sm font-bold text-slate-700">Transport par tiers (membres école/parents) :</p></div>
                 <div className="flex gap-4 md:col-span-2">
                   <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-slate-700"><input type="radio" name="trans" checked={formData.transportTiers === 'oui'} onChange={() => updateForm('transportTiers', 'oui')} className="w-4 h-4 text-indigo-600" /> J'accepte</label>
                   <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-slate-700"><input type="radio" name="trans" checked={formData.transportTiers === 'non'} onChange={() => updateForm('transportTiers', 'non')} className="w-4 h-4 text-indigo-600" /> Je n'accepte pas</label>
                 </div>
                 
-                <div className="md:col-span-2"><p className="text-sm font-bold text-slate-700">Décisions d'urgence médicale si parents injoignables :</p></div>
+                <div className="md:col-span-2"><p className="text-sm font-bold text-slate-700">Décisions d'urgence médicale si injoignables :</p></div>
                 <div className="flex gap-4 md:col-span-2">
                   <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-slate-700"><input type="radio" name="urg" checked={formData.urgenceMedicale === 'oui'} onChange={() => updateForm('urgenceMedicale', 'oui')} className="w-4 h-4 text-indigo-600" /> J'autorise</label>
                   <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-slate-700"><input type="radio" name="urg" checked={formData.urgenceMedicale === 'non'} onChange={() => updateForm('urgenceMedicale', 'non')} className="w-4 h-4 text-indigo-600" /> Je n'autorise pas</label>
@@ -627,34 +650,48 @@ const GestionInscriptions = () => {
             </div>
 
             <div className="bg-amber-50 p-6 rounded-2xl border border-amber-200">
-              <h3 className="font-black text-amber-900 flex items-center gap-2 mb-5 text-lg border-b border-amber-200 pb-3"><Heart className="text-amber-500"/> Fiche Sanitaire de Liaison</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="flex items-start gap-3 cursor-pointer p-4 bg-white rounded-xl border border-amber-100 shadow-sm h-full hover:border-amber-300 transition-colors">
-                    <input type="checkbox" checked={formData.vaccinsAJour} onChange={e => updateForm('vaccinsAJour', e.target.checked)} className="mt-1 w-5 h-5 text-amber-600 shrink-0" />
-                    <span className="text-sm text-slate-700 font-medium">Je certifie que les <strong>vaccinations obligatoires</strong> (Diphtérie, Tétanos, Poliomyélite, etc.) sont à jour. <em>Le carnet devra être fourni en pièce jointe.</em></span>
-                  </label>
+              <div className="flex justify-between items-center mb-5 border-b border-amber-200 pb-3">
+                <h3 className="font-black text-amber-900 flex items-center gap-2 text-lg"><Heart className="text-amber-500"/> Fiches Sanitaires Individualisées</h3>
+              </div>
+              
+              <div className="bg-white p-4 rounded-xl border border-amber-100 shadow-sm mb-6">
+                <h4 className="text-xs font-bold text-amber-800 uppercase mb-2">Médecin Traitant pour la famille</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><input type="text" placeholder="Nom du médecin" className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-amber-500 bg-slate-50" value={formData.medecinNom} onChange={e => updateForm('medecinNom', formatNom(e.target.value))} /></div>
+                  <div><input type="text" placeholder="Téléphone du médecin" maxLength="14" className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-amber-500 bg-slate-50" value={formData.medecinTel} onChange={e => updateForm('medecinTel', formatFrenchPhone(e.target.value))} /></div>
                 </div>
-                <div className="bg-white p-4 rounded-xl border border-amber-100 shadow-sm">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="col-span-2"><label className="block text-[10px] font-bold text-amber-800 uppercase">Médecin Traitant (Nom)</label><input type="text" className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-amber-500 bg-slate-50" value={formData.medecinNom} onChange={e => updateForm('medecinNom', e.target.value)} /></div>
-                    <div className="col-span-2"><label className="block text-[10px] font-bold text-amber-800 uppercase">Téléphone du Médecin</label><input type="tel" className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-amber-500 bg-slate-50" value={formData.medecinTel} onChange={e => updateForm('medecinTel', e.target.value)} /></div>
+              </div>
+
+              {/* FICHE SANITAIRE SPÉCIFIQUE PAR ENFANT */}
+              <div className="space-y-4">
+                {formData.enfants.map((enfant, index) => (
+                  <div key={enfant.id} className="bg-white p-5 rounded-xl border border-amber-100 shadow-sm">
+                    <h4 className="font-bold text-slate-800 border-b border-slate-100 pb-2 mb-4 text-sm flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-xs">{index + 1}</div>
+                      Dossier médical de <span className="text-indigo-600">{enfant.prenom || `Enfant ${index + 1}`}</span>
+                    </h4>
+                    
+                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-amber-50/50 rounded-xl border border-amber-100 mb-4 hover:bg-amber-50 transition-colors">
+                      <input type="checkbox" checked={enfant.vaccinsAJour} onChange={e => handleEnfantChange(index, 'vaccinsAJour', e.target.checked)} className="mt-1 w-5 h-5 text-amber-600 shrink-0" />
+                      <span className="text-sm text-slate-700 font-medium">Je certifie que les <strong>vaccinations obligatoires</strong> de {enfant.prenom || "cet enfant"} sont à jour. <em>(Carnet à fournir en pièce jointe)</em></span>
+                    </label>
+
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-bold text-amber-900 mb-1">Traitements médicaux en cours :</label>
+                        <input type="text" className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-amber-500 bg-slate-50" placeholder="Non, ou préciser... (Ordonnance exigée si administration à l'école)" value={enfant.traitementMedical} onChange={e => handleEnfantChange(index, 'traitementMedical', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-amber-900 mb-1">Allergies (Alimentaires, Médicamenteuses...) ou Asthme :</label>
+                        <textarea rows="2" className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-amber-500 bg-slate-50" placeholder="Si oui, un P.A.I. ou certificat médical sera exigé..." value={enfant.allergiesDetails} onChange={e => handleEnfantChange(index, 'allergiesDetails', e.target.value)}></textarea>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-amber-900 mb-1">Recommandations (Lunettes, audition, comportement...) :</label>
+                        <input type="text" className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-amber-500 bg-slate-50" value={enfant.recommandations} onChange={e => handleEnfantChange(index, 'recommandations', e.target.value)} />
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div className="md:col-span-2 space-y-4 bg-white p-5 rounded-xl border border-amber-100 shadow-sm">
-                  <div>
-                    <label className="block text-xs font-bold text-amber-900 mb-1">Traitements médicaux en cours :</label>
-                    <input type="text" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-amber-500 bg-slate-50" placeholder="Non, ou préciser... (Ordonnance exigée si administration à l'école)" value={formData.traitementMedical} onChange={e => updateForm('traitementMedical', e.target.value)} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-amber-900 mb-1">Allergies (Alimentaires, Médicamenteuses...) ou Asthme :</label>
-                    <textarea rows="2" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-amber-500 bg-slate-50" placeholder="Si oui, un P.A.I. ou certificat médical sera exigé..." value={formData.allergiesDetails} onChange={e => updateForm('allergiesDetails', e.target.value)}></textarea>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-amber-900 mb-1">Recommandations utiles (Lunettes, audition, comportement...) :</label>
-                    <input type="text" className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-amber-500 bg-slate-50" value={formData.recommandations} onChange={e => updateForm('recommandations', e.target.value)} />
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
           </div>
@@ -664,17 +701,12 @@ const GestionInscriptions = () => {
         {etape === 4 && (
           <div className="space-y-6 animate-fade-in">
             
-            {/* TÉLÉCHARGEMENT DES DOCUMENTS LÉGAUX */}
             <div className="bg-slate-100 p-5 rounded-2xl border border-slate-200 flex flex-col lg:flex-row gap-5 items-center justify-between shadow-sm">
               <div>
                 <h4 className="font-black text-slate-800 flex items-center gap-2"><FileText className="text-indigo-500"/> Documents Complets (PDF)</h4>
                 <p className="text-xs text-slate-500 mt-1">Cliquez sur les boutons pour lire ou télécharger les documents au format PDF. (Il vous suffit de fermer l'onglet du PDF pour revenir ici).</p>
               </div>
               <div className="flex flex-wrap gap-2 justify-center lg:justify-end">
-                {/* 
-                  REMARQUE : Remplacez les liens "/dossiers/..." par les véritables URLs de vos PDF 
-                  une fois qu'ils seront hébergés sur votre site ou sur votre Drive.
-                */}
                 <a href="/dossiers/Reglement_Interieur.pdf" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 bg-white border border-slate-300 text-slate-600 px-3 py-2 rounded-lg text-xs font-bold hover:text-indigo-600 hover:border-indigo-300 transition-colors shadow-sm">
                   <Download size={14}/> Règlement Intérieur
                 </a>
@@ -726,12 +758,17 @@ const GestionInscriptions = () => {
             </div>
             
             <div className="bg-emerald-50 p-6 rounded-2xl border border-emerald-200">
-              <h3 className="font-black text-emerald-900 flex items-center gap-2 text-lg mb-3"><Sparkles className="text-emerald-500"/> Charte de l'élève</h3>
+              <h3 className="font-black text-emerald-900 flex items-center gap-2 text-lg mb-3"><Sparkles className="text-emerald-500"/> Charte de l'élève (Nominative)</h3>
               <p className="text-sm text-emerald-800 mb-4">À valider après lecture avec vos enfants : S'engager à être à l'heure, respecter et vouvoyer les adultes, porter son uniforme propre, participer aux tâches, et travailler de son mieux.</p>
-              <label className="flex items-center gap-3 cursor-pointer p-4 bg-white border border-emerald-200 rounded-xl shadow-sm hover:border-emerald-400 transition-colors">
-                <input type="checkbox" checked={formData.accordCharteEleve} onChange={e => updateForm('accordCharteEleve', e.target.checked)} className="w-5 h-5 text-emerald-600 shrink-0" />
-                <span className="text-sm text-emerald-900 font-bold">L'enfant a (Les enfants ont) pris connaissance de la Charte de l'élève (PDF) et s'engage(nt) à la respecter.</span>
-              </label>
+              
+              <div className="space-y-3">
+                {formData.enfants.map((enfant, index) => (
+                  <label key={enfant.id} className="flex items-center gap-3 cursor-pointer p-4 bg-white border border-emerald-200 rounded-xl shadow-sm hover:border-emerald-400 transition-colors">
+                    <input type="checkbox" checked={enfant.accordCharteEleve} onChange={e => handleEnfantChange(index, 'accordCharteEleve', e.target.checked)} className="w-5 h-5 text-emerald-600 shrink-0" />
+                    <span className="text-sm text-emerald-900 font-bold">L'enfant <strong className="text-indigo-600 uppercase">{enfant.prenom || `Enfant ${index + 1}`}</strong> a pris connaissance de la Charte de l'élève (PDF) et s'engage à la respecter.</span>
+                  </label>
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -809,23 +846,48 @@ const GestionInscriptions = () => {
                 <UploadCloud size={32} className="mx-auto text-blue-500 mb-2" />
                 <h3 className="font-bold text-blue-900 text-base mb-3">Dépôt Sécurisé des Justificatifs</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-left">
+                  <div className="md:col-span-2 border-b border-blue-200 pb-2 mb-2"><span className="text-[10px] font-black uppercase text-blue-800 tracking-wider">Documents Familiaux</span></div>
                   {[
                     { nom: "Livret de Famille", req: true },
-                    { nom: "Carnet Vaccinations", req: true },
-                    { nom: "Photo d'identité", req: true },
-                    { nom: "Attestation RC", req: true },
+                    { nom: "Attestation Responsabilité Civile", req: true },
                     { nom: "Extrait Casier Judiciaire", req: true },
-                    { nom: "Avis Imposition", req: formData.trancheRevenu === 'tranche1' || formData.trancheRevenu === 'tranche2' },
-                    { nom: "Jugement Séparation", req: formData.situationFamiliale === 'separee' },
-                    { nom: "Bulletins & Radiation", req: false }
+                    { nom: "Avis Imposition (Si Tranche 1 ou 2)", req: formData.trancheRevenu === 'tranche1' || formData.trancheRevenu === 'tranche2' },
+                    { nom: "Jugement Séparation (Si autorité non conjointe)", req: formData.situationFamiliale === 'separee' }
                   ].map((doc, i) => (
-                    <div key={i} className="flex justify-between items-center p-3 bg-white border border-slate-200 rounded-xl hover:border-indigo-300 transition-colors shadow-sm">
+                    <div key={`fam-${i}`} className="flex justify-between items-center p-3 bg-white border border-slate-200 rounded-xl hover:border-indigo-300 transition-colors shadow-sm">
                       <div>
                         <span className="text-xs font-bold text-slate-700 block">{doc.nom}</span>
                         {doc.req ? <span className="text-[9px] uppercase font-black text-rose-500">Requis</span> : <span className="text-[9px] uppercase font-bold text-slate-400">Facultatif</span>}
                       </div>
                       <button className="bg-slate-100 hover:bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-lg text-xs font-bold border border-slate-200 transition-colors">Uploader</button>
                     </div>
+                  ))}
+
+                  <div className="md:col-span-2 border-b border-blue-200 pb-2 mt-4 mb-2"><span className="text-[10px] font-black uppercase text-blue-800 tracking-wider">Documents par Enfant</span></div>
+                  {formData.enfants.map((enfant, idx) => (
+                    <React.Fragment key={`doc-enf-${enfant.id}`}>
+                      <div className="flex justify-between items-center p-3 bg-white border border-slate-200 rounded-xl shadow-sm">
+                        <div>
+                          <span className="text-xs font-bold text-slate-700 block">Photo d'identité <strong className="text-indigo-600">({formatPrenom(enfant.prenom) || `Enfant ${idx+1}`})</strong></span>
+                          <span className="text-[9px] uppercase font-black text-rose-500">Requis</span>
+                        </div>
+                        <button className="bg-slate-100 text-indigo-600 px-2.5 py-1 rounded-lg text-xs font-bold border border-slate-200">Uploader</button>
+                      </div>
+                      <div className="flex justify-between items-center p-3 bg-white border border-slate-200 rounded-xl shadow-sm">
+                        <div>
+                          <span className="text-xs font-bold text-slate-700 block">Carnet de Vaccins <strong className="text-indigo-600">({formatPrenom(enfant.prenom) || `Enfant ${idx+1}`})</strong></span>
+                          <span className="text-[9px] uppercase font-black text-rose-500">Requis</span>
+                        </div>
+                        <button className="bg-slate-100 text-indigo-600 px-2.5 py-1 rounded-lg text-xs font-bold border border-slate-200">Uploader</button>
+                      </div>
+                      <div className="flex justify-between items-center p-3 bg-white border border-slate-200 rounded-xl shadow-sm">
+                        <div>
+                          <span className="text-xs font-bold text-slate-700 block">Bulletins & Radiation <strong className="text-indigo-600">({formatPrenom(enfant.prenom) || `Enfant ${idx+1}`})</strong></span>
+                          <span className="text-[9px] uppercase font-bold text-slate-400">Facultatif</span>
+                        </div>
+                        <button className="bg-slate-100 text-indigo-600 px-2.5 py-1 rounded-lg text-xs font-bold border border-slate-200">Uploader</button>
+                      </div>
+                    </React.Fragment>
                   ))}
                 </div>
               </div>
@@ -6521,7 +6583,7 @@ const [activeTab, setActiveTab] = useState(() => {
       case 'dons_recus': return <DonsRecus transactionsGlobales={transactionsGlobales} />;
       case 'evenements': return <GestionEvenements transactionsGlobales={transactionsGlobales} />;
       case 'gestion_acces': return <PlaceholderPage title="Gestion des Accès" />;
-      case 'factures_familles': return <PlaceholderPage title="Factures Familles (Admin)" />;
+      case 'dossiers_facturation': return <PlaceholderPage title="Dossiers & Facturation" />;
       case 'equipe_contrats': return <PlaceholderPage title="Équipe et Contrats" />;
       case 'uniformes_stock': return <PlaceholderPage title="Uniformes & Stock" />;
       default: return <PlaceholderPage title="Module en construction" />;
@@ -6622,8 +6684,8 @@ return (
             <a href="#gestion_acces" onClick={() => handleNavigation('gestion_acces')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'gestion_acces' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
               <Lock size={18} /> Gestion Accès
             </a>
-            <a href="#factures_familles" onClick={() => handleNavigation('factures_familles')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'factures_familles' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-              <FileSpreadsheet size={18} /> Factures Familles
+             <a href="#dossiers_facturation" onClick={() => handleNavigation('dossiers_facturation')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'dossiers_facturation' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
+            <FileSpreadsheet size={18} /> Dossiers & Facturation
             </a>
             <a href="#equipe_contrats" onClick={() => handleNavigation('equipe_contrats')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'equipe_contrats' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
               <Users size={18} /> Équipe (Contrats)
