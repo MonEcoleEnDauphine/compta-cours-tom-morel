@@ -7,7 +7,8 @@ import {
   Package, Target, TrendingUp, Info, Euro, ChevronDown, 
   Globe, Mail, Phone, PlusCircle, Edit2, Send, Clock, Hammer, Menu,
   Megaphone, Bell, Newspaper, Camera, MessageCircle,
-  Utensils, BarChart3, AlertCircle, Printer, CalendarDays
+  Utensils, BarChart3, AlertCircle, Printer, CalendarDays,
+  ChevronLeft, UploadCloud, Baby
 } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
@@ -278,6 +279,359 @@ const VieEcole = () => (
     </div>
   </div>
 );
+
+// --- MODULE : GESTION DES INSCRIPTIONS (DÉMATÉRIALISATION) ---
+import React, { useState, useMemo } from 'react';
+import { 
+  Users, FileSignature, Heart, Euro, Paperclip, 
+  CheckCircle2, ChevronRight, ChevronLeft, AlertTriangle, 
+  UploadCloud, Baby, BookOpen, GraduationCap, Utensils
+} from 'lucide-react';
+
+const GestionInscriptions = () => {
+  const [anneeScolaire, setAnneeScolaire] = useState('2026-2027');
+  const [isRenewal, setIsRenewal] = useState(false);
+  const [etape, setEtape] = useState(1);
+
+  // État global du formulaire
+  const [formData, setFormData] = useState({
+    // 1. Infos Générales
+    enfantNom: '', enfantPrenom: '', enfantDateNaissance: '',
+    parent1Nom: '', parent1Profession: '', parent1Tel: '',
+    parent2Nom: '', parent2Profession: '', parent2Tel: '',
+    situationFamiliale: 'conjointe',
+    fratrieInscrite: 1, // Utilisé pour le calcul automatique des tarifs
+    
+    // 2. Santé & Repas
+    vaccinsAJour: false, allergies: '',
+    accordPanierRepas: false, // Décharge obligatoire
+    
+    // 3. Autorisations & Engagements
+    droitImage: false, sortieSeul: false, urgenceMedicale: false,
+    dispoSurveillance: { lundi: false, mardi: false, jeudi: false, vendredi: false },
+    accordReglement: false, accordTravaux: false,
+    
+    // 4. Finances & Matériel
+    trancheRevenu: 'tranche3', // tranche1, tranche2, tranche3, soutien, reel, boursier
+    nbUniformes: 1,
+    donAssociation: 0
+  });
+
+  const updateForm = (field, value) => setFormData({ ...formData, [field]: value });
+  const nextStep = () => setEtape(e => Math.min(e + 1, 5));
+  const prevStep = () => setEtape(e => Math.max(e - 1, 1));
+
+  // --- CALCULATEUR FINANCIER AUTOMATIQUE ---
+  const devisMensuel = useMemo(() => {
+    const grilleMensualite = {
+      tranche1: 180, // < 5780 €
+      tranche2: 200, // < 14570 €
+      tranche3: 220, // Sans condition
+      soutien: 250,
+      reel: 500,
+      boursier: 60
+    };
+
+    let tarifBase = grilleMensualite[formData.trancheRevenu] || 220;
+    let reduction = 1; // 1 = 100% à payer
+
+    // Application des réductions de fratrie (10%, 15%, 20%)
+    if (formData.fratrieInscrite === 2) reduction = 0.90;
+    if (formData.fratrieInscrite === 3) reduction = 0.85;
+    if (formData.fratrieInscrite >= 4) reduction = 0.80;
+
+    return (tarifBase * reduction).toFixed(2);
+  }, [formData.trancheRevenu, formData.fratrieInscrite]);
+
+  const fraisAnnexes = useMemo(() => {
+    let tarifUniforme = 0;
+    if (formData.nbUniformes === 1) tarifUniforme = 70;
+    if (formData.nbUniformes === 2) tarifUniforme = 126;
+    if (formData.nbUniformes === 3) tarifUniforme = 165;
+
+    return {
+      inscription: 50, // Par famille
+      fournitures: 40 * formData.fratrieInscrite, // Par enfant
+      cautionLivres: 50 * formData.fratrieInscrite, // Par enfant (Non encaissé)
+      uniforme: tarifUniforme
+    };
+  }, [formData.nbUniformes, formData.fratrieInscrite]);
+
+  return (
+    <div className="space-y-6 max-w-5xl mx-auto pb-10 font-sans animate-fade-in mt-6">
+      
+      {/* HEADER */}
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2">
+            <GraduationCap className="text-indigo-600" /> Dossier d'Inscription
+          </h2>
+          <p className="text-slate-500 text-sm mt-1">Plateforme de saisie dématérialisée pour les familles.</p>
+        </div>
+        <div className="flex bg-slate-100 p-1 rounded-xl">
+          <select value={anneeScolaire} onChange={e => setAnneeScolaire(e.target.value)} className="bg-transparent border-none text-sm font-bold text-indigo-700 outline-none cursor-pointer pl-3 pr-8 py-1">
+            <option value="2025-2026">Période 2025-2026</option>
+            <option value="2026-2027">Période 2026-2027</option>
+          </select>
+        </div>
+      </div>
+
+      {/* BARRE DE PROGRESSION */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+        <div className="flex justify-between items-center mb-8 relative">
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-slate-100 -z-10"></div>
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-indigo-600 -z-10 transition-all duration-500" style={{ width: `${(etape - 1) * 25}%` }}></div>
+          
+          {[
+            { step: 1, icon: <Users size={16} />, label: "État Civil" },
+            { step: 2, icon: <Heart size={16} />, label: "Santé & Repas" },
+            { step: 3, icon: <FileSignature size={16} />, label: "Engagements" },
+            { step: 4, icon: <Euro size={16} />, label: "Finances" },
+            { step: 5, icon: <Paperclip size={16} />, label: "Pièces Jointes" }
+          ].map((item) => (
+            <div key={item.step} className="flex flex-col items-center gap-2 bg-white px-2">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold border-2 transition-all ${etape >= item.step ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' : 'bg-white border-slate-200 text-slate-400'}`}>
+                {item.icon}
+              </div>
+              <span className={`text-[10px] uppercase font-bold tracking-wider hidden md:block ${etape >= item.step ? 'text-indigo-900' : 'text-slate-400'}`}>{item.label}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* CONTENU DE L'ÉTAPE 1 : RENSEIGNEMENTS GÉNÉRAUX */}
+        {etape === 1 && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="flex items-center gap-4 bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-6">
+              <label className="flex items-center gap-2 text-sm font-bold text-indigo-900 cursor-pointer">
+                <input type="radio" checked={!isRenewal} onChange={() => setIsRenewal(false)} className="w-4 h-4 text-indigo-600" /> Nouvelle Inscription
+              </label>
+              <label className="flex items-center gap-2 text-sm font-bold text-indigo-900 cursor-pointer">
+                <input type="radio" checked={isRenewal} onChange={() => setIsRenewal(true)} className="w-4 h-4 text-indigo-600" /> Renouvellement
+              </label>
+              {isRenewal && <span className="text-xs text-indigo-600 bg-white px-2 py-1 rounded-md border border-indigo-200 ml-auto">Les données de l'an dernier seront pré-remplies.</span>}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4 bg-slate-50 p-5 rounded-2xl border border-slate-100">
+                <h3 className="font-black text-slate-700 flex items-center gap-2"><Baby size={18}/> L'Élève</h3>
+                <div><label className="block text-xs font-bold text-slate-500 mb-1">Nom de famille</label><input type="text" className="w-full border rounded-lg p-2 text-sm outline-none focus:border-indigo-500" value={formData.enfantNom} onChange={e => updateForm('enfantNom', e.target.value)} /></div>
+                <div><label className="block text-xs font-bold text-slate-500 mb-1">Prénom</label><input type="text" className="w-full border rounded-lg p-2 text-sm outline-none focus:border-indigo-500" value={formData.enfantPrenom} onChange={e => updateForm('enfantPrenom', e.target.value)} /></div>
+              </div>
+              <div className="space-y-4 bg-slate-50 p-5 rounded-2xl border border-slate-100">
+                <h3 className="font-black text-slate-700 flex items-center gap-2"><Users size={18}/> Les Parents</h3>
+                <div><label className="block text-xs font-bold text-slate-500 mb-1">Autorité parentale</label>
+                  <select value={formData.situationFamiliale} onChange={e => updateForm('situationFamiliale', e.target.value)} className="w-full border rounded-lg p-2 text-sm outline-none focus:border-indigo-500">
+                    <option value="conjointe">Conjointe (Parents mariés/pacsés/concubins)</option>
+                    <option value="separee">Séparés / Divorcés (Copie du jugement requise)</option>
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className="block text-xs font-bold text-slate-500 mb-1">Téléphone P1</label><input type="tel" className="w-full border rounded-lg p-2 text-sm outline-none focus:border-indigo-500" /></div>
+                  <div><label className="block text-xs font-bold text-slate-500 mb-1">Téléphone P2</label><input type="tel" className="w-full border rounded-lg p-2 text-sm outline-none focus:border-indigo-500" /></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* CONTENU DE L'ÉTAPE 2 : SANTÉ & REPAS */}
+        {etape === 2 && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="bg-amber-50 p-5 rounded-2xl border border-amber-200">
+              <h3 className="font-black text-amber-900 flex items-center gap-2 mb-3"><Heart size={18}/> Fiche Sanitaire de Liaison</h3>
+              <div className="space-y-3">
+                <label className="flex items-start gap-3 cursor-pointer p-3 bg-white rounded-xl border border-amber-100 hover:border-amber-300">
+                  <input type="checkbox" checked={formData.vaccinsAJour} onChange={e => updateForm('vaccinsAJour', e.target.checked)} className="mt-1 w-4 h-4 text-amber-600" />
+                  <span className="text-sm text-slate-700 font-medium">Je certifie que les <strong>vaccinations obligatoires</strong> (DTP, etc.) sont à jour. Je fournirai la copie du carnet à l'étape 5.</span>
+                </label>
+                <div>
+                  <label className="block text-xs font-bold text-amber-800 mb-1">Allergies (Alimentaires, Médicamenteuses...) ou P.A.I :</label>
+                  <textarea rows="2" className="w-full border rounded-lg p-2 text-sm outline-none focus:border-amber-500" placeholder="Précisez si nécessaire. Si oui, un certificat médical détaillé sera exigé..." value={formData.allergies} onChange={e => updateForm('allergies', e.target.value)}></textarea>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 p-5 rounded-2xl border border-blue-200">
+              <h3 className="font-black text-blue-900 flex items-center gap-2 mb-3"><Utensils size={18}/> Protocole des Paniers-Repas</h3>
+              <p className="text-xs text-blue-800 mb-4 leading-relaxed">Conformément à la réglementation sur l'accueil déjeuner, l'école ne dispose pas de service de restauration. Les repas sont préparés par vos soins.</p>
+              <label className="flex items-start gap-3 cursor-pointer p-3 bg-white rounded-xl border border-blue-100 hover:border-blue-300 shadow-sm">
+                <input type="checkbox" checked={formData.accordPanierRepas} onChange={e => updateForm('accordPanierRepas', e.target.checked)} className="mt-1 w-5 h-5 text-blue-600 shrink-0" />
+                <span className="text-sm text-slate-700 font-medium leading-relaxed">
+                  <strong>J'assume l'entière responsabilité</strong> de la fourniture et du transport du panier-repas de mon enfant. Je m'engage à respecter scrupuleusement la chaîne du froid (utilisation de pains de glace obligatoires), les évictions alimentaires, et à ne fournir aucun produit à base de lait cru. Je décharge le Cours Tom Morel de toute responsabilité sanitaire liée aux aliments préparés par mes soins.
+                </span>
+              </label>
+            </div>
+          </div>
+        )}
+
+        {/* CONTENU DE L'ÉTAPE 3 : ENGAGEMENTS & AUTORISATIONS */}
+        {etape === 3 && (
+          <div className="space-y-6 animate-fade-in">
+            <h3 className="font-black text-slate-800 flex items-center gap-2 text-lg"><BookOpen size={18}/> Vie Scolaire & Règlement Intérieur</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <label className="flex items-center gap-3 cursor-pointer p-4 bg-slate-50 rounded-xl border hover:bg-slate-100">
+                <input type="checkbox" className="w-4 h-4 text-indigo-600" />
+                <span className="text-sm text-slate-700 font-medium">J'ai lu et j'accepte le <strong>Règlement Intérieur</strong> (horaires 9h-16h30, tenue, comportement).</span>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer p-4 bg-slate-50 rounded-xl border hover:bg-slate-100">
+                <input type="checkbox" className="w-4 h-4 text-indigo-600" />
+                <span className="text-sm text-slate-700 font-medium">J'autorise l'école à utiliser des <strong>photographies</strong> de mon enfant (usage interne/promo).</span>
+              </label>
+            </div>
+
+            <div className="bg-indigo-50 p-5 rounded-2xl border border-indigo-100">
+              <h4 className="font-bold text-indigo-900 mb-2 text-sm">Engagement de surveillance de la pause méridienne (12h - 13h30)</h4>
+              <p className="text-xs text-indigo-800 mb-3">Veuillez indiquer vos jours de disponibilité. Un roulement sera établi pour l'année entière.</p>
+              <div className="flex flex-wrap gap-4">
+                {['lundi', 'mardi', 'jeudi', 'vendredi'].map(jour => (
+                  <label key={jour} className={`flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer font-bold capitalize text-sm transition-colors ${formData.dispoSurveillance[jour] ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-300'}`}>
+                    <input type="checkbox" className="hidden" checked={formData.dispoSurveillance[jour]} onChange={e => updateForm('dispoSurveillance', { ...formData.dispoSurveillance, [jour]: e.target.checked })} />
+                    {jour}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <label className="flex items-start gap-3 cursor-pointer p-4 bg-emerald-50 rounded-xl border border-emerald-200">
+              <input type="checkbox" className="mt-1 w-4 h-4 text-emerald-600" />
+              <span className="text-sm text-emerald-900 font-medium">
+                Je m'engage à assurer, à tour de rôle, le <strong>ménage hebdomadaire</strong> des locaux ainsi qu'à participer aux <strong>3 demi-journées de travaux</strong> annuels nécessaires au bon fonctionnement de notre école associative.
+              </span>
+            </label>
+          </div>
+        )}
+
+        {/* CONTENU DE L'ÉTAPE 4 : FINANCES */}
+        {etape === 4 && (
+          <div className="space-y-6 animate-fade-in grid grid-cols-1 lg:grid-cols-5 gap-8">
+            <div className="lg:col-span-3 space-y-6">
+              <h3 className="font-black text-slate-800 flex items-center gap-2 text-lg"><Euro size={18}/> Calcul de Scolarité & Trousseau</h3>
+              
+              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                <label className="block text-sm font-bold text-slate-700 mb-3">Déterminez votre tarification (Revenu Fiscal de Référence / part) :</label>
+                <select value={formData.trancheRevenu} onChange={e => updateForm('trancheRevenu', e.target.value)} className="w-full border border-slate-300 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-medium bg-white">
+                  <option value="tranche1">Tranche 1 (RFR &lt; 5780 €) — L'avis d'imposition sera exigé</option>
+                  <option value="tranche2">Tranche 2 (RFR &lt; 14570 €) — L'avis d'imposition sera exigé</option>
+                  <option value="tranche3">Tranche 3 — Tarif Standard (Sans conditions de revenus)</option>
+                  <option value="soutien">Tarif Soutien — Optionnel, pour soutenir le développement de l'école</option>
+                  <option value="reel">Tarif Réel — Optionnel, couvre le coût réel complet de la scolarité</option>
+                  <option value="boursier">Tarif Boursier (Minimum 60€) — Processus de bourse en cours</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                  <label className="block text-xs font-bold text-slate-500 mb-2 uppercase">Rang de l'enfant inscrit</label>
+                  <select value={formData.fratrieInscrite} onChange={e => updateForm('fratrieInscrite', Number(e.target.value))} className="w-full border border-slate-300 rounded-lg p-2 text-sm bg-white outline-none">
+                    <option value={1}>1er Enfant (Plein tarif)</option>
+                    <option value={2}>2ème Enfant (-10% de réduction)</option>
+                    <option value={3}>3ème Enfant (-15% de réduction)</option>
+                    <option value={4}>4ème Enfant et + (-20% de réduction)</option>
+                  </select>
+                </div>
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                  <label className="block text-xs font-bold text-slate-500 mb-2 uppercase">Uniformes du primaire</label>
+                  <select value={formData.nbUniformes} onChange={e => updateForm('nbUniformes', Number(e.target.value))} className="w-full border border-slate-300 rounded-lg p-2 text-sm bg-white outline-none">
+                    <option value={0}>J'ai déjà l'uniforme (Renouvellement)</option>
+                    <option value={1}>1 Trousseau complet (70 €)</option>
+                    <option value={2}>2 Trousseaux (126 €)</option>
+                    <option value={3}>3 Trousseaux (165 €)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* ENCART DEVIS GÉNÉRÉ AUTOMATIQUEMENT */}
+            <div className="lg:col-span-2">
+              <div className="bg-slate-800 text-white rounded-3xl p-6 shadow-xl sticky top-6">
+                <h4 className="text-sm font-bold uppercase tracking-widest text-slate-400 mb-4 border-b border-slate-700 pb-2">Simulation Financière</h4>
+                
+                <div className="space-y-4 mb-6">
+                  <div>
+                    <p className="text-xs text-slate-400">Scolarité Mensuelle (sur 10 mois)</p>
+                    <div className="flex items-end gap-2">
+                      <p className="text-3xl font-black text-emerald-400">{devisMensuel} €</p>
+                      <p className="text-xs text-slate-400 mb-1">/ mois</p>
+                    </div>
+                  </div>
+                  
+                  <div className="pt-4 border-t border-slate-700 space-y-2">
+                    <p className="text-[10px] font-bold uppercase text-slate-500">Frais Annexes (À régler à l'inscription)</p>
+                    <div className="flex justify-between text-xs"><span>Frais de dossier famille</span><span>50,00 €</span></div>
+                    <div className="flex justify-between text-xs"><span>Achat Uniforme(s)</span><span>{fraisAnnexes.uniforme.toFixed(2)} €</span></div>
+                    <div className="flex justify-between text-xs"><span>Participation Fournitures</span><span>{fraisAnnexes.fournitures.toFixed(2)} €</span></div>
+                    <div className="flex justify-between text-xs text-amber-300 italic"><span>Caution Livres (Non encaissée)</span><span>{fraisAnnexes.cautionLivres.toFixed(2)} €</span></div>
+                  </div>
+                </div>
+                
+                <div className="bg-white/10 p-3 rounded-xl text-[10px] text-slate-300 leading-relaxed">
+                  Règlement de la scolarité possible par virement automatique le 10 du mois suivant ou par chèque. Le mandat de prélèvement SEPA sera généré à la validation.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* CONTENU DE L'ÉTAPE 5 : UPLOAD & VALIDATION */}
+        {etape === 5 && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100 text-center">
+              <UploadCloud size={40} className="mx-auto text-blue-500 mb-3" />
+              <h3 className="font-black text-blue-900 text-lg">Dépôt Sécurisé des Justificatifs</h3>
+              <p className="text-xs text-blue-800 mt-1 max-w-lg mx-auto">Veuillez scanner ou photographier lisiblement les documents requis ci-dessous pour finaliser l'inscription administrative.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[
+                { nom: "Livret de Famille (Copie)", obligatoire: true },
+                { nom: "Carnet de Santé (Pages Vaccins)", obligatoire: true },
+                { nom: "Photo d'identité de l'enfant", obligatoire: true },
+                { nom: "Attestation Responsabilité Civile", obligatoire: true },
+                { nom: "Extrait Casier Judiciaire (Sept. 2026)", obligatoire: true },
+                { nom: "Bulletins Scolaires (Année N & N-1)", obligatoire: false },
+                { nom: "Certificat de Radiation", obligatoire: false },
+                { nom: "Jugement de Divorce / Séparation", obligatoire: formData.situationFamiliale === 'separee' }
+              ].map((doc, i) => (
+                <div key={i} className="flex justify-between items-center p-4 bg-white border border-slate-200 rounded-xl hover:border-indigo-300 transition-colors">
+                  <div>
+                    <span className="text-sm font-bold text-slate-700 block">{doc.nom}</span>
+                    {doc.obligatoire ? <span className="text-[9px] uppercase font-black text-rose-500">Requis</span> : <span className="text-[9px] uppercase font-black text-slate-400">Facultatif</span>}
+                  </div>
+                  <button className="bg-slate-100 hover:bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors border border-slate-200 hover:border-indigo-200">
+                    Parcourir...
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200 mt-6 text-center space-y-4">
+              <p className="text-sm font-bold text-emerald-900">En cliquant sur "Soumettre le dossier", je certifie sur l'honneur l'exactitude des renseignements fournis.</p>
+              <button className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3 rounded-xl font-black text-lg transition-all shadow-lg active:scale-95 inline-flex items-center gap-2">
+                <CheckCircle2 size={20} /> Soumettre le dossier complet
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* NAVIGATION DU WIZARD */}
+        <div className="flex justify-between mt-8 pt-6 border-t border-slate-100">
+          <button onClick={prevStep} disabled={etape === 1} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-colors ${etape === 1 ? 'opacity-0 pointer-events-none' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+            <ChevronLeft size={16} /> Précédent
+          </button>
+          
+          {etape < 5 && (
+            <button onClick={nextStep} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm transition-all shadow-md active:scale-95">
+              Étape suivante <ChevronRight size={16} />
+            </button>
+          )}
+        </div>
+
+      </div>
+    </div>
+  );
+};
+export default GestionInscriptions;
 
 // --- MODULE : CONTACT ---
 const InfosContact = () => (
@@ -5880,7 +6234,8 @@ const [activeTab, setActiveTab] = useState(() => {
     switch (activeTab) {
       case 'vie_ecole': return <VieEcole />;
       case 'accueil_famille': return <AccueilFamille />;
-      case 'contact': return <InfosContact />;
+      case 'inscriptions':  return <GestionInscriptions />;
+      case 'contact': return <GestionInscriptions transactionsGlobales="{transactionsGlobales}"/>;
       case 'etat_financier': return <EtatFinancier transactionsGlobales={transactionsGlobales} />;
       case 'grand_livre': return <GrandLivre transactionsGlobales={transactionsGlobales} />;
       case 'plan_comptable': return <PlanComptable />;
@@ -5901,7 +6256,7 @@ const [activeTab, setActiveTab] = useState(() => {
     }
   };
 
-  return (
+return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-800 relative">
       
       {isMobileMenuOpen && (
@@ -5920,10 +6275,12 @@ const [activeTab, setActiveTab] = useState(() => {
           <p className="text-slate-500 text-xs mt-2 uppercase tracking-widest font-semibold">ERP - Admin</p>
         </div>
 
-        {/* 3. Tous les boutons deviennent de VRAIS liens (<a>) avec un href */}
+        {/* --- NAVIGATION PRINCIPALE --- */}
         <nav className="flex-1 overflow-y-auto py-4 px-3 custom-scrollbar">
+          
           <div className="mb-6">
             <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Espace Famille</h3>
+            
             <a href="#accueil_famille" onClick={() => handleNavigation('accueil_famille')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'accueil_famille' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
               <LayoutDashboard size={18} /> Accueil
             </a>
@@ -5936,22 +6293,23 @@ const [activeTab, setActiveTab] = useState(() => {
             <a href="#factures_parents" onClick={() => handleNavigation('factures_parents')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'factures_parents' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
               <Receipt size={18} /> Mes Factures
             </a>
-            {/* Infos & Contact est maintenant en dernier */}
-            <a href="#contact" onClick={() => handleNavigation('contact')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'contact' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-              <Info size={18} /> Infos & Contact
-            </a>
-          </div>
-          
-         <div className="mb-6">
-            <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Plannings Parents</h3>
             
-            {/* NOUVEAU : Bouton unifié pour tous les plannings */}
+            {/* Plannings et Travaux rapatriés ici */}
             <a href="#plannings" onClick={() => handleNavigation('plannings')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'plannings' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
               <Calendar size={18} /> Plannings Cantine & Ménage
             </a>
-            
             <a href="#fiche_travaux" onClick={() => handleNavigation('fiche_travaux')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'fiche_travaux' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
               <Hammer size={18} /> Fiche Travaux
+            </a>
+
+            {/* Nouveau module Inscriptions */}
+            <a href="#inscriptions" onClick={() => handleNavigation('inscriptions')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'inscriptions' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
+              <FileSignature size={18} /> Inscriptions
+            </a>
+
+            {/* Contact en dernier */}
+            <a href="#contact" onClick={() => handleNavigation('contact')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'contact' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
+              <Info size={18} /> Infos & Contact
             </a>
           </div>
 
@@ -5965,7 +6323,7 @@ const [activeTab, setActiveTab] = useState(() => {
             </a>
           </div>
 
-<div className="mb-6">
+          <div className="mb-6">
             <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Compta & Finances</h3>
             <a href="#grand_livre" onClick={() => handleNavigation('grand_livre')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'grand_livre' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
               <BookOpen size={18} /> Grand Livre
@@ -5982,7 +6340,6 @@ const [activeTab, setActiveTab] = useState(() => {
             <a href="#dons_recus" onClick={() => handleNavigation('dons_recus')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'dons_recus' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
               <Heart size={18} /> Dons et reçus fiscaux
             </a>
-            {/* Le module unifié des Événements est maintenant ici : */}
             <a href="#evenements" onClick={() => handleNavigation('evenements')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'evenements' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
               <Calendar size={18} /> Événements
             </a>
