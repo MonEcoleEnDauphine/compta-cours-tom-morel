@@ -6569,7 +6569,7 @@ const [activeTab, setActiveTab] = useState(() => {
       case 'vie_ecole': return <VieEcole />;
       case 'accueil_famille': return <AccueilFamille />;
       case 'inscriptions':  return <GestionInscriptions />;
-      case 'contact': return <GestionInscriptions transactionsGlobales="{transactionsGlobales}"/>;
+      case 'contact': return <InfosContact />;
       case 'etat_financier': return <EtatFinancier transactionsGlobales={transactionsGlobales} />;
       case 'grand_livre': return <GrandLivre transactionsGlobales={transactionsGlobales} />;
       case 'plan_comptable': return <PlanComptable />;
