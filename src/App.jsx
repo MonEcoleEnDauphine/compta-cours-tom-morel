@@ -6740,60 +6740,66 @@ return (
             </a>
           </div>
 
-          {utilisateurConnecte === 'admin' && (
-          <>
-          <div className="mb-6">
-            <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Pilotage</h3>
-            <a href="#tableau_bord" onClick={() => handleNavigation('tableau_bord')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'tableau_bord' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-              <LayoutDashboard size={18} /> Tableau de Bord
-            </a>
-            <a href="#etat_financier" onClick={() => handleNavigation('etat_financier')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'etat_financier' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-              <PieChart size={18} /> État Financier
-            </a>
-          </div>
+{utilisateurConnecte === 'admin' && (
             <>
+              <div className="mb-6">
+                <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Pilotage</h3>
+                <a href="#tableau_bord" onClick={() => handleNavigation('tableau_bord')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'tableau_bord' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
+                  <LayoutDashboard size={18} /> Tableau de Bord
+                </a>
+                <a href="#etat_financier" onClick={() => handleNavigation('etat_financier')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'etat_financier' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
+                  <PieChart size={18} /> État Financier
+                </a>
+              </div>
 
-          <div className="mb-6">
-            <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Compta & Finances</h3>
-            <a href="#grand_livre" onClick={() => handleNavigation('grand_livre')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'grand_livre' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-              <BookOpen size={18} /> Grand Livre
-            </a>
-            <a href="#plan_comptable" onClick={() => handleNavigation('plan_comptable')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'plan_comptable' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-              <FileSignature size={18} /> Plan Comptable
-            </a>
-            <a href="#budget" onClick={() => handleNavigation('budget')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'budget' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-              <Target size={18} /> Budget
-            </a>
-            <a href="#notes_frais" onClick={() => handleNavigation('notes_frais')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'notes_frais' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-              <FileText size={18} /> Notes de Frais
-            </a>
-            <a href="#dons_recus" onClick={() => handleNavigation('dons_recus')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'dons_recus' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-              <Heart size={18} /> Dons et reçus fiscaux
-            </a>
-            <a href="#evenements" onClick={() => handleNavigation('evenements')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'evenements' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-              <Calendar size={18} /> Événements
-            </a>
-          </div>
+              <div className="mb-6">
+                <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Compta & Finances</h3>
+                <a href="#grand_livre" onClick={() => handleNavigation('grand_livre')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'grand_livre' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
+                  <BookOpen size={18} /> Grand Livre
+                </a>
+                <a href="#plan_comptable" onClick={() => handleNavigation('plan_comptable')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'plan_comptable' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
+                  <FileSignature size={18} /> Plan Comptable
+                </a>
+                <a href="#budget" onClick={() => handleNavigation('budget')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'budget' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
+                  <Target size={18} /> Budget
+                </a>
+                <a href="#notes_frais" onClick={() => handleNavigation('notes_frais')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'notes_frais' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
+                  <FileText size={18} /> Notes de Frais
+                </a>
+                <a href="#dons_recus" onClick={() => handleNavigation('dons_recus')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'dons_recus' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
+                  <Heart size={18} /> Dons et reçus fiscaux
+                </a>
+                <a href="#evenements" onClick={() => handleNavigation('evenements')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'evenements' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
+                  <Calendar size={18} /> Événements
+                </a>
+              </div>
 
-         <div className="mb-6">
-            <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Administration</h3>
-            <a href="#gestion_acces" onClick={() => handleNavigation('gestion_acces')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'gestion_acces' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-              <Lock size={18} /> Gestion Accès
-            </a>
-             <a href="#dossiers_facturation" onClick={() => handleNavigation('dossiers_facturation')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'dossiers_facturation' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-            <FileSpreadsheet size={18} /> Dossiers & Facturation
-            </a>
-            <a href="#equipe_contrats" onClick={() => handleNavigation('equipe_contrats')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'equipe_contrats' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-              <Users size={18} /> Équipe (Contrats)
-            </a>
-            <a href="#uniformes_stock" onClick={() => handleNavigation('uniformes_stock')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'uniformes_stock' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-              <Package size={18} /> Uniformes & Stock
-            </a>
-          </div>
-          </>
-      )}
+              <div className="mb-6">
+                <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Administration</h3>
+                <a href="#gestion_acces" onClick={() => handleNavigation('gestion_acces')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'gestion_acces' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
+                  <Lock size={18} /> Gestion Accès
+                </a>
+                 <a href="#dossiers_facturation" onClick={() => handleNavigation('dossiers_facturation')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'dossiers_facturation' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
+                <FileSpreadsheet size={18} /> Dossiers & Facturation
+                </a>
+                <a href="#equipe_contrats" onClick={() => handleNavigation('equipe_contrats')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'equipe_contrats' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
+                  <Users size={18} /> Équipe (Contrats)
+                </a>
+                <a href="#uniformes_stock" onClick={() => handleNavigation('uniformes_stock')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'uniformes_stock' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
+                  <Package size={18} /> Uniformes & Stock
+                </a>
+              </div>
+            </>
+          )}
 
         </nav>
+        
+        {/* BOUTON DÉCONNEXION */}
+        <div className="p-4 border-t border-slate-800">
+          <button onClick={() => setUtilisateurConnecte(null)} className="w-full flex items-center justify-center gap-2 text-slate-400 hover:text-rose-400 transition-colors text-sm font-bold">
+            <LogOut size={18} /> Déconnexion
+          </button>
+        </div>
       </aside>
 
       <main className="flex-1 flex flex-col h-screen overflow-hidden w-full">
