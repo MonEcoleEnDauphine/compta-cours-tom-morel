@@ -1128,12 +1128,22 @@ const InfosContact = () => (
 );
 
 // --- MODULE : PLANNINGS (Cantine & Ménage) ---
-const ModulePlannings = ({ defaultTab = 'cantine' }) => {
+const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [activePeriod, setActivePeriod] = useState(1);
   const [selectedFamilyFilter, setSelectedFamilyFilter] = useState('');
   const [quickFilterFamily, setQuickFilterFamily] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
+
+  // AUTO-SÉLECTION POUR LES FAMILLES (Verrouillage sur leur nom)
+  useEffect(() => {
+    if (utilisateurConnecte && utilisateurConnecte !== 'admin') {
+      const famId = ["BOCCA", "CHOMEL", "CORNET-BOUBE", "DE LASTIC ST JAL", "DE SERRES DE MESPLES", "FIARD", "GREPAT", "MELLIES", "RIOBÉ", "TAISSIDRE-CARVALHO", "BEZIAT", "DE MALAUSSENE", "FAUVAIN", "LE LÉZEC"].find(id => utilisateurConnecte.includes(id));
+      if (famId) {
+        setSelectedFamilyFilter(famId);
+      }
+    }
+  }, [utilisateurConnecte]);
 
   useEffect(() => {
     setActiveTab(defaultTab);
@@ -1879,9 +1889,14 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
           <button onClick={() => setActiveTab('cantine')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'cantine' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Utensils size={16} /> Cantine</button>
           <button onClick={() => setActiveTab('menage')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'menage' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Sparkles size={16} /> Ménage</button>
           <button onClick={() => setActiveTab('calendrier')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'calendrier' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><CalendarDays size={16} /> Calendrier</button>
-          <button onClick={() => setActiveTab('stats')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'stats' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><BarChart3 size={16} /> Statistiques</button>
-          <button onClick={() => setActiveTab('famille')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'famille' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Search size={16} /> Par Famille</button>
-          <button onClick={() => setActiveTab('regles')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'regles' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Info size={16} /> Règles</button>
+          <button onClick={() => setActiveTab('famille')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'famille' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Search size={16} /> Mon Planning</button>
+          
+          {utilisateurConnecte === 'admin' && (
+            <>
+              <button onClick={() => setActiveTab('stats')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'stats' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><BarChart3 size={16} /> Statistiques</button>
+              <button onClick={() => setActiveTab('regles')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'regles' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Info size={16} /> Règles</button>
+            </>
+          )}
         </div>
 
         {quickFilterFamily && (activeTab === 'cantine' || activeTab === 'menage') && (
@@ -2057,20 +2072,22 @@ const ModulePlannings = ({ defaultTab = 'cantine' }) => {
           {/* TAB FAMILLE */}
           {activeTab === 'famille' && (
             <div className="animate-in fade-in duration-300 max-w-3xl mx-auto pb-12">
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mb-6 flex flex-col items-center print:hidden">
-                <label className="font-bold text-slate-700 mb-3 text-lg">Rechercher le planning d'une famille ou maîtresse :</label>
-                <div className="relative w-full max-w-md">
-                  <Search size={16} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400" />
-                  <select 
-                    className="w-full bg-slate-50 border border-slate-300 text-slate-800 text-base rounded-lg focus:ring-blue-500 focus:border-blue-500 block pl-10 pr-4 py-3 font-semibold shadow-inner outline-none"
-                    value={selectedFamilyFilter} onChange={(e) => setSelectedFamilyFilter(e.target.value)}
-                  >
-                    <option value="">Sélectionnez un nom...</option>
-                    <optgroup label="Familles">{familiesList.map(f => <option key={f.id} value={f.id}>{f.id}</option>)}</optgroup>
-                    <optgroup label="Maîtresses"><option value="Mme GERARD">Mme GERARD</option><option value="Mme SUBLET">Mme SUBLET</option><option value="Mme HERVET">Mme HERVET</option></optgroup>
-                  </select>
+              {utilisateurConnecte === 'admin' && (
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mb-6 flex flex-col items-center print:hidden">
+                  <label className="font-bold text-slate-700 mb-3 text-lg">Rechercher le planning d'une famille ou maîtresse :</label>
+                  <div className="relative w-full max-w-md">
+                    <Search size={16} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400" />
+                    <select 
+                      className="w-full bg-slate-50 border border-slate-300 text-slate-800 text-base rounded-lg focus:ring-blue-500 focus:border-blue-500 block pl-10 pr-4 py-3 font-semibold shadow-inner outline-none"
+                      value={selectedFamilyFilter} onChange={(e) => setSelectedFamilyFilter(e.target.value)}
+                    >
+                      <option value="">Sélectionnez un nom...</option>
+                      <optgroup label="Familles">{familiesList.map(f => <option key={f.id} value={f.id}>{f.id}</option>)}</optgroup>
+                      <optgroup label="Maîtresses"><option value="Mme GERARD">Mme GERARD</option><option value="Mme SUBLET">Mme SUBLET</option><option value="Mme HERVET">Mme HERVET</option></optgroup>
+                    </select>
+                  </div>
                 </div>
-              </div>
+              )}
               
               {renderFamilyTab()}
             </div>
@@ -6663,7 +6680,7 @@ export default function App() {
       case 'tableau_bord': return <TableauBord transactionsGlobales={transactionsGlobales} />;
       case 'scolarite': return <PlaceholderPage title="Scolarité" />;
       case 'factures_parents': return <PlaceholderPage title="Mes Factures (Parents)" />;
-      case 'plannings': return <ModulePlannings defaultTab="cantine" />;
+      case 'plannings': return <ModulePlannings defaultTab="cantine" utilisateurConnecte={utilisateurConnecte} />;
       case 'fiche_travaux': return <PlaceholderPage title="Fiche_travaux" />;
       case 'budget': return <BudgetPrevisionnel transactionsGlobales={transactionsGlobales} />;
       case 'notes_frais': return <NotesFrais transactionsGlobales={transactionsGlobales} />;
@@ -6698,7 +6715,9 @@ export default function App() {
             <img src={LOGO_URL} alt="Logo" className="w-16 h-16 object-contain" />
           </div>
           <h1 className="text-white font-bold text-lg text-center leading-tight">Cours<br/>Tom Morel</h1>
-          <p className="text-slate-500 text-xs mt-2 uppercase tracking-widest font-semibold">ERP - Admin</p>
+          <p className="text-slate-500 text-xs mt-2 uppercase tracking-widest font-semibold">
+            {utilisateurConnecte === 'admin' ? 'ERP - ADMIN' : 'ESPACE FAMILLE'}
+          </p>
         </div>
 
         {/* --- NAVIGATION PRINCIPALE --- */}
@@ -6811,13 +6830,17 @@ export default function App() {
               {activeTab.replace(/_/g, ' ').toUpperCase()}
             </h2>
           </div>
-          <div className="flex items-center gap-4">
+         <div className="flex items-center gap-4">
             <div className="text-right hidden md:block">
-              <div className="text-sm font-bold text-slate-800">Admin</div>
-              <div className="text-xs text-slate-500">Profil : Direction</div>
+              <div className="text-sm font-bold text-slate-800">
+                {utilisateurConnecte === 'admin' ? 'Admin' : utilisateurConnecte}
+              </div>
+              <div className="text-xs text-slate-500">
+                {utilisateurConnecte === 'admin' ? 'Profil : Direction' : 'Profil : Parent'}
+              </div>
             </div>
-            <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-lg border-2 border-indigo-200">
-              A
+            <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-lg border-2 border-indigo-200 uppercase">
+              {utilisateurConnecte === 'admin' ? 'A' : utilisateurConnecte.charAt(0)}
             </div>
           </div>
         </header>
