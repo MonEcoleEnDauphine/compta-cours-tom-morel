@@ -6608,7 +6608,6 @@ const GestionEvenements = ({ transactionsGlobales }) => {
   );
 };
 
-// --- COMPOSANT PRINCIPAL (APP) ---
 export default function App() {
   // 1. STATUT DE CONNEXION (La Barrière de sécurité)
   const [utilisateurConnecte, setUtilisateurConnecte] = useState(null);
