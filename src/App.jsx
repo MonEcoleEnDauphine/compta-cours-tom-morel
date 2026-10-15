@@ -93,7 +93,7 @@ import {
   Globe, Mail, Phone, PlusCircle, Edit2, Send, Clock, Hammer, Menu,
   Megaphone, Bell, Newspaper, Camera, MessageCircle,
   Utensils, BarChart3, AlertCircle, Printer, CalendarDays,
-  ChevronLeft, UploadCloud, Baby
+  ChevronLeft, UploadCloud, Baby, LogOut
 } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
@@ -6608,14 +6608,17 @@ const GestionEvenements = ({ transactionsGlobales }) => {
   );
 };
 
+// --- COMPOSANT PRINCIPAL (APP) ---
 export default function App() {
-  // 1. NOUVEAU STATUT : Qui est connecté ? (null = personne, 'admin' = direction, 'famille' = parents)
+  // 1. STATUT DE CONNEXION (La Barrière de sécurité)
   const [utilisateurConnecte, setUtilisateurConnecte] = useState(null);
-  
+
+  // 2. GESTION DE LA NAVIGATION
   const [activeTab, setActiveTab] = useState(() => {
     const hash = window.location.hash.replace('#', '');
     return hash || 'accueil_famille';
   });
+  
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleNavigation = (tab) => {
@@ -6623,14 +6626,15 @@ export default function App() {
     setIsMobileMenuOpen(false);
   };
 
-  // 2. LA BARRIÈRE DE SÉCURITÉ : Si personne n'est connecté, on affiche l'écran de connexion !
+  // 3. SI PERSONNE N'EST CONNECTÉ -> On affiche l'écran de connexion
   if (!utilisateurConnecte) {
     return <EcranConnexion onLogin={setUtilisateurConnecte} />;
   }
 
-  // --- SI ON EST CONNECTÉ, ON AFFICHE L'ERP ---
+  // 4. SI CONNECTÉ -> On affiche l'application normale
   return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-800 relative">
+      
       
       {isMobileMenuOpen && (
         <div 
