@@ -6620,10 +6620,6 @@ export default function App() {
   
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const handleNavigation = (tab) => {
-    setActiveTab(tab);
-    setIsMobileMenuOpen(false);
-  };
 
   // 3. SI PERSONNE N'EST CONNECTÉ -> On affiche l'écran de connexion
   if (!utilisateurConnecte) {
