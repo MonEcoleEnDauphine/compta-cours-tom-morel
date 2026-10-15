@@ -6741,6 +6741,7 @@ return (
           </div>
 
           {utilisateurConnecte === 'admin' && (
+          <>
           <div className="mb-6">
             <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Pilotage</h3>
             <a href="#tableau_bord" onClick={() => handleNavigation('tableau_bord')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'tableau_bord' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
@@ -6750,6 +6751,7 @@ return (
               <PieChart size={18} /> État Financier
             </a>
           </div>
+            <>
 
           <div className="mb-6">
             <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Compta & Finances</h3>
