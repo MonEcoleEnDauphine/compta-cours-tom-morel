@@ -6609,23 +6609,17 @@ const GestionEvenements = ({ transactionsGlobales }) => {
 };
 
 export default function App() {
-  // 1. STATUT DE CONNEXION (La Barrière de sécurité)
+  // 1. VARIABLES (Doivent être tout en haut)
   const [utilisateurConnecte, setUtilisateurConnecte] = useState(null);
-
-  // 2. GESTION DE LA NAVIGATION
+  const [transactionsGlobales, setTransactionsGlobales] = useState([]); // <-- Ajouté ici !
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  
   const [activeTab, setActiveTab] = useState(() => {
     const hash = window.location.hash.replace('#', '');
     return hash || 'accueil_famille';
   });
-  
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-
-  // 3. SI PERSONNE N'EST CONNECTÉ -> On affiche l'écran de connexion
-  if (!utilisateurConnecte) {
-    return <EcranConnexion onLogin={setUtilisateurConnecte} />;
-  }
-
+  // 2. USE-EFFECT (Doivent obligatoirement être AVANT le bouclier)
   useEffect(() => {
     const fetchTx = () => {
       const q = collection(db, 'artifacts', appId, 'public', 'data', 'transactions');
@@ -6642,7 +6636,6 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  // 2. Si l'utilisateur utilise les flèches "Précédent/Suivant" du navigateur
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '');
@@ -6652,6 +6645,7 @@ export default function App() {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
+  // 3. FONCTIONS
   const handleNavigation = (tab) => {
     setActiveTab(tab);
     setIsMobileMenuOpen(false);
@@ -6683,7 +6677,12 @@ export default function App() {
     }
   };
 
-return (
+  // 4. BOUCLIER DE SÉCURITÉ (Placé au bon endroit, juste avant l'affichage)
+  if (!utilisateurConnecte) {
+    return <EcranConnexion onLogin={setUtilisateurConnecte} />;
+  }
+
+  return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-800 relative">
       
       {isMobileMenuOpen && (
