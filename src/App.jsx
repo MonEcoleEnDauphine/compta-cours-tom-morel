@@ -6775,7 +6775,7 @@ return (
             </a>
           </div>
 
-          <div className="mb-6">
+         <div className="mb-6">
             <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Administration</h3>
             <a href="#gestion_acces" onClick={() => handleNavigation('gestion_acces')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'gestion_acces' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
               <Lock size={18} /> Gestion Accès
@@ -6790,6 +6790,7 @@ return (
               <Package size={18} /> Uniformes & Stock
             </a>
           </div>
+          </>
       )}
 
         </nav>
