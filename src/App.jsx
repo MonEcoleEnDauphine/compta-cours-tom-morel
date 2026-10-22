@@ -1128,6 +1128,8 @@ const InfosContact = () => (
 );
 
 // --- MODULE : PLANNINGS (Cantine & Ménage) ---
+import React, { useState, useMemo, useEffect } from 'react';
+import { CalendarDays, Utensils, Sparkles, Search, Users, AlertTriangle, Download, Printer, BarChart3, Info, Clock, XCircle, Camera } from 'lucide-react';
 
 const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
   const [activeTab, setActiveTab] = useState(defaultTab);
@@ -1221,7 +1223,6 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
     let statsObj = {};
     
     famsData.forEach(f => {
-      // Ajout de periodCantine pour lisser les affectations intra-période
       statsObj[f.id] = { cantine: 0, menage: 0, total: 0, periodCantine: 0, lastCantine: null, lastMenage: "2026-01-01", virtualCantine: 0, virtualMenage: 0 };
     });
 
@@ -1242,13 +1243,13 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
       if (pIdx !== -1 && pIdx !== currentPeriodIdx) {
         currentPeriodIdx = pIdx;
         periodThursdaysDone = false;
-        // Remise à zéro des compteurs de la période courante
+        // Remise à zéro des compteurs cantine pour le lissage de la nouvelle période
         Object.keys(statsObj).forEach(k => {
           statsObj[k].periodCantine = 0;
         });
       }
 
-      // INTEGRATION ET EQUILIBRAGE GLOBAL LISSÉ (Toussaint)
+      // INTEGRATION LISSÉE DES NOUVEAUX SP LE 02 NOVEMBRE
       if (dateStr === "2026-11-02" && !spFamiliesIntegrated) {
           let sumCantine = 0; let sumMenage = 0; let countBase = 0;
           famsData.forEach(f => {
@@ -1297,6 +1298,9 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
       const isSemainePaire = weekIndex >= 0 && weekIndex % 2 === 0;
       const isSemaineImpaire = weekIndex >= 0 && weekIndex % 2 === 1;
 
+      // ----------------------------
+      // GESTION CANTINE
+      // ----------------------------
       if (isSchoolDayFlag) {
         let requiredParents = 2; let p1 = null; let p2 = null; let repasType = ""; let forcedError = false;
         const isInt1 = dateStr <= "2026-09-04"; const isInt2 = dateStr > "2026-09-04" && dateStr <= "2026-09-18";
@@ -1348,12 +1352,14 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
               let hasDay = f.days.includes(dayOfWeek);
               if (!hasDay) return false;
 
+              // Nouveaux : Jamais 2 jours de suite
               if (f.type.startsWith("Nouveau") && statsObj[f.id].lastCantine) {
                 let lastD = new Date(statsObj[f.id].lastCantine + "T12:00:00");
                 let diffDays = Math.ceil(Math.abs(currentDate - lastD) / (1000 * 60 * 60 * 24));
                 if (diffDays <= 3) return false; 
               }
 
+              // Intégration
               if (isInt1 && f.type.startsWith("Nouveau")) return false; 
               if (isInt2) {
                 let hasAncien = false;
@@ -1372,18 +1378,16 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
               let scoreA = statsObj[a.id].total; let scoreB = statsObj[b.id].total;
               if (a.id === "CHOMEL") scoreA += 1;
               if (b.id === "CHOMEL") scoreB += 1;
-              if (a.id === "FAUVAIN") scoreA += 2;
+              if (a.id === "FAUVAIN") scoreA += 2; // Compense leurs ménages
               if (b.id === "FAUVAIN") scoreB += 2;
 
-              // 1. Priorité au lissage intra-période (qui a fait le moins cette période)
+              // 1. PRIORITÉ ABSOLUE : Lissage intra-période
               let periodDiff = statsObj[a.id].periodCantine - statsObj[b.id].periodCantine;
               if (periodDiff !== 0) return periodDiff;
 
-              // 2. Ensuite on regarde le total global
+              // 2. Total annuel
               if (scoreA !== scoreB) return scoreA - scoreB;
               
-              // 3. Ménage puis dispo
-              if (statsObj[a.id].menage !== statsObj[b.id].menage) return statsObj[a.id].menage - statsObj[b.id].menage; 
               return a.days.length - b.days.length;
             });
 
@@ -1416,6 +1420,9 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
         scheduleArr.push({ date: dateStr, period: activeP.id, dayOfWeek, p1: finalP1, p2: finalP2, repasType, p1IsOut: p1Out, p2IsOut: p2Out, isError: forcedError });
       }
 
+      // ----------------------------
+      // GESTION MÉNAGE STRICTE
+      // ----------------------------
       if (dayOfWeek === 5 && isSchoolDayFlag) {
         let nextSat = new Date(currentDate); nextSat.setDate(nextSat.getDate() + 1);
         let nextSatStr = getDateStr(nextSat);
@@ -1426,14 +1433,14 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
         }
 
         if (isHolidayStart) {
-          let eligibleAsso = famsData.filter(f => f.isAsso && statsObj[f.id].menage < 4);
-          if (eligibleAsso.length === 0) eligibleAsso = famsData.filter(f => f.isAsso);
+          // Vacances = Asso uniquement
+          let eligibleAsso = famsData.filter(f => f.isAsso);
           
           eligibleAsso.sort((a, b) => {
-            let scA = statsObj[a.id].total; let scB = statsObj[b.id].total;
-            if (a.id === "FAUVAIN") scA -= 2;
-            if (b.id === "FAUVAIN") scB -= 2;
-            return scA - scB || a.id.localeCompare(b.id);
+            // Fauvain doit faire +2 ménages, donc on fait "comme s'ils en avaient 2 de moins" pour les piocher plus souvent.
+            let scoreA = statsObj[a.id].menage - (a.id === "FAUVAIN" ? 2 : 0);
+            let scoreB = statsObj[b.id].menage - (b.id === "FAUVAIN" ? 2 : 0);
+            return scoreA - scoreB || a.id.localeCompare(b.id);
           });
           
           if(eligibleAsso.length > 0) {
@@ -1443,56 +1450,28 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
             menageArr.push({ date: getDateStr(vacDate), period: activeP.id, familyId: chosen, isVacances: true, label: holidayName });
           }
         } else {
-          let candidates = famsData.filter(f => statsObj[f.id].menage === 0 && (dateStr >= "2026-11-02" || f.type !== "Nouveau SP"));
+          // Ménage classique : Tout le monde est dispo
+          let candidates = famsData.filter(f => dateStr >= "2026-11-02" || f.type !== "Nouveau SP");
           
-          if (statsObj["CHOMEL"].menage < 4) {
-            if (statsObj["CHOMEL"].menage === 0) {
-              if (!candidates.some(f => f.id === "CHOMEL")) candidates.push(famsData.find(f => f.id === "CHOMEL"));
-            } else {
-              let lastChomel = new Date(statsObj["CHOMEL"].lastMenage + "T12:00:00").getTime();
-              if (currentDate.getTime() - lastChomel >= 28 * 24 * 60 * 60 * 1000) {
-                if (!candidates.some(f => f.id === "CHOMEL")) candidates.push(famsData.find(f => f.id === "CHOMEL"));
-              }
-            }
-          }
-          
-          if (candidates.length === 0) {
-            candidates = famsData.filter(f => {
-              if (dateStr < "2026-11-02" && f.type === "Nouveau SP") return false;
-              if (f.isAsso && f.id !== "FAUVAIN" && statsObj[f.id].menage >= 2) return false; 
-              return statsObj[f.id].menage < 4; 
-            });
-            if(candidates.length === 0) candidates = famsData.filter(f => statsObj[f.id].menage < 4);
-            if(candidates.length === 0) candidates = [...famsData]; 
-          }
+          // Cooldown : On empêche de refaire le ménage dans les 4 semaines (28 jours)
+          let withCooldown = candidates.filter(f => {
+            let lastDate = new Date(statsObj[f.id].lastMenage + "T12:00:00").getTime();
+            return (currentDate.getTime() - lastDate) >= 28 * 24 * 60 * 60 * 1000;
+          });
+          if(withCooldown.length > 0) candidates = withCooldown;
 
+          // Règle de rentrée : 2 premiers week-ends exclusifs aux anciens (Le Lezec exclu du tout premier)
           if (regularMenageCount < 2) {
-             let restricted = candidates.filter(f => f.type && f.type.startsWith("Ancien"));
-             if (regularMenageCount === 0) {
-                 restricted = restricted.filter(f => f.id !== "LE LÉZEC");
-             }
-             if (restricted.length > 0) {
-                 candidates = restricted;
-             }
+             let restricted = candidates.filter(f => f.type === "Ancien");
+             if (regularMenageCount === 0) restricted = restricted.filter(f => f.id !== "LE LÉZEC");
+             if (restricted.length > 0) candidates = restricted;
           }
           
+          // Tri mathématique strict basé UNIQUEMENT sur le nombre de ménages déjà effectués
           candidates.sort((a, b) => {
-            let lastA = new Date(statsObj[a.id].lastMenage + "T12:00:00").getTime(); let lastB = new Date(statsObj[b.id].lastMenage + "T12:00:00").getTime();
-            let now = currentDate.getTime();
-            let penA = (now - lastA < 28 * 24 * 60 * 60 * 1000) ? 100 : 0; let penB = (now - lastB < 28 * 24 * 60 * 60 * 1000) ? 100 : 0;
-            
-            let chomelA = (a.id === "CHOMEL" && penA === 0 && statsObj[a.id].menage < 4) ? -100 : 0;
-            let chomelB = (b.id === "CHOMEL" && penB === 0 && statsObj[b.id].menage < 4) ? -100 : 0;
-            
-            let scoreA = statsObj[a.id].total + penA + chomelA;
-            let scoreB = statsObj[b.id].total + penB + chomelB;
-
-            if (a.id === "FAUVAIN") scoreA -= 2;
-            if (b.id === "FAUVAIN") scoreB -= 2;
-            
-            if (scoreA !== scoreB) return scoreA - scoreB;
-            if (statsObj[a.id].menage !== statsObj[b.id].menage) return statsObj[a.id].menage - statsObj[b.id].menage; 
-            return b.days.length - a.days.length; 
+            let scoreA = statsObj[a.id].menage - (a.id === "FAUVAIN" ? 2 : 0);
+            let scoreB = statsObj[b.id].menage - (b.id === "FAUVAIN" ? 2 : 0);
+            return scoreA - scoreB || a.id.localeCompare(b.id);
           });
 
           if(candidates.length > 0) {
@@ -1508,6 +1487,7 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
     }
 
     let fStats = Object.keys(statsObj).map(id => {
+      // Retrait du bonus virtuel pour afficher les statistiques exactes des tâches VRAIMENT accomplies
       let realCantine = statsObj[id].cantine - (statsObj[id].virtualCantine || 0);
       let realMenage = statsObj[id].menage - (statsObj[id].virtualMenage || 0);
       let realTotal = realCantine + realMenage;
