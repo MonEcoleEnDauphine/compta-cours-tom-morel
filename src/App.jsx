@@ -1131,12 +1131,11 @@ const InfosContact = () => (
 
 const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
   const [activeTab, setActiveTab] = useState(defaultTab);
-  const [activePeriod, setActivePeriod] = useState(2); // Démarrage par défaut sur la période 2 (Toussaint)
+  const [activePeriod, setActivePeriod] = useState(2);
   const [selectedFamilyFilter, setSelectedFamilyFilter] = useState('');
   const [quickFilterFamily, setQuickFilterFamily] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
 
-  // AUTO-SÉLECTION POUR LES FAMILLES (Verrouillage sur leur nom)
   useEffect(() => {
     if (utilisateurConnecte && utilisateurConnecte !== 'admin') {
       const famId = [
@@ -1164,25 +1163,22 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
     return `${y}-${m}-${day}`;
   }, []);
 
-  // --- L'ALGORITHME DE CALCUL ---
   const data = useMemo(() => {
     const famsData = [
       { id: "BOCCA", type: "Ancien", days: [1, 5], isAsso: false },
-      { id: "CHOMEL", type: "Nouveau", days: [4, 5], isAsso: false }, // Maj
-      { id: "CORNET-BOUBE", type: "Nouveau", days: [4], isAsso: false }, // Maj
+      { id: "CHOMEL", type: "Nouveau", days: [4, 5], isAsso: false },
+      { id: "CORNET-BOUBE", type: "Nouveau", days: [4], isAsso: false },
       { id: "DE LASTIC ST JAL", type: "Nouveau", days: [1, 2, 4, 5], isAsso: false },
-      { id: "DE SERRES", type: "Nouveau", days: [1], isAsso: false }, // Maj Nom
+      { id: "DE SERRES", type: "Nouveau", days: [1], isAsso: false },
       { id: "FIARD", type: "Ancien", days: [2, 4], isAsso: false },
-      { id: "GREPAT", type: "Ancien", days: [1, 2], isAsso: false }, // Maj
-      { id: "MELLIES", type: "Nouveau", days: [4, 5], isAsso: false }, // Maj
-      { id: "RIOBÉ", type: "Ancien", days: [4], isAsso: false }, // Maj
+      { id: "GREPAT", type: "Ancien", days: [1, 2], isAsso: false },
+      { id: "MELLIES", type: "Nouveau", days: [4, 5], isAsso: false },
+      { id: "RIOBÉ", type: "Ancien", days: [4], isAsso: false },
       { id: "TAISSIDRE-CARVALHO", type: "Ancien", days: [1], isAsso: false },
-      { id: "BEZIAT-MENUT", type: "Ancien", days: [1, 5], isAsso: true }, // Maj Nom
+      { id: "BEZIAT-MENUT", type: "Ancien", days: [1, 5], isAsso: true },
       { id: "DE MALAUSSENE", type: "Ancien", days: [1], isAsso: true },
       { id: "FAUVAIN", type: "Ancien", days: [1, 2, 5], isAsso: true }, 
       { id: "LE LÉZEC", type: "Ancien", days: [1, 5], isAsso: true },
-      
-      // Nouvelles familles (SP - Arrivée Toussaint)
       { id: "DE PONTE", type: "Nouveau SP", days: [4], isAsso: false },
       { id: "DURAND", type: "Nouveau SP", days: [1, 4], isAsso: false },
       { id: "ESCOBAR", type: "Nouveau SP", days: [4], isAsso: false },
@@ -1225,7 +1221,8 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
     let statsObj = {};
     
     famsData.forEach(f => {
-      statsObj[f.id] = { cantine: 0, menage: 0, total: 0, lastCantine: null, lastMenage: "2026-01-01" };
+      // Ajout de periodCantine pour lisser les affectations intra-période
+      statsObj[f.id] = { cantine: 0, menage: 0, total: 0, periodCantine: 0, lastCantine: null, lastMenage: "2026-01-01", virtualCantine: 0, virtualMenage: 0 };
     });
 
     let currentDate = new Date(2026, 8, 3, 12, 0, 0); 
@@ -1235,7 +1232,7 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
     let currentPeriodIdx = 0;
     let periodThursdaysDone = false;
     let regularMenageCount = 0; 
-    let spFamiliesIntegrated = false; // Flag pour équilibrage Toussaint
+    let spFamiliesIntegrated = false; 
 
     while (currentDate <= endDate) {
       const dateStr = getDateStr(currentDate);
@@ -1245,23 +1242,33 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
       if (pIdx !== -1 && pIdx !== currentPeriodIdx) {
         currentPeriodIdx = pIdx;
         periodThursdaysDone = false;
+        // Remise à zéro des compteurs de la période courante
+        Object.keys(statsObj).forEach(k => {
+          statsObj[k].periodCantine = 0;
+        });
       }
 
-      // INTEGRATION ET EQUILIBRAGE (Toussaint)
+      // INTEGRATION ET EQUILIBRAGE GLOBAL LISSÉ (Toussaint)
       if (dateStr === "2026-11-02" && !spFamiliesIntegrated) {
-          // On calcule la moyenne des cantines faites par les anciens/nouveaux normaux
-          let sumCantine = 0; let countBase = 0;
+          let sumCantine = 0; let sumMenage = 0; let countBase = 0;
           famsData.forEach(f => {
-              if (f.type !== "Nouveau SP") { sumCantine += statsObj[f.id].cantine; countBase++; }
+              if (f.type !== "Nouveau SP") { 
+                  sumCantine += statsObj[f.id].cantine;
+                  sumMenage += statsObj[f.id].menage;
+                  countBase++; 
+              }
           });
-          const avgCantine = Math.round(sumCantine / countBase);
+          const avgCantine = Math.floor(sumCantine / countBase);
+          const avgMenage = Math.floor(sumMenage / countBase);
           
-          // On ajoute virtuellement cette moyenne aux SP pour qu'ils soient traités équitablement
-          // (ils ont loupé ~2 mois, ils ne doivent pas monopoliser la cantine pour rattraper)
           famsData.forEach(f => {
               if (f.type === "Nouveau SP") {
-                  statsObj[f.id].total = avgCantine; // Agit comme un poids pour réduire leur sollicitation
-                  statsObj[f.id].cantine = 0; // Mais on garde leur compteur réel à 0 pour les stats d'affichage
+                  statsObj[f.id].cantine = avgCantine;
+                  statsObj[f.id].menage = avgMenage;
+                  statsObj[f.id].total = avgCantine + avgMenage;
+                  
+                  statsObj[f.id].virtualCantine = avgCantine;
+                  statsObj[f.id].virtualMenage = avgMenage;
               }
           });
           spFamiliesIntegrated = true;
@@ -1300,7 +1307,6 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
         else if (dayOfWeek === 2) { 
           repasType = "Placement libre";
           if (isSemainePaire) { 
-            // Mme Qarioh est présente un mardi sur deux (semaine paire)
             requiredParents = 1; p1 = "Mme QARIOH"; 
           } else if (isSemaineImpaire) {
             requiredParents = 0; p1 = "Mme GERARD"; p2 = "Mme SUBLET"; 
@@ -1319,26 +1325,24 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
 
         if (dateStr === "2026-09-03") {
           assigned = ["BOCCA", "TAISSIDRE-CARVALHO"];
-          statsObj["BOCCA"].cantine++; statsObj["BOCCA"].total++; statsObj["BOCCA"].lastCantine = dateStr;
-          statsObj["TAISSIDRE-CARVALHO"].cantine++; statsObj["TAISSIDRE-CARVALHO"].total++; statsObj["TAISSIDRE-CARVALHO"].lastCantine = dateStr;
+          statsObj["BOCCA"].cantine++; statsObj["BOCCA"].periodCantine++; statsObj["BOCCA"].total++; statsObj["BOCCA"].lastCantine = dateStr;
+          statsObj["TAISSIDRE-CARVALHO"].cantine++; statsObj["TAISSIDRE-CARVALHO"].periodCantine++; statsObj["TAISSIDRE-CARVALHO"].total++; statsObj["TAISSIDRE-CARVALHO"].lastCantine = dateStr;
         }
         else if (dateStr === "2026-09-04") {
           assigned = ["RIOBÉ", "BEZIAT-MENUT"];
-          statsObj["RIOBÉ"].cantine++; statsObj["RIOBÉ"].total++; statsObj["RIOBÉ"].lastCantine = dateStr;
-          statsObj["BEZIAT-MENUT"].cantine++; statsObj["BEZIAT-MENUT"].total++; statsObj["BEZIAT-MENUT"].lastCantine = dateStr;
+          statsObj["RIOBÉ"].cantine++; statsObj["RIOBÉ"].periodCantine++; statsObj["RIOBÉ"].total++; statsObj["RIOBÉ"].lastCantine = dateStr;
+          statsObj["BEZIAT-MENUT"].cantine++; statsObj["BEZIAT-MENUT"].periodCantine++; statsObj["BEZIAT-MENUT"].total++; statsObj["BEZIAT-MENUT"].lastCantine = dateStr;
         } 
         else if (dayOfWeek === 4 && fauvainRiobeThursdays < 4 && !periodThursdaysDone && currentPeriodIdx < 4 && dateStr < "2026-11-02") {
-          // Historiquement conservé pour T1
           assigned = ["RIOBÉ", "FAUVAIN"];
           fauvainRiobeThursdays++; periodThursdaysDone = true;
-          statsObj["RIOBÉ"].cantine++; statsObj["RIOBÉ"].total++; statsObj["RIOBÉ"].lastCantine = dateStr;
-          statsObj["FAUVAIN"].cantine++; statsObj["FAUVAIN"].total++; statsObj["FAUVAIN"].lastCantine = dateStr;
+          statsObj["RIOBÉ"].cantine++; statsObj["RIOBÉ"].periodCantine++; statsObj["RIOBÉ"].total++; statsObj["RIOBÉ"].lastCantine = dateStr;
+          statsObj["FAUVAIN"].cantine++; statsObj["FAUVAIN"].periodCantine++; statsObj["FAUVAIN"].total++; statsObj["FAUVAIN"].lastCantine = dateStr;
         } 
         else if (requiredParents > 0) {
           for (let i = assigned.length; i < requiredParents; i++) {
             let available = famsData.filter(f => {
               if (assigned.includes(f.id)) return false;
-              // Les Nouveaux SP ne peuvent pas être placés avant la Toussaint
               if (dateStr < "2026-11-02" && f.type === "Nouveau SP") return false;
 
               let hasDay = f.days.includes(dayOfWeek);
@@ -1368,26 +1372,33 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
               let scoreA = statsObj[a.id].total; let scoreB = statsObj[b.id].total;
               if (a.id === "CHOMEL") scoreA += 1;
               if (b.id === "CHOMEL") scoreB += 1;
-              
               if (a.id === "FAUVAIN") scoreA += 2;
               if (b.id === "FAUVAIN") scoreB += 2;
 
+              // 1. Priorité au lissage intra-période (qui a fait le moins cette période)
+              let periodDiff = statsObj[a.id].periodCantine - statsObj[b.id].periodCantine;
+              if (periodDiff !== 0) return periodDiff;
+
+              // 2. Ensuite on regarde le total global
               if (scoreA !== scoreB) return scoreA - scoreB;
+              
+              // 3. Ménage puis dispo
               if (statsObj[a.id].menage !== statsObj[b.id].menage) return statsObj[a.id].menage - statsObj[b.id].menage; 
               return a.days.length - b.days.length;
             });
 
             if (available.length > 0) {
               assigned.push(available[0].id);
-              statsObj[available[0].id].cantine++; statsObj[available[0].id].total++; statsObj[available[0].id].lastCantine = dateStr;
+              statsObj[available[0].id].cantine++; statsObj[available[0].id].periodCantine++; statsObj[available[0].id].total++; statsObj[available[0].id].lastCantine = dateStr;
             } else {
               let fallback = famsData.filter(f => !assigned.includes(f.id) && (dateStr >= "2026-11-02" || f.type !== "Nouveau SP")).sort((a, b) => {
-                 let scA = statsObj[a.id].total; let scB = statsObj[b.id].total;
-                 return scA - scB;
+                 let pDiff = statsObj[a.id].periodCantine - statsObj[b.id].periodCantine;
+                 if (pDiff !== 0) return pDiff;
+                 return statsObj[a.id].total - statsObj[b.id].total;
               });
               if (fallback.length > 0) {
                 assigned.push(fallback[0].id);
-                statsObj[fallback[0].id].cantine++; statsObj[fallback[0].id].total++; statsObj[fallback[0].id].lastCantine = dateStr;
+                statsObj[fallback[0].id].cantine++; statsObj[fallback[0].id].periodCantine++; statsObj[fallback[0].id].total++; statsObj[fallback[0].id].lastCantine = dateStr;
                 forcedError = true;
               }
             }
@@ -1497,9 +1508,10 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
     }
 
     let fStats = Object.keys(statsObj).map(id => {
-      // Pour l'affichage, on soustrait le bonus virtuel ajouté aux SP pour voir le VRAI total effectué
-      let realTotal = statsObj[id].cantine + statsObj[id].menage;
-      return { id: id, name: id, cantine: statsObj[id].cantine, menage: statsObj[id].menage, total: realTotal, isTeacher: false };
+      let realCantine = statsObj[id].cantine - (statsObj[id].virtualCantine || 0);
+      let realMenage = statsObj[id].menage - (statsObj[id].virtualMenage || 0);
+      let realTotal = realCantine + realMenage;
+      return { id: id, name: id, cantine: realCantine, menage: realMenage, total: realTotal, isTeacher: false };
     });
     
     let teaCantine = (tId) => scheduleArr.filter(s => s.p1 === tId || s.p2 === tId).length;
@@ -1520,7 +1532,6 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
 
   const { familiesList, periodsInfo, schedule, menagesSchedule, familyStats, holidays } = data;
 
-  // --- FONCTIONS DE FORMATAGE ---
   const getLocalDateString = (d) => {
     let year = d.getFullYear(); let month = String(d.getMonth() + 1).padStart(2, '0'); let day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
@@ -1539,6 +1550,46 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
     let d2 = new Date(dateString + "T12:00:00");
     d2.setDate(d2.getDate() + 1); 
     return `Sam. ${d1.getDate()} au Dim. ${new Date(d2).toLocaleDateString('fr-FR', {day:'numeric', month:'short'})}`;
+  };
+
+  const handleDownloadImage = async () => {
+    try {
+      const captureZone = document.getElementById('capture-zone');
+      if (!captureZone) return;
+      
+      const originalOverflow = captureZone.style.overflow;
+      const originalHeight = captureZone.style.height;
+      captureZone.style.overflow = 'visible';
+      captureZone.style.height = 'auto';
+      
+      if (!window.html2canvas) {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+      }
+      
+      const canvas = await window.html2canvas(captureZone, {
+          scale: 2, 
+          backgroundColor: '#ffffff',
+          logging: false
+      });
+      
+      captureZone.style.overflow = originalOverflow;
+      captureZone.style.height = originalHeight;
+      
+      const image = canvas.toDataURL("image/jpeg", 0.9);
+      const link = document.createElement("a");
+      link.href = image;
+      link.download = "planning-annuel.jpg";
+      link.click();
+    } catch (err) {
+      console.error("Erreur de capture de l'image:", err);
+      alert("Une erreur s'est produite lors de la génération de l'image.");
+    }
   };
 
   const teacherStyles = {
@@ -1921,10 +1972,8 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
               <Printer size={16} /> Imprimer
             </button>
             {activeTab === 'calendrier' && (
-              <button onClick={() => {
-                alert("Pour générer une image parfaite de ce calendrier massif :\n\n1. Cliquez sur 'Imprimer'\n2. Dans la boîte de dialogue, choisissez 'Enregistrer au format PDF'.\n\nVous pourrez ensuite facilement partager ce fichier complet ou en faire une capture d'écran.");
-              }} className="bg-teal-600 hover:bg-teal-700 text-white px-5 py-2.5 rounded-lg font-semibold text-sm transition shadow-sm flex items-center gap-2">
-                <Camera size={16} /> Image
+              <button onClick={handleDownloadImage} className="bg-teal-600 hover:bg-teal-700 text-white px-5 py-2.5 rounded-lg font-semibold text-sm transition shadow-sm flex items-center gap-2">
+                <Camera size={16} /> Image JPEG
               </button>
             )}
           </div>
@@ -2154,7 +2203,8 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                   <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><Users className="text-slate-400" size={18}/> Période d'intégration</h3>
                   <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
-                      <li><strong>Nouvelles Familles SP (Toussaint) :</strong> Intégration à partir du 02 Novembre avec un coefficient minoré pour garantir une équité parfaite (-20% de présence).</li>
+                      <li><strong>Nouvelles Familles SP (Toussaint) :</strong> Intégration à partir du 02 Novembre avec un coefficient virtuel sur la totalité (Cantines + Ménages) pour garantir une répartition lissée sur l'année.</li>
+                      <li><strong>Équilibrage Intra-période :</strong> La priorité d'affectation prend d'abord en compte le nombre de cantines effectuées dans la période en cours avant de regarder le total annuel.</li>
                       <li><strong>Du 03 au 04 Sept. :</strong> Uniquement des anciens.</li><li><strong>Du 07 au 18 Sept. :</strong> Binômes obligatoires (1 Ancien + 1 Nouveau). Les maîtresses comptent comme "Ancien".</li>
                   </ul>
               </div>
@@ -2182,6 +2232,8 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
     </div>
   );
 };
+
+export default ModulePlannings;
 
 // --- TABLEAU DE BORD (DASHBOARD) ---
 const TableauBord = ({ transactionsGlobales }) => {
