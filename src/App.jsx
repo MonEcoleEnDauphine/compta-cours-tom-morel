@@ -1128,9 +1128,12 @@ const InfosContact = () => (
 );
 
 // --- MODULE : PLANNINGS (Cantine & Ménage) ---
+import React, { useState, useMemo, useEffect } from 'react';
+import { CalendarDays, Utensils, Sparkles, Search, Users, AlertTriangle, Download, Printer, BarChart3, Info, Clock, XCircle, Camera } from 'lucide-react';
+
 const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
   const [activeTab, setActiveTab] = useState(defaultTab);
-  const [activePeriod, setActivePeriod] = useState(1);
+  const [activePeriod, setActivePeriod] = useState(2); // Démarrage par défaut sur la période 2 (Toussaint)
   const [selectedFamilyFilter, setSelectedFamilyFilter] = useState('');
   const [quickFilterFamily, setQuickFilterFamily] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
@@ -1138,7 +1141,12 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
   // AUTO-SÉLECTION POUR LES FAMILLES (Verrouillage sur leur nom)
   useEffect(() => {
     if (utilisateurConnecte && utilisateurConnecte !== 'admin') {
-      const famId = ["BOCCA", "CHOMEL", "CORNET-BOUBE", "DE LASTIC ST JAL", "DE SERRES DE MESPLES", "FIARD", "GREPAT", "MELLIES", "RIOBÉ", "TAISSIDRE-CARVALHO", "BEZIAT", "DE MALAUSSENE", "FAUVAIN", "LE LÉZEC"].find(id => utilisateurConnecte.includes(id));
+      const famId = [
+        "BOCCA", "CHOMEL", "CORNET-BOUBE", "DE LASTIC ST JAL", "DE SERRES", "FIARD", 
+        "GREPAT", "MELLIES", "RIOBÉ", "TAISSIDRE-CARVALHO", "BEZIAT-MENUT", 
+        "DE MALAUSSENE", "FAUVAIN", "LE LÉZEC", "DE PONTE", "DURAND", "ESCOBAR", 
+        "DE LA CHARRIE", "PILON", "SHAW"
+      ].find(id => utilisateurConnecte.includes(id));
       if (famId) {
         setSelectedFamilyFilter(famId);
       }
@@ -1162,19 +1170,27 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
   const data = useMemo(() => {
     const famsData = [
       { id: "BOCCA", type: "Ancien", days: [1, 5], isAsso: false },
-      { id: "CHOMEL", type: "Nouveau", days: [4], isAsso: false },
-      { id: "CORNET-BOUBE", type: "Nouveau", days: [1, 2, 4, 5], isAsso: false },
+      { id: "CHOMEL", type: "Nouveau", days: [4, 5], isAsso: false }, // Maj
+      { id: "CORNET-BOUBE", type: "Nouveau", days: [4], isAsso: false }, // Maj
       { id: "DE LASTIC ST JAL", type: "Nouveau", days: [1, 2, 4, 5], isAsso: false },
-      { id: "DE SERRES DE MESPLES", type: "Nouveau", days: [1], isAsso: false },
+      { id: "DE SERRES", type: "Nouveau", days: [1], isAsso: false }, // Maj Nom
       { id: "FIARD", type: "Ancien", days: [2, 4], isAsso: false },
-      { id: "GREPAT", type: "Ancien", days: [1, 2], isAsso: false },
-      { id: "MELLIES", type: "Nouveau", days: [2, 4], isAsso: false },
-      { id: "RIOBÉ", type: "Ancien", days: [1, 2, 4, 5], isAsso: false },
+      { id: "GREPAT", type: "Ancien", days: [1, 2], isAsso: false }, // Maj
+      { id: "MELLIES", type: "Nouveau", days: [4, 5], isAsso: false }, // Maj
+      { id: "RIOBÉ", type: "Ancien", days: [4], isAsso: false }, // Maj
       { id: "TAISSIDRE-CARVALHO", type: "Ancien", days: [1], isAsso: false },
-      { id: "BEZIAT", type: "Ancien", days: [1, 5], isAsso: true },
+      { id: "BEZIAT-MENUT", type: "Ancien", days: [1, 5], isAsso: true }, // Maj Nom
       { id: "DE MALAUSSENE", type: "Ancien", days: [1], isAsso: true },
       { id: "FAUVAIN", type: "Ancien", days: [1, 2, 5], isAsso: true }, 
-      { id: "LE LÉZEC", type: "Ancien flex", days: [1, 5], flexUntil: "2026-09-18", isAsso: true }
+      { id: "LE LÉZEC", type: "Ancien", days: [1, 5], isAsso: true },
+      
+      // Nouvelles familles (SP - Arrivée Toussaint)
+      { id: "DE PONTE", type: "Nouveau SP", days: [4], isAsso: false },
+      { id: "DURAND", type: "Nouveau SP", days: [1, 4], isAsso: false },
+      { id: "ESCOBAR", type: "Nouveau SP", days: [4], isAsso: false },
+      { id: "DE LA CHARRIE", type: "Nouveau SP", days: [1, 2], isAsso: false },
+      { id: "PILON", type: "Nouveau SP", days: [1, 4], isAsso: false },
+      { id: "SHAW", type: "Nouveau SP", days: [2], isAsso: false }
     ];
 
     const perData = [
@@ -1203,7 +1219,6 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
       if (!famId || famId.startsWith("Mme")) return false;
       const fam = famsData.find(f => f.id === famId);
       if (!fam) return false;
-      if (fam.id === "LE LÉZEC" && fam.flexUntil && dStr <= fam.flexUntil) return false;
       return !fam.days.includes(dOw);
     };
 
@@ -1222,6 +1237,7 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
     let currentPeriodIdx = 0;
     let periodThursdaysDone = false;
     let regularMenageCount = 0; 
+    let spFamiliesIntegrated = false; // Flag pour équilibrage Toussaint
 
     while (currentDate <= endDate) {
       const dateStr = getDateStr(currentDate);
@@ -1231,6 +1247,26 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
       if (pIdx !== -1 && pIdx !== currentPeriodIdx) {
         currentPeriodIdx = pIdx;
         periodThursdaysDone = false;
+      }
+
+      // INTEGRATION ET EQUILIBRAGE (Toussaint)
+      if (dateStr === "2026-11-02" && !spFamiliesIntegrated) {
+          // On calcule la moyenne des cantines faites par les anciens/nouveaux normaux
+          let sumCantine = 0; let countBase = 0;
+          famsData.forEach(f => {
+              if (f.type !== "Nouveau SP") { sumCantine += statsObj[f.id].cantine; countBase++; }
+          });
+          const avgCantine = Math.round(sumCantine / countBase);
+          
+          // On ajoute virtuellement cette moyenne aux SP pour qu'ils soient traités équitablement
+          // (ils ont loupé ~2 mois, ils ne doivent pas monopoliser la cantine pour rattraper)
+          famsData.forEach(f => {
+              if (f.type === "Nouveau SP") {
+                  statsObj[f.id].total = avgCantine; // Agit comme un poids pour réduire leur sollicitation
+                  statsObj[f.id].cantine = 0; // Mais on garde leur compteur réel à 0 pour les stats d'affichage
+              }
+          });
+          spFamiliesIntegrated = true;
       }
       
       let activeP = perData[0];
@@ -1253,8 +1289,8 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
          const diffDays = Math.round((currentDate - d1) / (24 * 60 * 60 * 1000));
          weekIndex = Math.floor(diffDays / 7);
       }
-      const isGerardSubletWeek = weekIndex >= 0 && weekIndex % 2 === 0;
-      const isSubletHervetWeek = weekIndex >= 0 && weekIndex % 2 === 1;
+      const isSemainePaire = weekIndex >= 0 && weekIndex % 2 === 0;
+      const isSemaineImpaire = weekIndex >= 0 && weekIndex % 2 === 1;
 
       if (isSchoolDayFlag) {
         let requiredParents = 2; let p1 = null; let p2 = null; let repasType = ""; let forcedError = false;
@@ -1265,15 +1301,19 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
         } 
         else if (dayOfWeek === 2) { 
           repasType = "Placement libre";
-          if (isGerardSubletWeek) { requiredParents = 0; p1 = "Mme GERARD"; p2 = "Mme SUBLET"; } 
-          else { requiredParents = 2; }
+          if (isSemainePaire) { 
+            // Mme Qarioh est présente un mardi sur deux (semaine paire)
+            requiredParents = 1; p1 = "Mme QARIOH"; 
+          } else if (isSemaineImpaire) {
+            requiredParents = 0; p1 = "Mme GERARD"; p2 = "Mme SUBLET"; 
+          }
         } 
         else if (dayOfWeek === 4) { 
           repasType = "Filles / Garçons"; 
         } 
         else if (dayOfWeek === 5) { 
           repasType = "Par cordée";
-          if (isSubletHervetWeek) { requiredParents = 0; p1 = "Mme SUBLET"; p2 = "Mme HERVET"; } 
+          if (isSemaineImpaire) { requiredParents = 0; p1 = "Mme SUBLET"; p2 = "Mme HERVET"; } 
           else { requiredParents = 2; }
         }
 
@@ -1285,11 +1325,12 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
           statsObj["TAISSIDRE-CARVALHO"].cantine++; statsObj["TAISSIDRE-CARVALHO"].total++; statsObj["TAISSIDRE-CARVALHO"].lastCantine = dateStr;
         }
         else if (dateStr === "2026-09-04") {
-          assigned = ["RIOBÉ", "BEZIAT"];
+          assigned = ["RIOBÉ", "BEZIAT-MENUT"];
           statsObj["RIOBÉ"].cantine++; statsObj["RIOBÉ"].total++; statsObj["RIOBÉ"].lastCantine = dateStr;
-          statsObj["BEZIAT"].cantine++; statsObj["BEZIAT"].total++; statsObj["BEZIAT"].lastCantine = dateStr;
+          statsObj["BEZIAT-MENUT"].cantine++; statsObj["BEZIAT-MENUT"].total++; statsObj["BEZIAT-MENUT"].lastCantine = dateStr;
         } 
-        else if (dayOfWeek === 4 && fauvainRiobeThursdays < 4 && !periodThursdaysDone && currentPeriodIdx < 4) {
+        else if (dayOfWeek === 4 && fauvainRiobeThursdays < 4 && !periodThursdaysDone && currentPeriodIdx < 4 && dateStr < "2026-11-02") {
+          // Historiquement conservé pour T1
           assigned = ["RIOBÉ", "FAUVAIN"];
           fauvainRiobeThursdays++; periodThursdaysDone = true;
           statsObj["RIOBÉ"].cantine++; statsObj["RIOBÉ"].total++; statsObj["RIOBÉ"].lastCantine = dateStr;
@@ -1299,29 +1340,28 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
           for (let i = assigned.length; i < requiredParents; i++) {
             let available = famsData.filter(f => {
               if (assigned.includes(f.id)) return false;
-              if (f.id === "FAUVAIN" && dayOfWeek === 4) return false; 
-              if (f.id === "LE LÉZEC" && dateStr === "2026-10-12") return false; 
+              // Les Nouveaux SP ne peuvent pas être placés avant la Toussaint
+              if (dateStr < "2026-11-02" && f.type === "Nouveau SP") return false;
 
               let hasDay = f.days.includes(dayOfWeek);
-              if (f.id === "LE LÉZEC" && f.flexUntil && dateStr <= f.flexUntil) hasDay = true;
               if (!hasDay) return false;
 
-              if (f.type === "Nouveau" && statsObj[f.id].lastCantine) {
+              if (f.type.startsWith("Nouveau") && statsObj[f.id].lastCantine) {
                 let lastD = new Date(statsObj[f.id].lastCantine + "T12:00:00");
                 let diffDays = Math.ceil(Math.abs(currentDate - lastD) / (1000 * 60 * 60 * 24));
                 if (diffDays <= 3) return false; 
               }
 
-              if (isInt1 && f.type === "Nouveau") return false; 
+              if (isInt1 && f.type.startsWith("Nouveau")) return false; 
               if (isInt2) {
                 let hasAncien = false;
-                if (p1 === "Mme GERARD" || p1 === "Mme SUBLET" || p1 === "Mme HERVET") hasAncien = true;
+                if (p1 === "Mme GERARD" || p1 === "Mme SUBLET" || p1 === "Mme HERVET" || p1 === "Mme QARIOH") hasAncien = true;
                 for (let a of assigned) {
                   const checkFam = famsData.find(family => family.id === a);
                   if (checkFam && checkFam.type.startsWith("Ancien")) hasAncien = true;
                 }
                 if (hasAncien && f.type.startsWith("Ancien")) return false; 
-                if (!hasAncien && f.type === "Nouveau" && i === 1) return false; 
+                if (!hasAncien && f.type.startsWith("Nouveau") && i === 1) return false; 
               }
               return true;
             });
@@ -1343,10 +1383,8 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
               assigned.push(available[0].id);
               statsObj[available[0].id].cantine++; statsObj[available[0].id].total++; statsObj[available[0].id].lastCantine = dateStr;
             } else {
-              let fallback = famsData.filter(f => !assigned.includes(f.id)).sort((a, b) => {
+              let fallback = famsData.filter(f => !assigned.includes(f.id) && (dateStr >= "2026-11-02" || f.type !== "Nouveau SP")).sort((a, b) => {
                  let scA = statsObj[a.id].total; let scB = statsObj[b.id].total;
-                 if (a.id === "FAUVAIN") scA += 2;
-                 if (b.id === "FAUVAIN") scB += 2;
                  return scA - scB;
               });
               if (fallback.length > 0) {
@@ -1396,7 +1434,7 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
             menageArr.push({ date: getDateStr(vacDate), period: activeP.id, familyId: chosen, isVacances: true, label: holidayName });
           }
         } else {
-          let candidates = famsData.filter(f => statsObj[f.id].menage === 0);
+          let candidates = famsData.filter(f => statsObj[f.id].menage === 0 && (dateStr >= "2026-11-02" || f.type !== "Nouveau SP"));
           
           if (statsObj["CHOMEL"].menage < 4) {
             if (statsObj["CHOMEL"].menage === 0) {
@@ -1411,6 +1449,7 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
           
           if (candidates.length === 0) {
             candidates = famsData.filter(f => {
+              if (dateStr < "2026-11-02" && f.type === "Nouveau SP") return false;
               if (f.isAsso && f.id !== "FAUVAIN" && statsObj[f.id].menage >= 2) return false; 
               return statsObj[f.id].menage < 4; 
             });
@@ -1460,13 +1499,16 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
     }
 
     let fStats = Object.keys(statsObj).map(id => {
-      return { id: id, name: id, cantine: statsObj[id].cantine, menage: statsObj[id].menage, total: statsObj[id].total, isTeacher: false };
+      // Pour l'affichage, on soustrait le bonus virtuel ajouté aux SP pour voir le VRAI total effectué
+      let realTotal = statsObj[id].cantine + statsObj[id].menage;
+      return { id: id, name: id, cantine: statsObj[id].cantine, menage: statsObj[id].menage, total: realTotal, isTeacher: false };
     });
     
     let teaCantine = (tId) => scheduleArr.filter(s => s.p1 === tId || s.p2 === tId).length;
     fStats.push({ id: "Mme GERARD", name: "Mme GERARD", isTeacher: true, cantine: teaCantine("Mme GERARD"), menage: 0, total: teaCantine("Mme GERARD") });
     fStats.push({ id: "Mme SUBLET", name: "Mme SUBLET", isTeacher: true, cantine: teaCantine("Mme SUBLET"), menage: 0, total: teaCantine("Mme SUBLET") });
     fStats.push({ id: "Mme HERVET", name: "Mme HERVET", isTeacher: true, cantine: teaCantine("Mme HERVET"), menage: 0, total: teaCantine("Mme HERVET") });
+    fStats.push({ id: "Mme QARIOH", name: "Mme QARIOH", isTeacher: true, cantine: teaCantine("Mme QARIOH"), menage: 0, total: teaCantine("Mme QARIOH") });
 
     fStats.sort((a, b) => {
       if (a.isTeacher && !b.isTeacher) return 1;
@@ -1495,34 +1537,40 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
 
   const formatMenageDate = (dateString) => {
     if (!dateString) return "";
-    let d1 = new Date(dateString + "T12:00:00"); // Samedi
+    let d1 = new Date(dateString + "T12:00:00"); 
     let d2 = new Date(dateString + "T12:00:00");
-    d2.setDate(d2.getDate() + 1); // Dimanche (+1 jour par rapport à samedi)
+    d2.setDate(d2.getDate() + 1); 
     return `Sam. ${d1.getDate()} au Dim. ${new Date(d2).toLocaleDateString('fr-FR', {day:'numeric', month:'short'})}`;
   };
 
   const teacherStyles = {
     "Mme GERARD": "bg-slate-800 text-white border-slate-900",
     "Mme SUBLET": "bg-neutral-800 text-white border-neutral-900",
-    "Mme HERVET": "bg-zinc-800 text-white border-zinc-900"
+    "Mme HERVET": "bg-zinc-800 text-white border-zinc-900",
+    "Mme QARIOH": "bg-stone-800 text-white border-stone-900"
   };
 
   const familyStyles = {
     "TAISSIDRE-CARVALHO": "bg-cyan-100 text-cyan-800 border-cyan-300",
     "DE MALAUSSENE": "bg-fuchsia-100 text-fuchsia-800 border-fuchsia-300",
-    "DE SERRES DE MESPLES": "bg-yellow-200 text-yellow-900 border-yellow-400",
     "DE SERRES": "bg-yellow-200 text-yellow-900 border-yellow-400",
     "LE LÉZEC": "bg-sky-100 text-sky-800 border-sky-300",
     "FIARD": "bg-pink-100 text-pink-800 border-pink-300",
     "GREPAT": "bg-indigo-100 text-indigo-800 border-indigo-300",
     "MELLIES": "bg-teal-100 text-teal-800 border-teal-300",
     "BOCCA": "bg-blue-100 text-blue-800 border-blue-300",
-    "BEZIAT": "bg-emerald-100 text-emerald-800 border-emerald-300",
+    "BEZIAT-MENUT": "bg-emerald-100 text-emerald-800 border-emerald-300",
     "DE LASTIC ST JAL": "bg-purple-100 text-purple-800 border-purple-300",
     "CHOMEL": "bg-red-100 text-red-800 border-red-300",
     "CORNET-BOUBE": "bg-lime-100 text-lime-800 border-lime-300",
     "RIOBÉ": "bg-orange-100 text-orange-800 border-orange-300",
-    "FAUVAIN": "bg-amber-100 text-amber-800 border-amber-300"
+    "FAUVAIN": "bg-amber-100 text-amber-800 border-amber-300",
+    "DE PONTE": "bg-rose-100 text-rose-800 border-rose-300",
+    "DURAND": "bg-violet-100 text-violet-800 border-violet-300",
+    "ESCOBAR": "bg-green-100 text-green-800 border-green-300",
+    "DE LA CHARRIE": "bg-blue-200 text-blue-900 border-blue-400",
+    "PILON": "bg-orange-200 text-orange-900 border-orange-400",
+    "SHAW": "bg-fuchsia-200 text-fuchsia-900 border-fuchsia-400"
   };
 
   const FamilyPill = ({ id, isOut = false, fullWidth = false }) => {
@@ -1616,7 +1664,6 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
       { y: 2027, m: 5, name: 'Juin' }, { y: 2027, m: 6, name: 'Juillet' }
     ];
     const dayNames = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
-
     const cells = [];
 
     cells.push(<div key="tl" className="bg-slate-100 border-r border-b-2 border-slate-300 sticky top-0 z-20" style={{ gridColumn: 1, gridRow: 1 }}></div>);
@@ -1704,7 +1751,7 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
             {menageEvent && (
               <div className={`mt-auto pt-0.5 flex flex-col gap-0.5 items-center w-full relative z-10 ${rowSpan === 2 ? 'mb-auto' : ''}`}>
                 <span className="text-[9px] text-indigo-700 uppercase font-black flex items-center justify-center bg-indigo-100 border border-indigo-200 w-full py-0.5 rounded shadow-sm print:text-[8px]">
-                   🧹 MÉNAGE
+                  🧹 MÉNAGE
                 </span>
                 <FamilyPill id={menageEvent.familyId} isOut={false} fullWidth={true} />
               </div>
@@ -2083,7 +2130,7 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
                     >
                       <option value="">Sélectionnez un nom...</option>
                       <optgroup label="Familles">{familiesList.map(f => <option key={f.id} value={f.id}>{f.id}</option>)}</optgroup>
-                      <optgroup label="Maîtresses"><option value="Mme GERARD">Mme GERARD</option><option value="Mme SUBLET">Mme SUBLET</option><option value="Mme HERVET">Mme HERVET</option></optgroup>
+                      <optgroup label="Maîtresses"><option value="Mme GERARD">Mme GERARD</option><option value="Mme SUBLET">Mme SUBLET</option><option value="Mme HERVET">Mme HERVET</option><option value="Mme QARIOH">Mme QARIOH</option></optgroup>
                     </select>
                   </div>
                 </div>
@@ -2101,7 +2148,7 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
                   <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><Utensils className="text-slate-400" size={18}/> Jours de Cantine</h3>
                   <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
                       <li><strong>Lundi :</strong> Repas par classe (2 parents)</li>
-                      <li><strong>Mardi :</strong> Alternance. Semaine 1 : Mme Gerard + Mme Sublet (0 parent). Semaine 2 : 2 parents.</li>
+                      <li><strong>Mardi :</strong> Alternance. Semaine Impaire : Mme Gerard + Mme Sublet (0 parent). Semaine Paire : Mme Qarioh + 1 parent.</li>
                       <li><strong>Jeudi :</strong> Filles/Garçons (2 parents)</li>
                       <li><strong>Vendredi :</strong> Par cordée. Alternance. Semaine 1 : 2 parents. Semaine 2 : Mme Sublet + Mme Hervet (0 parent).</li>
                   </ul>
@@ -2109,6 +2156,7 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                   <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><Users className="text-slate-400" size={18}/> Période d'intégration</h3>
                   <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
+                      <li><strong>Nouvelles Familles SP (Toussaint) :</strong> Intégration à partir du 02 Novembre avec un coefficient minoré pour garantir une équité parfaite (-20% de présence).</li>
                       <li><strong>Du 03 au 04 Sept. :</strong> Uniquement des anciens.</li><li><strong>Du 07 au 18 Sept. :</strong> Binômes obligatoires (1 Ancien + 1 Nouveau). Les maîtresses comptent comme "Ancien".</li>
                   </ul>
               </div>
@@ -2136,6 +2184,7 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
     </div>
   );
 };
+
 // --- TABLEAU DE BORD (DASHBOARD) ---
 const TableauBord = ({ transactionsGlobales }) => {
   const [anneeFiltre, setAnneeFiltre] = useState('TOTAL');
