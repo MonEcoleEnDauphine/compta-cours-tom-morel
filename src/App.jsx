@@ -1127,7 +1127,7 @@ const InfosContact = () => (
   </div>
 );
 
-// --- MODULE : PLANNINGS (Cantine & Ménage) ---
+/// --- MODULE : PLANNINGS (Cantine & Ménage) ---
 
 const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
   const [activeTab, setActiveTab] = useState(defaultTab);
@@ -1241,13 +1241,11 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
       if (pIdx !== -1 && pIdx !== currentPeriodIdx) {
         currentPeriodIdx = pIdx;
         periodThursdaysDone = false;
-        // Remise à zéro des compteurs cantine pour le lissage de la nouvelle période
         Object.keys(statsObj).forEach(k => {
           statsObj[k].periodCantine = 0;
         });
       }
 
-      // INTEGRATION LISSÉE DES NOUVEAUX SP LE 02 NOVEMBRE
       if (dateStr === "2026-11-02" && !spFamiliesIntegrated) {
           let sumCantine = 0; let sumMenage = 0; let countBase = 0;
           famsData.forEach(f => {
@@ -1350,14 +1348,12 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
               let hasDay = f.days.includes(dayOfWeek);
               if (!hasDay) return false;
 
-              // Nouveaux : Jamais 2 jours de suite
               if (f.type.startsWith("Nouveau") && statsObj[f.id].lastCantine) {
                 let lastD = new Date(statsObj[f.id].lastCantine + "T12:00:00");
                 let diffDays = Math.ceil(Math.abs(currentDate - lastD) / (1000 * 60 * 60 * 24));
                 if (diffDays <= 3) return false; 
               }
 
-              // Intégration
               if (isInt1 && f.type.startsWith("Nouveau")) return false; 
               if (isInt2) {
                 let hasAncien = false;
@@ -1374,16 +1370,14 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
 
             available.sort((a, b) => {
               let scoreA = statsObj[a.id].total; let scoreB = statsObj[b.id].total;
-              if (a.id === "CHOMEL") scoreA += 1;
-              if (b.id === "CHOMEL") scoreB += 1;
-              if (a.id === "FAUVAIN") scoreA += 2; // Compense leurs ménages
+              
+              // Ajustements ponctuels si besoin (l'équilibre naturel du total fait déjà le travail, mais on maintient les règles de base)
+              if (a.id === "FAUVAIN") scoreA += 2;
               if (b.id === "FAUVAIN") scoreB += 2;
 
-              // 1. PRIORITÉ ABSOLUE : Lissage intra-période
               let periodDiff = statsObj[a.id].periodCantine - statsObj[b.id].periodCantine;
               if (periodDiff !== 0) return periodDiff;
 
-              // 2. Total annuel
               if (scoreA !== scoreB) return scoreA - scoreB;
               
               return a.days.length - b.days.length;
@@ -1419,7 +1413,7 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
       }
 
       // ----------------------------
-      // GESTION MÉNAGE STRICTE
+      // GESTION MÉNAGE
       // ----------------------------
       if (dayOfWeek === 5 && isSchoolDayFlag) {
         let nextSat = new Date(currentDate); nextSat.setDate(nextSat.getDate() + 1);
@@ -1431,13 +1425,11 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
         }
 
         if (isHolidayStart) {
-          // Vacances = Asso uniquement
           let eligibleAsso = famsData.filter(f => f.isAsso);
           
           eligibleAsso.sort((a, b) => {
-            // Fauvain doit faire +2 ménages, donc on fait "comme s'ils en avaient 2 de moins" pour les piocher plus souvent.
-            let scoreA = statsObj[a.id].menage - (a.id === "FAUVAIN" ? 2 : 0);
-            let scoreB = statsObj[b.id].menage - (b.id === "FAUVAIN" ? 2 : 0);
+            let scoreA = statsObj[a.id].menage - (a.id === "FAUVAIN" ? 2 : 0) - (a.id === "LE LÉZEC" ? 1 : 0);
+            let scoreB = statsObj[b.id].menage - (b.id === "FAUVAIN" ? 2 : 0) - (b.id === "LE LÉZEC" ? 1 : 0);
             return scoreA - scoreB || a.id.localeCompare(b.id);
           });
           
@@ -1448,27 +1440,31 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
             menageArr.push({ date: getDateStr(vacDate), period: activeP.id, familyId: chosen, isVacances: true, label: holidayName });
           }
         } else {
-          // Ménage classique : Tout le monde est dispo
           let candidates = famsData.filter(f => dateStr >= "2026-11-02" || f.type !== "Nouveau SP");
           
-          // Cooldown : On empêche de refaire le ménage dans les 4 semaines (28 jours)
+          // BLOCAGE CHOMEL ET DURAND : 1 seul ménage max sur l'année
+          candidates = candidates.filter(f => {
+             if (f.id === "CHOMEL" && statsObj[f.id].menage >= 1) return false;
+             if (f.id === "DURAND" && statsObj[f.id].menage >= 1) return false;
+             return true;
+          });
+          
           let withCooldown = candidates.filter(f => {
             let lastDate = new Date(statsObj[f.id].lastMenage + "T12:00:00").getTime();
             return (currentDate.getTime() - lastDate) >= 28 * 24 * 60 * 60 * 1000;
           });
           if(withCooldown.length > 0) candidates = withCooldown;
 
-          // Règle de rentrée : 2 premiers week-ends exclusifs aux anciens (Le Lezec exclu du tout premier)
           if (regularMenageCount < 2) {
              let restricted = candidates.filter(f => f.type === "Ancien");
              if (regularMenageCount === 0) restricted = restricted.filter(f => f.id !== "LE LÉZEC");
              if (restricted.length > 0) candidates = restricted;
           }
           
-          // Tri mathématique strict basé UNIQUEMENT sur le nombre de ménages déjà effectués
+          // TRI MÉNAGE : LE LÉZEC et SHAW ont un malus virtuel de -1 pour les forcer à être choisis
           candidates.sort((a, b) => {
-            let scoreA = statsObj[a.id].menage - (a.id === "FAUVAIN" ? 2 : 0);
-            let scoreB = statsObj[b.id].menage - (b.id === "FAUVAIN" ? 2 : 0);
+            let scoreA = statsObj[a.id].menage - (a.id === "FAUVAIN" ? 2 : 0) - (a.id === "LE LÉZEC" ? 1 : 0) - (a.id === "SHAW" ? 1 : 0);
+            let scoreB = statsObj[b.id].menage - (b.id === "FAUVAIN" ? 2 : 0) - (b.id === "LE LÉZEC" ? 1 : 0) - (b.id === "SHAW" ? 1 : 0);
             return scoreA - scoreB || a.id.localeCompare(b.id);
           });
 
@@ -1485,7 +1481,6 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
     }
 
     let fStats = Object.keys(statsObj).map(id => {
-      // Retrait du bonus virtuel pour afficher les statistiques exactes des tâches VRAIMENT accomplies
       let realCantine = statsObj[id].cantine - (statsObj[id].virtualCantine || 0);
       let realMenage = statsObj[id].menage - (statsObj[id].virtualMenage || 0);
       let realTotal = realCantine + realMenage;
@@ -1607,18 +1602,19 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
     let styleClass = isTeacher ? (teacherStyles[id] || "bg-slate-700 text-white") : (familyStyles[id] || "bg-slate-100 text-slate-800 border-slate-300");
     let errBorder = isOut ? "border-red-600 shadow-red-200 border-2" : "border-transparent";
     
-    const widthClass = fullWidth ? "w-full justify-center" : "";
-    const textClass = fullWidth ? "text-[10px] leading-tight truncate" : "text-[11px]";
+    // Modification CSS : Taille de texte plus petite, espaces réduits, et retour à la ligne autorisé
+    const widthClass = fullWidth ? "w-full justify-center px-0.5 py-0.5 min-h-[16px]" : "px-2 py-1";
+    const textClass = fullWidth ? "text-[7.5px] leading-[8.5px] text-center whitespace-normal break-words" : "text-[11px]";
 
     return (
       <button 
         onClick={() => setQuickFilterFamily(id)}
-        className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border font-extrabold shadow-sm transition-all hover:opacity-80 active:scale-95 cursor-pointer ${styleClass} ${errBorder} ${widthClass} ${textClass}`}
+        className={`inline-flex items-center gap-1 rounded-md border font-extrabold shadow-sm transition-all hover:opacity-80 active:scale-95 cursor-pointer ${styleClass} ${errBorder} ${widthClass} ${textClass}`}
         title={isOut ? `⚠️ Jour non souhaité par ${id}` : `Filtrer sur ${id}`}
       >
         {isTeacher && <Users size={10} className="shrink-0" />} 
         {isOut && <AlertTriangle size={10} className="text-red-600 shrink-0" />} 
-        <span className="truncate">{id}</span>
+        <span>{id}</span>
       </button>
     );
   };
@@ -1745,7 +1741,7 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
         }
 
         let customStyle = { gridColumn: moIdx + 2, gridRow: `${day + 1} / span ${rowSpan}` };
-        let cellClass = "p-1 flex flex-col gap-0.5 border-r border-b border-slate-200 text-[9px] min-h-[40px] relative overflow-hidden ";
+        let cellClass = "p-1 flex flex-col gap-0.5 border-r border-b border-slate-200 text-[9px] min-h-[45px] relative overflow-hidden ";
 
         if (!cantineEvent && !menageEvent && !isHoliday && !isWeekend) {
            customStyle.backgroundImage = 'repeating-linear-gradient(45deg, #ffffff, #ffffff 6px, #f1f5f9 6px, #f1f5f9 12px)';
@@ -1777,7 +1773,7 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
 
             {menageEvent && (
               <div className={`mt-auto pt-0.5 flex flex-col gap-0.5 items-center w-full relative z-10 ${rowSpan === 2 ? 'mb-auto' : ''}`}>
-                <span className="text-[9px] text-indigo-700 uppercase font-black flex items-center justify-center bg-indigo-100 border border-indigo-200 w-full py-0.5 rounded shadow-sm print:text-[8px]">
+                <span className="text-[7px] leading-none text-indigo-700 uppercase font-black flex items-center justify-center bg-indigo-100 border border-indigo-200 w-full py-0.5 rounded shadow-sm">
                   🧹 MÉNAGE
                 </span>
                 <FamilyPill id={menageEvent.familyId} isOut={false} fullWidth={true} />
@@ -1790,7 +1786,7 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
 
     return (
       <div className="overflow-x-auto pb-10 calendar-container print:overflow-visible print:pb-0 print:w-full print:max-w-none" id="capture-zone">
-        <div className="grid border-t border-l border-slate-200 min-w-[1200px] calendar-grid print:min-w-0 print:w-full print:h-[95vh]" style={{ gridTemplateColumns: "25px repeat(11, minmax(0, 1fr))", gridTemplateRows: "auto repeat(31, minmax(0, 1fr))" }}>
+        <div className="grid border-t border-l border-slate-200 min-w-[1200px] calendar-grid print:min-w-0 print:w-full print:h-[95vh]" style={{ gridTemplateColumns: "25px repeat(11, minmax(0, 1fr))", gridTemplateRows: "auto repeat(31, minmax(45px, auto))" }}>
           {cells}
         </div>
       </div>
@@ -1916,7 +1912,7 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
              width: 100% !important; 
              height: 95vh !important;
              grid-template-columns: 20px repeat(11, minmax(0, 1fr)) !important; 
-             grid-template-rows: auto repeat(31, minmax(0, 1fr)) !important; 
+             grid-template-rows: auto repeat(31, minmax(45px, auto)) !important; 
           }
           .calendar-grid > div { 
              padding: 1px !important; 
@@ -2181,7 +2177,7 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                   <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><Users className="text-slate-400" size={18}/> Période d'intégration</h3>
                   <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
-                      <li><strong>Nouvelles Familles SP (Toussaint) :</strong> Intégration à partir du 02 Novembre avec un coefficient virtuel sur la totalité (Cantines + Ménages) pour garantir une répartition lissée sur l'année.</li>
+                      <li><strong>Nouvelles Familles SP (Toussaint) :</strong> Intégration à partir du 02 Novembre avec un coefficient virtuel sur la totalité (Cantines + Ménages) pour garantir une répartition lissée sur l'année sans s'accaparer les tâches.</li>
                       <li><strong>Équilibrage Intra-période :</strong> La priorité d'affectation prend d'abord en compte le nombre de cantines effectuées dans la période en cours avant de regarder le total annuel.</li>
                       <li><strong>Du 03 au 04 Sept. :</strong> Uniquement des anciens.</li><li><strong>Du 07 au 18 Sept. :</strong> Binômes obligatoires (1 Ancien + 1 Nouveau). Les maîtresses comptent comme "Ancien".</li>
                   </ul>
@@ -2189,17 +2185,16 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                   <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><AlertCircle className="text-slate-400" size={18}/> Cas Particuliers Strictes</h3>
                   <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
-                      <li><strong>Nouveaux :</strong> Ne sont jamais placés 2 jours d'affilée.</li>
-                      <li><strong>Échange Septembre :</strong> BOCCA + TAISSIDRE-CARVALHO le 3 sept. RIOBÉ + BEZIAT le 4 sept.</li>
+                      <li><strong>CHOMEL & DURAND :</strong> Limités manuellement à 1 seul ménage sur l'année. Les cantines sont rééquilibrées automatiquement.</li>
+                      <li><strong>LE LÉZEC & SHAW :</strong> Un ménage supplémentaire forcé. Leurs cantines sont réduites en conséquence.</li>
                       <li><strong>FAUVAIN :</strong> Fait 4 jeudis en duo avec RIOBÉ (1 par période). Leurs 2 cantines de base sont converties en 2 ménages supplémentaires pour équilibrer.</li>
-                      <li><strong className="text-rose-600 inline-flex items-center gap-1"><AlertTriangle size={14}/> Icône d'alerte :</strong> Indique qu'une famille dépanne sur un jour qu'elle n'avait pas indiqué dans ses disponibilités.</li>
                   </ul>
               </div>
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                   <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><Sparkles className="text-slate-400" size={18}/> Ménage et Équité</h3>
                   <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
                       <li>Un ménage est planifié chaque week-end de période scolaire.</li>
-                      <li><strong>Règle Rentrée :</strong> Les 2 premiers week-ends sont exclusivement réalisés par des "Anciens" (Le Lézec exclu du tout premier).</li>
+                      <li><strong>Tri Strict :</strong> La répartition du week-end est basée <em>exclusivement</em> sur le nombre de ménages déjà effectués, pour assurer une égalité parfaite (sauf exceptions listées ci-dessus).</li>
                       <li>Les 5 ménages des vacances sont réservés aux membres de l'association.</li>
                   </ul>
               </div>
