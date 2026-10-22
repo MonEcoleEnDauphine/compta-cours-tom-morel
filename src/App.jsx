@@ -2211,8 +2211,6 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
   );
 };
 
-export default ModulePlannings;
-
 // --- TABLEAU DE BORD (DASHBOARD) ---
 const TableauBord = ({ transactionsGlobales }) => {
   const [anneeFiltre, setAnneeFiltre] = useState('TOTAL');
