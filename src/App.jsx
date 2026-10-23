@@ -142,36 +142,35 @@ const PlaceholderPage = ({ title }) => (
 const AccueilFamille = ({ utilisateurConnecte }) => {
   const isAdmin = utilisateurConnecte?.role === 'admin';
 
-  // États des données (connectés à Firebase)
   const [dons, setDons] = useState([]);
   const [parametres, setParametres] = useState({ 
-    motEquipe: "Chers parents, nous sommes impatients de retrouver vos enfants. N'oubliez pas de vérifier vos plannings de ménage et de cantine dans le menu de gauche. Les fournitures scolaires ont été commandées.",
-    titreMot: "Préparation de la rentrée 2026/2027",
-    budgetGoal: 58724,
-    annee: "2025/2026"
+    motEquipe: "Bienvenue pour cette nouvelle année.", titreMot: "Préparation de la rentrée", budgetGoal: 58724, annee: "2025/2026"
   });
+  const [rappels, setRappels] = useState([]);
+  const [evenements, setEvenements] = useState([]);
+  const [equipe, setEquipe] = useState([]);
 
-  // État du Pop-up "Fun" intégré
   const [modal, setModal] = useState({ isOpen: false, type: '', payload: null });
   const [formValue, setFormValue] = useState({});
 
-useEffect(() => {
-    // Écoute des dons pour la jauge
-    const qDons = collection(db, 'artifacts', appId, 'public', 'data', 'dons');
-    const unsubDons = onSnapshot(qDons, (snapshot) => {
-      const liste = [];
-      snapshot.forEach((doc) => { liste.push({ id: doc.id, ...doc.data() }); });
-      setDons(liste);
+  useEffect(() => {
+    const unsubDons = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'dons'), (snapshot) => {
+      setDons(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-
-    // Écoute des paramètres de l'accueil (Chemin Firebase RÉPARÉ)
     const unsubParams = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'accueil'), (docSnap) => {
-      if (docSnap.exists()) {
-        setParametres(docSnap.data());
-      }
+      if (docSnap.exists()) setParametres(docSnap.data());
+    });
+    const unsubRappels = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'rappels'), (snapshot) => {
+      setRappels(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    const unsubEvts = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'evenements'), (snapshot) => {
+      setEvenements(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    const unsubEquipe = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'equipe'), (snapshot) => {
+      setEquipe(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    return () => { unsubDons(); unsubParams(); };
+    return () => { unsubDons(); unsubParams(); unsubRappels(); unsubEvts(); unsubEquipe(); };
   }, []);
 
   const totalDons = dons.reduce((acc, d) => acc + (Number(d.montant) || 0), 0);
@@ -179,295 +178,309 @@ useEffect(() => {
   const resteCollecter = Math.max(0, parametres.budgetGoal - totalDons);
   const formatMontant = (val) => new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val || 0);
 
-  // Ouverture du Pop-up stylisé
   const openEditModal = (type) => {
     if (type === 'mot') setFormValue({ titre: parametres.titreMot, contenu: parametres.motEquipe });
-    if (type === 'objectif') setFormValue({ budgetGoal: parametres.budgetGoal, annee: parametres.annee });
+    else if (type === 'objectif') setFormValue({ budgetGoal: parametres.budgetGoal, annee: parametres.annee });
+    else if (type === 'rappel') setFormValue({ texte: '' });
+    else if (type === 'evenement') setFormValue({ mois: '', jour: '', titre: '', desc: '' });
+    else if (type === 'equipe') setFormValue({ nom: '', role: '', initials: '', color: 'bg-blue-600' });
     setModal({ isOpen: true, type });
   };
 
-  // Sauvegarde depuis le Pop-up vers Firebase (RÉPARÉ)
   const handleSave = async (e) => {
     e.preventDefault();
-    let newData = { ...parametres };
-    
-    if (modal.type === 'mot') {
-      newData.titreMot = formValue.titre;
-      newData.motEquipe = formValue.contenu;
-    } else if (modal.type === 'objectif') {
-      newData.budgetGoal = Number(formValue.budgetGoal);
-      newData.annee = formValue.annee;
-    }
-
     try {
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'accueil'), newData);
+      if (modal.type === 'mot' || modal.type === 'objectif') {
+        let newData = { ...parametres };
+        if (modal.type === 'mot') { newData.titreMot = formValue.titre; newData.motEquipe = formValue.contenu; }
+        if (modal.type === 'objectif') { newData.budgetGoal = Number(formValue.budgetGoal); newData.annee = formValue.annee; }
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'accueil'), newData);
+      } else if (modal.type === 'rappel') {
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'rappels'), formValue);
+      } else if (modal.type === 'evenement') {
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'evenements'), formValue);
+      } else if (modal.type === 'equipe') {
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'equipe'), formValue);
+      }
       setModal({ isOpen: false, type: '', payload: null });
-    } catch (err) {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'accueil'), newData);
-      setModal({ isOpen: false, type: '', payload: null });
+    } catch (err) { alert("Erreur lors de l'enregistrement."); }
+  };
+
+  const handleDelete = async (collectionName, id) => {
+    if (window.confirm("Supprimer cet élément ?")) {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', collectionName, id));
     }
   };
 
-  const equipe = [
-    { nom: "Laurence Gérard", role: "Direction", initials: "LG", color: "bg-blue-600" },
-    { nom: "Cécile Sublet", role: "Enseignante", initials: "CS", color: "bg-sky-500" },
-    { nom: "Florence Hervet", role: "Enseignante", initials: "FH", color: "bg-emerald-500" },
-    { nom: "Luc Fauvain", role: "Président Asso.", initials: "LF", color: "bg-purple-500" },
-    { nom: "Louis-Vianney Le Lézec", role: "Trésorier", initials: "LL", color: "bg-amber-500" },
-  ];
-
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-10 font-sans animate-fade-in relative">
-      
-      {/* POP-UP (MODAL) FUN & INTÉGRÉ AU DESIGN */}
       {modal.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl border border-indigo-100 w-full max-w-md overflow-hidden transition-all scale-100">
+          <div className="bg-white rounded-3xl shadow-2xl border border-indigo-100 w-full max-w-md overflow-hidden">
             <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 p-6 text-white flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-white/10 backdrop-blur-md rounded-2xl">
-                  {modal.type === 'mot' ? <Megaphone size={22} className="text-indigo-200" /> : <Target size={22} className="text-rose-200" />}
-                </div>
-                <div>
-                  <h3 className="font-bold text-lg leading-tight">
-                    {modal.type === 'mot' ? "Modifier le mot de l'équipe" : "Modifier l'objectif"}
-                  </h3>
-                  <p className="text-indigo-200 text-xs mt-0.5">Mise à jour en temps réel</p>
-                </div>
-              </div>
-              <button onClick={() => setModal({ isOpen: false })} className="text-white/70 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-colors">
-                <XCircle size={20} />
-              </button>
+              <h3 className="font-bold text-lg leading-tight">Ajout / Modification</h3>
+              <button onClick={() => setModal({ isOpen: false })} className="text-white/70 hover:text-white"><XCircle size={20} /></button>
             </div>
-
             <form onSubmit={handleSave} className="p-6 space-y-4">
               {modal.type === 'mot' && (
                 <>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Titre du message</label>
-                    <input type="text" value={formValue.titre} onChange={e => setFormValue({...formValue, titre: e.target.value})} className="w-full border border-slate-200 rounded-2xl p-3 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-indigo-600 bg-slate-50/50" required />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Contenu du message</label>
-                    <textarea value={formValue.contenu} onChange={e => setFormValue({...formValue, contenu: e.target.value})} rows="4" className="w-full border border-slate-200 rounded-2xl p-3 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-indigo-600 bg-slate-50/50 custom-scrollbar" required />
-                  </div>
+                  <input type="text" value={formValue.titre} onChange={e => setFormValue({...formValue, titre: e.target.value})} className="w-full border rounded-xl p-3 text-sm" placeholder="Titre" required />
+                  <textarea value={formValue.contenu} onChange={e => setFormValue({...formValue, contenu: e.target.value})} rows="4" className="w-full border rounded-xl p-3 text-sm" required />
                 </>
               )}
-
               {modal.type === 'objectif' && (
                 <>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Période cible</label>
-                    <input type="text" value={formValue.annee} onChange={e => setFormValue({...formValue, annee: e.target.value})} placeholder="Ex: 2025/2026" className="w-full border border-slate-200 rounded-2xl p-3 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-rose-500 bg-slate-50/50" required />
+                  <input type="text" value={formValue.annee} onChange={e => setFormValue({...formValue, annee: e.target.value})} className="w-full border rounded-xl p-3 text-sm" placeholder="Période" required />
+                  <input type="number" value={formValue.budgetGoal} onChange={e => setFormValue({...formValue, budgetGoal: e.target.value})} className="w-full border rounded-xl p-3 text-sm" required />
+                </>
+              )}
+              {modal.type === 'rappel' && (
+                <textarea value={formValue.texte} onChange={e => setFormValue({...formValue, texte: e.target.value})} rows="3" className="w-full border rounded-xl p-3 text-sm" placeholder="Texte du rappel..." required />
+              )}
+              {modal.type === 'evenement' && (
+                <>
+                  <div className="flex gap-2">
+                    <input type="text" value={formValue.mois} onChange={e => setFormValue({...formValue, mois: e.target.value})} className="w-1/3 border rounded-xl p-3 text-sm uppercase" placeholder="Mois (ex: SEP)" required />
+                    <input type="text" value={formValue.jour} onChange={e => setFormValue({...formValue, jour: e.target.value})} className="w-2/3 border rounded-xl p-3 text-sm" placeholder="Jour (ex: 12)" required />
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Objectif financier (€)</label>
-                    <input type="number" value={formValue.budgetGoal} onChange={e => setFormValue({...formValue, budgetGoal: e.target.value})} className="w-full border border-slate-200 rounded-2xl p-3 text-lg font-black text-rose-600 outline-none focus:ring-2 focus:ring-rose-500 bg-slate-50/50" required />
+                  <input type="text" value={formValue.titre} onChange={e => setFormValue({...formValue, titre: e.target.value})} className="w-full border rounded-xl p-3 text-sm" placeholder="Titre de l'événement" required />
+                  <input type="text" value={formValue.desc} onChange={e => setFormValue({...formValue, desc: e.target.value})} className="w-full border rounded-xl p-3 text-sm" placeholder="Description (ex: 18h30 - Stade)" required />
+                </>
+              )}
+              {modal.type === 'equipe' && (
+                <>
+                  <input type="text" value={formValue.nom} onChange={e => setFormValue({...formValue, nom: e.target.value})} className="w-full border rounded-xl p-3 text-sm" placeholder="Prénom et Nom" required />
+                  <input type="text" value={formValue.role} onChange={e => setFormValue({...formValue, role: e.target.value})} className="w-full border rounded-xl p-3 text-sm" placeholder="Rôle (ex: Enseignante)" required />
+                  <div className="flex gap-2">
+                    <input type="text" value={formValue.initials} onChange={e => setFormValue({...formValue, initials: e.target.value})} maxLength="2" className="w-1/3 border rounded-xl p-3 text-sm uppercase" placeholder="Initiales" required />
+                    <select value={formValue.color} onChange={e => setFormValue({...formValue, color: e.target.value})} className="w-2/3 border rounded-xl p-3 text-sm">
+                      <option value="bg-blue-600">Bleu</option>
+                      <option value="bg-sky-500">Bleu Clair</option>
+                      <option value="bg-emerald-500">Vert</option>
+                      <option value="bg-purple-500">Violet</option>
+                      <option value="bg-amber-500">Orange</option>
+                      <option value="bg-rose-500">Rouge</option>
+                    </select>
                   </div>
                 </>
               )}
-
-              <div className="pt-4 border-t border-slate-100 flex justify-end gap-3 mt-6">
-                <button type="button" onClick={() => setModal({ isOpen: false })} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors">Annuler</button>
-                <button type="submit" className="px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 active:scale-95">
-                  <CheckCircle2 size={16} /> Enregistrer
-                </button>
+              <div className="pt-4 flex justify-end gap-3 mt-6">
+                <button type="submit" className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700">Enregistrer</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* BANDEAU D'ACCUEIL */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-8 rounded-2xl shadow-md text-white flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-black mb-2">Bienvenue sur le portail Familles</h1>
-          <p className="text-blue-100 text-sm">Toutes les informations, plannings et actualités du Cours Tom Morel centralisées ici.</p>
-        </div>
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-8 rounded-2xl shadow-md text-white">
+        <h1 className="text-3xl font-black mb-2">Bienvenue sur le portail Familles</h1>
+        <p className="text-blue-100 text-sm">Toutes les informations, plannings et actualités du Cours Tom Morel centralisées ici.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          
-          {/* ACTUALITÉS */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 relative group">
-            {isAdmin && (
-              <button onClick={() => openEditModal('mot')} className="absolute top-4 right-4 bg-indigo-50 text-indigo-600 p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-indigo-100" title="Modifier le mot de l'équipe">
-                <Edit2 size={16} />
-              </button>
-            )}
-            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
-              <Megaphone className="text-indigo-500" size={20} /> Le mot de l'équipe
-            </h2>
+            {isAdmin && <button onClick={() => openEditModal('mot')} className="absolute top-4 right-4 bg-indigo-50 text-indigo-600 p-2 rounded-lg opacity-0 group-hover:opacity-100"><Edit2 size={16} /></button>}
+            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3"><Megaphone className="text-indigo-500" size={20} /> Le mot de l'équipe</h2>
             <div className="bg-indigo-50/50 border border-indigo-100 p-4 rounded-xl">
               <h3 className="font-bold text-indigo-900 mb-2">{parametres.titreMot}</h3>
               <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">{parametres.motEquipe}</p>
             </div>
           </div>
 
-          {/* JAUGE DES DONS */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 relative group">
-            {isAdmin && (
-              <button onClick={() => openEditModal('objectif')} className="absolute top-4 right-4 bg-rose-50 text-rose-600 p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-rose-100" title="Modifier l'objectif">
-                <Edit2 size={16} />
-              </button>
-            )}
-            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
-              <Target className="text-rose-500" size={20} /> Objectif de la Période {parametres.annee}
-            </h2>
-            
+            {isAdmin && <button onClick={() => openEditModal('objectif')} className="absolute top-4 right-4 bg-rose-50 text-rose-600 p-2 rounded-lg opacity-0 group-hover:opacity-100"><Edit2 size={16} /></button>}
+            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3"><Target className="text-rose-500" size={20} /> Objectif {parametres.annee}</h2>
             <div className="grid grid-cols-3 gap-4 mb-6">
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-center">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">Objectif</span>
-                <p className="text-xl font-black text-indigo-600">{formatMontant(parametres.budgetGoal)} €</p>
-              </div>
-              <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 text-center">
-                <span className="text-[10px] font-bold text-emerald-600 uppercase">Dons Actuels</span>
-                <p className="text-xl font-black text-emerald-700">{formatMontant(totalDons)} €</p>
-              </div>
-              <div className="bg-rose-50 p-4 rounded-xl border border-rose-100 text-center">
-                <span className="text-[10px] font-bold text-rose-600 uppercase">Reste à collecter</span>
-                <p className="text-xl font-black text-rose-700">{formatMontant(resteCollecter)} €</p>
-              </div>
+              <div className="bg-slate-50 p-4 rounded-xl text-center"><p className="text-xl font-black text-indigo-600">{formatMontant(parametres.budgetGoal)} €</p></div>
+              <div className="bg-emerald-50 p-4 rounded-xl text-center"><p className="text-xl font-black text-emerald-700">{formatMontant(totalDons)} €</p></div>
+              <div className="bg-rose-50 p-4 rounded-xl text-center"><p className="text-xl font-black text-rose-700">{formatMontant(resteCollecter)} €</p></div>
             </div>
-
-            <div className="mb-2 flex justify-between items-end">
-              <span className="text-xs font-bold text-slate-500">Progression de l'Objectif :</span>
-              <span className="text-xl font-black text-indigo-600">{pctProgression}%</span>
-            </div>
-            <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden shadow-inner">
-              <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 h-full rounded-full transition-all duration-1000" style={{ width: `${pctProgression}%` }}></div>
-            </div>
+            <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden shadow-inner"><div className="bg-gradient-to-r from-indigo-500 to-indigo-600 h-full" style={{ width: `${pctProgression}%` }}></div></div>
           </div>
 
-          {/* TROMBINOSCOPE */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 relative group">
-            {isAdmin && <button className="absolute top-4 right-4 bg-emerald-50 text-emerald-600 p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-emerald-100"><Edit2 size={16}/></button>}
-            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
-              <Users className="text-emerald-500" size={20} /> L'équipe (Trombinoscope)
-            </h2>
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 relative">
+            <div className="flex justify-between border-b border-slate-100 pb-3 mb-4">
+              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Users className="text-emerald-500" size={20} /> L'équipe (Trombinoscope)</h2>
+              {isAdmin && <button onClick={() => openEditModal('equipe')} className="bg-emerald-50 text-emerald-600 p-2 rounded-lg"><PlusCircle size={16}/></button>}
+            </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-              {equipe.map((membre, idx) => (
-                <div key={idx} className="flex flex-col items-center p-3 hover:bg-slate-50 rounded-xl transition-colors text-center border border-transparent hover:border-slate-100">
+              {equipe.map((membre) => (
+                <div key={membre.id} className="flex flex-col items-center p-3 hover:bg-slate-50 rounded-xl relative group">
+                  {isAdmin && <button onClick={() => handleDelete('equipe', membre.id)} className="absolute top-0 right-0 text-rose-500 opacity-0 group-hover:opacity-100"><Trash2 size={14}/></button>}
                   <div className={`w-16 h-16 rounded-full flex items-center justify-center text-white font-black text-xl mb-3 shadow-md ${membre.color}`}>{membre.initials}</div>
-                  <span className="text-sm font-bold text-slate-800 leading-tight">{membre.nom}</span>
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mt-1">{membre.role}</span>
+                  <span className="text-sm font-bold text-slate-800 leading-tight text-center">{membre.nom}</span>
+                  <span className="text-[10px] font-semibold text-slate-500 uppercase mt-1 text-center">{membre.role}</span>
                 </div>
               ))}
+              {equipe.length === 0 && <div className="col-span-full text-slate-400 text-sm text-center">Aucun membre ajouté.</div>}
             </div>
           </div>
         </div>
 
-        {/* COLONNE DROITE */}
         <div className="space-y-6">
-          
-          <div className="bg-white rounded-2xl shadow-sm border border-rose-100 p-6 bg-gradient-to-b from-white to-rose-50/30 relative group">
-            {isAdmin && <button className="absolute top-4 right-4 bg-rose-100 text-rose-700 p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"><Edit2 size={16}/></button>}
-            <h2 className="text-sm font-bold text-rose-800 flex items-center gap-2 mb-4 border-b border-rose-100 pb-3">
-              <Bell className="text-rose-500" size={18} /> Rappels importants
-            </h2>
+          <div className="bg-white rounded-2xl shadow-sm border border-rose-100 p-6 bg-gradient-to-b from-white to-rose-50/30 relative">
+            <div className="flex justify-between border-b border-rose-100 pb-3 mb-4">
+              <h2 className="text-sm font-bold text-rose-800 flex items-center gap-2"><Bell className="text-rose-500" size={18} /> Rappels importants</h2>
+              {isAdmin && <button onClick={() => openEditModal('rappel')} className="bg-rose-100 text-rose-700 p-1.5 rounded-lg"><PlusCircle size={14}/></button>}
+            </div>
             <ul className="space-y-3">
-              <li className="flex items-start gap-2 text-sm text-slate-600 bg-white p-3 rounded-xl border border-rose-100 shadow-sm">
-                <div className="w-1.5 h-1.5 rounded-full bg-rose-500 mt-1.5 shrink-0"></div>
-                <span>Merci de remplir les <b>fiches travaux</b> avant le 15 Septembre.</span>
-              </li>
-              <li className="flex items-start gap-2 text-sm text-slate-600 bg-white p-3 rounded-xl border border-rose-100 shadow-sm">
-                <div className="w-1.5 h-1.5 rounded-full bg-rose-500 mt-1.5 shrink-0"></div>
-                <span>Pensez à vérifier vos créneaux pour le <b>ménage du week-end</b>.</span>
-              </li>
+              {rappels.map(rappel => (
+                <li key={rappel.id} className="flex items-start justify-between gap-2 text-sm text-slate-600 bg-white p-3 rounded-xl border border-rose-100 shadow-sm group">
+                  <div className="flex items-start gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-rose-500 mt-1.5 shrink-0"></div>
+                    <span>{rappel.texte}</span>
+                  </div>
+                  {isAdmin && <button onClick={() => handleDelete('rappels', rappel.id)} className="text-rose-400 opacity-0 group-hover:opacity-100"><Trash2 size={14}/></button>}
+                </li>
+              ))}
+              {rappels.length === 0 && <li className="text-xs text-slate-400">Aucun rappel actif.</li>}
             </ul>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 relative group">
-            {isAdmin && <button className="absolute top-4 right-4 bg-blue-50 text-blue-600 p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"><Edit2 size={16}/></button>}
-            <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
-              <Calendar className="text-blue-500" size={18} /> Prochains événements
-            </h2>
-            <div className="space-y-4">
-              <div className="flex gap-4 items-center group/event">
-                <div className="bg-blue-50 text-blue-700 px-3 py-2 rounded-xl text-center min-w-[50px] group-hover/event:bg-blue-600 group-hover/event:text-white transition-colors">
-                  <span className="block text-xs font-bold uppercase">Sep</span><span className="block text-lg font-black">12</span>
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-slate-800">Réunion de Rentrée</h4>
-                  <p className="text-xs text-slate-500 mt-0.5">18h30 - Salles de classe</p>
-                </div>
-              </div>
-              <div className="flex gap-4 items-center group/event">
-                <div className="bg-blue-50 text-blue-700 px-3 py-2 rounded-xl text-center min-w-[50px] group-hover/event:bg-blue-600 group-hover/event:text-white transition-colors">
-                  <span className="block text-xs font-bold uppercase">Oct</span><span className="block text-lg font-black">20</span>
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-slate-800">Cross de l'école</h4>
-                  <p className="text-xs text-slate-500 mt-0.5">Matinée - Stade municipal</p>
-                </div>
-              </div>
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 relative">
+            <div className="flex justify-between border-b border-slate-100 pb-3 mb-4">
+              <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2"><Calendar className="text-blue-500" size={18} /> Prochains événements</h2>
+              {isAdmin && <button onClick={() => openEditModal('evenement')} className="bg-blue-50 text-blue-600 p-1.5 rounded-lg"><PlusCircle size={14}/></button>}
             </div>
-            <button className="w-full mt-5 bg-slate-50 hover:bg-slate-100 text-slate-600 py-2 rounded-xl text-xs font-bold transition-colors">
-              Voir tout l'agenda
-            </button>
+            <div className="space-y-4">
+              {evenements.map(evt => (
+                <div key={evt.id} className="flex justify-between items-center group/event">
+                  <div className="flex gap-4 items-center">
+                    <div className="bg-blue-50 text-blue-700 px-3 py-2 rounded-xl text-center min-w-[50px]">
+                      <span className="block text-xs font-bold uppercase">{evt.mois}</span><span className="block text-lg font-black">{evt.jour}</span>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-800">{evt.titre}</h4>
+                      <p className="text-xs text-slate-500 mt-0.5">{evt.desc}</p>
+                    </div>
+                  </div>
+                  {isAdmin && <button onClick={() => handleDelete('evenements', evt.id)} className="text-rose-400 opacity-0 group-hover/event:opacity-100"><Trash2 size={14}/></button>}
+                </div>
+              ))}
+              {evenements.length === 0 && <div className="text-xs text-slate-400">Aucun événement à venir.</div>}
+            </div>
           </div>
-
         </div>
       </div>
     </div>
   );
 };
 
-
 // --- MODULE : VIE DE L'ÉCOLE ---
+const VieEcole = ({ utilisateurConnecte }) => {
+  const isAdmin = utilisateurConnecte?.role === 'admin';
+  const [documents, setDocuments] = useState([]);
+  const [photos, setPhotos] = useState([]);
+  const [isUploading, setIsUploading] = useState(false);
 
-const VieEcole = () => (
-  <div className="space-y-6 max-w-6xl mx-auto pb-10 font-sans animate-fade-in">
-    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mt-6">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-          <Newspaper className="text-indigo-600" /> Vie de l'école
-        </h2>
-        <p className="text-slate-500 text-sm mt-1">Retrouvez les dernières lettres aux parents, les photos et les actualités des classes.</p>
+  useEffect(() => {
+    const unsubDocs = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'documents_ecole'), (snapshot) => {
+      setDocuments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    const unsubPhotos = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'galerie_photos'), (snapshot) => {
+      setPhotos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => { unsubDocs(); unsubPhotos(); };
+  }, []);
+
+  const handleFileUpload = async (e, collectionName) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setIsUploading(true);
+    try {
+      const fileRef = ref(storage, `${collectionName}/${appId}_${Date.now()}_${file.name}`);
+      await uploadBytes(fileRef, file);
+      const url = await getDownloadURL(fileRef);
+
+      const titre = prompt("Entrez un titre pour ce fichier :", file.name) || file.name;
+      const desc = collectionName === 'documents_ecole' ? (prompt("Description optionnelle :", "") || "") : "";
+
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', collectionName), {
+        titre, description: desc, url, filename: file.name, date_creation: new Date().toISOString()
+      });
+    } catch (err) { alert("Erreur d'upload."); }
+    setIsUploading(false);
+  };
+
+  const handleDelete = async (collectionName, id) => {
+    if (window.confirm("Supprimer ce fichier définitivement ?")) {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', collectionName, id));
+    }
+  };
+
+  return (
+    <div className="space-y-6 max-w-6xl mx-auto pb-10 font-sans animate-fade-in">
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex justify-between items-center mt-6">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2"><Newspaper className="text-indigo-600" /> Vie de l'école</h2>
+          <p className="text-slate-500 text-sm mt-1">Retrouvez les dernières lettres aux parents, les photos et les actualités.</p>
+        </div>
       </div>
-    </div>
 
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {/* Lettres aux parents */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-         <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
-          <FileText className="text-blue-500" size={20} /> Lettres aux parents
-         </h3>
-         <div className="space-y-3">
-           <div className="flex justify-between items-center p-3 hover:bg-slate-50 rounded-xl border border-slate-100 transition-colors cursor-pointer group">
-             <div className="flex items-center gap-3">
-               <div className="bg-blue-100 text-blue-600 p-2 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors"><FileText size={16} /></div>
-               <div>
-                 <p className="font-bold text-sm text-slate-700">Lettre de rentrée - Période 1</p>
-                 <p className="text-[10px] text-slate-400">Exemple de document</p>
+      {isUploading && (
+        <div className="bg-indigo-50 text-indigo-700 p-4 rounded-xl text-sm font-bold animate-pulse text-center">
+          Téléchargement du fichier en cours...
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+           <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
+             <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><FileText className="text-blue-500" size={20} /> Lettres aux parents</h3>
+             {isAdmin && (
+               <label className="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer hover:bg-blue-100">
+                 + Ajouter PDF <input type="file" accept=".pdf" className="hidden" onChange={(e) => handleFileUpload(e, 'documents_ecole')} />
+               </label>
+             )}
+           </div>
+           <div className="space-y-3">
+             {documents.map(doc => (
+               <div key={doc.id} className="flex justify-between items-center p-3 hover:bg-slate-50 rounded-xl border border-slate-100 transition-colors group">
+                 <a href={doc.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 flex-1">
+                   <div className="bg-blue-100 text-blue-600 p-2 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors"><FileText size={16} /></div>
+                   <div>
+                     <p className="font-bold text-sm text-slate-700">{doc.titre}</p>
+                     <p className="text-[10px] text-slate-400">{doc.description}</p>
+                   </div>
+                 </a>
+                 {isAdmin ? (
+                   <button onClick={() => handleDelete('documents_ecole', doc.id)} className="text-slate-300 hover:text-rose-500 p-2"><Trash2 size={16}/></button>
+                 ) : (
+                   <Download size={16} className="text-slate-400" />
+                 )}
                </div>
-             </div>
-             <Download size={16} className="text-slate-400 group-hover:text-blue-600 transition-colors" />
+             ))}
+             {documents.length === 0 && <p className="text-xs text-slate-400 italic text-center">Aucun document disponible.</p>}
            </div>
-           <div className="text-center mt-4">
-             <p className="text-xs text-slate-400 italic">Espace d'administration à venir pour déposer vos PDF...</p>
-           </div>
-         </div>
-      </div>
+        </div>
 
-      {/* Photos */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-         <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
-          <Camera className="text-emerald-500" size={20} /> Galerie Photos
-         </h3>
-         <div className="grid grid-cols-2 gap-3">
-           <div className="aspect-video bg-slate-50 rounded-xl flex items-center justify-center border border-slate-200 border-dashed hover:bg-slate-100 cursor-pointer transition-colors">
-             <span className="text-xs text-slate-400 font-medium text-center px-2">Sortie Forêt<br/>(Album vide)</span>
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+           <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
+             <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Camera className="text-emerald-500" size={20} /> Galerie Photos</h3>
+             {isAdmin && (
+               <label className="bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer hover:bg-emerald-100">
+                 + Ajouter Photo <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'galerie_photos')} />
+               </label>
+             )}
            </div>
-           <div className="aspect-video bg-slate-50 rounded-xl flex items-center justify-center border border-slate-200 border-dashed hover:bg-slate-100 cursor-pointer transition-colors">
-             <span className="text-xs text-slate-400 font-medium text-center px-2">Atelier Peinture<br/>(Album vide)</span>
+           <div className="grid grid-cols-2 gap-3">
+             {photos.map(photo => (
+               <div key={photo.id} className="relative group rounded-xl overflow-hidden border border-slate-200">
+                 <a href={photo.url} target="_blank" rel="noreferrer">
+                   <img src={photo.url} alt={photo.titre} className="w-full h-24 object-cover hover:scale-105 transition-transform" />
+                 </a>
+                 <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] font-bold p-1 truncate text-center">{photo.titre}</div>
+                 {isAdmin && <button onClick={() => handleDelete('galerie_photos', photo.id)} className="absolute top-1 right-1 bg-white text-rose-500 p-1 rounded-md opacity-0 group-hover:opacity-100"><Trash2 size={12}/></button>}
+               </div>
+             ))}
+             {photos.length === 0 && <div className="col-span-2 text-xs text-slate-400 italic text-center py-6">La galerie est vide.</div>}
            </div>
-         </div>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 // --- MODULE : GESTION DES INSCRIPTIONS ---
 
@@ -7096,7 +7109,7 @@ export default function App() {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'vie_ecole': return <VieEcole />;
+      case 'vie_ecole': return <VieEcole utilisateurConnecte={utilisateurConnecte} />;
       case 'accueil_famille': return <AccueilFamille utilisateurConnecte={utilisateurConnecte} />;
       case 'inscriptions':  return <GestionInscriptions />;
       case 'contact': return <InfosContact />;
