@@ -7274,13 +7274,16 @@ const ModuleGestionAcces = () => {
   );
 };
 
-// --- MODULE : GESTION DU PLANNING CANTINES & MENAGES ---
-const ModuleParametresFamilles = () => {
+// --- MODULE : GESTION DU PLANNING CANTINES & MENAGES PAR FAMILLE---
+const ModuleGestionPlanningCantinesMenages = () => {
   const [familles, setFamilles] = useState([]);
   const [parametres, setParametres] = useState({ zone: 'A', anneeScolaire: '2026-2027' });
   const [isEditingParametres, setIsEditingParametres] = useState(false);
+  const [brouillon, setBrouillon] = useState(null);
   
-  // État du formulaire d'ajout/édition
+  // Nouvel état pour savoir si on modifie une famille existante
+  const [editingFamilleId, setEditingFamilleId] = useState(null);
+  
   const [formData, setFormData] = useState({
     nom: '',
     type: 'Ancien',
@@ -7289,16 +7292,13 @@ const ModuleParametresFamilles = () => {
     particularites: ''
   });
 
-  // Chargement des données depuis Firebase
   useEffect(() => {
-    // Chargement des paramètres globaux
     const unsubParams = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'parametres_globaux'), (docSnap) => {
       if (docSnap.exists()) {
         setParametres(docSnap.data());
       }
     });
 
-    // Chargement des familles
     const qFamilles = collection(db, 'artifacts', appId, 'public', 'data', 'familles_planning');
     const unsubFamilles = onSnapshot(qFamilles, (snapshot) => {
       const liste = [];
@@ -7312,11 +7312,11 @@ const ModuleParametresFamilles = () => {
 
   const handleSaveParametres = async () => {
     try {
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'parametres_globaux'), parametres);
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'parametres_globaux'), parametres, { merge: true });
       setIsEditingParametres(false);
       alert("Paramètres de l'école mis à jour !");
     } catch (e) {
-      alert("Erreur lors de la sauvegarde des paramètres. Vérifiez que le document existe dans Firebase.");
+      alert("Erreur lors de la sauvegarde des paramètres.");
     }
   };
 
@@ -7329,26 +7329,58 @@ const ModuleParametresFamilles = () => {
     });
   };
 
+  const handleEditFamille = (famille) => {
+    setFormData({
+      nom: famille.nom || '',
+      type: famille.type || 'Ancien',
+      isAsso: famille.isAsso || false,
+      days: famille.days || [],
+      particularites: famille.particularites || ''
+    });
+    setEditingFamilleId(famille.id);
+  };
+
+  const cancelEdit = () => {
+    setFormData({ nom: '', type: 'Ancien', isAsso: false, days: [], particularites: '' });
+    setEditingFamilleId(null);
+  };
+
   const handleSaveFamille = async (e) => {
     e.preventDefault();
-    if (!formData.nom.trim()) return alert("Le nom est obligatoire.");
+    const nomSaisi = formData.nom.toUpperCase().trim();
+    if (!nomSaisi) return alert("Le nom est obligatoire.");
+
+    // --- GARDE-FOU : Vérification des doublons (on ignore la famille en cours d'édition) ---
+    const familleExiste = familles.some(f => f.nom === nomSaisi && f.id !== editingFamilleId);
+    if (familleExiste) {
+      return alert(`La famille "${nomSaisi}" existe déjà dans la base. Veuillez modifier ou supprimer l'existante.`);
+    }
+    // ----------------------------------------------------------------------------------------
     
     try {
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'familles_planning'), {
-        nom: formData.nom.toUpperCase().trim(),
+      const familleData = {
+        nom: nomSaisi,
         type: formData.type,
         isAsso: formData.isAsso,
         days: formData.days,
         particularites: formData.particularites
-      });
+      };
+
+      if (editingFamilleId) {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'familles_planning', editingFamilleId), familleData);
+      } else {
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'familles_planning'), familleData);
+      }
+      
       setFormData({ nom: '', type: 'Ancien', isAsso: false, days: [], particularites: '' });
+      setEditingFamilleId(null);
     } catch (e) {
-      alert("Erreur lors de l'ajout de la famille.");
+      alert("Erreur lors de l'enregistrement de la famille.");
     }
   };
 
   const handleDeleteFamille = async (id) => {
-    if (window.confirm("Supprimer cette famille du planning ?")) {
+    if (window.confirm("Supprimer cette famille de la base de données ?")) {
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'familles_planning', id));
     }
   };
@@ -7358,27 +7390,29 @@ const ModuleParametresFamilles = () => {
     return map[val] || val;
   };
 
+  const handleGeneratePlannings = async () => {
+    if (!window.confirm("Générer un nouveau brouillon de planning (Cantines & Ménages) ? L'ancien non publié sera écrasé.")) return;
+    setBrouillon([{ id: 1, date: '04/09/2026', type: 'Ménage', famille: 'EN ATTENTE' }]);
+  };
+
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-10 font-sans animate-fade-in">
+    <div className="space-y-6 max-w-7xl mx-auto pb-10 font-sans animate-fade-in relative">
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mt-4">
         <div>
           <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2">
-            <Users className="text-indigo-600" /> Base de Données Familles & Paramètres
+            <Users className="text-indigo-600" /> Gestion des Plannings Cantines & Ménages
           </h2>
-          <p className="text-slate-500 text-sm mt-1">Configuration du moteur d'algorithme pour les plannings.</p>
+          <p className="text-slate-500 text-sm mt-1">Base de données des familles et moteur de génération automatique des calendriers.</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* COLONNE GAUCHE : PARAMÈTRES & AJOUT */}
         <div className="space-y-6 lg:col-span-1">
           
-          {/* PARAMÈTRES GLOBAUX */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
             <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-2">
               <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                <Globe size={18} className="text-indigo-500"/> Paramètres de l'école
+                <Globe size={18} className="text-indigo-500"/> Paramètres Généraux
               </h3>
               {!isEditingParametres ? (
                 <button onClick={() => setIsEditingParametres(true)} className="text-indigo-500 hover:text-indigo-700"><Edit2 size={16}/></button>
@@ -7412,22 +7446,33 @@ const ModuleParametresFamilles = () => {
                 )}
               </div>
             </div>
+
+            <div className="pt-4 mt-6 border-t border-slate-100">
+              <button 
+                onClick={handleGeneratePlannings}
+                className="w-full bg-slate-800 hover:bg-slate-900 text-white px-4 py-3 rounded-xl font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2"
+              >
+                <Calendar size={16} />
+                Générer un Brouillon
+              </button>
+              <p className="text-[10px] text-slate-400 mt-2 text-center leading-tight">Croise la zone, les jours fériés et les statuts des familles pour créer les plannings.</p>
+            </div>
           </div>
 
-          {/* AJOUT D'UNE FAMILLE */}
           <div className="bg-indigo-50/50 rounded-2xl shadow-sm border border-indigo-100 p-6">
             <h3 className="font-bold text-indigo-900 mb-4 border-b border-indigo-200 pb-2 flex items-center gap-2">
-              <PlusCircle size={18} className="text-indigo-600"/> Ajouter une famille
+              {editingFamilleId ? <Edit2 size={18} className="text-indigo-600"/> : <PlusCircle size={18} className="text-indigo-600"/>} 
+              {editingFamilleId ? 'Modifier la famille' : 'Profiler une famille'}
             </h3>
             <form onSubmit={handleSaveFamille} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1">Nom de la famille</label>
-                <input type="text" value={formData.nom} onChange={e => setFormData({...formData, nom: e.target.value})} placeholder="Ex: DUPONT" className="w-full border border-white rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" required />
+                <input type="text" value={formData.nom} onChange={e => setFormData({...formData, nom: e.target.value})} placeholder="Ex: BEZIAT-MENUT" className="w-full border border-white rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm uppercase" required />
               </div>
               
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Type d'intégration</label>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Type (Ménage)</label>
                   <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} className="w-full border border-white rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm cursor-pointer">
                     <option value="Ancien">Ancien</option>
                     <option value="Nouveau">Nouveau</option>
@@ -7438,13 +7483,13 @@ const ModuleParametresFamilles = () => {
                 <div className="flex flex-col justify-end">
                   <label className="flex items-center gap-2 cursor-pointer bg-white p-2.5 rounded-xl border border-white shadow-sm hover:border-indigo-300">
                     <input type="checkbox" checked={formData.isAsso} onChange={e => setFormData({...formData, isAsso: e.target.checked})} className="w-4 h-4 text-indigo-600" />
-                    <span className="text-xs font-bold text-slate-700">Membre Asso</span>
+                    <span className="text-xs font-bold text-slate-700">Bureau Asso</span>
                   </label>
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-2">Jours souhaités (Cantine)</label>
+                <label className="block text-xs font-bold text-slate-600 mb-2">Jours de Cantine (Abonnement)</label>
                 <div className="flex flex-wrap gap-2">
                   {[
                     { label: 'Lun', val: 1 }, { label: 'Mar', val: 2 }, 
@@ -7458,31 +7503,37 @@ const ModuleParametresFamilles = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">Particularités / Dérogations</label>
-                <textarea value={formData.particularites} onChange={e => setFormData({...formData, particularites: e.target.value})} rows="2" placeholder="Ex: Limité à 1 seul ménage par an, ne peut pas le jeudi..." className="w-full border border-white rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm custom-scrollbar"></textarea>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Particularités (Info interne)</label>
+                <textarea value={formData.particularites} onChange={e => setFormData({...formData, particularites: e.target.value})} rows="2" placeholder="Ex: Allergie arachide / Ne peut pas nettoyer le vendredi..." className="w-full border border-white rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm custom-scrollbar"></textarea>
               </div>
 
-              <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-all shadow-md flex items-center justify-center gap-2 active:scale-95">
-                <CheckCircle2 size={16} /> Sauvegarder le profil
-              </button>
+              <div className="flex gap-2">
+                {editingFamilleId && (
+                  <button type="button" onClick={cancelEdit} className="w-1/3 bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-2.5 rounded-xl font-bold text-sm transition-all">
+                    Annuler
+                  </button>
+                )}
+                <button type="submit" className={`${editingFamilleId ? 'w-2/3' : 'w-full'} bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-all shadow-md flex items-center justify-center gap-2 active:scale-95`}>
+                  <CheckCircle2 size={16} /> {editingFamilleId ? 'Modifier' : 'Enregistrer'}
+                </button>
+              </div>
             </form>
           </div>
         </div>
 
-        {/* COLONNE DROITE : LISTE DES FAMILLES */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 lg:col-span-2 overflow-hidden flex flex-col h-full max-h-[800px]">
           <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center shrink-0">
-            <h3 className="font-bold text-slate-800 text-lg">Familles enregistrées ({familles.length})</h3>
+            <h3 className="font-bold text-slate-800 text-lg">Base de données ({familles.length} inscrits)</h3>
           </div>
           
           <div className="overflow-y-auto p-0 flex-1 custom-scrollbar">
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-100/80 text-slate-500 text-[10px] font-bold uppercase tracking-wider sticky top-0 backdrop-blur-md z-10 shadow-sm">
                 <tr>
-                  <th className="p-4">Nom de la famille</th>
-                  <th className="p-4">Jours</th>
-                  <th className="p-4">Statuts</th>
-                  <th className="p-4">Particularités</th>
+                  <th className="p-4">Famille</th>
+                  <th className="p-4">Cantine</th>
+                  <th className="p-4">Ménage & Statut</th>
+                  <th className="p-4">Notes Admin</th>
                   <th className="p-4 text-center">Action</th>
                 </tr>
               </thead>
@@ -7508,9 +7559,14 @@ const ModuleParametresFamilles = () => {
                       {f.particularites || <span className="italic text-slate-300">-</span>}
                     </td>
                     <td className="p-4 text-center">
-                      <button onClick={() => handleDeleteFamille(f.id)} className="text-slate-300 hover:text-rose-600 p-1.5 rounded-lg transition-colors" title="Supprimer">
-                        <Trash2 size={16}/>
-                      </button>
+                      <div className="flex items-center justify-center gap-1">
+                        <button onClick={() => handleEditFamille(f)} className="text-slate-300 hover:text-indigo-600 p-1.5 rounded-lg transition-colors" title="Modifier">
+                          <Edit2 size={16}/>
+                        </button>
+                        <button onClick={() => handleDeleteFamille(f.id)} className="text-slate-300 hover:text-rose-600 p-1.5 rounded-lg transition-colors" title="Supprimer">
+                          <Trash2 size={16}/>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -7523,11 +7579,33 @@ const ModuleParametresFamilles = () => {
             </table>
           </div>
         </div>
-
       </div>
+
+      {brouillon && (
+        <div className="bg-white rounded-2xl shadow-sm border border-indigo-200 p-6 mt-6 relative overflow-hidden animate-fade-in">
+          <div className="absolute top-0 left-0 w-full h-1 bg-indigo-500"></div>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+            <div>
+              <h3 className="text-lg font-bold text-slate-800">Aperçu du Brouillon</h3>
+              <p className="text-xs text-slate-500">Vérifiez et ajustez manuellement les assignations (Ménage & Cantine) avant de les publier aux parents.</p>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setBrouillon(null)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-200 transition-colors">Annuler le brouillon</button>
+              <button className="px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-bold hover:bg-emerald-600 shadow-sm transition-colors">Publier le Calendrier</button>
+            </div>
+          </div>
+          
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-8 text-center text-slate-500 italic text-sm">
+            L'interface interactive de calendrier s'affichera ici une fois l'algorithme mathématique connecté.
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
+
+
 
 export default function App() {
   // 1. VARIABLES (Doivent être tout en haut)
