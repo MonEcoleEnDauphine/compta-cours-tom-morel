@@ -7277,19 +7277,22 @@ const ModuleGestionAcces = () => {
 // --- MODULE : GESTION DU PLANNING CANTINES & MENAGES PAR FAMILLE---
 const ModuleGestionPlanningCantinesMenages = () => {
   const [familles, setFamilles] = useState([]);
-  // Ajout des nouveaux paramètres par défaut
   const [parametres, setParametres] = useState({ 
     zone: 'A', 
     anneeScolaire: '2026-2027',
     dateRentree: '',
     dateFin: '',
-    joursPedagogiques: ''
+    joursPedagogiques: '',
+    conditionsCantine: '',
+    conditionsMenage: ''
   });
   const [isEditingParametres, setIsEditingParametres] = useState(false);
   const [brouillon, setBrouillon] = useState(null);
-  
   const [editingFamilleId, setEditingFamilleId] = useState(null);
   
+  // ÉTAT POUR LA FENÊTRE POP-UP (MODALE) SUR-MESURE
+  const [modal, setModal] = useState({ isOpen: false, type: 'alert', title: '', message: '', onConfirm: null });
+
   const [formData, setFormData] = useState({
     nom: '',
     type: 'Ancien',
@@ -7297,6 +7300,24 @@ const ModuleGestionPlanningCantinesMenages = () => {
     days: [],
     particularites: ''
   });
+
+  // Fonctions utilitaires pour afficher les pop-ups
+  const showAlert = (title, message) => {
+    setModal({ isOpen: true, type: 'alert', title, message, onConfirm: () => setModal({ isOpen: false }) });
+  };
+
+  const showConfirm = (title, message, onConfirmAction) => {
+    setModal({
+      isOpen: true,
+      type: 'confirm',
+      title,
+      message,
+      onConfirm: () => {
+        onConfirmAction();
+        setModal({ isOpen: false });
+      }
+    });
+  };
 
   useEffect(() => {
     const unsubParams = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'parametres_globaux'), (docSnap) => {
@@ -7320,9 +7341,9 @@ const ModuleGestionPlanningCantinesMenages = () => {
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'parametres_globaux'), parametres, { merge: true });
       setIsEditingParametres(false);
-      alert("Paramètres de l'école mis à jour !");
+      showAlert("Succès", "Paramètres de l'école mis à jour avec succès !");
     } catch (e) {
-      alert("Erreur lors de la sauvegarde des paramètres.");
+      showAlert("Erreur", "Erreur lors de la sauvegarde des paramètres.");
     }
   };
 
@@ -7354,11 +7375,11 @@ const ModuleGestionPlanningCantinesMenages = () => {
   const handleSaveFamille = async (e) => {
     e.preventDefault();
     const nomSaisi = formData.nom.toUpperCase().trim();
-    if (!nomSaisi) return alert("Le nom est obligatoire.");
+    if (!nomSaisi) return showAlert("Attention", "Le nom de la famille est obligatoire.");
 
     const familleExiste = familles.some(f => f.nom === nomSaisi && f.id !== editingFamilleId);
     if (familleExiste) {
-      return alert(`La famille "${nomSaisi}" existe déjà dans la base. Veuillez modifier ou supprimer l'existante.`);
+      return showAlert("Doublon détecté", `La famille "${nomSaisi}" existe déjà dans la base. Veuillez modifier ou supprimer l'existante.`);
     }
     
     try {
@@ -7372,42 +7393,118 @@ const ModuleGestionPlanningCantinesMenages = () => {
 
       if (editingFamilleId) {
         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'familles_planning', editingFamilleId), familleData);
+        showAlert("Succès", "La famille a été modifiée avec succès.");
       } else {
         await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'familles_planning'), familleData);
+        showAlert("Succès", "La famille a été ajoutée à la base de données.");
       }
       
       setFormData({ nom: '', type: 'Ancien', isAsso: false, days: [], particularites: '' });
       setEditingFamilleId(null);
     } catch (e) {
-      alert("Erreur lors de l'enregistrement de la famille.");
+      showAlert("Erreur", "Erreur lors de l'enregistrement de la famille.");
     }
   };
 
-  const handleDeleteFamille = async (id) => {
-    if (window.confirm("Supprimer cette famille de la base de données ?")) {
-      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'familles_planning', id));
-    }
+  const handleDeleteFamille = (id) => {
+    showConfirm(
+      "Confirmation de suppression",
+      "Voulez-vous vraiment supprimer cette famille de la base de données ? Cette action est irréversible.",
+      async () => {
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'familles_planning', id));
+      }
+    );
   };
 
   const getDayName = (val) => {
-    const map = { 1: 'Lundi', 2: 'Mardi', 4: 'Jeudi', 5: 'Vendredi' };
+    const map = { 1: 'Lundi', 2: 'Mardi', 4: 'Jeudi', 5: 'Vendredi', 6: 'Samedi' };
     return map[val] || val;
   };
 
-  const handleGeneratePlannings = async () => {
-    if (!window.confirm("Générer un nouveau brouillon de planning (Cantines & Ménages) ? L'ancien non publié sera écrasé.")) return;
-    setBrouillon([{ id: 1, date: '04/09/2026', type: 'Ménage', famille: 'EN ATTENTE' }]);
-  };
-
-  // Fonction pour formater les dates à l'affichage
   const formatDateAffichage = (dateString) => {
     if (!dateString) return 'Non définie';
     const options = { year: 'numeric', month: 'long', day: 'numeric' };
     return new Date(dateString).toLocaleDateString('fr-FR', options);
   };
 
+  const handleGeneratePlannings = () => {
+    if (!parametres.dateRentree || !parametres.dateFin) {
+      return showAlert("Paramètres manquants", "Veuillez définir la date de rentrée et de fin des cours dans les paramètres généraux.");
+    }
+
+    showConfirm(
+      "Générer un nouveau brouillon",
+      "Générer un nouveau brouillon de planning (Cantines & Ménages) ? L'ancien brouillon non publié sera écrasé.",
+      () => {
+        const start = new Date(parametres.dateRentree);
+        const end = new Date(parametres.dateFin);
+        const joursExclus = (parametres.joursPedagogiques || '').split(',').map(d => d.trim());
+
+        const cantineBrouillon = [];
+        const menageBrouillon = [];
+        const famillesMenage = familles.filter(f => f.type !== 'Équipe Pédagogique');
+        let menageIndex = 0;
+
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          const dayOfWeek = d.getDay(); 
+          const dateLocale = d.toLocaleDateString('fr-FR');
+          const isExclu = joursExclus.includes(dateLocale);
+
+          if ([1, 2, 4, 5].includes(dayOfWeek) && !isExclu) {
+            const inscritsCantine = familles.filter(f => f.days && f.days.includes(dayOfWeek));
+            if (inscritsCantine.length > 0) {
+              cantineBrouillon.push({
+                date: dateLocale,
+                jour: getDayName(dayOfWeek),
+                inscrits: inscritsCantine.map(f => f.nom)
+              });
+            }
+          }
+
+          if (dayOfWeek === 6 && !isExclu) {
+            if (famillesMenage.length > 0) {
+              const assignedFamily = famillesMenage[menageIndex % famillesMenage.length];
+              menageBrouillon.push({
+                date: "Week-end du " + dateLocale,
+                jour: "Sam/Dim",
+                famille: assignedFamily.nom,
+                type: assignedFamily.type
+              });
+              menageIndex++;
+            }
+          }
+        }
+        setBrouillon({ cantine: cantineBrouillon, menage: menageBrouillon });
+      }
+    );
+  };
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-10 font-sans animate-fade-in relative">
+      
+      {/* POP-UP / MODALE SUR-MESURE */}
+      {modal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-md overflow-hidden animate-slide-up">
+            <div className="p-6">
+              <h3 className="text-lg font-black text-slate-800 mb-2">{modal.title}</h3>
+              <p className="text-slate-600 text-sm leading-relaxed">{modal.message}</p>
+            </div>
+            <div className="bg-slate-50 px-6 py-4 border-t border-slate-100 flex justify-end gap-3">
+              {modal.type === 'confirm' && (
+                <button onClick={() => setModal({ isOpen: false })} className="px-4 py-2 text-sm font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors">
+                  Annuler
+                </button>
+              )}
+              <button onClick={modal.onConfirm} className="px-4 py-2 text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-colors">
+                {modal.type === 'confirm' ? 'Confirmer' : 'OK'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RESTE DU CONTENU DU MODULE */}
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mt-4">
         <div>
           <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2">
@@ -7459,30 +7556,49 @@ const ModuleGestionPlanningCantinesMenages = () => {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Date Rentrée</label>
+                  {isEditingParametres ? (
+                    <input type="date" value={parametres.dateRentree || ''} onChange={e => setParametres({...parametres, dateRentree: e.target.value})} className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
+                  ) : (
+                    <p className="font-semibold text-slate-800 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 text-[11px] truncate">{formatDateAffichage(parametres.dateRentree)}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Fin des cours</label>
+                  {isEditingParametres ? (
+                    <input type="date" value={parametres.dateFin || ''} onChange={e => setParametres({...parametres, dateFin: e.target.value})} className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
+                  ) : (
+                    <p className="font-semibold text-slate-800 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 text-[11px] truncate">{formatDateAffichage(parametres.dateFin)}</p>
+                  )}
+                </div>
+              </div>
+
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Date de Rentrée</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Jours Pédagogiques (Exclus)</label>
                 {isEditingParametres ? (
-                  <input type="date" value={parametres.dateRentree || ''} onChange={e => setParametres({...parametres, dateRentree: e.target.value})} className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
+                  <textarea value={parametres.joursPedagogiques || ''} onChange={e => setParametres({...parametres, joursPedagogiques: e.target.value})} rows="1" placeholder="Ex: 02/11/2026, 15/05/2027" className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500 custom-scrollbar"></textarea>
                 ) : (
-                  <p className="font-semibold text-slate-800 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 text-sm">{formatDateAffichage(parametres.dateRentree)}</p>
+                  <p className="font-semibold text-slate-800 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 text-sm min-h-[38px]">{parametres.joursPedagogiques || <span className="italic text-slate-400">-</span>}</p>
                 )}
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Fin des cours</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Conditions globales Cantine</label>
                 {isEditingParametres ? (
-                  <input type="date" value={parametres.dateFin || ''} onChange={e => setParametres({...parametres, dateFin: e.target.value})} className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
+                  <textarea value={parametres.conditionsCantine || ''} onChange={e => setParametres({...parametres, conditionsCantine: e.target.value})} rows="2" placeholder="Règles générales pour la cantine..." className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500 custom-scrollbar"></textarea>
                 ) : (
-                  <p className="font-semibold text-slate-800 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 text-sm">{formatDateAffichage(parametres.dateFin)}</p>
+                  <p className="font-semibold text-slate-800 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 text-sm min-h-[38px]">{parametres.conditionsCantine || <span className="italic text-slate-400">Aucune condition définie</span>}</p>
                 )}
               </div>
-
+              
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Journées Pédagogiques (Exclues Cantine)</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Conditions globales Ménage</label>
                 {isEditingParametres ? (
-                  <textarea value={parametres.joursPedagogiques || ''} onChange={e => setParametres({...parametres, joursPedagogiques: e.target.value})} rows="2" placeholder="Ex: 02/11/2026, 15/05/2027" className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500 custom-scrollbar"></textarea>
+                  <textarea value={parametres.conditionsMenage || ''} onChange={e => setParametres({...parametres, conditionsMenage: e.target.value})} rows="2" placeholder="Ex: Clés à récupérer le vendredi soir..." className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500 custom-scrollbar"></textarea>
                 ) : (
-                  <p className="font-semibold text-slate-800 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 text-sm min-h-[38px]">{parametres.joursPedagogiques || <span className="italic text-slate-400">Aucune date renseignée</span>}</p>
+                  <p className="font-semibold text-slate-800 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 text-sm min-h-[38px]">{parametres.conditionsMenage || <span className="italic text-slate-400">Aucune condition définie</span>}</p>
                 )}
               </div>
             </div>
@@ -7495,7 +7611,6 @@ const ModuleGestionPlanningCantinesMenages = () => {
                 <Calendar size={16} />
                 Générer un Brouillon
               </button>
-              <p className="text-[10px] text-slate-400 mt-2 text-center leading-tight">Croise la zone, les jours fériés et les statuts des familles pour créer les plannings.</p>
             </div>
           </div>
 
@@ -7544,7 +7659,7 @@ const ModuleGestionPlanningCantinesMenages = () => {
 
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1">Particularités (Info interne)</label>
-                <textarea value={formData.particularites} onChange={e => setFormData({...formData, particularites: e.target.value})} rows="2" placeholder="Ex: Allergie arachide / Ne peut pas nettoyer le vendredi..." className="w-full border border-white rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm custom-scrollbar"></textarea>
+                <textarea value={formData.particularites} onChange={e => setFormData({...formData, particularites: e.target.value})} rows="2" placeholder="Ex: Allergie arachide / Ne peut pas nettoyer tel week-end..." className="w-full border border-white rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm custom-scrollbar"></textarea>
               </div>
 
               <div className="flex gap-2">
@@ -7627,20 +7742,57 @@ const ModuleGestionPlanningCantinesMenages = () => {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
             <div>
               <h3 className="text-lg font-bold text-slate-800">Aperçu du Brouillon</h3>
-              <p className="text-xs text-slate-500">Vérifiez et ajustez manuellement les assignations (Ménage & Cantine) avant de les publier aux parents.</p>
+              <p className="text-xs text-slate-500">Vérifiez la répartition avant de publier officiellement les plannings.</p>
             </div>
             <div className="flex gap-3">
-              <button onClick={() => setBrouillon(null)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-200 transition-colors">Annuler le brouillon</button>
-              <button className="px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-bold hover:bg-emerald-600 shadow-sm transition-colors">Publier le Calendrier</button>
+              <button onClick={() => setBrouillon(null)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-200 transition-colors">Annuler</button>
+              <button className="px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-bold hover:bg-emerald-600 shadow-sm transition-colors">Publier les Calendriers</button>
             </div>
           </div>
           
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-8 text-center text-slate-500 italic text-sm">
-            L'interface interactive de calendrier s'affichera ici une fois l'algorithme mathématique connecté.
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div>
+              <h4 className="font-bold text-slate-700 mb-3 flex items-center gap-2"><Trash2 size={16} className="text-rose-500"/> Planning Ménage (Week-ends)</h4>
+              <div className="h-[400px] overflow-y-auto custom-scrollbar border border-slate-200 rounded-xl">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-slate-500 text-[10px] font-bold uppercase sticky top-0">
+                    <tr><th className="p-3">Date</th><th className="p-3">Famille assignée</th><th className="p-3">Statut</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {brouillon.menage.map((m, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50">
+                        <td className="p-3 font-semibold text-slate-700">{m.date}</td>
+                        <td className="p-3 font-black text-indigo-700">{m.famille}</td>
+                        <td className="p-3 text-[10px] uppercase font-bold text-slate-500">{m.type}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="font-bold text-slate-700 mb-3 flex items-center gap-2"><Users size={16} className="text-blue-500"/> Prévisionnel Cantine</h4>
+              <div className="h-[400px] overflow-y-auto custom-scrollbar border border-slate-200 rounded-xl">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-slate-500 text-[10px] font-bold uppercase sticky top-0">
+                    <tr><th className="p-3">Date</th><th className="p-3">Effectif</th><th className="p-3">Familles inscrites</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {brouillon.cantine.map((c, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50">
+                        <td className="p-3 font-semibold text-slate-700 whitespace-nowrap">{c.jour} {c.date}</td>
+                        <td className="p-3 font-black text-blue-600">{c.inscrits.length} repas</td>
+                        <td className="p-3 text-xs text-slate-600">{c.inscrits.join(', ')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       )}
-
     </div>
   );
 };
