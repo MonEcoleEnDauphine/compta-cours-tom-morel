@@ -384,23 +384,41 @@ const VieEcole = ({ utilisateurConnecte }) => {
     return () => { unsubDocs(); unsubPhotos(); };
   }, []);
 
-  const handleFileUpload = async (e, collectionName) => {
+const handleFileUpload = async (e, collectionName) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    // Sécurité de taille pour éviter les délais infinis
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Le fichier dépasse la limite autorisée de 5 Mo.");
+      e.target.value = '';
+      return;
+    }
+
     setIsUploading(true);
     try {
       const fileRef = ref(storage, `${collectionName}/${appId}_${Date.now()}_${file.name}`);
       await uploadBytes(fileRef, file);
       const url = await getDownloadURL(fileRef);
 
-      const titre = prompt("Entrez un titre pour ce fichier :", file.name) || file.name;
-      const desc = collectionName === 'documents_ecole' ? (prompt("Description optionnelle :", "") || "") : "";
+      // On utilise le nom du fichier brut pour ne plus bloquer le navigateur
+      const titre = file.name.replace(/\.[^/.]+$/, "");
 
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', collectionName), {
-        titre, description: desc, url, filename: file.name, date_creation: new Date().toISOString()
+        titre: titre, 
+        description: "", 
+        url: url, 
+        filename: file.name, 
+        date_creation: new Date().toISOString()
       });
-    } catch (err) { alert("Erreur d'upload."); }
-    setIsUploading(false);
+      
+    } catch (err) { 
+      console.error(err);
+      alert("Erreur de téléchargement. Vérifiez que Firebase Storage est activé."); 
+    } finally {
+      setIsUploading(false);
+      e.target.value = ''; // Réinitialise l'input pour pouvoir renvoyer le même fichier
+    }
   };
 
   const handleDelete = async (collectionName, id) => {
