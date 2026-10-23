@@ -7043,7 +7043,7 @@ const ModuleGestionAcces = () => {
     "Espace Famille": ['accueil_famille', 'vie_ecole', 'scolarite', 'factures_parents', 'plannings', 'fiche_travaux', 'inscriptions', 'contact'],
     "Pilotage": ['tableau_bord', 'etat_financier'],
     "Compta & Finances": ['grand_livre', 'plan_comptable', 'budget', 'notes_frais', 'dons_recus', 'evenements'],
-    "Administration": ['gestion_acces', 'dossiers_facturation', 'equipe_contrats', 'uniformes_stock']
+    "Administration": ['gestion_acces', 'parametres_familles', 'dossiers_facturation', 'equipe_contrats', 'uniformes_stock']
   };
 
   useEffect(() => {
@@ -7274,6 +7274,260 @@ const ModuleGestionAcces = () => {
   );
 };
 
+// --- MODULE : GESTION DU PLANNING CANTINES & MENAGES ---
+const ModuleParametresFamilles = () => {
+  const [familles, setFamilles] = useState([]);
+  const [parametres, setParametres] = useState({ zone: 'A', anneeScolaire: '2026-2027' });
+  const [isEditingParametres, setIsEditingParametres] = useState(false);
+  
+  // État du formulaire d'ajout/édition
+  const [formData, setFormData] = useState({
+    nom: '',
+    type: 'Ancien',
+    isAsso: false,
+    days: [],
+    particularites: ''
+  });
+
+  // Chargement des données depuis Firebase
+  useEffect(() => {
+    // Chargement des paramètres globaux
+    const unsubParams = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'parametres_globaux'), (docSnap) => {
+      if (docSnap.exists()) {
+        setParametres(docSnap.data());
+      }
+    });
+
+    // Chargement des familles
+    const qFamilles = collection(db, 'artifacts', appId, 'public', 'data', 'familles_planning');
+    const unsubFamilles = onSnapshot(qFamilles, (snapshot) => {
+      const liste = [];
+      snapshot.forEach(doc => liste.push({ id: doc.id, ...doc.data() }));
+      liste.sort((a, b) => a.nom.localeCompare(b.nom));
+      setFamilles(liste);
+    });
+
+    return () => { unsubParams(); unsubFamilles(); };
+  }, []);
+
+  const handleSaveParametres = async () => {
+    try {
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'parametres_globaux'), parametres);
+      setIsEditingParametres(false);
+      alert("Paramètres de l'école mis à jour !");
+    } catch (e) {
+      alert("Erreur lors de la sauvegarde des paramètres. Vérifiez que le document existe dans Firebase.");
+    }
+  };
+
+  const handleDayToggle = (dayValue) => {
+    setFormData(prev => {
+      const newDays = prev.days.includes(dayValue) 
+        ? prev.days.filter(d => d !== dayValue) 
+        : [...prev.days, dayValue].sort();
+      return { ...prev, days: newDays };
+    });
+  };
+
+  const handleSaveFamille = async (e) => {
+    e.preventDefault();
+    if (!formData.nom.trim()) return alert("Le nom est obligatoire.");
+    
+    try {
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'familles_planning'), {
+        nom: formData.nom.toUpperCase().trim(),
+        type: formData.type,
+        isAsso: formData.isAsso,
+        days: formData.days,
+        particularites: formData.particularites
+      });
+      setFormData({ nom: '', type: 'Ancien', isAsso: false, days: [], particularites: '' });
+    } catch (e) {
+      alert("Erreur lors de l'ajout de la famille.");
+    }
+  };
+
+  const handleDeleteFamille = async (id) => {
+    if (window.confirm("Supprimer cette famille du planning ?")) {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'familles_planning', id));
+    }
+  };
+
+  const getDayName = (val) => {
+    const map = { 1: 'Lundi', 2: 'Mardi', 4: 'Jeudi', 5: 'Vendredi' };
+    return map[val] || val;
+  };
+
+  return (
+    <div className="space-y-6 max-w-7xl mx-auto pb-10 font-sans animate-fade-in">
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mt-4">
+        <div>
+          <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2">
+            <Users className="text-indigo-600" /> Base de Données Familles & Paramètres
+          </h2>
+          <p className="text-slate-500 text-sm mt-1">Configuration du moteur d'algorithme pour les plannings.</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* COLONNE GAUCHE : PARAMÈTRES & AJOUT */}
+        <div className="space-y-6 lg:col-span-1">
+          
+          {/* PARAMÈTRES GLOBAUX */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-2">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                <Globe size={18} className="text-indigo-500"/> Paramètres de l'école
+              </h3>
+              {!isEditingParametres ? (
+                <button onClick={() => setIsEditingParametres(true)} className="text-indigo-500 hover:text-indigo-700"><Edit2 size={16}/></button>
+              ) : (
+                <button onClick={handleSaveParametres} className="text-emerald-600 hover:text-emerald-700 font-bold text-xs bg-emerald-50 px-2 py-1 rounded">Enregistrer</button>
+              )}
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Zone de Vacances</label>
+                {isEditingParametres ? (
+                  <select value={parametres.zone} onChange={e => setParametres({...parametres, zone: e.target.value})} className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500">
+                    <option value="A">Zone A (Lyon, Grenoble, Bordeaux...)</option>
+                    <option value="B">Zone B (Marseille, Lille, Strasbourg...)</option>
+                    <option value="C">Zone C (Paris, Toulouse, Montpellier...)</option>
+                  </select>
+                ) : (
+                  <p className="font-semibold text-slate-800 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">Zone {parametres.zone}</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Année Scolaire Active</label>
+                {isEditingParametres ? (
+                  <select value={parametres.anneeScolaire} onChange={e => setParametres({...parametres, anneeScolaire: e.target.value})} className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500">
+                    <option value="2025-2026">2025-2026</option>
+                    <option value="2026-2027">2026-2027</option>
+                  </select>
+                ) : (
+                  <p className="font-semibold text-slate-800 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">{parametres.anneeScolaire}</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* AJOUT D'UNE FAMILLE */}
+          <div className="bg-indigo-50/50 rounded-2xl shadow-sm border border-indigo-100 p-6">
+            <h3 className="font-bold text-indigo-900 mb-4 border-b border-indigo-200 pb-2 flex items-center gap-2">
+              <PlusCircle size={18} className="text-indigo-600"/> Ajouter une famille
+            </h3>
+            <form onSubmit={handleSaveFamille} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Nom de la famille</label>
+                <input type="text" value={formData.nom} onChange={e => setFormData({...formData, nom: e.target.value})} placeholder="Ex: DUPONT" className="w-full border border-white rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" required />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Type d'intégration</label>
+                  <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} className="w-full border border-white rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm cursor-pointer">
+                    <option value="Ancien">Ancien</option>
+                    <option value="Nouveau">Nouveau</option>
+                    <option value="Nouveau SP">Nouveau SP (Toussaint)</option>
+                    <option value="Équipe Pédagogique">Équipe Pédagogique</option>
+                  </select>
+                </div>
+                <div className="flex flex-col justify-end">
+                  <label className="flex items-center gap-2 cursor-pointer bg-white p-2.5 rounded-xl border border-white shadow-sm hover:border-indigo-300">
+                    <input type="checkbox" checked={formData.isAsso} onChange={e => setFormData({...formData, isAsso: e.target.checked})} className="w-4 h-4 text-indigo-600" />
+                    <span className="text-xs font-bold text-slate-700">Membre Asso</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-2">Jours souhaités (Cantine)</label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { label: 'Lun', val: 1 }, { label: 'Mar', val: 2 }, 
+                    { label: 'Jeu', val: 4 }, { label: 'Ven', val: 5 }
+                  ].map(day => (
+                    <button type="button" key={day.val} onClick={() => handleDayToggle(day.val)} className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${formData.days.includes(day.val) ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm' : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-300'}`}>
+                      {day.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Particularités / Dérogations</label>
+                <textarea value={formData.particularites} onChange={e => setFormData({...formData, particularites: e.target.value})} rows="2" placeholder="Ex: Limité à 1 seul ménage par an, ne peut pas le jeudi..." className="w-full border border-white rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm custom-scrollbar"></textarea>
+              </div>
+
+              <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-all shadow-md flex items-center justify-center gap-2 active:scale-95">
+                <CheckCircle2 size={16} /> Sauvegarder le profil
+              </button>
+            </form>
+          </div>
+        </div>
+
+        {/* COLONNE DROITE : LISTE DES FAMILLES */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 lg:col-span-2 overflow-hidden flex flex-col h-full max-h-[800px]">
+          <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center shrink-0">
+            <h3 className="font-bold text-slate-800 text-lg">Familles enregistrées ({familles.length})</h3>
+          </div>
+          
+          <div className="overflow-y-auto p-0 flex-1 custom-scrollbar">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-100/80 text-slate-500 text-[10px] font-bold uppercase tracking-wider sticky top-0 backdrop-blur-md z-10 shadow-sm">
+                <tr>
+                  <th className="p-4">Nom de la famille</th>
+                  <th className="p-4">Jours</th>
+                  <th className="p-4">Statuts</th>
+                  <th className="p-4">Particularités</th>
+                  <th className="p-4 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {familles.map(f => (
+                  <tr key={f.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="p-4 font-black text-slate-700">{f.nom}</td>
+                    <td className="p-4">
+                      <div className="flex gap-1 flex-wrap">
+                        {f.days && f.days.length > 0 
+                          ? f.days.map(d => <span key={d} className="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded text-[10px] font-bold">{getDayName(d)}</span>)
+                          : <span className="text-slate-400 italic text-[10px]">Aucun jour</span>
+                        }
+                      </div>
+                    </td>
+                    <td className="p-4 space-y-1">
+                      <span className={`block w-fit px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${f.type?.startsWith('Ancien') ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+                        {f.type}
+                      </span>
+                      {f.isAsso && <span className="block w-fit px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-200">Bureau Asso</span>}
+                    </td>
+                    <td className="p-4 text-xs text-slate-500 max-w-[200px] truncate" title={f.particularites}>
+                      {f.particularites || <span className="italic text-slate-300">-</span>}
+                    </td>
+                    <td className="p-4 text-center">
+                      <button onClick={() => handleDeleteFamille(f.id)} className="text-slate-300 hover:text-rose-600 p-1.5 rounded-lg transition-colors" title="Supprimer">
+                        <Trash2 size={16}/>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {familles.length === 0 && (
+                  <tr>
+                    <td colSpan="5" className="p-10 text-center text-slate-400 italic">Aucune famille n'est encore enregistrée pour cette année.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+};
 
 export default function App() {
   // 1. VARIABLES (Doivent être tout en haut)
@@ -7340,6 +7594,7 @@ export default function App() {
       case 'equipe_contrats': return <PlaceholderPage title="Équipe et Contrats" />;
       case 'uniformes_stock': return <PlaceholderPage title="Uniformes & Stock" />;
       case 'gestion_acces': return <ModuleGestionAcces/>;
+      case 'parametres_familles': return <ModuleParametresFamilles />;
       default: return <PlaceholderPage title="Module en construction" />;
     }
   };
@@ -7382,7 +7637,7 @@ export default function App() {
             const hasAnyFamilyAccess = ['accueil_famille', 'vie_ecole', 'scolarite', 'factures_parents', 'plannings', 'fiche_travaux', 'inscriptions', 'contact'].some(hasAccess);
             const hasAnyPilotageAccess = ['tableau_bord', 'etat_financier'].some(hasAccess);
             const hasAnyComptaAccess = ['grand_livre', 'plan_comptable', 'budget', 'notes_frais', 'dons_recus', 'evenements'].some(hasAccess);
-            const hasAnyAdminAccess = ['gestion_acces', 'dossiers_facturation', 'equipe_contrats', 'uniformes_stock'].some(hasAccess);
+            const hasAnyAdminAccess = ['gestion_acces', 'parametres_familles', 'dossiers_facturation', 'equipe_contrats', 'uniformes_stock'].some(hasAccess);
 
             return (
               <>
@@ -7421,9 +7676,10 @@ export default function App() {
                 )}
 
                 {hasAnyAdminAccess && (
-                  <div className="mb-6">
+                 <div className="mb-6">
                     <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Administration</h3>
                     {hasAccess('gestion_acces') && <a href="#gestion_acces" onClick={() => handleNavigation('gestion_acces')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'gestion_acces' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><Lock size={18} /> Gestion Accès</a>}
+                    {hasAccess('parametres_familles') && <a href="#parametres_familles" onClick={() => handleNavigation('parametres_familles')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'parametres_familles' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><Users size={18} /> Base Familles</a>}
                     {hasAccess('dossiers_facturation') && <a href="#dossiers_facturation" onClick={() => handleNavigation('dossiers_facturation')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'dossiers_facturation' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><FileSpreadsheet size={18} /> Dossiers & Facturation</a>}
                     {hasAccess('equipe_contrats') && <a href="#equipe_contrats" onClick={() => handleNavigation('equipe_contrats')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'equipe_contrats' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><Users size={18} /> Équipe (Contrats)</a>}
                     {hasAccess('uniformes_stock') && <a href="#uniformes_stock" onClick={() => handleNavigation('uniformes_stock')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'uniformes_stock' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><Package size={18} /> Uniformes & Stock</a>}
