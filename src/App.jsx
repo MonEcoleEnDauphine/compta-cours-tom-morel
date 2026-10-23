@@ -7672,7 +7672,7 @@ export default function App() {
       case 'equipe_contrats': return <PlaceholderPage title="Équipe et Contrats" />;
       case 'uniformes_stock': return <PlaceholderPage title="Uniformes & Stock" />;
       case 'gestion_acces': return <ModuleGestionAcces/>;
-      case 'parametres_familles': return <ModuleParametresFamilles />;
+      case 'parametres_familles': return <ModuleGestionPlanningCantinesMenages />;
       default: return <PlaceholderPage title="Module en construction" />;
     }
   };
