@@ -42,85 +42,101 @@ const EcranConnexion = ({ onLogin }) => {
   const [id, setId] = useState('');
   const [mdp, setMdp] = useState('');
   const [erreur, setErreur] = useState('');
+  const [chargement, setChargement] = useState(false);
 
-  const gererConnexion = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const idSaisi = id.trim().toUpperCase();
-
-    if (idSaisi === 'ADMIN' && mdp === 'AdminCTM2026') {
-      return onLogin({ identifiant: 'ADMIN', role: 'admin', modulesAutorises: ['all'] });
-    }
+    setErreur('');
+    setChargement(true);
 
     try {
-      const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'utilisateurs'), 
-        where('identifiant', '==', idSaisi), 
-        where('mdp', '==', mdp)
-      );
-      const querySnapshot = await getDocs(q);
-      
-      if (!querySnapshot.empty) {
-        const userData = querySnapshot.docs[0].data();
-        onLogin(userData);
+      const q = collection(db, 'artifacts', appId, 'public', 'data', 'utilisateurs');
+      const snapshot = await getDocs(q);
+      const saisieId = id.toUpperCase().trim();
+
+      const compte = snapshot.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .find(u => u.identifiant?.toUpperCase().trim() === saisieId && u.mdp === mdp);
+
+      if (compte) {
+        onLogin(compte);
       } else {
         setErreur('Identifiant ou mot de passe incorrect.');
       }
     } catch (err) {
-      setErreur('Erreur de connexion à la base de données.');
+      setErreur('Erreur de connexion au serveur.');
+    } finally {
+      setChargement(false);
     }
   };
-  
-  return (
-    <div className="min-h-screen bg-slate-100 flex flex-col justify-center items-center p-4 font-sans relative overflow-hidden">
-      {/* Design d'arrière-plan */}
-      <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-indigo-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
-      <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-emerald-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
 
-      <div className="bg-white p-8 md:p-10 rounded-3xl shadow-2xl w-full max-w-md z-10 border border-slate-100">
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-20 h-20 bg-indigo-50 rounded-2xl flex items-center justify-center mb-4 border border-indigo-100 shadow-inner">
-            <Lock size={32} className="text-indigo-600" />
-          </div>
-          <h1 className="text-2xl font-black text-slate-800 text-center leading-tight">Cours Tom Morel</h1>
-          <p className="text-slate-500 text-sm mt-2">Accès à l'espace privé</p>
+  return (
+    <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl shadow-xl border border-slate-200/80 p-8 w-full max-w-sm text-center">
+        
+        {/* LOGO DE L'ÉCOLE */}
+        <div className="w-20 h-20 mx-auto mb-4 flex items-center justify-center">
+          <img 
+            src="/logo.png" 
+            alt="Logo Cours Tom Morel" 
+            className="w-full h-full object-contain"
+          />
         </div>
 
-        <form onSubmit={gererConnexion} className="space-y-5">
-          {erreur && (
-            <div className="bg-rose-50 text-rose-600 text-sm font-bold p-3 rounded-xl flex items-center gap-2 border border-rose-200 animate-fade-in">
-              <AlertTriangle size={18} /> {erreur}
-            </div>
-          )}
+        <h1 className="text-2xl font-black text-slate-800 tracking-tight">Cours Tom Morel</h1>
+        <p className="text-xs text-slate-400 font-medium mt-1 mb-6">Accès à l'espace privé</p>
 
+        {erreur && (
+          <div className="mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-600 rounded-xl text-xs font-semibold">
+            {erreur}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4 text-left">
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Identifiant</label>
-            <div className="relative">
-              <Users className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+              Identifiant
+            </label>
+            <div className="relative flex items-center">
+              <Users size={16} className="absolute left-3.5 text-slate-400" />
               <input 
                 type="text" 
+                required 
                 value={id} 
-                onChange={(e) => setId(e.target.value)}
-                placeholder="Ex: BEZIAT-MENUT"
-                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all font-medium uppercase"
+                onChange={e => setId(e.target.value)} 
+                placeholder="EX: BEZIAT-MENUT" 
+                className="w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold uppercase outline-none focus:ring-2 focus:ring-indigo-600 focus:bg-white transition-all"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Mot de passe</label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+              Mot de passe
+            </label>
+            <div className="relative flex items-center">
+              <Lock size={16} className="absolute left-3.5 text-slate-400" />
               <input 
                 type="password" 
+                required 
                 value={mdp} 
-                onChange={(e) => setMdp(e.target.value)}
-                placeholder="••••••••"
-                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all font-medium"
+                onChange={e => setMdp(e.target.value)} 
+                placeholder="••••••••" 
+                className="w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-600 focus:bg-white transition-all"
               />
             </div>
           </div>
 
-          <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3.5 rounded-xl transition-all shadow-lg shadow-indigo-200 active:scale-95 flex justify-center items-center gap-2 mt-4">
-            Se connecter <ChevronRight size={18} />
+          <button 
+            type="submit" 
+            disabled={chargement}
+            className="w-full mt-2 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+          >
+            {chargement ? 'Connexion…' : (
+              <>
+                Se connecter <ChevronRight size={16} />
+              </>
+            )}
           </button>
         </form>
       </div>
@@ -178,13 +194,42 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
   const resteCollecter = Math.max(0, parametres.budgetGoal - totalDons);
   const formatMontant = (val) => new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val || 0);
 
-  const openEditModal = (type) => {
-    if (type === 'mot') setFormValue({ titre: parametres.titreMot, contenu: parametres.motEquipe });
-    else if (type === 'objectif') setFormValue({ budgetGoal: parametres.budgetGoal, annee: parametres.annee });
-    else if (type === 'rappel') setFormValue({ texte: '' });
-    else if (type === 'evenement') setFormValue({ mois: '', jour: '', titre: '', desc: '' });
-    else if (type === 'equipe') setFormValue({ nom: '', role: '', initials: '', color: 'bg-blue-600' });
-    setModal({ isOpen: true, type });
+  // Tri chronologique automatique des événements (du plus proche au plus lointain)
+  const evenementsTries = [...evenements].sort((a, b) => {
+    if (!a.date) return 1;
+    if (!b.date) return -1;
+    return a.date.localeCompare(b.date);
+  });
+
+  // Calcul du badge jour/mois à partir de la date ISO (ex: "2026-11-11")
+  const getBadgeDate = (evt) => {
+    if (evt.date) {
+      const d = new Date(evt.date + 'T00:00:00');
+      return {
+        mois: d.toLocaleDateString('fr-FR', { month: 'short' }).replace('.', '').toUpperCase(),
+        jour: String(d.getDate()).padStart(2, '0')
+      };
+    }
+    return { mois: evt.mois || '---', jour: evt.jour || '--' };
+  };
+
+  const openEditModal = (type, payload = null) => {
+    if (type === 'mot') {
+      setFormValue({ titre: parametres.titreMot, contenu: parametres.motEquipe });
+    } else if (type === 'objectif') {
+      setFormValue({ budgetGoal: parametres.budgetGoal, annee: parametres.annee });
+    } else if (type === 'rappel') {
+      setFormValue({ texte: '' });
+    } else if (type === 'evenement') {
+      if (payload) {
+        setFormValue({ date: payload.date || '', titre: payload.titre || '', desc: payload.desc || '' });
+      } else {
+        setFormValue({ date: '', titre: '', desc: '' });
+      }
+    } else if (type === 'equipe') {
+      setFormValue({ nom: '', role: '', initials: '', color: 'bg-blue-600' });
+    }
+    setModal({ isOpen: true, type, payload });
   };
 
   const handleSave = async (e) => {
@@ -198,12 +243,27 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
       } else if (modal.type === 'rappel') {
         await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'rappels'), formValue);
       } else if (modal.type === 'evenement') {
-        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'evenements'), formValue);
+        const d = new Date(formValue.date + 'T00:00:00');
+        const evtData = {
+          date: formValue.date,
+          titre: formValue.titre,
+          desc: formValue.desc,
+          mois: d.toLocaleDateString('fr-FR', { month: 'short' }).replace('.', '').toUpperCase(),
+          jour: String(d.getDate()).padStart(2, '0')
+        };
+
+        if (modal.payload?.id) {
+          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'evenements', modal.payload.id), evtData);
+        } else {
+          await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'evenements'), evtData);
+        }
       } else if (modal.type === 'equipe') {
         await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'equipe'), formValue);
       }
       setModal({ isOpen: false, type: '', payload: null });
-    } catch (err) { alert("Erreur lors de l'enregistrement."); }
+    } catch (err) {
+      alert("Erreur lors de l'enregistrement.");
+    }
   };
 
   const handleDelete = async (collectionName, id) => {
@@ -218,8 +278,14 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
           <div className="bg-white rounded-3xl shadow-2xl border border-indigo-100 w-full max-w-md overflow-hidden">
             <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 p-6 text-white flex justify-between items-center">
-              <h3 className="font-bold text-lg leading-tight">Ajout / Modification</h3>
-              <button onClick={() => setModal({ isOpen: false })} className="text-white/70 hover:text-white"><XCircle size={20} /></button>
+              <h3 className="font-bold text-lg leading-tight">
+                {modal.type === 'evenement'
+                  ? (modal.payload ? "Modifier l'événement" : "Ajouter un événement")
+                  : "Ajout / Modification"}
+              </h3>
+              <button onClick={() => setModal({ isOpen: false, type: '', payload: null })} className="text-white/70 hover:text-white">
+                <XCircle size={20} />
+              </button>
             </div>
             <form onSubmit={handleSave} className="p-6 space-y-4">
               {modal.type === 'mot' && (
@@ -239,12 +305,38 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
               )}
               {modal.type === 'evenement' && (
                 <>
-                  <div className="flex gap-2">
-                    <input type="text" value={formValue.mois} onChange={e => setFormValue({...formValue, mois: e.target.value})} className="w-1/3 border rounded-xl p-3 text-sm uppercase" placeholder="Mois (ex: SEP)" required />
-                    <input type="text" value={formValue.jour} onChange={e => setFormValue({...formValue, jour: e.target.value})} className="w-2/3 border rounded-xl p-3 text-sm" placeholder="Jour (ex: 12)" required />
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Date de l'événement</label>
+                    <input 
+                      type="date" 
+                      value={formValue.date} 
+                      onChange={e => setFormValue({...formValue, date: e.target.value})} 
+                      className="w-full border rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-600" 
+                      required 
+                    />
                   </div>
-                  <input type="text" value={formValue.titre} onChange={e => setFormValue({...formValue, titre: e.target.value})} className="w-full border rounded-xl p-3 text-sm" placeholder="Titre de l'événement" required />
-                  <input type="text" value={formValue.desc} onChange={e => setFormValue({...formValue, desc: e.target.value})} className="w-full border rounded-xl p-3 text-sm" placeholder="Description (ex: 18h30 - Stade)" required />
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Titre</label>
+                    <input 
+                      type="text" 
+                      value={formValue.titre} 
+                      onChange={e => setFormValue({...formValue, titre: e.target.value})} 
+                      className="w-full border rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-600" 
+                      placeholder="Ex: Fête de l'école" 
+                      required 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Description / Heure / Lieu</label>
+                    <input 
+                      type="text" 
+                      value={formValue.desc} 
+                      onChange={e => setFormValue({...formValue, desc: e.target.value})} 
+                      className="w-full border rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-600" 
+                      placeholder="Ex: 09h00 à l'école" 
+                      required 
+                    />
+                  </div>
                 </>
               )}
               {modal.type === 'equipe' && (
@@ -265,7 +357,12 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
                 </>
               )}
               <div className="pt-4 flex justify-end gap-3 mt-6">
-                <button type="submit" className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700">Enregistrer</button>
+                <button type="button" onClick={() => setModal({ isOpen: false, type: '', payload: null })} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100">
+                  Annuler
+                </button>
+                <button type="submit" className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700">
+                  Enregistrer
+                </button>
               </div>
             </form>
           </div>
@@ -338,27 +435,54 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
             </ul>
           </div>
 
+          {/* SECTION PROCHAINS ÉVÉNEMENTS (TRIÉE ET ÉDITABLE) */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 relative">
             <div className="flex justify-between border-b border-slate-100 pb-3 mb-4">
               <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2"><Calendar className="text-blue-500" size={18} /> Prochains événements</h2>
-              {isAdmin && <button onClick={() => openEditModal('evenement')} className="bg-blue-50 text-blue-600 p-1.5 rounded-lg"><PlusCircle size={14}/></button>}
+              {isAdmin && (
+                <button onClick={() => openEditModal('evenement')} className="bg-blue-50 text-blue-600 p-1.5 rounded-lg hover:bg-blue-100 transition-colors" title="Ajouter un événement">
+                  <PlusCircle size={14}/>
+                </button>
+              )}
             </div>
             <div className="space-y-4">
-              {evenements.map(evt => (
-                <div key={evt.id} className="flex justify-between items-center group/event">
-                  <div className="flex gap-4 items-center">
-                    <div className="bg-blue-50 text-blue-700 px-3 py-2 rounded-xl text-center min-w-[50px]">
-                      <span className="block text-xs font-bold uppercase">{evt.mois}</span><span className="block text-lg font-black">{evt.jour}</span>
+              {evenementsTries.map(evt => {
+                const badge = getBadgeDate(evt);
+                return (
+                  <div key={evt.id} className="flex justify-between items-center group/event p-2 rounded-xl hover:bg-slate-50 transition-colors">
+                    <div className="flex gap-4 items-center flex-1 min-w-0 pr-2">
+                      <div className="bg-blue-50 text-blue-700 px-3 py-2 rounded-xl text-center min-w-[50px] shrink-0 border border-blue-100">
+                        <span className="block text-[11px] font-bold uppercase">{badge.mois}</span>
+                        <span className="block text-lg font-black leading-tight">{badge.jour}</span>
+                      </div>
+                      <div className="truncate">
+                        <h4 className="text-sm font-bold text-slate-800 truncate">{evt.titre}</h4>
+                        <p className="text-xs text-slate-500 mt-0.5 truncate">{evt.desc}</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-800">{evt.titre}</h4>
-                      <p className="text-xs text-slate-500 mt-0.5">{evt.desc}</p>
-                    </div>
+
+                    {isAdmin && (
+                      <div className="flex items-center gap-1 opacity-0 group-hover/event:opacity-100 transition-opacity shrink-0">
+                        <button 
+                          onClick={() => openEditModal('evenement', evt)} 
+                          className="text-slate-400 hover:text-indigo-600 p-1.5 hover:bg-indigo-50 rounded-lg transition-colors" 
+                          title="Modifier"
+                        >
+                          <Edit2 size={14}/>
+                        </button>
+                        <button 
+                          onClick={() => handleDelete('evenements', evt.id)} 
+                          className="text-slate-400 hover:text-rose-600 p-1.5 hover:bg-rose-50 rounded-lg transition-colors" 
+                          title="Supprimer"
+                        >
+                          <Trash2 size={14}/>
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  {isAdmin && <button onClick={() => handleDelete('evenements', evt.id)} className="text-rose-400 opacity-0 group-hover/event:opacity-100"><Trash2 size={14}/></button>}
-                </div>
-              ))}
-              {evenements.length === 0 && <div className="text-xs text-slate-400">Aucun événement à venir.</div>}
+                );
+              })}
+              {evenementsTries.length === 0 && <div className="text-xs text-slate-400 text-center py-4">Aucun événement à venir.</div>}
             </div>
           </div>
         </div>
