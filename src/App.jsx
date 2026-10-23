@@ -1463,14 +1463,21 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
   const [quickFilterFamily, setQuickFilterFamily] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
 
+  // AUTO-SÉLECTION SÉCURISÉE (Évite le crash TypeError: includes is not a function)
   useEffect(() => {
     if (utilisateurConnecte && utilisateurConnecte !== 'admin') {
+      // Conversion en chaîne explicite au cas où utilisateurConnecte est un objet
+      const userStr = typeof utilisateurConnecte === 'object' 
+        ? JSON.stringify(utilisateurConnecte).toUpperCase() 
+        : String(utilisateurConnecte).toUpperCase();
+
       const famId = [
         "BOCCA", "CHOMEL", "CORNET-BOUBE", "DE LASTIC ST JAL", "DE SERRES", "FIARD", 
         "GREPAT", "MELLIES", "RIOBÉ", "TAISSIDRE-CARVALHO", "BEZIAT-MENUT", 
         "DE MALAUSSENE", "FAUVAIN", "LE LÉZEC", "DE PONTE", "DURAND", "ESCOBAR", 
         "DE LA CHARRIE", "PILON", "SHAW"
-      ].find(id => utilisateurConnecte.includes(id));
+      ].find(id => userStr.includes(id));
+
       if (famId) {
         setSelectedFamilyFilter(famId);
       }
@@ -1543,7 +1550,6 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
       return !fam.days.includes(dOw);
     };
 
-    // --- INTEGRATION STRICTE DES FICHIERS HISTORIQUES ---
     const historicalCantine = [
       { date: '2026-09-03', p1: 'BOCCA', p2: 'TAISSIDRE-CARVALHO', repasType: 'Filles / Garçons' },
       { date: '2026-09-04', p1: 'RIOBÉ', p2: 'BEZIAT-MENUT', repasType: 'Par cordée' },
@@ -1706,10 +1712,8 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
         if (requiredParents > 0) {
           for (let i = assigned.length; i < requiredParents; i++) {
             let available = famsData.filter(f => {
-              // RÈGLE 1 : DISPENSE NAISSANCE (DE LASTIC ST JAL du 01/02 au 15/04)
               if (f.id === "DE LASTIC ST JAL" && dateStr >= "2027-02-01" && dateStr <= "2027-04-15") return false;
 
-              // RÈGLE 3 : DUO LE LÉZEC (Maman/Papa) sur Lundi (1) ou Vendredi (5)
               if (assigned.includes(f.id)) {
                 if (f.id === "LE LÉZEC" && [1, 5].includes(dayOfWeek) && assigned.length === 1 && assigned[0] === "LE LÉZEC") {
                    // Autorisé pour le duo
@@ -1721,7 +1725,6 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
               let hasDay = f.days.includes(dayOfWeek);
               if (!hasDay) return false;
 
-              // RÈGLE 2 : Séparation des "Nouveau SP" à la cantine (pas 2 Nouveau SP ensemble)
               if (i === 1 && assigned.length === 1) {
                 const firstFam = famsData.find(family => family.id === assigned[0]);
                 if (firstFam && firstFam.type === "Nouveau SP" && f.type === "Nouveau SP") {
@@ -1751,7 +1754,6 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
             if (available.length > 0) {
               const chosenId = available[0].id;
               assigned.push(chosenId);
-              // RÈGLE 3 : On compte 1 service par apparition
               statsObj[chosenId].cantine++; 
               statsObj[chosenId].periodCantine++; 
               statsObj[chosenId].total++; 
@@ -1797,7 +1799,6 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
 
         if (isHolidayStart) {
           let eligibleAsso = famsData.filter(f => {
-            // RÈGLE 1 : DISPENSE NAISSANCE (DE LASTIC ST JAL du 01/02 au 15/04)
             if (f.id === "DE LASTIC ST JAL" && nextSatStr >= "2027-02-01" && nextSatStr <= "2027-04-15") return false;
             return f.isAsso;
           });
@@ -1816,12 +1817,10 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
           }
         } else {
           let candidates = famsData.filter(f => {
-            // RÈGLE 1 : DISPENSE NAISSANCE
             if (f.id === "DE LASTIC ST JAL" && nextSatStr >= "2027-02-01" && nextSatStr <= "2027-04-15") return false;
             return true;
           });
           
-          // BLOCAGE CHOMEL ET DURAND : 1 seul ménage max sur l'année
           candidates = candidates.filter(f => {
              if (f.id === "CHOMEL" && statsObj[f.id].menage >= 1) return false;
              if (f.id === "DURAND" && statsObj[f.id].menage >= 1) return false;
