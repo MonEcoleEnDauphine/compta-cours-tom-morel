@@ -8,7 +8,7 @@ import {
   Globe, Mail, Phone, PlusCircle, Edit2, Send, Clock, Hammer, Menu,
   Megaphone, Bell, Newspaper, Camera, MessageCircle,
   Utensils, BarChart3, AlertCircle, Printer, CalendarDays,
-  ChevronLeft, UploadCloud, Baby, LogOut, Eye, EyeOff, Globe, CheckCircle2
+  ChevronLeft, UploadCloud, Baby, LogOut, Eye, EyeOff
 } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
@@ -246,7 +246,7 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
         let newData = { ...parametres };
         if (modal.type === 'mot') { newData.titreMot = formValue.titre; newData.motEquipe = formValue.contenu; }
         if (modal.type === 'objectif') { newData.budgetGoal = Number(formValue.budgetGoal); newData.annee = formValue.annee; }
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'accueil'), newData);
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'parametres_globaux'), parametres, { merge: true });
       } else if (modal.type === 'rappel') {
         await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'rappels'), formValue);
       } else if (modal.type === 'evenement') {
@@ -7292,7 +7292,7 @@ const ModuleParametresFamilles = () => {
   // Chargement des données depuis Firebase
   useEffect(() => {
     // Chargement des paramètres globaux
-    const unsubParams = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'parametres_globaux'), (docSnap) => {
+    const unsubParams = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'parametres_globaux'), (docSnap) => {
       if (docSnap.exists()) {
         setParametres(docSnap.data());
       }
