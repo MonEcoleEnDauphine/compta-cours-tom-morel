@@ -47,7 +47,7 @@ const EcranConnexion = ({ onLogin }) => {
     e.preventDefault();
     const idSaisi = id.trim().toUpperCase();
 
-    if (idSaisi === 'ADMIN' && mdp === 'admin') {
+    if (idSaisi === 'ADMIN' && mdp === 'AdminCTM2026') {
       return onLogin({ identifiant: 'ADMIN', role: 'admin', modulesAutorises: ['all'] });
     }
 
