@@ -7277,11 +7277,17 @@ const ModuleGestionAcces = () => {
 // --- MODULE : GESTION DU PLANNING CANTINES & MENAGES PAR FAMILLE---
 const ModuleGestionPlanningCantinesMenages = () => {
   const [familles, setFamilles] = useState([]);
-  const [parametres, setParametres] = useState({ zone: 'A', anneeScolaire: '2026-2027' });
+  // Ajout des nouveaux paramètres par défaut
+  const [parametres, setParametres] = useState({ 
+    zone: 'A', 
+    anneeScolaire: '2026-2027',
+    dateRentree: '',
+    dateFin: '',
+    joursPedagogiques: ''
+  });
   const [isEditingParametres, setIsEditingParametres] = useState(false);
   const [brouillon, setBrouillon] = useState(null);
   
-  // Nouvel état pour savoir si on modifie une famille existante
   const [editingFamilleId, setEditingFamilleId] = useState(null);
   
   const [formData, setFormData] = useState({
@@ -7295,7 +7301,7 @@ const ModuleGestionPlanningCantinesMenages = () => {
   useEffect(() => {
     const unsubParams = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'parametres_globaux'), (docSnap) => {
       if (docSnap.exists()) {
-        setParametres(docSnap.data());
+        setParametres(prev => ({ ...prev, ...docSnap.data() }));
       }
     });
 
@@ -7350,12 +7356,10 @@ const ModuleGestionPlanningCantinesMenages = () => {
     const nomSaisi = formData.nom.toUpperCase().trim();
     if (!nomSaisi) return alert("Le nom est obligatoire.");
 
-    // --- GARDE-FOU : Vérification des doublons (on ignore la famille en cours d'édition) ---
     const familleExiste = familles.some(f => f.nom === nomSaisi && f.id !== editingFamilleId);
     if (familleExiste) {
       return alert(`La famille "${nomSaisi}" existe déjà dans la base. Veuillez modifier ou supprimer l'existante.`);
     }
-    // ----------------------------------------------------------------------------------------
     
     try {
       const familleData = {
@@ -7395,6 +7399,13 @@ const ModuleGestionPlanningCantinesMenages = () => {
     setBrouillon([{ id: 1, date: '04/09/2026', type: 'Ménage', famille: 'EN ATTENTE' }]);
   };
 
+  // Fonction pour formater les dates à l'affichage
+  const formatDateAffichage = (dateString) => {
+    if (!dateString) return 'Non définie';
+    const options = { year: 'numeric', month: 'long', day: 'numeric' };
+    return new Date(dateString).toLocaleDateString('fr-FR', options);
+  };
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-10 font-sans animate-fade-in relative">
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mt-4">
@@ -7422,27 +7433,56 @@ const ModuleGestionPlanningCantinesMenages = () => {
             </div>
             
             <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Zone</label>
+                  {isEditingParametres ? (
+                    <select value={parametres.zone} onChange={e => setParametres({...parametres, zone: e.target.value})} className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500">
+                      <option value="A">Zone A</option>
+                      <option value="B">Zone B</option>
+                      <option value="C">Zone C</option>
+                    </select>
+                  ) : (
+                    <p className="font-semibold text-slate-800 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">Zone {parametres.zone}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Année Scolaire</label>
+                  {isEditingParametres ? (
+                    <select value={parametres.anneeScolaire} onChange={e => setParametres({...parametres, anneeScolaire: e.target.value})} className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500">
+                      <option value="2025-2026">2025-2026</option>
+                      <option value="2026-2027">2026-2027</option>
+                    </select>
+                  ) : (
+                    <p className="font-semibold text-slate-800 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">{parametres.anneeScolaire}</p>
+                  )}
+                </div>
+              </div>
+
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Zone de Vacances</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Date de Rentrée</label>
                 {isEditingParametres ? (
-                  <select value={parametres.zone} onChange={e => setParametres({...parametres, zone: e.target.value})} className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500">
-                    <option value="A">Zone A (Lyon, Grenoble, Bordeaux...)</option>
-                    <option value="B">Zone B (Marseille, Lille, Strasbourg...)</option>
-                    <option value="C">Zone C (Paris, Toulouse, Montpellier...)</option>
-                  </select>
+                  <input type="date" value={parametres.dateRentree || ''} onChange={e => setParametres({...parametres, dateRentree: e.target.value})} className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
                 ) : (
-                  <p className="font-semibold text-slate-800 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">Zone {parametres.zone}</p>
+                  <p className="font-semibold text-slate-800 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 text-sm">{formatDateAffichage(parametres.dateRentree)}</p>
                 )}
               </div>
+
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Année Scolaire Active</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Fin des cours</label>
                 {isEditingParametres ? (
-                  <select value={parametres.anneeScolaire} onChange={e => setParametres({...parametres, anneeScolaire: e.target.value})} className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500">
-                    <option value="2025-2026">2025-2026</option>
-                    <option value="2026-2027">2026-2027</option>
-                  </select>
+                  <input type="date" value={parametres.dateFin || ''} onChange={e => setParametres({...parametres, dateFin: e.target.value})} className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
                 ) : (
-                  <p className="font-semibold text-slate-800 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">{parametres.anneeScolaire}</p>
+                  <p className="font-semibold text-slate-800 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 text-sm">{formatDateAffichage(parametres.dateFin)}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Journées Pédagogiques (Exclues Cantine)</label>
+                {isEditingParametres ? (
+                  <textarea value={parametres.joursPedagogiques || ''} onChange={e => setParametres({...parametres, joursPedagogiques: e.target.value})} rows="2" placeholder="Ex: 02/11/2026, 15/05/2027" className="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500 custom-scrollbar"></textarea>
+                ) : (
+                  <p className="font-semibold text-slate-800 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 text-sm min-h-[38px]">{parametres.joursPedagogiques || <span className="italic text-slate-400">Aucune date renseignée</span>}</p>
                 )}
               </div>
             </div>
@@ -7604,7 +7644,6 @@ const ModuleGestionPlanningCantinesMenages = () => {
     </div>
   );
 };
-
 
 
 export default function App() {
