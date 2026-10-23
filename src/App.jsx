@@ -6880,8 +6880,8 @@ export default function App() {
             <img src={LOGO_URL} alt="Logo" className="w-16 h-16 object-contain" />
           </div>
           <h1 className="text-white font-bold text-lg text-center leading-tight">Cours<br/>Tom Morel</h1>
-          <p className="text-slate-500 text-xs mt-2 uppercase tracking-widest font-semibold">
-            {utilisateurConnecte === 'admin' ? 'ERP - ADMIN' : 'ESPACE FAMILLE'}
+           <p className="text-slate-500 text-xs mt-2 uppercase tracking-widest font-semibold">
+            {utilisateurConnecte?.role === 'admin' ? 'ERP - ADMIN' : 'ESPACE FAMILLE'}
           </p>
         </div>
 
@@ -6995,17 +6995,17 @@ export default function App() {
               {activeTab.replace(/_/g, ' ').toUpperCase()}
             </h2>
           </div>
-         <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4">
             <div className="text-right hidden md:block">
               <div className="text-sm font-bold text-slate-800">
-                {utilisateurConnecte === 'admin' ? 'Admin' : utilisateurConnecte}
+                {utilisateurConnecte?.role === 'admin' ? 'Admin' : utilisateurConnecte?.identifiant}
               </div>
               <div className="text-xs text-slate-500">
-                {utilisateurConnecte === 'admin' ? 'Profil : Direction' : 'Profil : Parent'}
+                {utilisateurConnecte?.role === 'admin' ? 'Profil : Direction' : 'Profil : Parent'}
               </div>
             </div>
             <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-lg border-2 border-indigo-200 uppercase">
-              {utilisateurConnecte === 'admin' ? 'A' : utilisateurConnecte.charAt(0)}
+              {utilisateurConnecte?.role === 'admin' ? 'A' : (utilisateurConnecte?.identifiant ? utilisateurConnecte.identifiant.charAt(0) : '?')}
             </div>
           </div>
         </header>
