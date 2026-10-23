@@ -376,8 +376,17 @@ const VieEcole = ({ utilisateurConnecte }) => {
   const [modal, setModal] = useState({ isOpen: false, type: '' });
   const [formValue, setFormValue] = useState({ titre: '', desc: '', url: '', coverUrl: '' });
 
-  // Image d'illustration par défaut si aucune miniature n'est fournie
   const DEFAULT_COVER = "https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=600&q=80";
+
+  // Transformation automatique des liens de partage Drive en flux image direct
+  const formatDriveImageUrl = (url) => {
+    if (!url) return '';
+    const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+    if (match && match[1]) {
+      return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1000`;
+    }
+    return url;
+  };
 
   useEffect(() => {
     const unsubDocs = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'documents_ecole'), (snapshot) => {
@@ -398,11 +407,13 @@ const VieEcole = ({ utilisateurConnecte }) => {
     e.preventDefault();
     try {
       const collectionName = modal.type === 'document' ? 'documents_ecole' : 'galerie_photos';
+      const cleanCoverUrl = formatDriveImageUrl(formValue.coverUrl);
+
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', collectionName), {
         titre: formValue.titre,
         description: formValue.desc,
         url: formValue.url,
-        coverUrl: formValue.coverUrl || DEFAULT_COVER,
+        coverUrl: cleanCoverUrl || DEFAULT_COVER,
         date_creation: new Date().toISOString()
       });
       setModal({ isOpen: false, type: '' });
@@ -419,8 +430,6 @@ const VieEcole = ({ utilisateurConnecte }) => {
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-10 font-sans animate-fade-in relative">
-      
-      {/* POP-UP DE SAISIE */}
       {modal.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
           <div className="bg-white rounded-3xl shadow-2xl border border-indigo-100 w-full max-w-md overflow-hidden">
@@ -450,8 +459,8 @@ const VieEcole = ({ utilisateurConnecte }) => {
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Lien d'image de couverture / miniature (Optionnel)</label>
-                <input type="url" value={formValue.coverUrl} onChange={e => setFormValue({...formValue, coverUrl: e.target.value})} className="w-full border rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-600" placeholder="https://... (Lien direct d'image)" />
-                <p className="text-[10px] text-slate-400 mt-1">Si laissé vide, une image par défaut sera attribuée.</p>
+                <input type="url" value={formValue.coverUrl} onChange={e => setFormValue({...formValue, coverUrl: e.target.value})} className="w-full border rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-600" placeholder="https://drive.google.com/file/d/..." />
+                <p className="text-[10px] text-slate-400 mt-1">Colle le lien de partage Drive du fichier photo. L'ERP l'affiche automatiquement en miniature.</p>
               </div>
 
               <div className="pt-4 flex justify-end gap-3 mt-6">
@@ -471,8 +480,6 @@ const VieEcole = ({ utilisateurConnecte }) => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        
-        {/* DOCUMENTS */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
            <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><FileText className="text-blue-500" size={20} /> Lettres aux parents</h3>
@@ -501,7 +508,6 @@ const VieEcole = ({ utilisateurConnecte }) => {
            </div>
         </div>
 
-        {/* GALERIE PHOTOS AVEC MINIATURES */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
            <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Camera className="text-emerald-500" size={20} /> Galerie Photos</h3>
@@ -519,7 +525,7 @@ const VieEcole = ({ utilisateurConnecte }) => {
                      src={photo.coverUrl || DEFAULT_COVER} 
                      alt={photo.titre} 
                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-80 group-hover:opacity-100" 
-                     onError={(e) => { e.target.src = DEFAULT_COVER; }} // Secours si le lien d'image est brisé
+                     onError={(e) => { e.target.src = DEFAULT_COVER; }}
                    />
                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent"></div>
                    <span className="absolute bottom-2.5 left-3 right-3 text-white text-xs font-bold truncate drop-shadow-md flex items-center gap-1.5">
@@ -536,7 +542,6 @@ const VieEcole = ({ utilisateurConnecte }) => {
              {photos.length === 0 && <div className="col-span-2 text-xs text-slate-400 italic text-center py-6">Aucun album lié.</div>}
            </div>
         </div>
-
       </div>
     </div>
   );
