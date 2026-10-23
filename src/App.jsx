@@ -37,7 +37,7 @@ const db = getFirestore(app);
 const storage = getStorage(app);
 const appId = "cours-tom-morel-erp";
 
-// --- MODULE : ÉCRAN DE CONNEXION (SAS DE SÉCURITÉ) ---
+ ÉCRAN DE CONNEXION (SAS DE SÉCURITÉ) ---
 const EcranConnexion = ({ onLogin }) => {
   const [id, setId] = useState('');
   const [mdp, setMdp] = useState('');
@@ -367,14 +367,17 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
   );
 };
 
-// --- MODULE : VIE DE L'ÉCOLE (Version Liens Google Drive) ---
+// --- MODULE : VIE DE L'ÉCOLE (Avec miniatures personnalisables) ---
 const VieEcole = ({ utilisateurConnecte }) => {
   const isAdmin = utilisateurConnecte?.role === 'admin';
   const [documents, setDocuments] = useState([]);
   const [photos, setPhotos] = useState([]);
   
   const [modal, setModal] = useState({ isOpen: false, type: '' });
-  const [formValue, setFormValue] = useState({ titre: '', desc: '', url: '' });
+  const [formValue, setFormValue] = useState({ titre: '', desc: '', url: '', coverUrl: '' });
+
+  // Image d'illustration par défaut si aucune miniature n'est fournie
+  const DEFAULT_COVER = "https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=600&q=80";
 
   useEffect(() => {
     const unsubDocs = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'documents_ecole'), (snapshot) => {
@@ -387,7 +390,7 @@ const VieEcole = ({ utilisateurConnecte }) => {
   }, []);
 
   const openAddModal = (type) => {
-    setFormValue({ titre: '', desc: '', url: '' });
+    setFormValue({ titre: '', desc: '', url: '', coverUrl: '' });
     setModal({ isOpen: true, type });
   };
 
@@ -399,16 +402,17 @@ const VieEcole = ({ utilisateurConnecte }) => {
         titre: formValue.titre,
         description: formValue.desc,
         url: formValue.url,
+        coverUrl: formValue.coverUrl || DEFAULT_COVER,
         date_creation: new Date().toISOString()
       });
       setModal({ isOpen: false, type: '' });
     } catch (err) {
-      alert("Erreur lors de l'enregistrement du lien.");
+      alert("Erreur lors de l'enregistrement.");
     }
   };
 
   const handleDelete = async (collectionName, id) => {
-    if (window.confirm("Supprimer ce lien définitivement ?")) {
+    if (window.confirm("Supprimer cet élément ?")) {
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', collectionName, id));
     }
   };
@@ -416,20 +420,20 @@ const VieEcole = ({ utilisateurConnecte }) => {
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-10 font-sans animate-fade-in relative">
       
-      {/* POP-UP DE SAISIE DU LIEN */}
+      {/* POP-UP DE SAISIE */}
       {modal.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
           <div className="bg-white rounded-3xl shadow-2xl border border-indigo-100 w-full max-w-md overflow-hidden">
             <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 p-6 text-white flex justify-between items-center">
               <h3 className="font-bold text-lg leading-tight">
-                {modal.type === 'document' ? "Lier un document (Google Drive)" : "Lier un album photo (Google Photos/Drive)"}
+                {modal.type === 'document' ? "Lier un document PDF" : "Lier un album photo"}
               </h3>
               <button onClick={() => setModal({ isOpen: false, type: '' })} className="text-white/70 hover:text-white"><XCircle size={20} /></button>
             </div>
             <form onSubmit={handleSave} className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Titre</label>
-                <input type="text" value={formValue.titre} onChange={e => setFormValue({...formValue, titre: e.target.value})} className="w-full border rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-600" placeholder="Ex: Lettre de rentrée" required />
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Titre *</label>
+                <input type="text" value={formValue.titre} onChange={e => setFormValue({...formValue, titre: e.target.value})} className="w-full border rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-600" placeholder="Ex: Sortie Forêt / Rentrée 2026" required />
               </div>
               
               {modal.type === 'document' && (
@@ -440,14 +444,19 @@ const VieEcole = ({ utilisateurConnecte }) => {
               )}
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Lien d'accès (URL)</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Lien Google Drive / Photos *</label>
                 <input type="url" value={formValue.url} onChange={e => setFormValue({...formValue, url: e.target.value})} className="w-full border rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-600" placeholder="https://drive.google.com/..." required />
-                <p className="text-[10px] text-slate-400 mt-2 font-medium bg-slate-100 p-2 rounded-lg">⚠️ Assurez-vous que le lien est réglé sur "Tous les utilisateurs disposant du lien peuvent lire" dans Google Drive.</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Lien d'image de couverture / miniature (Optionnel)</label>
+                <input type="url" value={formValue.coverUrl} onChange={e => setFormValue({...formValue, coverUrl: e.target.value})} className="w-full border rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-600" placeholder="https://... (Lien direct d'image)" />
+                <p className="text-[10px] text-slate-400 mt-1">Si laissé vide, une image par défaut sera attribuée.</p>
               </div>
 
               <div className="pt-4 flex justify-end gap-3 mt-6">
                 <button type="button" onClick={() => setModal({ isOpen: false, type: '' })} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100">Annuler</button>
-                <button type="submit" className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md">Enregistrer le lien</button>
+                <button type="submit" className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md">Enregistrer</button>
               </div>
             </form>
           </div>
@@ -463,7 +472,7 @@ const VieEcole = ({ utilisateurConnecte }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         
-        {/* --- DOCUMENTS (LIENS) --- */}
+        {/* DOCUMENTS */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
            <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><FileText className="text-blue-500" size={20} /> Lettres aux parents</h3>
@@ -488,11 +497,11 @@ const VieEcole = ({ utilisateurConnecte }) => {
                  )}
                </div>
              ))}
-             {documents.length === 0 && <p className="text-xs text-slate-400 italic text-center py-4">Aucun lien de document publié.</p>}
+             {documents.length === 0 && <p className="text-xs text-slate-400 italic text-center py-4">Aucun document publié.</p>}
            </div>
         </div>
 
-        {/* --- GALERIE PHOTOS (LIENS ALBUMS) --- */}
+        {/* GALERIE PHOTOS AVEC MINIATURES */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
            <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Camera className="text-emerald-500" size={20} /> Galerie Photos</h3>
@@ -504,15 +513,21 @@ const VieEcole = ({ utilisateurConnecte }) => {
            </div>
            <div className="grid grid-cols-2 gap-3">
              {photos.map(photo => (
-               <div key={photo.id} className="relative group rounded-xl border border-slate-200 aspect-video bg-emerald-50 flex items-center justify-center hover:bg-emerald-100 transition-colors shadow-sm">
-                 <a href={photo.url} target="_blank" rel="noreferrer" className="flex flex-col items-center justify-center p-3 text-center w-full h-full cursor-pointer">
-                   <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm mb-2 text-emerald-500 group-hover:scale-110 transition-transform">
-                     <Camera size={20} />
-                   </div>
-                   <span className="text-xs font-bold text-emerald-900 truncate w-full px-2">{photo.titre}</span>
+               <div key={photo.id} className="relative group rounded-2xl overflow-hidden border border-slate-200 aspect-video bg-slate-900 shadow-sm">
+                 <a href={photo.url} target="_blank" rel="noreferrer" className="block w-full h-full">
+                   <img 
+                     src={photo.coverUrl || DEFAULT_COVER} 
+                     alt={photo.titre} 
+                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-80 group-hover:opacity-100" 
+                     onError={(e) => { e.target.src = DEFAULT_COVER; }} // Secours si le lien d'image est brisé
+                   />
+                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent"></div>
+                   <span className="absolute bottom-2.5 left-3 right-3 text-white text-xs font-bold truncate drop-shadow-md flex items-center gap-1.5">
+                     <Camera size={14} className="text-emerald-400 shrink-0"/> {photo.titre}
+                   </span>
                  </a>
                  {isAdmin && (
-                   <button onClick={() => handleDelete('galerie_photos', photo.id)} className="absolute top-2 right-2 bg-white text-rose-500 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 shadow-sm z-20 hover:bg-rose-50">
+                   <button onClick={() => handleDelete('galerie_photos', photo.id)} className="absolute top-2 right-2 bg-white/90 text-rose-500 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 shadow-sm z-20 hover:bg-rose-50 transition-opacity">
                      <Trash2 size={14}/>
                    </button>
                  )}
