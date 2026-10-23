@@ -367,7 +367,7 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
   );
 };
 
-// --- MODULE : VIE DE L'ÉCOLE ---
+// --- MODULE : VIE DE L'ÉCOLE (Version Liens Google Drive) ---
 const VieEcole = ({ utilisateurConnecte }) => {
   const isAdmin = utilisateurConnecte?.role === 'admin';
   const [documents, setDocuments] = useState([]);
@@ -408,7 +408,7 @@ const VieEcole = ({ utilisateurConnecte }) => {
   };
 
   const handleDelete = async (collectionName, id) => {
-    if (window.confirm("Supprimer cet élément de la liste ?")) {
+    if (window.confirm("Supprimer ce lien définitivement ?")) {
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', collectionName, id));
     }
   };
@@ -416,13 +416,13 @@ const VieEcole = ({ utilisateurConnecte }) => {
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-10 font-sans animate-fade-in relative">
       
-      {/* POP-UP D'AJOUT PAR LIEN */}
+      {/* POP-UP DE SAISIE DU LIEN */}
       {modal.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
           <div className="bg-white rounded-3xl shadow-2xl border border-indigo-100 w-full max-w-md overflow-hidden">
             <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 p-6 text-white flex justify-between items-center">
               <h3 className="font-bold text-lg leading-tight">
-                {modal.type === 'document' ? "Lier un document (PDF)" : "Lier un album photo"}
+                {modal.type === 'document' ? "Lier un document (Google Drive)" : "Lier un album photo (Google Photos/Drive)"}
               </h3>
               <button onClick={() => setModal({ isOpen: false, type: '' })} className="text-white/70 hover:text-white"><XCircle size={20} /></button>
             </div>
@@ -434,20 +434,20 @@ const VieEcole = ({ utilisateurConnecte }) => {
               
               {modal.type === 'document' && (
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Description courte</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Description (Optionnel)</label>
                   <input type="text" value={formValue.desc} onChange={e => setFormValue({...formValue, desc: e.target.value})} className="w-full border rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-600" placeholder="Ex: Période 1" />
                 </div>
               )}
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Lien d'accès (Google Drive, etc.)</label>
-                <input type="url" value={formValue.url} onChange={e => setFormValue({...formValue, url: e.target.value})} className="w-full border rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-600" placeholder="https://..." required />
-                <p className="text-[10px] text-slate-400 mt-1 italic">Assurez-vous que le lien est réglé sur "Tous les utilisateurs disposant du lien peuvent lire".</p>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Lien d'accès (URL)</label>
+                <input type="url" value={formValue.url} onChange={e => setFormValue({...formValue, url: e.target.value})} className="w-full border rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-600" placeholder="https://drive.google.com/..." required />
+                <p className="text-[10px] text-slate-400 mt-2 font-medium bg-slate-100 p-2 rounded-lg">⚠️ Assurez-vous que le lien est réglé sur "Tous les utilisateurs disposant du lien peuvent lire" dans Google Drive.</p>
               </div>
 
               <div className="pt-4 flex justify-end gap-3 mt-6">
                 <button type="button" onClick={() => setModal({ isOpen: false, type: '' })} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100">Annuler</button>
-                <button type="submit" className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700">Enregistrer</button>
+                <button type="submit" className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md">Enregistrer le lien</button>
               </div>
             </form>
           </div>
@@ -462,54 +462,57 @@ const VieEcole = ({ utilisateurConnecte }) => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        {/* --- DOCUMENTS (LIENS) --- */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
            <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><FileText className="text-blue-500" size={20} /> Lettres aux parents</h3>
              {isAdmin && (
-               <button onClick={() => openAddModal('document')} className="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors">
-                 + Ajouter un lien
+               <button onClick={() => openAddModal('document')} className="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors shadow-sm">
+                 + Ajouter un lien PDF
                </button>
              )}
            </div>
            <div className="space-y-3">
              {documents.map(doc => (
                <div key={doc.id} className="flex justify-between items-center p-3 hover:bg-slate-50 rounded-xl border border-slate-100 transition-colors group">
-                 <a href={doc.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 flex-1">
-                   <div className="bg-blue-100 text-blue-600 p-2 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors"><FileText size={16} /></div>
+                 <a href={doc.url} target="_blank" rel="noreferrer" className="flex items-center gap-4 flex-1">
+                   <div className="bg-blue-100 text-blue-600 p-3 rounded-xl shadow-sm group-hover:bg-blue-600 group-hover:text-white transition-colors"><FileText size={20} /></div>
                    <div>
-                     <p className="font-bold text-sm text-slate-700">{doc.titre}</p>
-                     <p className="text-[10px] text-slate-400">{doc.description}</p>
+                     <p className="font-bold text-sm text-slate-700 group-hover:text-blue-700 transition-colors">{doc.titre}</p>
+                     <p className="text-[10px] text-slate-400 mt-0.5">{doc.description || "Cliquez pour ouvrir dans Google Drive"}</p>
                    </div>
                  </a>
-                 {isAdmin ? (
+                 {isAdmin && (
                    <button onClick={() => handleDelete('documents_ecole', doc.id)} className="text-slate-300 hover:text-rose-500 p-2"><Trash2 size={16}/></button>
-                 ) : (
-                   <a href={doc.url} target="_blank" rel="noreferrer"><Download size={16} className="text-slate-400 hover:text-indigo-600" /></a>
                  )}
                </div>
              ))}
-             {documents.length === 0 && <p className="text-xs text-slate-400 italic text-center">Aucun document disponible.</p>}
+             {documents.length === 0 && <p className="text-xs text-slate-400 italic text-center py-4">Aucun lien de document publié.</p>}
            </div>
         </div>
 
+        {/* --- GALERIE PHOTOS (LIENS ALBUMS) --- */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
            <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Camera className="text-emerald-500" size={20} /> Galerie Photos</h3>
              {isAdmin && (
-               <button onClick={() => openAddModal('photo')} className="bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-100 transition-colors">
+               <button onClick={() => openAddModal('photo')} className="bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-100 transition-colors shadow-sm">
                  + Lier un album
                </button>
              )}
            </div>
            <div className="grid grid-cols-2 gap-3">
              {photos.map(photo => (
-               <div key={photo.id} className="relative group rounded-xl overflow-hidden border border-slate-200 aspect-video bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors">
-                 <a href={photo.url} target="_blank" rel="noreferrer" className="absolute inset-0 flex flex-col items-center justify-center p-2 text-center text-slate-600 hover:text-indigo-600">
-                   <Camera size={24} className="mb-2 opacity-50" />
-                   <span className="text-xs font-bold">{photo.titre}</span>
+               <div key={photo.id} className="relative group rounded-xl border border-slate-200 aspect-video bg-emerald-50 flex items-center justify-center hover:bg-emerald-100 transition-colors shadow-sm">
+                 <a href={photo.url} target="_blank" rel="noreferrer" className="flex flex-col items-center justify-center p-3 text-center w-full h-full cursor-pointer">
+                   <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm mb-2 text-emerald-500 group-hover:scale-110 transition-transform">
+                     <Camera size={20} />
+                   </div>
+                   <span className="text-xs font-bold text-emerald-900 truncate w-full px-2">{photo.titre}</span>
                  </a>
                  {isAdmin && (
-                   <button onClick={() => handleDelete('galerie_photos', photo.id)} className="absolute top-1 right-1 bg-white text-rose-500 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 shadow-sm z-10 hover:bg-rose-50">
+                   <button onClick={() => handleDelete('galerie_photos', photo.id)} className="absolute top-2 right-2 bg-white text-rose-500 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 shadow-sm z-20 hover:bg-rose-50">
                      <Trash2 size={14}/>
                    </button>
                  )}
@@ -518,6 +521,7 @@ const VieEcole = ({ utilisateurConnecte }) => {
              {photos.length === 0 && <div className="col-span-2 text-xs text-slate-400 italic text-center py-6">Aucun album lié.</div>}
            </div>
         </div>
+
       </div>
     </div>
   );
