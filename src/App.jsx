@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore, collection, doc, deleteDoc, onSnapshot, addDoc, updateDoc, query, where, getDocs } from "firebase/firestore";
+import { getFirestore, collection, doc, deleteDoc, onSnapshot, addDoc, updateDoc, query, where, getDocs, setDoc } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import * as XLSX from 'xlsx';
 
@@ -155,7 +155,7 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
   const [modal, setModal] = useState({ isOpen: false, type: '', payload: null });
   const [formValue, setFormValue] = useState({});
 
-  useEffect(() => {
+useEffect(() => {
     // Écoute des dons pour la jauge
     const qDons = collection(db, 'artifacts', appId, 'public', 'data', 'dons');
     const unsubDons = onSnapshot(qDons, (snapshot) => {
@@ -164,8 +164,8 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
       setDons(liste);
     });
 
-    // Écoute des paramètres de l'accueil
-    const unsubParams = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'accueil_config'), (docSnap) => {
+    // Écoute des paramètres de l'accueil (Chemin Firebase RÉPARÉ)
+    const unsubParams = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'accueil'), (docSnap) => {
       if (docSnap.exists()) {
         setParametres(docSnap.data());
       }
@@ -186,7 +186,7 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
     setModal({ isOpen: true, type });
   };
 
-  // Sauvegarde depuis le Pop-up vers Firebase
+  // Sauvegarde depuis le Pop-up vers Firebase (RÉPARÉ)
   const handleSave = async (e) => {
     e.preventDefault();
     let newData = { ...parametres };
@@ -200,11 +200,10 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
     }
 
     try {
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accueil_config'), newData);
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'accueil'), newData);
       setModal({ isOpen: false, type: '', payload: null });
     } catch (err) {
-      // Création du document s'il n'existe pas encore
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'accueil_config'), newData);
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'accueil'), newData);
       setModal({ isOpen: false, type: '', payload: null });
     }
   };
@@ -2252,7 +2251,7 @@ useEffect(() => {
           {/* TAB FAMILLE */}
           {activeTab === 'famille' && (
             <div className="animate-in fade-in duration-300 max-w-3xl mx-auto pb-12">
-              {utilisateurConnecte === 'admin' && (
+              {utilisateurConnecte?.role === 'admin' && (
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mb-6 flex flex-col items-center print:hidden">
                   <label className="font-bold text-slate-700 mb-3 text-lg">Rechercher le planning d'une famille ou maîtresse :</label>
                   <div className="relative w-full max-w-md">
@@ -7021,7 +7020,7 @@ export default function App() {
             </a>
           </div>
 
-{utilisateurConnecte === 'admin' && (
+{utilisateurConnecte?.role === 'admin' && (
             <>
               <div className="mb-6">
                 <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Pilotage</h3>
