@@ -8,7 +8,7 @@ import {
   Globe, Mail, Phone, PlusCircle, Edit2, Send, Clock, Hammer, Menu,
   Megaphone, Bell, Newspaper, Camera, MessageCircle,
   Utensils, BarChart3, AlertCircle, Printer, CalendarDays,
-  ChevronLeft, UploadCloud, Baby, LogOut, Eye, EyeOff
+  ChevronLeft, UploadCloud, Baby, LogOut, Eye, EyeOff, Globe, CheckCircle2
 } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
