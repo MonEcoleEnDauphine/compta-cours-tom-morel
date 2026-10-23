@@ -37,7 +37,7 @@ const db = getFirestore(app);
 const storage = getStorage(app);
 const appId = "cours-tom-morel-erp";
 
- ÉCRAN DE CONNEXION (SAS DE SÉCURITÉ) ---
+// --- MODULE : ÉCRAN DE CONNEXION (SAS DE SÉCURITÉ) ---
 const EcranConnexion = ({ onLogin }) => {
   const [id, setId] = useState('');
   const [mdp, setMdp] = useState('');
