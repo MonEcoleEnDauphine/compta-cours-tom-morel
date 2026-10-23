@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore, collection, doc, deleteDoc, onSnapshot, addDoc, updateDoc } from "firebase/firestore";
+import { getFirestore, collection, doc, deleteDoc, onSnapshot, addDoc, updateDoc, query, where, getDocs } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import * as XLSX from 'xlsx';
 
@@ -43,26 +43,32 @@ const EcranConnexion = ({ onLogin }) => {
   const [mdp, setMdp] = useState('');
   const [erreur, setErreur] = useState('');
 
-  const gererConnexion = (e) => {
+  const gererConnexion = async (e) => {
     e.preventDefault();
-    
-    // On met l'identifiant en majuscules pour éviter les erreurs de saisie
     const idSaisi = id.trim().toUpperCase();
 
-    // Test Compte ADMIN
     if (idSaisi === 'ADMIN' && mdp === 'admin') {
-      onLogin('admin');
-    } 
-    // Test Compte FAMILLE SPÉCIFIQUE (BEZIAT-MENUT)
-    else if (idSaisi === 'BEZIAT-MENUT' && mdp === 'beziat2026') {
-      // On transmet l'identité exacte pour pouvoir filtrer ses données plus tard
-      onLogin('BEZIAT-MENUT');
-    } 
-    else {
-      setErreur('Identifiant ou mot de passe incorrect.');
+      return onLogin({ identifiant: 'ADMIN', role: 'admin', modulesAutorises: ['all'] });
+    }
+
+    try {
+      const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'utilisateurs'), 
+        where('identifiant', '==', idSaisi), 
+        where('mdp', '==', mdp)
+      );
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        const userData = querySnapshot.docs[0].data();
+        onLogin(userData);
+      } else {
+        setErreur('Identifiant ou mot de passe incorrect.');
+      }
+    } catch (err) {
+      setErreur('Erreur de connexion à la base de données.');
     }
   };
-
+  
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col justify-center items-center p-4 font-sans relative overflow-hidden">
       {/* Design d'arrière-plan */}
@@ -1136,16 +1142,11 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
   const [quickFilterFamily, setQuickFilterFamily] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
 
-  useEffect(() => {
-    if (utilisateurConnecte && utilisateurConnecte !== 'admin') {
-      const famId = [
-        "BOCCA", "CHOMEL", "CORNET-BOUBE", "DE LASTIC ST JAL", "DE SERRES", "FIARD", 
-        "GREPAT", "MELLIES", "RIOBÉ", "TAISSIDRE-CARVALHO", "BEZIAT-MENUT", 
-        "DE MALAUSSENE", "FAUVAIN", "LE LÉZEC", "DE PONTE", "DURAND", "ESCOBAR", 
-        "DE LA CHARRIE", "PILON", "SHAW"
-      ].find(id => utilisateurConnecte.includes(id));
-      if (famId) {
-        setSelectedFamilyFilter(famId);
+useEffect(() => {
+    // Si ce n'est pas un admin, on bloque le planning sur SON nom de famille
+    if (utilisateurConnecte && utilisateurConnecte.role !== 'admin') {
+      if (utilisateurConnecte.familleId) {
+        setSelectedFamilyFilter(utilisateurConnecte.familleId);
       }
     }
   }, [utilisateurConnecte]);
@@ -1972,7 +1973,7 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
           <button onClick={() => setActiveTab('calendrier')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'calendrier' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><CalendarDays size={16} /> Calendrier</button>
           <button onClick={() => setActiveTab('famille')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'famille' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Search size={16} /> Mon Planning</button>
           
-          {utilisateurConnecte === 'admin' && (
+          {utilisateurConnecte?.role === 'admin' && (
             <>
               <button onClick={() => setActiveTab('stats')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'stats' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><BarChart3 size={16} /> Statistiques</button>
               <button onClick={() => setActiveTab('regles')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'regles' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Info size={16} /> Règles</button>
@@ -6707,6 +6708,87 @@ const GestionEvenements = ({ transactionsGlobales }) => {
   );
 };
 
+const ModuleGestionAcces = () => {
+  const [utilisateurs, setUtilisateurs] = useState([]);
+  const [form, setForm] = useState({ identifiant: '', mdp: '', role: 'famille', familleId: '', modules: ['accueil_famille'] });
+
+  useEffect(() => {
+    const q = collection(db, 'artifacts', appId, 'public', 'data', 'utilisateurs');
+    const unsub = onSnapshot(q, (snapshot) => {
+      const liste = [];
+      snapshot.forEach(doc => liste.push({ id: doc.id, ...doc.data() }));
+      setUtilisateurs(liste);
+    });
+    return () => unsub();
+  }, []);
+
+  const handleModuleToggle = (mod) => {
+    setForm(prev => ({
+      ...prev,
+      modules: prev.modules.includes(mod) ? prev.modules.filter(m => m !== mod) : [...prev.modules, mod]
+    }));
+  };
+
+  const handleCreateUser = async (e) => {
+    e.preventDefault();
+    try {
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'utilisateurs'), {
+        identifiant: form.identifiant.toUpperCase().trim(),
+        mdp: form.mdp,
+        role: form.role,
+        familleId: form.familleId.toUpperCase().trim(),
+        modulesAutorises: form.modules
+      });
+      alert("Accès créé !");
+      setForm({ identifiant: '', mdp: '', role: 'famille', familleId: '', modules: ['accueil_famille'] });
+    } catch (e) {
+      alert("Erreur de création.");
+    }
+  };
+
+  return (
+    <div className="max-w-5xl mx-auto space-y-6 animate-fade-in pb-10">
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mt-6">
+        <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2 mb-6"><Lock className="text-indigo-600"/> Gestion des Accès & Permissions</h2>
+        
+        <form onSubmit={handleCreateUser} className="bg-slate-50 p-6 rounded-xl border border-slate-200 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div><label className="block text-xs font-bold mb-1">Identifiant de connexion</label><input type="text" required value={form.identifiant} onChange={e => setForm({...form, identifiant: e.target.value})} className="w-full p-2 border rounded-lg" /></div>
+            <div><label className="block text-xs font-bold mb-1">Mot de passe provisoire</label><input type="text" required value={form.mdp} onChange={e => setForm({...form, mdp: e.target.value})} className="w-full p-2 border rounded-lg" /></div>
+            <div><label className="block text-xs font-bold mb-1">Rôle</label><select value={form.role} onChange={e => setForm({...form, role: e.target.value})} className="w-full p-2 border rounded-lg"><option value="famille">Famille</option><option value="admin">Administrateur</option></select></div>
+            <div><label className="block text-xs font-bold mb-1">Lier à la famille (Planning)</label><input type="text" value={form.familleId} onChange={e => setForm({...form, familleId: e.target.value})} placeholder="Ex: BEZIAT-MENUT" className="w-full p-2 border rounded-lg" /></div>
+          </div>
+          
+          <div>
+            <label className="block text-xs font-bold mb-2">Modules autorisés pour cet utilisateur</label>
+            <div className="flex flex-wrap gap-2">
+              {['accueil_famille', 'vie_ecole', 'inscriptions', 'plannings', 'factures_parents'].map(mod => (
+                <label key={mod} className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border cursor-pointer">
+                  <input type="checkbox" checked={form.modules.includes(mod)} onChange={() => handleModuleToggle(mod)} />
+                  <span className="text-sm font-semibold">{mod}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <button type="submit" className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold">Créer l'utilisateur</button>
+        </form>
+
+        <div className="mt-8">
+          <h3 className="font-bold mb-3">Comptes existants</h3>
+          <ul className="space-y-2">
+            {utilisateurs.map(u => (
+              <li key={u.id} className="bg-white border p-3 rounded-lg flex justify-between text-sm">
+                <span><strong>{u.identifiant}</strong> ({u.role}) - Lié à: {u.familleId || 'Aucun'}</span>
+                <span className="text-slate-400 text-xs">{u.modulesAutorises?.join(', ')}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function App() {
   // 1. VARIABLES (Doivent être tout en haut)
   const [utilisateurConnecte, setUtilisateurConnecte] = useState(null);
@@ -6772,6 +6854,7 @@ export default function App() {
       case 'dossiers_facturation': return <PlaceholderPage title="Dossiers & Facturation" />;
       case 'equipe_contrats': return <PlaceholderPage title="Équipe et Contrats" />;
       case 'uniformes_stock': return <PlaceholderPage title="Uniformes & Stock" />;
+      case 'gestion_acces': return <ModuleGestionAcces/>;
       default: return <PlaceholderPage title="Module en construction" />;
     }
   };
