@@ -1463,11 +1463,16 @@ const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
   const [quickFilterFamily, setQuickFilterFamily] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
 
-useEffect(() => {
-    // Si ce n'est pas un admin, on bloque le planning sur SON nom de famille
-    if (utilisateurConnecte && utilisateurConnecte.role !== 'admin') {
-      if (utilisateurConnecte.familleId) {
-        setSelectedFamilyFilter(utilisateurConnecte.familleId);
+  useEffect(() => {
+    if (utilisateurConnecte && utilisateurConnecte !== 'admin') {
+      const famId = [
+        "BOCCA", "CHOMEL", "CORNET-BOUBE", "DE LASTIC ST JAL", "DE SERRES", "FIARD", 
+        "GREPAT", "MELLIES", "RIOBÉ", "TAISSIDRE-CARVALHO", "BEZIAT-MENUT", 
+        "DE MALAUSSENE", "FAUVAIN", "LE LÉZEC", "DE PONTE", "DURAND", "ESCOBAR", 
+        "DE LA CHARRIE", "PILON", "SHAW"
+      ].find(id => utilisateurConnecte.includes(id));
+      if (famId) {
+        setSelectedFamilyFilter(famId);
       }
     }
   }, [utilisateurConnecte]);
@@ -1538,7 +1543,7 @@ useEffect(() => {
       return !fam.days.includes(dOw);
     };
 
-    // --- INTEGRATION STRICTE DES FICHIERS HISTORIQUES (Septembre -> Toussaint) ---
+    // --- INTEGRATION STRICTE DES FICHIERS HISTORIQUES ---
     const historicalCantine = [
       { date: '2026-09-03', p1: 'BOCCA', p2: 'TAISSIDRE-CARVALHO', repasType: 'Filles / Garçons' },
       { date: '2026-09-04', p1: 'RIOBÉ', p2: 'BEZIAT-MENUT', repasType: 'Par cordée' },
@@ -1701,11 +1706,28 @@ useEffect(() => {
         if (requiredParents > 0) {
           for (let i = assigned.length; i < requiredParents; i++) {
             let available = famsData.filter(f => {
-              if (assigned.includes(f.id)) return false;
-              if (dateStr < "2026-11-02" && f.type === "Nouveau SP") return false;
+              // RÈGLE 1 : DISPENSE NAISSANCE (DE LASTIC ST JAL du 01/02 au 15/04)
+              if (f.id === "DE LASTIC ST JAL" && dateStr >= "2027-02-01" && dateStr <= "2027-04-15") return false;
+
+              // RÈGLE 3 : DUO LE LÉZEC (Maman/Papa) sur Lundi (1) ou Vendredi (5)
+              if (assigned.includes(f.id)) {
+                if (f.id === "LE LÉZEC" && [1, 5].includes(dayOfWeek) && assigned.length === 1 && assigned[0] === "LE LÉZEC") {
+                   // Autorisé pour le duo
+                } else {
+                   return false;
+                }
+              }
 
               let hasDay = f.days.includes(dayOfWeek);
               if (!hasDay) return false;
+
+              // RÈGLE 2 : Séparation des "Nouveau SP" à la cantine (pas 2 Nouveau SP ensemble)
+              if (i === 1 && assigned.length === 1) {
+                const firstFam = famsData.find(family => family.id === assigned[0]);
+                if (firstFam && firstFam.type === "Nouveau SP" && f.type === "Nouveau SP") {
+                   return false;
+                }
+              }
 
               if (f.type.startsWith("Nouveau") && statsObj[f.id].lastCantine) {
                 let lastD = new Date(statsObj[f.id].lastCantine + "T12:00:00");
@@ -1727,8 +1749,13 @@ useEffect(() => {
             });
 
             if (available.length > 0) {
-              assigned.push(available[0].id);
-              statsObj[available[0].id].cantine++; statsObj[available[0].id].periodCantine++; statsObj[available[0].id].total++; statsObj[available[0].id].lastCantine = dateStr;
+              const chosenId = available[0].id;
+              assigned.push(chosenId);
+              // RÈGLE 3 : On compte 1 service par apparition
+              statsObj[chosenId].cantine++; 
+              statsObj[chosenId].periodCantine++; 
+              statsObj[chosenId].total++; 
+              statsObj[chosenId].lastCantine = dateStr;
             } else {
               let fallback = famsData.filter(f => !assigned.includes(f.id)).sort((a, b) => {
                  let pDiff = statsObj[a.id].periodCantine - statsObj[b.id].periodCantine;
@@ -1736,8 +1763,9 @@ useEffect(() => {
                  return statsObj[a.id].total - statsObj[b.id].total;
               });
               if (fallback.length > 0) {
-                assigned.push(fallback[0].id);
-                statsObj[fallback[0].id].cantine++; statsObj[fallback[0].id].periodCantine++; statsObj[fallback[0].id].total++; statsObj[fallback[0].id].lastCantine = dateStr;
+                const chosenId = fallback[0].id;
+                assigned.push(chosenId);
+                statsObj[chosenId].cantine++; statsObj[chosenId].periodCantine++; statsObj[chosenId].total++; statsObj[chosenId].lastCantine = dateStr;
                 forcedError = true;
               }
             }
@@ -1768,7 +1796,11 @@ useEffect(() => {
         }
 
         if (isHolidayStart) {
-          let eligibleAsso = famsData.filter(f => f.isAsso);
+          let eligibleAsso = famsData.filter(f => {
+            // RÈGLE 1 : DISPENSE NAISSANCE (DE LASTIC ST JAL du 01/02 au 15/04)
+            if (f.id === "DE LASTIC ST JAL" && nextSatStr >= "2027-02-01" && nextSatStr <= "2027-04-15") return false;
+            return f.isAsso;
+          });
           
           eligibleAsso.sort((a, b) => {
             let scoreA = statsObj[a.id].menage - (a.id === "LE LÉZEC" ? 1 : 0);
@@ -1783,7 +1815,11 @@ useEffect(() => {
             menageArr.push({ date: getDateStr(vacDate), period: activeP.id, familyId: chosen, isVacances: true, label: holidayName });
           }
         } else {
-          let candidates = famsData.filter(f => f);
+          let candidates = famsData.filter(f => {
+            // RÈGLE 1 : DISPENSE NAISSANCE
+            if (f.id === "DE LASTIC ST JAL" && nextSatStr >= "2027-02-01" && nextSatStr <= "2027-04-15") return false;
+            return true;
+          });
           
           // BLOCAGE CHOMEL ET DURAND : 1 seul ménage max sur l'année
           candidates = candidates.filter(f => {
@@ -1798,7 +1834,6 @@ useEffect(() => {
           });
           if(withCooldown.length > 0) candidates = withCooldown;
           
-          // TRI MÉNAGE : LE LÉZEC et SHAW ont un malus virtuel de -1 pour les forcer à être choisis plus souvent
           candidates.sort((a, b) => {
             let scoreA = statsObj[a.id].menage - (a.id === "LE LÉZEC" ? 1 : 0) - (a.id === "SHAW" ? 1 : 0);
             let scoreB = statsObj[b.id].menage - (b.id === "LE LÉZEC" ? 1 : 0) - (b.id === "SHAW" ? 1 : 0);
@@ -2294,7 +2329,7 @@ useEffect(() => {
           <button onClick={() => setActiveTab('calendrier')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'calendrier' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><CalendarDays size={16} /> Calendrier</button>
           <button onClick={() => setActiveTab('famille')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'famille' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Search size={16} /> Mon Planning</button>
           
-          {utilisateurConnecte?.role === 'admin' && (
+          {utilisateurConnecte === 'admin' && (
             <>
               <button onClick={() => setActiveTab('stats')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'stats' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><BarChart3 size={16} /> Statistiques</button>
               <button onClick={() => setActiveTab('regles')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'regles' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Info size={16} /> Règles</button>
@@ -2475,7 +2510,7 @@ useEffect(() => {
           {/* TAB FAMILLE */}
           {activeTab === 'famille' && (
             <div className="animate-in fade-in duration-300 max-w-3xl mx-auto pb-12">
-              {utilisateurConnecte?.role === 'admin' && (
+              {utilisateurConnecte === 'admin' && (
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mb-6 flex flex-col items-center print:hidden">
                   <label className="font-bold text-slate-700 mb-3 text-lg">Rechercher le planning d'une famille ou maîtresse :</label>
                   <div className="relative w-full max-w-md">
@@ -2510,26 +2545,19 @@ useEffect(() => {
                   </ul>
               </div>
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                  <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><Users className="text-slate-400" size={18}/> Période d'intégration</h3>
+                  <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><Users className="text-slate-400" size={18}/> Période d'intégration & Règles Particulières</h3>
                   <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
-                      <li><strong>Nouvelles Familles SP (Toussaint) :</strong> Intégration à partir du 02 Novembre avec un coefficient virtuel sur la totalité (Cantines + Ménages) pour garantir une répartition lissée sur l'année sans s'accaparer les tâches.</li>
+                      <li><strong>Nouvelles Familles SP (Toussaint) :</strong> Intégration à partir du 02 Novembre avec un coefficient virtuel pour lisser la présence. Jamais 2 familles "Nouveau SP" en duo à la cantine.</li>
+                      <li><strong>DE LASTIC ST JAL (Dispense Naissance) :</strong> Aucune cantine ni ménage attribués entre le 1er Février et le 15 Avril 2027.</li>
+                      <li><strong>LE LÉZEC (Duo Papa/Maman) :</strong> Autorisation d'occuper les 2 postes de cantine le lundi ou le vendredi (comptabilisé comme 2 services réels).</li>
                       <li><strong>Équilibrage Intra-période :</strong> La priorité d'affectation prend d'abord en compte le nombre de cantines effectuées dans la période en cours avant de regarder le total annuel.</li>
-                      <li><strong>Historique préservé :</strong> L'algorithme a injecté en dur les données de vos tableaux de Septembre à Octobre pour s'y tenir strictement.</li>
                   </ul>
               </div>
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                  <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><AlertCircle className="text-slate-400" size={18}/> Cas Particuliers Strictes</h3>
+                  <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><AlertCircle className="text-slate-400" size={18}/> Cas Particuliers Ménage</h3>
                   <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
                       <li><strong>CHOMEL & DURAND :</strong> Limités manuellement à 1 seul ménage sur l'année. Les cantines sont rééquilibrées automatiquement.</li>
                       <li><strong>LE LÉZEC & SHAW :</strong> Un ménage supplémentaire forcé. Leurs cantines sont réduites en conséquence.</li>
-                  </ul>
-              </div>
-              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                  <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><Sparkles className="text-slate-400" size={18}/> Ménage et Équité</h3>
-                  <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
-                      <li>Un ménage est planifié chaque week-end de période scolaire.</li>
-                      <li><strong>Tri Strict :</strong> La répartition du week-end est basée <em>exclusivement</em> sur le nombre de ménages déjà effectués, pour assurer une égalité parfaite (sauf exceptions listées ci-dessus).</li>
-                      <li>Les 5 ménages des vacances sont réservés aux membres de l'association.</li>
                   </ul>
               </div>
             </div>
