@@ -6805,9 +6805,17 @@ const GestionEvenements = ({ transactionsGlobales }) => {
   );
 };
 
+// --- MODULE : GESTION DES ACCÈS ---
 const ModuleGestionAcces = () => {
   const [utilisateurs, setUtilisateurs] = useState([]);
   const [form, setForm] = useState({ identifiant: '', mdp: '', role: 'famille', familleId: '', modules: ['accueil_famille'] });
+
+  const CATEGORIES = {
+    "Espace Famille": ['accueil_famille', 'vie_ecole', 'scolarite', 'factures_parents', 'plannings', 'fiche_travaux', 'inscriptions', 'contact'],
+    "Pilotage": ['tableau_bord', 'etat_financier'],
+    "Compta & Finances": ['grand_livre', 'plan_comptable', 'budget', 'notes_frais', 'dons_recus', 'evenements'],
+    "Administration": ['gestion_acces', 'dossiers_facturation', 'equipe_contrats', 'uniformes_stock']
+  };
 
   useEffect(() => {
     const q = collection(db, 'artifacts', appId, 'public', 'data', 'utilisateurs');
@@ -6826,6 +6834,20 @@ const ModuleGestionAcces = () => {
     }));
   };
 
+  const handleCategoryToggle = (category) => {
+    const catModules = CATEGORIES[category];
+    const allChecked = catModules.every(m => form.modules.includes(m));
+    setForm(prev => {
+      let newModules = [...prev.modules];
+      if (allChecked) {
+        newModules = newModules.filter(m => !catModules.includes(m));
+      } else {
+        catModules.forEach(m => { if (!newModules.includes(m)) newModules.push(m); });
+      }
+      return { ...prev, modules: newModules };
+    });
+  };
+
   const handleCreateUser = async (e) => {
     e.preventDefault();
     try {
@@ -6836,7 +6858,7 @@ const ModuleGestionAcces = () => {
         familleId: form.familleId.toUpperCase().trim(),
         modulesAutorises: form.modules
       });
-      alert("Accès créé !");
+      alert("Accès créé avec succès !");
       setForm({ identifiant: '', mdp: '', role: 'famille', familleId: '', modules: ['accueil_famille'] });
     } catch (e) {
       alert("Erreur de création.");
@@ -6844,42 +6866,57 @@ const ModuleGestionAcces = () => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 animate-fade-in pb-10">
+    <div className="max-w-6xl mx-auto space-y-6 animate-fade-in pb-10">
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mt-6">
         <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2 mb-6"><Lock className="text-indigo-600"/> Gestion des Accès & Permissions</h2>
         
-        <form onSubmit={handleCreateUser} className="bg-slate-50 p-6 rounded-xl border border-slate-200 space-y-4">
+        <form onSubmit={handleCreateUser} className="bg-slate-50 p-6 rounded-xl border border-slate-200 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div><label className="block text-xs font-bold mb-1">Identifiant de connexion</label><input type="text" required value={form.identifiant} onChange={e => setForm({...form, identifiant: e.target.value})} className="w-full p-2 border rounded-lg" /></div>
-            <div><label className="block text-xs font-bold mb-1">Mot de passe provisoire</label><input type="text" required value={form.mdp} onChange={e => setForm({...form, mdp: e.target.value})} className="w-full p-2 border rounded-lg" /></div>
-            <div><label className="block text-xs font-bold mb-1">Rôle</label><select value={form.role} onChange={e => setForm({...form, role: e.target.value})} className="w-full p-2 border rounded-lg"><option value="famille">Famille</option><option value="admin">Administrateur</option></select></div>
-            <div><label className="block text-xs font-bold mb-1">Lier à la famille (Planning)</label><input type="text" value={form.familleId} onChange={e => setForm({...form, familleId: e.target.value})} placeholder="Ex: BEZIAT-MENUT" className="w-full p-2 border rounded-lg" /></div>
+            <div><label className="block text-xs font-bold mb-1">Identifiant de connexion</label><input type="text" required value={form.identifiant} onChange={e => setForm({...form, identifiant: e.target.value})} className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" /></div>
+            <div><label className="block text-xs font-bold mb-1">Mot de passe provisoire</label><input type="text" required value={form.mdp} onChange={e => setForm({...form, mdp: e.target.value})} className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" /></div>
+            <div><label className="block text-xs font-bold mb-1">Rôle Global</label><select value={form.role} onChange={e => setForm({...form, role: e.target.value})} className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-white"><option value="famille">Famille / Bureau</option><option value="admin">Administrateur Total</option></select></div>
+            <div><label className="block text-xs font-bold mb-1">Lier à la famille (Planning)</label><input type="text" value={form.familleId} onChange={e => setForm({...form, familleId: e.target.value})} placeholder="Ex: BEZIAT-MENUT" className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" /></div>
           </div>
           
-          <div>
-            <label className="block text-xs font-bold mb-2">Modules autorisés pour cet utilisateur</label>
-            <div className="flex flex-wrap gap-2">
-              {['accueil_famille', 'vie_ecole', 'inscriptions', 'plannings', 'factures_parents'].map(mod => (
-                <label key={mod} className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border cursor-pointer">
-                  <input type="checkbox" checked={form.modules.includes(mod)} onChange={() => handleModuleToggle(mod)} />
-                  <span className="text-sm font-semibold">{mod}</span>
-                </label>
+          <div className="border-t border-slate-200 pt-4">
+            <label className="block text-sm font-black text-slate-800 mb-4">Autorisations détaillées (Cochez les modules accessibles)</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {Object.entries(CATEGORIES).map(([catName, modules]) => (
+                <div key={catName} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-2 mb-3">
+                    <h4 className="font-bold text-xs uppercase text-slate-500">{catName}</h4>
+                    <button type="button" onClick={() => handleCategoryToggle(catName)} className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded font-bold hover:bg-slate-200 transition-colors">Tout cocher</button>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {modules.map(mod => (
+                      <label key={mod} className="flex items-center gap-2 cursor-pointer group">
+                        <input type="checkbox" checked={form.modules.includes(mod)} onChange={() => handleModuleToggle(mod)} className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500" />
+                        <span className="text-xs font-semibold text-slate-700 group-hover:text-indigo-600 transition-colors">{mod}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           </div>
-          <button type="submit" className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold">Créer l'utilisateur</button>
+          <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 transition-colors text-white px-8 py-3 rounded-xl font-bold shadow-md">Créer l'utilisateur</button>
         </form>
 
         <div className="mt-8">
-          <h3 className="font-bold mb-3">Comptes existants</h3>
-          <ul className="space-y-2">
+          <h3 className="font-bold text-slate-800 mb-4">Comptes existants</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {utilisateurs.map(u => (
-              <li key={u.id} className="bg-white border p-3 rounded-lg flex justify-between text-sm">
-                <span><strong>{u.identifiant}</strong> ({u.role}) - Lié à: {u.familleId || 'Aucun'}</span>
-                <span className="text-slate-400 text-xs">{u.modulesAutorises?.join(', ')}</span>
-              </li>
+              <div key={u.id} className="bg-white border border-slate-200 p-4 rounded-xl flex flex-col justify-between shadow-sm">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="font-black text-slate-800">{u.identifiant} <span className="text-[10px] font-bold uppercase ml-2 bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-100">{u.role}</span></span>
+                  <span className="text-xs font-semibold text-slate-500">Lié: {u.familleId || 'Aucun'}</span>
+                </div>
+                <div className="text-[10px] text-slate-500 leading-relaxed font-mono bg-slate-50 p-2 rounded-lg border border-slate-100 mt-2">
+                  {u.role === 'admin' ? 'Accès illimité à tous les modules' : u.modulesAutorises?.join(' • ')}
+                </div>
+              </div>
             ))}
-          </ul>
+          </div>
         </div>
       </div>
     </div>
@@ -6982,115 +7019,67 @@ export default function App() {
         </div>
 
         {/* --- NAVIGATION PRINCIPALE --- */}
+
         <nav className="flex-1 overflow-y-auto py-4 px-3 custom-scrollbar">
-          
           {(() => {
             const hasAccess = (moduleName) => {
               if (utilisateurConnecte?.role === 'admin') return true;
               return utilisateurConnecte?.modulesAutorises?.includes(moduleName);
             };
 
+            const hasAnyFamilyAccess = ['accueil_famille', 'vie_ecole', 'scolarite', 'factures_parents', 'plannings', 'fiche_travaux', 'inscriptions', 'contact'].some(hasAccess);
+            const hasAnyPilotageAccess = ['tableau_bord', 'etat_financier'].some(hasAccess);
+            const hasAnyComptaAccess = ['grand_livre', 'plan_comptable', 'budget', 'notes_frais', 'dons_recus', 'evenements'].some(hasAccess);
+            const hasAnyAdminAccess = ['gestion_acces', 'dossiers_facturation', 'equipe_contrats', 'uniformes_stock'].some(hasAccess);
+
             return (
               <>
-                <div className="mb-6">
-                  <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Espace Famille</h3>
-                  
-                  {hasAccess('accueil_famille') && (
-                    <a href="#accueil_famille" onClick={() => handleNavigation('accueil_famille')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'accueil_famille' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-                      <LayoutDashboard size={18} /> Accueil
-                    </a>
-                  )}
-                  {hasAccess('vie_ecole') && (
-                    <a href="#vie_ecole" onClick={() => handleNavigation('vie_ecole')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'vie_ecole' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-                      <Newspaper size={18} /> Vie de l'école
-                    </a>
-                  )}
-                  {hasAccess('scolarite') && (
-                    <a href="#scolarite" onClick={() => handleNavigation('scolarite')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'scolarite' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-                      <GraduationCap size={18} /> Scolarité
-                    </a>
-                  )}
-                  {hasAccess('factures_parents') && (
-                    <a href="#factures_parents" onClick={() => handleNavigation('factures_parents')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'factures_parents' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-                      <Receipt size={18} /> Mes Factures
-                    </a>
-                  )}
-                  {hasAccess('plannings') && (
-                    <a href="#plannings" onClick={() => handleNavigation('plannings')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'plannings' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-                      <Calendar size={18} /> Plannings Cantine & Ménage
-                    </a>
-                  )}
-                  {hasAccess('fiche_travaux') && (
-                    <a href="#fiche_travaux" onClick={() => handleNavigation('fiche_travaux')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'fiche_travaux' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-                      <Hammer size={18} /> Fiche Travaux
-                    </a>
-                  )}
-                  {hasAccess('inscriptions') && (
-                    <a href="#inscriptions" onClick={() => handleNavigation('inscriptions')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'inscriptions' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-                      <FileSignature size={18} /> Inscriptions
-                    </a>
-                  )}
-                  {hasAccess('contact') && (
-                    <a href="#contact" onClick={() => handleNavigation('contact')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'contact' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-                      <Info size={18} /> Infos & Contact
-                    </a>
-                  )}
-                </div>
+                {hasAnyFamilyAccess && (
+                  <div className="mb-6">
+                    <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Espace Famille</h3>
+                    {hasAccess('accueil_famille') && <a href="#accueil_famille" onClick={() => handleNavigation('accueil_famille')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'accueil_famille' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'} w-full`}><LayoutDashboard size={18} /> Accueil</a>}
+                    {hasAccess('vie_ecole') && <a href="#vie_ecole" onClick={() => handleNavigation('vie_ecole')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'vie_ecole' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><Newspaper size={18} /> Vie de l'école</a>}
+                    {hasAccess('scolarite') && <a href="#scolarite" onClick={() => handleNavigation('scolarite')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'scolarite' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><GraduationCap size={18} /> Scolarité</a>}
+                    {hasAccess('factures_parents') && <a href="#factures_parents" onClick={() => handleNavigation('factures_parents')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'factures_parents' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><Receipt size={18} /> Mes Factures</a>}
+                    {hasAccess('plannings') && <a href="#plannings" onClick={() => handleNavigation('plannings')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'plannings' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><Calendar size={18} /> Plannings & Ménage</a>}
+                    {hasAccess('fiche_travaux') && <a href="#fiche_travaux" onClick={() => handleNavigation('fiche_travaux')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'fiche_travaux' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><Hammer size={18} /> Fiche Travaux</a>}
+                    {hasAccess('inscriptions') && <a href="#inscriptions" onClick={() => handleNavigation('inscriptions')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'inscriptions' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><FileSignature size={18} /> Inscriptions</a>}
+                    {hasAccess('contact') && <a href="#contact" onClick={() => handleNavigation('contact')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'contact' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><Info size={18} /> Infos & Contact</a>}
+                  </div>
+                )}
+
+                {hasAnyPilotageAccess && (
+                  <div className="mb-6">
+                    <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Pilotage</h3>
+                    {hasAccess('tableau_bord') && <a href="#tableau_bord" onClick={() => handleNavigation('tableau_bord')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'tableau_bord' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><LayoutDashboard size={18} /> Tableau de Bord</a>}
+                    {hasAccess('etat_financier') && <a href="#etat_financier" onClick={() => handleNavigation('etat_financier')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'etat_financier' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><PieChart size={18} /> État Financier</a>}
+                  </div>
+                )}
+
+                {hasAnyComptaAccess && (
+                  <div className="mb-6">
+                    <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Compta & Finances</h3>
+                    {hasAccess('grand_livre') && <a href="#grand_livre" onClick={() => handleNavigation('grand_livre')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'grand_livre' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><BookOpen size={18} /> Grand Livre</a>}
+                    {hasAccess('plan_comptable') && <a href="#plan_comptable" onClick={() => handleNavigation('plan_comptable')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'plan_comptable' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><FileSignature size={18} /> Plan Comptable</a>}
+                    {hasAccess('budget') && <a href="#budget" onClick={() => handleNavigation('budget')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'budget' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><Target size={18} /> Budget</a>}
+                    {hasAccess('notes_frais') && <a href="#notes_frais" onClick={() => handleNavigation('notes_frais')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'notes_frais' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><FileText size={18} /> Notes de Frais</a>}
+                    {hasAccess('dons_recus') && <a href="#dons_recus" onClick={() => handleNavigation('dons_recus')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'dons_recus' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><Heart size={18} /> Dons et reçus fiscaux</a>}
+                    {hasAccess('evenements') && <a href="#evenements" onClick={() => handleNavigation('evenements')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'evenements' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><Calendar size={18} /> Événements</a>}
+                  </div>
+                )}
+
+                {hasAnyAdminAccess && (
+                  <div className="mb-6">
+                    <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Administration</h3>
+                    {hasAccess('gestion_acces') && <a href="#gestion_acces" onClick={() => handleNavigation('gestion_acces')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'gestion_acces' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><Lock size={18} /> Gestion Accès</a>}
+                    {hasAccess('dossiers_facturation') && <a href="#dossiers_facturation" onClick={() => handleNavigation('dossiers_facturation')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'dossiers_facturation' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><FileSpreadsheet size={18} /> Dossiers & Facturation</a>}
+                    {hasAccess('equipe_contrats') && <a href="#equipe_contrats" onClick={() => handleNavigation('equipe_contrats')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'equipe_contrats' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><Users size={18} /> Équipe (Contrats)</a>}
+                    {hasAccess('uniformes_stock') && <a href="#uniformes_stock" onClick={() => handleNavigation('uniformes_stock')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'uniformes_stock' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><Package size={18} /> Uniformes & Stock</a>}
+                  </div>
+                )}
               </>
             );
           })()}
-
-          {utilisateurConnecte?.role === 'admin' && (
-            <>
-              <div className="mb-6">
-                <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Pilotage</h3>
-                <a href="#tableau_bord" onClick={() => handleNavigation('tableau_bord')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'tableau_bord' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-                  <LayoutDashboard size={18} /> Tableau de Bord
-                </a>
-                <a href="#etat_financier" onClick={() => handleNavigation('etat_financier')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'etat_financier' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-                  <PieChart size={18} /> État Financier
-                </a>
-              </div>
-
-              <div className="mb-6">
-                <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Compta & Finances</h3>
-                <a href="#grand_livre" onClick={() => handleNavigation('grand_livre')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'grand_livre' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-                  <BookOpen size={18} /> Grand Livre
-                </a>
-                <a href="#plan_comptable" onClick={() => handleNavigation('plan_comptable')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'plan_comptable' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-                  <FileSignature size={18} /> Plan Comptable
-                </a>
-                <a href="#budget" onClick={() => handleNavigation('budget')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'budget' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-                  <Target size={18} /> Budget
-                </a>
-                <a href="#notes_frais" onClick={() => handleNavigation('notes_frais')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'notes_frais' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-                  <FileText size={18} /> Notes de Frais
-                </a>
-                <a href="#dons_recus" onClick={() => handleNavigation('dons_recus')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'dons_recus' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-                  <Heart size={18} /> Dons et reçus fiscaux
-                </a>
-                <a href="#evenements" onClick={() => handleNavigation('evenements')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'evenements' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-                  <Calendar size={18} /> Événements
-                </a>
-              </div>
-
-              <div className="mb-6">
-                <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Administration</h3>
-                <a href="#gestion_acces" onClick={() => handleNavigation('gestion_acces')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'gestion_acces' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-                  <Lock size={18} /> Gestion Accès
-                </a>
-                <a href="#dossiers_facturation" onClick={() => handleNavigation('dossiers_facturation')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'dossiers_facturation' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-                  <FileSpreadsheet size={18} /> Dossiers & Facturation
-                </a>
-                <a href="#equipe_contrats" onClick={() => handleNavigation('equipe_contrats')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'equipe_contrats' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-                  <Users size={18} /> Équipe (Contrats)
-                </a>
-                <a href="#uniformes_stock" onClick={() => handleNavigation('uniformes_stock')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'uniformes_stock' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-                  <Package size={18} /> Uniformes & Stock
-                </a>
-              </div>
-            </>
-          )}
         </nav>
         
         {/* BOUTON DÉCONNEXION */}
