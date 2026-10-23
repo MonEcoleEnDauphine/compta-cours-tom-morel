@@ -138,40 +138,148 @@ const PlaceholderPage = ({ title }) => (
   </div>
 );
 
-// --- MODULE : ACCUEIL FAMILLE (Tableau de Bord Parents) ---
-const AccueilFamille = () => {
-  const [dons, setDons] = useState([]);
-  const budgetGoal = 58724; // L'objectif que vous aviez fixé
+// --- MODULE : ACCUEIL FAMILLE (Tableau de Bord Dynamique) ---
+const AccueilFamille = ({ utilisateurConnecte }) => {
+  const isAdmin = utilisateurConnecte?.role === 'admin';
 
-  // Récupération des dons en temps réel pour la jauge
+  // États des données (connectés à Firebase)
+  const [dons, setDons] = useState([]);
+  const [parametres, setParametres] = useState({ 
+    motEquipe: "Chers parents, nous sommes impatients de retrouver vos enfants. N'oubliez pas de vérifier vos plannings de ménage et de cantine dans le menu de gauche. Les fournitures scolaires ont été commandées.",
+    titreMot: "Préparation de la rentrée 2026/2027",
+    budgetGoal: 58724,
+    annee: "2025/2026"
+  });
+
+  // État du Pop-up "Fun" intégré
+  const [modal, setModal] = useState({ isOpen: false, type: '', payload: null });
+  const [formValue, setFormValue] = useState({});
+
   useEffect(() => {
-    const q = collection(db, 'artifacts', appId, 'public', 'data', 'dons');
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    // Écoute des dons pour la jauge
+    const qDons = collection(db, 'artifacts', appId, 'public', 'data', 'dons');
+    const unsubDons = onSnapshot(qDons, (snapshot) => {
       const liste = [];
       snapshot.forEach((doc) => { liste.push({ id: doc.id, ...doc.data() }); });
       setDons(liste);
     });
-    return () => unsubscribe();
+
+    // Écoute des paramètres de l'accueil
+    const unsubParams = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'accueil_config'), (docSnap) => {
+      if (docSnap.exists()) {
+        setParametres(docSnap.data());
+      }
+    });
+
+    return () => { unsubDons(); unsubParams(); };
   }, []);
 
-  // Calculs pour la jauge
   const totalDons = dons.reduce((acc, d) => acc + (Number(d.montant) || 0), 0);
-  const pctProgression = budgetGoal > 0 ? Math.min((totalDons / budgetGoal) * 100, 100).toFixed(2) : 0;
-  const resteCollecter = Math.max(0, budgetGoal - totalDons);
+  const pctProgression = parametres.budgetGoal > 0 ? Math.min((totalDons / parametres.budgetGoal) * 100, 100).toFixed(2) : 0;
+  const resteCollecter = Math.max(0, parametres.budgetGoal - totalDons);
   const formatMontant = (val) => new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val || 0);
 
-  // Données fictives (Trombinoscope)
+  // Ouverture du Pop-up stylisé
+  const openEditModal = (type) => {
+    if (type === 'mot') setFormValue({ titre: parametres.titreMot, contenu: parametres.motEquipe });
+    if (type === 'objectif') setFormValue({ budgetGoal: parametres.budgetGoal, annee: parametres.annee });
+    setModal({ isOpen: true, type });
+  };
+
+  // Sauvegarde depuis le Pop-up vers Firebase
+  const handleSave = async (e) => {
+    e.preventDefault();
+    let newData = { ...parametres };
+    
+    if (modal.type === 'mot') {
+      newData.titreMot = formValue.titre;
+      newData.motEquipe = formValue.contenu;
+    } else if (modal.type === 'objectif') {
+      newData.budgetGoal = Number(formValue.budgetGoal);
+      newData.annee = formValue.annee;
+    }
+
+    try {
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accueil_config'), newData);
+      setModal({ isOpen: false, type: '', payload: null });
+    } catch (err) {
+      // Création du document s'il n'existe pas encore
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'accueil_config'), newData);
+      setModal({ isOpen: false, type: '', payload: null });
+    }
+  };
+
   const equipe = [
-    { nom: "Laurence Gérard", role: "Direction", img: "https://ui-avatars.com/api/?name=Laurence+Gérard&background=4f46e5&color=fff&size=128" },
-    { nom: "Cécile Sublet", role: "Enseignante", img: "https://ui-avatars.com/api/?name=Cécile+Sublet&background=0ea5e9&color=fff&size=128" },
-    { nom: "Florence Hervet", role: "Enseignante", img: "https://ui-avatars.com/api/?name=Florence+ Hervet&background=10b981&color=fff&size=128" },
-    { nom: "Luc Fauvain", role: "Président Asso.", img: "https://ui-avatars.com/api/?name=Laurent+Fauvain&background=8b5cf6&color=fff&size=128" },
-    { nom: "Louis-Vianney Le Lézec", role: "Trésorier", img: "https://ui-avatars.com/api/?name=Le+Lezec&background=f59e0b&color=fff&size=128" },
+    { nom: "Laurence Gérard", role: "Direction", initials: "LG", color: "bg-blue-600" },
+    { nom: "Cécile Sublet", role: "Enseignante", initials: "CS", color: "bg-sky-500" },
+    { nom: "Florence Hervet", role: "Enseignante", initials: "FH", color: "bg-emerald-500" },
+    { nom: "Luc Fauvain", role: "Président Asso.", initials: "LF", color: "bg-purple-500" },
+    { nom: "Louis-Vianney Le Lézec", role: "Trésorier", initials: "LL", color: "bg-amber-500" },
   ];
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-10 font-sans animate-fade-in">
+    <div className="space-y-6 max-w-7xl mx-auto pb-10 font-sans animate-fade-in relative">
       
+      {/* POP-UP (MODAL) FUN & INTÉGRÉ AU DESIGN */}
+      {modal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl border border-indigo-100 w-full max-w-md overflow-hidden transition-all scale-100">
+            <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 p-6 text-white flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 backdrop-blur-md rounded-2xl">
+                  {modal.type === 'mot' ? <Megaphone size={22} className="text-indigo-200" /> : <Target size={22} className="text-rose-200" />}
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg leading-tight">
+                    {modal.type === 'mot' ? "Modifier le mot de l'équipe" : "Modifier l'objectif"}
+                  </h3>
+                  <p className="text-indigo-200 text-xs mt-0.5">Mise à jour en temps réel</p>
+                </div>
+              </div>
+              <button onClick={() => setModal({ isOpen: false })} className="text-white/70 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-colors">
+                <XCircle size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSave} className="p-6 space-y-4">
+              {modal.type === 'mot' && (
+                <>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Titre du message</label>
+                    <input type="text" value={formValue.titre} onChange={e => setFormValue({...formValue, titre: e.target.value})} className="w-full border border-slate-200 rounded-2xl p-3 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-indigo-600 bg-slate-50/50" required />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Contenu du message</label>
+                    <textarea value={formValue.contenu} onChange={e => setFormValue({...formValue, contenu: e.target.value})} rows="4" className="w-full border border-slate-200 rounded-2xl p-3 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-indigo-600 bg-slate-50/50 custom-scrollbar" required />
+                  </div>
+                </>
+              )}
+
+              {modal.type === 'objectif' && (
+                <>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Période cible</label>
+                    <input type="text" value={formValue.annee} onChange={e => setFormValue({...formValue, annee: e.target.value})} placeholder="Ex: 2025/2026" className="w-full border border-slate-200 rounded-2xl p-3 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-rose-500 bg-slate-50/50" required />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Objectif financier (€)</label>
+                    <input type="number" value={formValue.budgetGoal} onChange={e => setFormValue({...formValue, budgetGoal: e.target.value})} className="w-full border border-slate-200 rounded-2xl p-3 text-lg font-black text-rose-600 outline-none focus:ring-2 focus:ring-rose-500 bg-slate-50/50" required />
+                  </div>
+                </>
+              )}
+
+              <div className="pt-4 border-t border-slate-100 flex justify-end gap-3 mt-6">
+                <button type="button" onClick={() => setModal({ isOpen: false })} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors">Annuler</button>
+                <button type="submit" className="px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 active:scale-95">
+                  <CheckCircle2 size={16} /> Enregistrer
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* BANDEAU D'ACCUEIL */}
       <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-8 rounded-2xl shadow-md text-white flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-black mb-2">Bienvenue sur le portail Familles</h1>
@@ -180,34 +288,39 @@ const AccueilFamille = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* COLONNE GAUCHE (Plus large) */}
         <div className="lg:col-span-2 space-y-6">
           
           {/* ACTUALITÉS */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 relative group">
+            {isAdmin && (
+              <button onClick={() => openEditModal('mot')} className="absolute top-4 right-4 bg-indigo-50 text-indigo-600 p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-indigo-100" title="Modifier le mot de l'équipe">
+                <Edit2 size={16} />
+              </button>
+            )}
             <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
               <Megaphone className="text-indigo-500" size={20} /> Le mot de l'équipe
             </h2>
             <div className="bg-indigo-50/50 border border-indigo-100 p-4 rounded-xl">
-              <h3 className="font-bold text-indigo-900 mb-2">Préparation de la rentrée 2026/2027</h3>
-              <p className="text-sm text-slate-600 leading-relaxed">
-                Chers parents, nous sommes impatients de retrouver vos enfants. N'oubliez pas de vérifier vos plannings de ménage et de cantine dans le menu de gauche. Les fournitures scolaires ont été commandées.
-              </p>
-              <p className="text-xs text-slate-400 mt-3 text-right">Publié par La Direction, hier à 14:30</p>
+              <h3 className="font-bold text-indigo-900 mb-2">{parametres.titreMot}</h3>
+              <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">{parametres.motEquipe}</p>
             </div>
           </div>
 
-          {/* JAUGE DES DONS (Design type HelloAsso/Dashboard) */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+          {/* JAUGE DES DONS */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 relative group">
+            {isAdmin && (
+              <button onClick={() => openEditModal('objectif')} className="absolute top-4 right-4 bg-rose-50 text-rose-600 p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-rose-100" title="Modifier l'objectif">
+                <Edit2 size={16} />
+              </button>
+            )}
             <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
-              <Target className="text-rose-500" size={20} /> Objectif de la Période 2025/2026
+              <Target className="text-rose-500" size={20} /> Objectif de la Période {parametres.annee}
             </h2>
             
             <div className="grid grid-cols-3 gap-4 mb-6">
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-center">
                 <span className="text-[10px] font-bold text-slate-400 uppercase">Objectif</span>
-                <p className="text-xl font-black text-indigo-600">{formatMontant(budgetGoal)} €</p>
+                <p className="text-xl font-black text-indigo-600">{formatMontant(parametres.budgetGoal)} €</p>
               </div>
               <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 text-center">
                 <span className="text-[10px] font-bold text-emerald-600 uppercase">Dons Actuels</span>
@@ -226,35 +339,31 @@ const AccueilFamille = () => {
             <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden shadow-inner">
               <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 h-full rounded-full transition-all duration-1000" style={{ width: `${pctProgression}%` }}></div>
             </div>
-            <div className="flex justify-between items-center mt-2 text-[10px] font-bold text-slate-400">
-              <span>0 €</span>
-              <span>{formatMontant(budgetGoal)} €</span>
-            </div>
           </div>
 
           {/* TROMBINOSCOPE */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 relative group">
+            {isAdmin && <button className="absolute top-4 right-4 bg-emerald-50 text-emerald-600 p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-emerald-100"><Edit2 size={16}/></button>}
             <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
               <Users className="text-emerald-500" size={20} /> L'équipe (Trombinoscope)
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
               {equipe.map((membre, idx) => (
                 <div key={idx} className="flex flex-col items-center p-3 hover:bg-slate-50 rounded-xl transition-colors text-center border border-transparent hover:border-slate-100">
-                  <img src={membre.img} alt={membre.nom} className="w-16 h-16 rounded-full shadow-sm mb-3 border-2 border-white" />
+                  <div className={`w-16 h-16 rounded-full flex items-center justify-center text-white font-black text-xl mb-3 shadow-md ${membre.color}`}>{membre.initials}</div>
                   <span className="text-sm font-bold text-slate-800 leading-tight">{membre.nom}</span>
                   <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mt-1">{membre.role}</span>
                 </div>
               ))}
             </div>
           </div>
-
         </div>
 
-        {/* COLONNE DROITE (Plus fine) */}
+        {/* COLONNE DROITE */}
         <div className="space-y-6">
           
-          {/* RAPPELS RAPIDES */}
-          <div className="bg-white rounded-2xl shadow-sm border border-rose-100 p-6 bg-gradient-to-b from-white to-rose-50/30">
+          <div className="bg-white rounded-2xl shadow-sm border border-rose-100 p-6 bg-gradient-to-b from-white to-rose-50/30 relative group">
+            {isAdmin && <button className="absolute top-4 right-4 bg-rose-100 text-rose-700 p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"><Edit2 size={16}/></button>}
             <h2 className="text-sm font-bold text-rose-800 flex items-center gap-2 mb-4 border-b border-rose-100 pb-3">
               <Bell className="text-rose-500" size={18} /> Rappels importants
             </h2>
@@ -270,40 +379,28 @@ const AccueilFamille = () => {
             </ul>
           </div>
 
-          {/* ÉVÉNEMENTS */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 relative group">
+            {isAdmin && <button className="absolute top-4 right-4 bg-blue-50 text-blue-600 p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"><Edit2 size={16}/></button>}
             <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
               <Calendar className="text-blue-500" size={18} /> Prochains événements
             </h2>
             <div className="space-y-4">
-              <div className="flex gap-4 items-center group">
-                <div className="bg-blue-50 text-blue-700 px-3 py-2 rounded-xl text-center min-w-[50px] group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                  <span className="block text-xs font-bold uppercase">Sep</span>
-                  <span className="block text-lg font-black">12</span>
+              <div className="flex gap-4 items-center group/event">
+                <div className="bg-blue-50 text-blue-700 px-3 py-2 rounded-xl text-center min-w-[50px] group-hover/event:bg-blue-600 group-hover/event:text-white transition-colors">
+                  <span className="block text-xs font-bold uppercase">Sep</span><span className="block text-lg font-black">12</span>
                 </div>
                 <div>
                   <h4 className="text-sm font-bold text-slate-800">Réunion de Rentrée</h4>
                   <p className="text-xs text-slate-500 mt-0.5">18h30 - Salles de classe</p>
                 </div>
               </div>
-              <div className="flex gap-4 items-center group">
-                <div className="bg-blue-50 text-blue-700 px-3 py-2 rounded-xl text-center min-w-[50px] group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                  <span className="block text-xs font-bold uppercase">Oct</span>
-                  <span className="block text-lg font-black">20</span>
+              <div className="flex gap-4 items-center group/event">
+                <div className="bg-blue-50 text-blue-700 px-3 py-2 rounded-xl text-center min-w-[50px] group-hover/event:bg-blue-600 group-hover/event:text-white transition-colors">
+                  <span className="block text-xs font-bold uppercase">Oct</span><span className="block text-lg font-black">20</span>
                 </div>
                 <div>
                   <h4 className="text-sm font-bold text-slate-800">Cross de l'école</h4>
                   <p className="text-xs text-slate-500 mt-0.5">Matinée - Stade municipal</p>
-                </div>
-              </div>
-              <div className="flex gap-4 items-center group">
-                <div className="bg-blue-50 text-blue-700 px-3 py-2 rounded-xl text-center min-w-[50px] group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                  <span className="block text-xs font-bold uppercase">Déc</span>
-                  <span className="block text-lg font-black">15</span>
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-slate-800">Fête de Noël</h4>
-                  <p className="text-xs text-slate-500 mt-0.5">16h00 - Cour de récréation</p>
                 </div>
               </div>
             </div>
@@ -317,6 +414,7 @@ const AccueilFamille = () => {
     </div>
   );
 };
+
 
 // --- MODULE : VIE DE L'ÉCOLE ---
 
@@ -6835,7 +6933,7 @@ export default function App() {
   const renderContent = () => {
     switch (activeTab) {
       case 'vie_ecole': return <VieEcole />;
-      case 'accueil_famille': return <AccueilFamille />;
+      case 'accueil_famille': return <AccueilFamille utilisateurConnecte={utilisateurConnecte} />;
       case 'inscriptions':  return <GestionInscriptions />;
       case 'contact': return <InfosContact />;
       case 'etat_financier': return <EtatFinancier transactionsGlobales={transactionsGlobales} />;
