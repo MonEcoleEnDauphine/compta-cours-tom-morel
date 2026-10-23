@@ -8,7 +8,7 @@ import {
   Globe, Mail, Phone, PlusCircle, Edit2, Send, Clock, Hammer, Menu,
   Megaphone, Bell, Newspaper, Camera, MessageCircle,
   Utensils, BarChart3, AlertCircle, Printer, CalendarDays,
-  ChevronLeft, UploadCloud, Baby, LogOut
+  ChevronLeft, UploadCloud, Baby, LogOut, Eye, EyeOff
 } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
@@ -6809,6 +6809,11 @@ const GestionEvenements = ({ transactionsGlobales }) => {
 const ModuleGestionAcces = () => {
   const [utilisateurs, setUtilisateurs] = useState([]);
   const [form, setForm] = useState({ identifiant: '', mdp: '', role: 'famille', familleId: '', modules: ['accueil_famille'] });
+  
+  // Nouveaux états pour l'édition et la visibilité des mots de passe
+  const [modalConfig, setModalConfig] = useState({ isOpen: false, type: 'success', message: '' });
+  const [editingUserId, setEditingUserId] = useState(null);
+  const [visiblePasswords, setVisiblePasswords] = useState({});
 
   const CATEGORIES = {
     "Espace Famille": ['accueil_famille', 'vie_ecole', 'scolarite', 'factures_parents', 'plannings', 'fiche_travaux', 'inscriptions', 'contact'],
@@ -6848,37 +6853,108 @@ const ModuleGestionAcces = () => {
     });
   };
 
-  const handleCreateUser = async (e) => {
+  const togglePasswordVisibility = (id) => {
+    setVisiblePasswords(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleEditUser = (user) => {
+    setForm({
+      identifiant: user.identifiant || '',
+      mdp: user.mdp || '',
+      role: user.role || 'famille',
+      familleId: user.familleId || '',
+      modules: user.modulesAutorises || []
+    });
+    setEditingUserId(user.id);
+    window.scrollTo({ top: 0, behavior: 'smooth' }); // Remonte en haut pour éditer
+  };
+
+  const handleDeleteUser = async (id, identifiant) => {
+    if (window.confirm(`⚠️ DANGER : Êtes-vous sûr de vouloir supprimer définitivement l'accès de "${identifiant}" ?`)) {
+      try {
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'utilisateurs', id));
+        setModalConfig({ isOpen: true, type: 'success', message: `Le compte ${identifiant} a été supprimé.` });
+        if (editingUserId === id) cancelEdit();
+      } catch (e) {
+        setModalConfig({ isOpen: true, type: 'error', message: "Erreur lors de la suppression." });
+      }
+    }
+  };
+
+  const cancelEdit = () => {
+    setForm({ identifiant: '', mdp: '', role: 'famille', familleId: '', modules: ['accueil_famille'] });
+    setEditingUserId(null);
+  };
+
+  const handleSaveUser = async (e) => {
     e.preventDefault();
     try {
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'utilisateurs'), {
+      const userData = {
         identifiant: form.identifiant.toUpperCase().trim(),
         mdp: form.mdp,
         role: form.role,
         familleId: form.familleId.toUpperCase().trim(),
         modulesAutorises: form.modules
-      });
-      alert("Accès créé avec succès !");
-      setForm({ identifiant: '', mdp: '', role: 'famille', familleId: '', modules: ['accueil_famille'] });
-    } catch (e) {
-      alert("Erreur de création.");
+      };
+
+      if (editingUserId) {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'utilisateurs', editingUserId), userData);
+        setModalConfig({ isOpen: true, type: 'success', message: "Le compte a été modifié avec succès." });
+      } else {
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'utilisateurs'), userData);
+        setModalConfig({ isOpen: true, type: 'success', message: "Le compte a été créé avec succès." });
+      }
+      
+      cancelEdit();
+    } catch (err) {
+      setModalConfig({ isOpen: true, type: 'error', message: "Une erreur est survenue lors de l'enregistrement." });
     }
   };
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-fade-in pb-10">
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mt-6">
-        <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2 mb-6"><Lock className="text-indigo-600"/> Gestion des Accès & Permissions</h2>
+      
+      {modalConfig.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-sm overflow-hidden transition-all scale-100">
+            <div className={`p-6 text-white flex justify-between items-center bg-gradient-to-r ${modalConfig.type === 'success' ? 'from-emerald-600 to-emerald-800' : 'from-rose-600 to-rose-800'}`}>
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 backdrop-blur-md rounded-2xl">
+                  {modalConfig.type === 'success' ? <CheckCircle2 size={22} className="text-emerald-100" /> : <AlertTriangle size={22} className="text-rose-100" />}
+                </div>
+                <div><h3 className="font-bold text-lg leading-tight">{modalConfig.type === 'success' ? 'Succès' : 'Erreur'}</h3></div>
+              </div>
+              <button onClick={() => setModalConfig({ ...modalConfig, isOpen: false })} className="text-white/70 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-colors"><XCircle size={20} /></button>
+            </div>
+            <div className="p-6"><p className="text-slate-600 font-medium leading-relaxed">{modalConfig.message}</p></div>
+            <div className="p-4 bg-slate-50/80 border-t border-slate-100 flex justify-end">
+              <button onClick={() => setModalConfig({ ...modalConfig, isOpen: false })} className={`px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all ${modalConfig.type === 'success' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'}`}>OK</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mt-6 transition-all">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+            <Lock className="text-indigo-600"/> {editingUserId ? "Modification d'un accès" : "Créer un nouvel accès"}
+          </h2>
+          {editingUserId && (
+            <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1 animate-pulse">
+              <Edit2 size={14}/> Mode Édition
+            </span>
+          )}
+        </div>
         
-        <form onSubmit={handleCreateUser} className="bg-slate-50 p-6 rounded-xl border border-slate-200 space-y-6">
+        <form onSubmit={handleSaveUser} className={`p-6 rounded-xl border space-y-6 transition-colors ${editingUserId ? 'bg-amber-50/50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div><label className="block text-xs font-bold mb-1">Identifiant de connexion</label><input type="text" required value={form.identifiant} onChange={e => setForm({...form, identifiant: e.target.value})} className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" /></div>
-            <div><label className="block text-xs font-bold mb-1">Mot de passe provisoire</label><input type="text" required value={form.mdp} onChange={e => setForm({...form, mdp: e.target.value})} className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" /></div>
-            <div><label className="block text-xs font-bold mb-1">Rôle Global</label><select value={form.role} onChange={e => setForm({...form, role: e.target.value})} className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-white"><option value="famille">Famille / Bureau</option><option value="admin">Administrateur Total</option></select></div>
-            <div><label className="block text-xs font-bold mb-1">Lier à la famille (Planning)</label><input type="text" value={form.familleId} onChange={e => setForm({...form, familleId: e.target.value})} placeholder="Ex: BEZIAT-MENUT" className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" /></div>
+            <div><label className="block text-xs font-bold mb-1 text-slate-700">Identifiant de connexion</label><input type="text" required value={form.identifiant} onChange={e => setForm({...form, identifiant: e.target.value})} className="w-full p-2.5 bg-white border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" /></div>
+            <div><label className="block text-xs font-bold mb-1 text-slate-700">Mot de passe</label><input type="text" required value={form.mdp} onChange={e => setForm({...form, mdp: e.target.value})} className="w-full p-2.5 bg-white border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" /></div>
+            <div><label className="block text-xs font-bold mb-1 text-slate-700">Rôle Global</label><select value={form.role} onChange={e => setForm({...form, role: e.target.value})} className="w-full p-2.5 bg-white border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"><option value="famille">Famille / Bureau</option><option value="admin">Administrateur Total</option></select></div>
+            <div><label className="block text-xs font-bold mb-1 text-slate-700">Lier à la famille (Planning)</label><input type="text" value={form.familleId} onChange={e => setForm({...form, familleId: e.target.value})} placeholder="Ex: BEZIAT-MENUT" className="w-full p-2.5 bg-white border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" /></div>
           </div>
           
-          <div className="border-t border-slate-200 pt-4">
+          <div className="border-t border-slate-200 pt-5">
             <label className="block text-sm font-black text-slate-800 mb-4">Autorisations détaillées (Cochez les modules accessibles)</label>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {Object.entries(CATEGORIES).map(([catName, modules]) => (
@@ -6899,20 +6975,71 @@ const ModuleGestionAcces = () => {
               ))}
             </div>
           </div>
-          <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 transition-colors text-white px-8 py-3 rounded-xl font-bold shadow-md">Créer l'utilisateur</button>
+          
+          <div className="flex gap-3 pt-2">
+            <button type="submit" className={`px-8 py-3 rounded-xl font-bold shadow-md transition-colors text-white ${editingUserId ? 'bg-amber-500 hover:bg-amber-600' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
+              {editingUserId ? "Enregistrer les modifications" : "Créer l'utilisateur"}
+            </button>
+            {editingUserId && (
+              <button type="button" onClick={cancelEdit} className="px-6 py-3 rounded-xl font-bold bg-slate-200 text-slate-700 hover:bg-slate-300 transition-colors">
+                Annuler
+              </button>
+            )}
+          </div>
         </form>
 
-        <div className="mt-8">
-          <h3 className="font-bold text-slate-800 mb-4">Comptes existants</h3>
+        <div className="mt-10">
+          <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2 border-b border-slate-100 pb-2">
+            <Users size={20} className="text-slate-400" /> Base des comptes ({utilisateurs.length})
+          </h3>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {utilisateurs.map(u => (
-              <div key={u.id} className="bg-white border border-slate-200 p-4 rounded-xl flex flex-col justify-between shadow-sm">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="font-black text-slate-800">{u.identifiant} <span className="text-[10px] font-bold uppercase ml-2 bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-100">{u.role}</span></span>
-                  <span className="text-xs font-semibold text-slate-500">Lié: {u.familleId || 'Aucun'}</span>
+              <div key={u.id} className={`bg-white border p-4 rounded-xl flex flex-col justify-between shadow-sm relative group transition-all ${editingUserId === u.id ? 'border-amber-400 ring-2 ring-amber-50' : 'border-slate-200 hover:border-indigo-300'}`}>
+                
+                {/* Actions (Éditer / Supprimer) */}
+                <div className="absolute top-3 right-3 flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                  <button onClick={() => handleEditUser(u)} className="p-1.5 bg-slate-100 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Modifier">
+                    <Edit2 size={16}/>
+                  </button>
+                  <button onClick={() => handleDeleteUser(u.id, u.identifiant)} className="p-1.5 bg-slate-100 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Supprimer">
+                    <Trash2 size={16}/>
+                  </button>
                 </div>
-                <div className="text-[10px] text-slate-500 leading-relaxed font-mono bg-slate-50 p-2 rounded-lg border border-slate-100 mt-2">
-                  {u.role === 'admin' ? 'Accès illimité à tous les modules' : u.modulesAutorises?.join(' • ')}
+
+                <div className="pr-16 mb-3">
+                  <span className="font-black text-slate-800 text-lg">{u.identifiant}</span>
+                  <span className={`text-[10px] font-bold uppercase ml-2 px-2 py-0.5 rounded border ${u.role === 'admin' ? 'bg-rose-50 text-rose-700 border-rose-100' : 'bg-indigo-50 text-indigo-700 border-indigo-100'}`}>
+                    {u.role}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 mb-3 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] uppercase font-bold text-slate-400">Famille Liée</span>
+                    <span className="font-semibold">{u.familleId || <span className="italic text-slate-400">Aucune</span>}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] uppercase font-bold text-slate-400">Mot de passe</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-slate-800">
+                        {visiblePasswords[u.id] ? u.mdp : '••••••••'}
+                      </span>
+                      <button onClick={() => togglePasswordVisibility(u.id)} className="text-slate-400 hover:text-indigo-600 transition-colors">
+                        {visiblePasswords[u.id] ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Droits d'accès :</span>
+                  <div className="text-[10px] text-slate-600 leading-relaxed font-mono">
+                    {u.role === 'admin' ? (
+                      <span className="text-rose-600 font-bold">🔒 Accès total (Administrateur)</span>
+                    ) : (
+                      u.modulesAutorises?.length > 0 ? u.modulesAutorises.join(' • ') : <span className="italic text-slate-400">Aucun accès accordé</span>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -6922,6 +7049,7 @@ const ModuleGestionAcces = () => {
     </div>
   );
 };
+
 
 export default function App() {
   // 1. VARIABLES (Doivent être tout en haut)
