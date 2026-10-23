@@ -489,16 +489,31 @@ const VieEcole = ({ utilisateurConnecte }) => {
                </button>
              )}
            </div>
-           <div className="space-y-3">
+<div className="space-y-3">
              {documents.map(doc => (
                <div key={doc.id} className="flex justify-between items-center p-3 hover:bg-slate-50 rounded-xl border border-slate-100 transition-colors group">
                  <a href={doc.url} target="_blank" rel="noreferrer" className="flex items-center gap-4 flex-1">
-                   <div className="bg-blue-100 text-blue-600 p-3 rounded-xl shadow-sm group-hover:bg-blue-600 group-hover:text-white transition-colors"><FileText size={20} /></div>
+                   
+                   {/* MINIATURE 1ÈRE PAGE PDF */}
+                   <div className="w-12 h-16 shrink-0 bg-slate-100 border border-slate-200 rounded-lg overflow-hidden shadow-sm relative flex items-center justify-center">
+                     <img 
+                       src={formatDriveImageUrl(doc.url)} 
+                       alt={doc.titre} 
+                       className="w-full h-full object-cover object-top relative z-10"
+                       onError={(e) => { e.target.style.display = 'none'; }}
+                     />
+                     {/* Icône de secours en arrière-plan */}
+                     <div className="absolute inset-0 flex items-center justify-center text-blue-500 bg-blue-50">
+                       <FileText size={20} />
+                     </div>
+                   </div>
+
                    <div>
                      <p className="font-bold text-sm text-slate-700 group-hover:text-blue-700 transition-colors">{doc.titre}</p>
                      <p className="text-[10px] text-slate-400 mt-0.5">{doc.description || "Cliquez pour ouvrir dans Google Drive"}</p>
                    </div>
                  </a>
+
                  {isAdmin && (
                    <button onClick={() => handleDelete('documents_ecole', doc.id)} className="text-slate-300 hover:text-rose-500 p-2"><Trash2 size={16}/></button>
                  )}
