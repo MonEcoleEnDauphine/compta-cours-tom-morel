@@ -6947,7 +6947,6 @@ export default function App() {
       case 'notes_frais': return <NotesFrais transactionsGlobales={transactionsGlobales} />;
       case 'dons_recus': return <DonsRecus transactionsGlobales={transactionsGlobales} />;
       case 'evenements': return <GestionEvenements transactionsGlobales={transactionsGlobales} />;
-      case 'gestion_acces': return <PlaceholderPage title="Gestion des Accès" />;
       case 'dossiers_facturation': return <PlaceholderPage title="Dossiers & Facturation" />;
       case 'equipe_contrats': return <PlaceholderPage title="Équipe et Contrats" />;
       case 'uniformes_stock': return <PlaceholderPage title="Uniformes & Stock" />;
@@ -6985,42 +6984,63 @@ export default function App() {
         {/* --- NAVIGATION PRINCIPALE --- */}
         <nav className="flex-1 overflow-y-auto py-4 px-3 custom-scrollbar">
           
-          <div className="mb-6">
-            <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Espace Famille</h3>
-            
-            <a href="#accueil_famille" onClick={() => handleNavigation('accueil_famille')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'accueil_famille' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-              <LayoutDashboard size={18} /> Accueil
-            </a>
-            <a href="#vie_ecole" onClick={() => handleNavigation('vie_ecole')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'vie_ecole' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-              <Newspaper size={18} /> Vie de l'école
-            </a>
-            <a href="#scolarite" onClick={() => handleNavigation('scolarite')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'scolarite' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-              <GraduationCap size={18} /> Scolarité
-            </a>
-            <a href="#factures_parents" onClick={() => handleNavigation('factures_parents')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'factures_parents' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-              <Receipt size={18} /> Mes Factures
-            </a>
-            
-            {/* Plannings et Travaux rapatriés ici */}
-            <a href="#plannings" onClick={() => handleNavigation('plannings')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'plannings' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-              <Calendar size={18} /> Plannings Cantine & Ménage
-            </a>
-            <a href="#fiche_travaux" onClick={() => handleNavigation('fiche_travaux')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'fiche_travaux' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-              <Hammer size={18} /> Fiche Travaux
-            </a>
+          {(() => {
+            const hasAccess = (moduleName) => {
+              if (utilisateurConnecte?.role === 'admin') return true;
+              return utilisateurConnecte?.modulesAutorises?.includes(moduleName);
+            };
 
-            {/* Nouveau module Inscriptions */}
-            <a href="#inscriptions" onClick={() => handleNavigation('inscriptions')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'inscriptions' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-              <FileSignature size={18} /> Inscriptions
-            </a>
+            return (
+              <>
+                <div className="mb-6">
+                  <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Espace Famille</h3>
+                  
+                  {hasAccess('accueil_famille') && (
+                    <a href="#accueil_famille" onClick={() => handleNavigation('accueil_famille')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'accueil_famille' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
+                      <LayoutDashboard size={18} /> Accueil
+                    </a>
+                  )}
+                  {hasAccess('vie_ecole') && (
+                    <a href="#vie_ecole" onClick={() => handleNavigation('vie_ecole')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'vie_ecole' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
+                      <Newspaper size={18} /> Vie de l'école
+                    </a>
+                  )}
+                  {hasAccess('scolarite') && (
+                    <a href="#scolarite" onClick={() => handleNavigation('scolarite')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'scolarite' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
+                      <GraduationCap size={18} /> Scolarité
+                    </a>
+                  )}
+                  {hasAccess('factures_parents') && (
+                    <a href="#factures_parents" onClick={() => handleNavigation('factures_parents')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'factures_parents' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
+                      <Receipt size={18} /> Mes Factures
+                    </a>
+                  )}
+                  {hasAccess('plannings') && (
+                    <a href="#plannings" onClick={() => handleNavigation('plannings')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'plannings' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
+                      <Calendar size={18} /> Plannings Cantine & Ménage
+                    </a>
+                  )}
+                  {hasAccess('fiche_travaux') && (
+                    <a href="#fiche_travaux" onClick={() => handleNavigation('fiche_travaux')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'fiche_travaux' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
+                      <Hammer size={18} /> Fiche Travaux
+                    </a>
+                  )}
+                  {hasAccess('inscriptions') && (
+                    <a href="#inscriptions" onClick={() => handleNavigation('inscriptions')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'inscriptions' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
+                      <FileSignature size={18} /> Inscriptions
+                    </a>
+                  )}
+                  {hasAccess('contact') && (
+                    <a href="#contact" onClick={() => handleNavigation('contact')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'contact' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
+                      <Info size={18} /> Infos & Contact
+                    </a>
+                  )}
+                </div>
+              </>
+            );
+          })()}
 
-            {/* Contact en dernier */}
-            <a href="#contact" onClick={() => handleNavigation('contact')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'contact' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-              <Info size={18} /> Infos & Contact
-            </a>
-          </div>
-
-{utilisateurConnecte?.role === 'admin' && (
+          {utilisateurConnecte?.role === 'admin' && (
             <>
               <div className="mb-6">
                 <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Pilotage</h3>
@@ -7059,8 +7079,8 @@ export default function App() {
                 <a href="#gestion_acces" onClick={() => handleNavigation('gestion_acces')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'gestion_acces' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
                   <Lock size={18} /> Gestion Accès
                 </a>
-                 <a href="#dossiers_facturation" onClick={() => handleNavigation('dossiers_facturation')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'dossiers_facturation' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
-                <FileSpreadsheet size={18} /> Dossiers & Facturation
+                <a href="#dossiers_facturation" onClick={() => handleNavigation('dossiers_facturation')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'dossiers_facturation' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
+                  <FileSpreadsheet size={18} /> Dossiers & Facturation
                 </a>
                 <a href="#equipe_contrats" onClick={() => handleNavigation('equipe_contrats')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'equipe_contrats' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}>
                   <Users size={18} /> Équipe (Contrats)
@@ -7071,7 +7091,6 @@ export default function App() {
               </div>
             </>
           )}
-
         </nav>
         
         {/* BOUTON DÉCONNEXION */}
