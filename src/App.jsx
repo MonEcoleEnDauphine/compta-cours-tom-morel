@@ -1456,9 +1456,6 @@ const InfosContact = () => (
 
 // --- MODULE : PLANNINGS (Cantine & Ménage) ---
 
-// --- MODULE : PLANNINGS (Cantine & Ménage) ---
-
-
 export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [activePeriod, setActivePeriod] = useState(2);
@@ -1466,6 +1463,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
   const [quickFilterFamily, setQuickFilterFamily] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
 
+  // --- RÈGLE D'AFFICHAGE DES ONGLETS ADMIN ---
   const peutVoirAdmin = 
     utilisateurConnecte?.role === 'admin' || 
     utilisateurConnecte?.role === 'Administrateur Global' || 
@@ -1477,24 +1475,15 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         ? JSON.stringify(utilisateurConnecte).toUpperCase() 
         : String(utilisateurConnecte).toUpperCase();
 
-      let famId = [
+      const famId = [
         "BOCCA", "CHOMEL", "CORNET-BOUBE", "DE LASTIC ST JAL", "DE SERRES", "FIARD", 
         "GREPAT", "MELLIES", "RIOBÉ", "TAISSIDRE-CARVALHO", "BEZIAT-MENUT", 
         "DE MALAUSSENE", "FAUVAIN", "LE LÉZEC", "DE PONTE", "DURAND", "ESCOBAR", 
         "DE LA CHARRIE", "PILON", "SHAW"
       ].find(id => userStr.includes(id));
-
-      if (!famId) {
-          if (userStr.includes("GERARD")) famId = "MME GERARD";
-          else if (userStr.includes("SUBLET")) famId = "MME SUBLET";
-          else if (userStr.includes("HERVET")) famId = "MME HERVET";
-          else if (userStr.includes("QARIOH") || userStr.includes("CARIO")) famId = "MME QARIOH";
-      }
       
       if (famId) {
         setSelectedFamilyFilter(famId);
-        // CORRECTION : Active automatiquement le filtre visuel partout pour la personne connectée
-        setQuickFilterFamily(famId);
       }
     }
   }, [utilisateurConnecte, peutVoirAdmin]);
@@ -1541,6 +1530,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { id: 2, name: "Toussaint - Noël", desc: "02/11 - 18/12", start: "2026-11-02", end: "2026-12-18" },
       { id: 3, name: "Noël - Février", desc: "04/01 - 12/02", start: "2027-01-04", end: "2027-02-12" },
       { id: 4, name: "Février - Pâques", desc: "01/03 - 09/04", start: "2027-03-01", end: "2027-04-09" },
+      // RÈGLE : Fin d'année fixée au 25 Juin 2027
       { id: 5, name: "Pâques - Été", desc: "26/04 - 25/06", start: "2027-04-26", end: "2027-06-25" }
     ];
 
@@ -1550,7 +1540,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { name: "Noël", start: "2026-12-19", end: "2027-01-03" },
       { name: "Hiver", start: "2027-02-13", end: "2027-02-28" },
       { name: "Printemps", start: "2027-04-10", end: "2027-04-25" },
-      { name: "d'Été", start: "2027-06-26", end: "2027-08-31" }
+      { name: "d'Été", start: "2027-07-03", end: "2027-08-31" }
     ];
 
     function getDateStr(d) {
@@ -1559,7 +1549,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     }
 
     const checkIsOut = (famId, dOw, dStr) => {
-      if (!famId || famId.startsWith("MME")) return false;
+      if (!famId || famId.startsWith("Mme")) return false;
       const fam = famsData.find(f => f.id === famId);
       if (!fam) return false;
       return !fam.days.includes(dOw);
@@ -1569,29 +1559,29 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { date: '2026-09-03', p1: 'BOCCA', p2: 'TAISSIDRE-CARVALHO', repasType: 'Filles / Garçons' },
       { date: '2026-09-04', p1: 'RIOBÉ', p2: 'BEZIAT-MENUT', repasType: 'Par cordée' },
       { date: '2026-09-07', p1: 'DE SERRES', p2: 'DE MALAUSSENE', repasType: 'Repas par classe' },
-      { date: '2026-09-08', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
+      { date: '2026-09-08', p1: 'Mme GERARD', p2: 'Mme SUBLET', repasType: 'Placement libre' },
       { date: '2026-09-10', p1: 'RIOBÉ', p2: 'FAUVAIN', repasType: 'Filles / Garçons' },
       { date: '2026-09-11', p1: 'LE LÉZEC', p2: 'CORNET-BOUBE', repasType: 'Par cordée' },
       { date: '2026-09-14', p1: 'GREPAT', p2: 'DE LASTIC ST JAL', repasType: 'Repas par classe' },
       { date: '2026-09-15', p1: 'MELLIES', p2: 'GREPAT', repasType: 'Placement libre' },
       { date: '2026-09-17', p1: 'CHOMEL', p2: 'LE LÉZEC', repasType: 'Filles / Garçons' },
-      { date: '2026-09-18', p1: 'MME SUBLET', p2: 'MME HERVET', repasType: 'Par cordée' },
+      { date: '2026-09-18', p1: 'Mme SUBLET', p2: 'Mme HERVET', repasType: 'Par cordée' },
       { date: '2026-09-21', p1: 'DE SERRES', p2: 'TAISSIDRE-CARVALHO', repasType: 'Repas par classe' },
-      { date: '2026-09-22', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
+      { date: '2026-09-22', p1: 'Mme GERARD', p2: 'Mme SUBLET', repasType: 'Placement libre' },
       { date: '2026-09-24', p1: 'MELLIES', p2: 'CORNET-BOUBE', repasType: 'Filles / Garçons' },
       { date: '2026-09-25', p1: 'BOCCA', p2: 'BEZIAT-MENUT', repasType: 'Par cordée' },
       { date: '2026-09-28', p1: 'DE MALAUSSENE', p2: 'DE SERRES', repasType: 'Repas par classe' },
       { date: '2026-09-29', p1: 'FIARD', p2: 'GREPAT', repasType: 'Placement libre' },
       { date: '2026-10-01', p1: 'MELLIES', p2: 'CORNET-BOUBE', repasType: 'Filles / Garçons' },
-      { date: '2026-10-02', p1: 'MME SUBLET', p2: 'MME HERVET', repasType: 'Par cordée' },
+      { date: '2026-10-02', p1: 'Mme SUBLET', p2: 'Mme HERVET', repasType: 'Par cordée' },
       { date: '2026-10-05', p1: 'TAISSIDRE-CARVALHO', p2: 'DE MALAUSSENE', repasType: 'Repas par classe' },
-      { date: '2026-10-06', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
+      { date: '2026-10-06', p1: 'Mme GERARD', p2: 'Mme SUBLET', repasType: 'Placement libre' },
       { date: '2026-10-08', p1: 'FIARD', p2: 'DE LASTIC ST JAL', repasType: 'Filles / Garçons' },
       { date: '2026-10-09', p1: 'BOCCA', p2: 'BEZIAT-MENUT', repasType: 'Par cordée' },
       { date: '2026-10-12', p1: 'DE SERRES', p2: 'TAISSIDRE-CARVALHO', repasType: 'Repas par classe' },
       { date: '2026-10-13', p1: 'GREPAT', p2: 'MELLIES', repasType: 'Placement libre' },
       { date: '2026-10-15', p1: 'CORNET-BOUBE', p2: 'CHOMEL', repasType: 'Filles / Garçons' },
-      { date: '2026-10-16', p1: 'MME SUBLET', p2: 'MME HERVET', repasType: 'Par cordée' }
+      { date: '2026-10-16', p1: 'Mme SUBLET', p2: 'Mme HERVET', repasType: 'Par cordée' }
     ];
 
     const historicalMenage = [
@@ -1630,11 +1620,9 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         }
     });
 
-    const forcedDePonteDates = ["2026-11-12", "2026-12-10", "2027-01-21", "2027-03-04", "2027-04-01", "2027-05-20"];
-    const forcedRiobeDates = ["2026-11-26", "2027-01-07", "2027-02-04", "2027-03-18", "2027-04-29", "2027-06-03", "2027-06-17"];
-
     let currentDate = new Date(2026, 10, 2, 12, 0, 0); 
-    const endDate = new Date(2027, 6, 30, 12, 0, 0);
+    // RÈGLE : Arrêt de l'algorithme le 25 Juin 2027 (Mois 5 = Juin)
+    const endDate = new Date(2027, 5, 25, 12, 0, 0);
     
     let currentPeriodIdx = -1; 
     let currentMonthStr = "";
@@ -1669,8 +1657,8 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                   countBase++; 
               }
           });
-          const avgCantine = Math.floor(sumCantine / countBase);
-          const avgMenage = Math.floor(sumMenage / countBase);
+          const avgCantine = Math.round(sumCantine / countBase);
+          const avgMenage = Math.round(sumMenage / countBase);
           
           famsData.forEach(f => {
               if (f.type === "Nouveau SP") {
@@ -1711,7 +1699,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       // ----------------------------
       // GESTION CANTINE
       // ----------------------------
-      if (isSchoolDayFlag && dateStr <= "2027-06-25") {
+      if (isSchoolDayFlag) {
         let requiredParents = 2; let p1 = null; let p2 = null; let repasType = ""; let forcedError = false;
 
         if (dayOfWeek === 1) { 
@@ -1719,10 +1707,10 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         } 
         else if (dayOfWeek === 2) { 
           repasType = "Placement libre";
-          if (isSemaineImpaire) { 
-            requiredParents = 1; p1 = "MME QARIOH"; 
-          } else if (isSemainePaire) {
-            requiredParents = 0; p1 = "MME GERARD"; p2 = "MME SUBLET"; 
+          if (isSemainePaire) { 
+            requiredParents = 1; p1 = "Mme QARIOH"; 
+          } else if (isSemaineImpaire) {
+            requiredParents = 0; p1 = "Mme GERARD"; p2 = "Mme SUBLET"; 
           }
         } 
         else if (dayOfWeek === 4) { 
@@ -1732,9 +1720,9 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
           repasType = "Par cordée";
           if (isSemaineImpaire) { 
             if (dateStr >= "2026-11-02") {
-                requiredParents = 1; p1 = "MME SUBLET"; 
+                requiredParents = 1; p1 = "Mme SUBLET"; 
             } else {
-                requiredParents = 0; p1 = "MME SUBLET"; p2 = "MME HERVET"; 
+                requiredParents = 0; p1 = "Mme SUBLET"; p2 = "Mme HERVET"; 
             }
           } 
           else { requiredParents = 2; }
@@ -1743,39 +1731,19 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         let assigned = [];
 
         if (requiredParents > 0) {
-            if (dayOfWeek === 4) {
-                if (forcedDePonteDates.includes(dateStr) && !assigned.includes("DE PONTE")) {
-                    assigned.push("DE PONTE");
-                    statsObj["DE PONTE"].cantine++; statsObj["DE PONTE"].periodCantine++; statsObj["DE PONTE"].monthCantine++; statsObj["DE PONTE"].total++; statsObj["DE PONTE"].lastCantine = dateStr;
-                }
-                if (forcedRiobeDates.includes(dateStr) && !assigned.includes("RIOBÉ")) {
-                    assigned.push("RIOBÉ");
-                    statsObj["RIOBÉ"].cantine++; statsObj["RIOBÉ"].periodCantine++; statsObj["RIOBÉ"].monthCantine++; statsObj["RIOBÉ"].total++; statsObj["RIOBÉ"].lastCantine = dateStr;
-                }
-            }
-
-            if (dateStr === "2026-11-13" && dayOfWeek === 5 && !assigned.includes("LE LÉZEC")) {
-                assigned.push("LE LÉZEC");
-                statsObj["LE LÉZEC"].cantine++; statsObj["LE LÉZEC"].periodCantine++; statsObj["LE LÉZEC"].monthCantine++; statsObj["LE LÉZEC"].total++; statsObj["LE LÉZEC"].lastCantine = dateStr;
-            }
-
           for (let i = assigned.length; i < requiredParents; i++) {
             let available = famsData.filter(f => {
+              if (f.id === "DE LASTIC ST JAL" && dateStr >= "2027-02-01" && dateStr <= "2027-04-15") return false;
+
               if (assigned.includes(f.id)) {
                 if (f.id === "LE LÉZEC" && [1, 5].includes(dayOfWeek) && assigned.length === 1 && assigned[0] === "LE LÉZEC") {
-                   // OK
                 } else {
                    return false;
                 }
               }
 
-              if (f.id === "DE LASTIC ST JAL" && dateStr >= "2027-02-01" && dateStr <= "2027-04-15") return false;
-              
-              if (f.id === "LE LÉZEC") {
-                  if (dateStr === "2026-11-06") return false; 
-                  if (requiredParents < 2) return false; 
-                  if (i === 1 && assigned[0] !== "LE LÉZEC") return false; 
-              }
+              // RÈGLE : LE LÉZEC bloqué le vendredi 6 novembre
+              if (f.id === "LE LÉZEC" && dateStr === "2026-11-06") return false;
 
               let hasDay = f.days.includes(dayOfWeek);
               if (!hasDay) return false;
@@ -1804,18 +1772,16 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
             }
 
             available.sort((a, b) => {
-              if (statsObj[a.id].cantine === 0 && statsObj[b.id].cantine > 0) return -1;
-              if (statsObj[a.id].cantine > 0 && statsObj[b.id].cantine === 0) return 1;
-
-              let scoreA = statsObj[a.id].total; let scoreB = statsObj[b.id].total;
+              let scoreA = statsObj[a.id].total + (a.isAsso ? 1 : 0); 
+              let scoreB = statsObj[b.id].total + (b.isAsso ? 1 : 0);
               
-              let monthDiff = statsObj[a.id].monthCantine - statsObj[b.id].monthCantine;
-              if (monthDiff !== 0) return monthDiff;
-
+              if (scoreA !== scoreB) return scoreA - scoreB;
+              
               let periodDiff = statsObj[a.id].periodCantine - statsObj[b.id].periodCantine;
               if (periodDiff !== 0) return periodDiff;
 
-              if (scoreA !== scoreB) return scoreA - scoreB;
+              let monthDiff = statsObj[a.id].monthCantine - statsObj[b.id].monthCantine;
+              if (monthDiff !== 0) return monthDiff;
               
               return a.days.length - b.days.length;
             });
@@ -1830,11 +1796,13 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
               statsObj[chosenId].lastCantine = dateStr;
             } else {
               let fallback = famsData.filter(f => !assigned.includes(f.id)).sort((a, b) => {
-                 let mDiff = statsObj[a.id].monthCantine - statsObj[b.id].monthCantine;
-                 if (mDiff !== 0) return mDiff;
+                 let scoreA = statsObj[a.id].total + (a.isAsso ? 1 : 0); 
+                 let scoreB = statsObj[b.id].total + (b.isAsso ? 1 : 0);
+                 let tDiff = scoreA - scoreB;
+                 if (tDiff !== 0) return tDiff;
                  let pDiff = statsObj[a.id].periodCantine - statsObj[b.id].periodCantine;
                  if (pDiff !== 0) return pDiff;
-                 return statsObj[a.id].total - statsObj[b.id].total;
+                 return statsObj[a.id].monthCantine - statsObj[b.id].monthCantine;
               });
               if (fallback.length > 0) {
                 const chosenId = fallback[0].id;
@@ -1877,9 +1845,18 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
           });
           
           eligibleAsso.sort((a, b) => {
+            // RÈGLE : Minimum 1 ménage pour tous
+            let aZero = statsObj[a.id].menage === 0 ? 0 : 1;
+            let bZero = statsObj[b.id].menage === 0 ? 0 : 1;
+            if (aZero !== bZero) return aZero - bZero;
+
             let scoreA = statsObj[a.id].menage - (a.id === "LE LÉZEC" ? 1 : 0);
             let scoreB = statsObj[b.id].menage - (b.id === "LE LÉZEC" ? 1 : 0);
-            return scoreA - scoreB || a.id.localeCompare(b.id);
+            if (scoreA !== scoreB) return scoreA - scoreB;
+            
+            let totA = statsObj[a.id].total + (a.isAsso ? 1 : 0);
+            let totB = statsObj[b.id].total + (b.isAsso ? 1 : 0);
+            return totA - totB;
           });
           
           if(eligibleAsso.length > 0) {
@@ -1909,12 +1886,18 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
           if(withCooldown.length > 0) candidates = withCooldown;
           
           candidates.sort((a, b) => {
-            if (statsObj[a.id].menage === 0 && statsObj[b.id].menage > 0) return -1;
-            if (statsObj[a.id].menage > 0 && statsObj[b.id].menage === 0) return 1;
+            // RÈGLE : Minimum 1 ménage pour tous
+            let aZero = statsObj[a.id].menage === 0 ? 0 : 1;
+            let bZero = statsObj[b.id].menage === 0 ? 0 : 1;
+            if (aZero !== bZero) return aZero - bZero;
 
             let scoreA = statsObj[a.id].menage - (a.id === "SHAW" ? 1 : 0);
             let scoreB = statsObj[b.id].menage - (b.id === "SHAW" ? 1 : 0);
-            return scoreA - scoreB || a.id.localeCompare(b.id);
+            if (scoreA !== scoreB) return scoreA - scoreB;
+            
+            let totA = statsObj[a.id].total + (a.isAsso ? 1 : 0);
+            let totB = statsObj[b.id].total + (b.isAsso ? 1 : 0);
+            return totA - totB;
           });
 
           if(candidates.length > 0) {
@@ -1936,10 +1919,10 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     });
     
     let teaCantine = (tId) => scheduleArr.filter(s => s.p1 === tId || s.p2 === tId).length;
-    fStats.push({ id: "MME GERARD", name: "MME GERARD", isTeacher: true, cantine: teaCantine("MME GERARD"), menage: 0, total: teaCantine("MME GERARD") });
-    fStats.push({ id: "MME SUBLET", name: "MME SUBLET", isTeacher: true, cantine: teaCantine("MME SUBLET"), menage: 0, total: teaCantine("MME SUBLET") });
-    fStats.push({ id: "MME HERVET", name: "MME HERVET", isTeacher: true, cantine: teaCantine("MME HERVET"), menage: 0, total: teaCantine("MME HERVET") });
-    fStats.push({ id: "MME QARIOH", name: "MME QARIOH", isTeacher: true, cantine: teaCantine("MME QARIOH"), menage: 0, total: teaCantine("MME QARIOH") });
+    fStats.push({ id: "Mme GERARD", name: "Mme GERARD", isTeacher: true, cantine: teaCantine("Mme GERARD"), menage: 0, total: teaCantine("Mme GERARD") });
+    fStats.push({ id: "Mme SUBLET", name: "Mme SUBLET", isTeacher: true, cantine: teaCantine("Mme SUBLET"), menage: 0, total: teaCantine("Mme SUBLET") });
+    fStats.push({ id: "Mme HERVET", name: "Mme HERVET", isTeacher: true, cantine: teaCantine("Mme HERVET"), menage: 0, total: teaCantine("Mme HERVET") });
+    fStats.push({ id: "Mme QARIOH", name: "Mme QARIOH", isTeacher: true, cantine: teaCantine("Mme QARIOH"), menage: 0, total: teaCantine("Mme QARIOH") });
 
     fStats.sort((a, b) => {
       if (a.isTeacher && !b.isTeacher) return 1;
@@ -2014,10 +1997,10 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
   };
 
   const teacherStyles = {
-    "MME GERARD": "bg-slate-800 text-white border-slate-900",
-    "MME SUBLET": "bg-neutral-800 text-white border-neutral-900",
-    "MME HERVET": "bg-zinc-800 text-white border-zinc-900",
-    "MME QARIOH": "bg-stone-800 text-white border-stone-900"
+    "Mme GERARD": "bg-slate-800 text-white border-slate-900",
+    "Mme SUBLET": "bg-neutral-800 text-white border-neutral-900",
+    "Mme HERVET": "bg-zinc-800 text-white border-zinc-900",
+    "Mme QARIOH": "bg-stone-800 text-white border-stone-900"
   };
 
   const familyStyles = {
@@ -2046,7 +2029,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
   const FamilyPill = ({ id, isOut = false, fullWidth = false }) => {
     if (!id || typeof id !== 'string') return <span className={`text-red-500 text-xs italic bg-red-50 px-2 py-0.5 rounded border border-red-300 ${fullWidth ? 'w-full text-center block' : ''}`}>-</span>;
     
-    let isTeacher = id.startsWith("MME");
+    let isTeacher = id.startsWith("Mme");
     let styleClass = isTeacher ? (teacherStyles[id] || "bg-slate-700 text-white") : (familyStyles[id] || "bg-slate-100 text-slate-800 border-slate-300");
     let errBorder = isOut ? "border-red-600 shadow-red-200 border-2" : "border-transparent";
     
@@ -2055,10 +2038,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
 
     return (
       <button 
-        onClick={() => {
-          // Tout le monde peut cliquer pour filtrer
-          setQuickFilterFamily(id);
-        }}
+        onClick={() => setQuickFilterFamily(id)}
         className={`inline-flex items-center gap-1 rounded-md border font-extrabold shadow-sm transition-all hover:opacity-80 active:scale-95 cursor-pointer ${styleClass} ${errBorder} ${widthClass} ${textClass}`}
         title={isOut ? `⚠️ Jour non souhaité par ${id}` : `Filtrer sur ${id}`}
       >
@@ -2172,14 +2152,13 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         const isWeekend = dayWeek === 0 || dayWeek === 6;
         const isHoliday = holidays.includes(dateStr);
 
-        // CORRECTION CALENDRIER GLOBAL : Le calendrier réagit désormais au filtre !
-        let cantineEvent = schedule.find(s => s.date === dateStr && (!quickFilterFamily || s.p1 === quickFilterFamily || s.p2 === quickFilterFamily));
-        let menageEvent = menagesSchedule.find(m => m.date === dateStr && (!quickFilterFamily || m.familyId === quickFilterFamily));
+        let cantineEvent = schedule.find(s => s.date === dateStr);
+        let menageEvent = menagesSchedule.find(m => m.date === dateStr);
 
         if (!menageEvent && dayWeek === 0) {
            let satDate = new Date(d);
            satDate.setDate(satDate.getDate() - 1);
-           menageEvent = menagesSchedule.find(m => m.date === getLocalDateString(satDate) && (!quickFilterFamily || m.familyId === quickFilterFamily));
+           menageEvent = menagesSchedule.find(m => m.date === getLocalDateString(satDate));
         }
 
         if (dayWeek === 0 && day > 1 && menageEvent) {
@@ -2255,7 +2234,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       );
     }
 
-    const isTeacher = selectedFamilyFilter.startsWith("MME");
+    const isTeacher = selectedFamilyFilter.startsWith("Mme");
     const famInfo = isTeacher ? { type: "Équipe Pédagogique", isAsso: false } : familiesList.find(f => f.id === selectedFamilyFilter);
     let allEvents = [
         ...schedule.filter(s => s.p1 === selectedFamilyFilter || s.p2 === selectedFamilyFilter).map(s => ({ 
@@ -2601,12 +2580,8 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                       value={selectedFamilyFilter} onChange={(e) => setSelectedFamilyFilter(e.target.value)}
                     >
                       <option value="">Sélectionnez un nom...</option>
-                      <optgroup label="Familles">
-                        {[...familiesList].sort((a, b) => a.id.localeCompare(b.id)).map(f => (
-                          <option key={f.id} value={f.id}>{f.id}</option>
-                        ))}
-                      </optgroup>
-                      <optgroup label="Maîtresses"><option value="MME GERARD">MME GERARD</option><option value="MME SUBLET">MME SUBLET</option><option value="MME HERVET">MME HERVET</option><option value="MME QARIOH">MME QARIOH</option></optgroup>
+                      <optgroup label="Familles">{familiesList.map(f => <option key={f.id} value={f.id}>{f.id}</option>)}</optgroup>
+                      <optgroup label="Maîtresses"><option value="Mme GERARD">Mme GERARD</option><option value="Mme SUBLET">Mme SUBLET</option><option value="Mme HERVET">Mme HERVET</option><option value="Mme QARIOH">Mme QARIOH</option></optgroup>
                     </select>
                   </div>
                 </div>
@@ -2624,9 +2599,9 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                   <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><Utensils className="text-slate-400" size={18}/> Jours de Cantine</h3>
                   <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
                       <li><strong>Lundi :</strong> Repas par classe (2 parents)</li>
-                      <li><strong>Mardi :</strong> Alternance. Semaine Paire : Mme Gerard + Mme Sublet (0 parent). Semaine Impaire : Mme Qarioh + 1 parent.</li>
+                      <li><strong>Mardi :</strong> Alternance. Semaine Impaire : Mme Gerard + Mme Sublet (0 parent). Semaine Paire : Mme Qarioh + 1 parent.</li>
                       <li><strong>Jeudi :</strong> Filles/Garçons (2 parents)</li>
-                      <li><strong>Vendredi :</strong> Par cordée. Alternance. Semaine Paire : 2 parents. Semaine Impaire (à partir de Novembre) : Mme Sublet + 1 parent.</li>
+                      <li><strong>Vendredi :</strong> Par cordée. Alternance. Semaine 1 : 2 parents. Semaine 2 (à partir de Novembre) : Mme Sublet + 1 parent.</li>
                   </ul>
               </div>
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
@@ -2640,11 +2615,13 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                   <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><AlertCircle className="text-slate-400" size={18}/> Cas Particuliers Strictes</h3>
                   <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
+                      <li><strong>Fin d'année :</strong> L'année s'arrête le Vendredi 25 Juin 2027 (le dernier ménage est attribué sur ce week-end).</li>
+                      <li><strong>Ménage garanti :</strong> Chaque famille a l'obligation stricte d'effectuer au minimum 1 ménage sur l'année.</li>
                       <li><strong>DE LASTIC ST JAL (Dispense Naissance) :</strong> Aucune cantine ni ménage attribués entre le 1er Février et le 15 Avril 2027. À leur retour, le lissage mensuel limitera automatiquement la surcharge de rattrapage.</li>
-                      <li><strong>LE LÉZEC (Double garde Maman/Papa) :</strong> Autorisation et obligation d'occuper les 2 postes de cantine simultanément lorsqu'ils sont tirés au sort (comptabilisé comme 2 services réels). Ils ne peuvent pas être séparés et assignés avec une autre famille. Indisponibilité ponctuelle respectée le 6 novembre.</li>
-                      <li><strong>CHOMEL & DURAND :</strong> Limités manuellement à 1 seul ménage sur l'année. Les cantines sont rééquilibrées automatiquement. Toutes les autres familles font au moins un ménage.</li>
+                      <li><strong>LE LÉZEC (Double garde Maman/Papa) :</strong> Autorisation d'occuper les 2 postes de cantine simultanément le lundi ou le vendredi (comptabilisé comme 2 services réels). Bloqué manuellement le vendredi 6 novembre.</li>
+                      <li><strong>Familles Association :</strong> Avantage accordé aux membres de l'association. Leur score est réduit virtuellement d'un point pour qu'ils soient moins sollicités par le tirage au sort annuel (objectif 13 services au lieu de 14).</li>
+                      <li><strong>CHOMEL & DURAND :</strong> Limités manuellement à 1 seul ménage sur l'année. Les cantines sont rééquilibrées automatiquement.</li>
                       <li><strong>SHAW :</strong> Un ménage supplémentaire forcé. Leurs cantines sont réduites en conséquence par le lissage global.</li>
-                      <li><strong>Forçages manuels :</strong> Dates de cantines spécifiques verrouillées en dur pour les familles DE PONTE et RIOBÉ.</li>
                   </ul>
               </div>
             </div>
