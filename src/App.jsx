@@ -1498,8 +1498,8 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
 
   useEffect(() => {
     setActiveTab(defaultTab);
-    setQuickFilterFamily(null); 
-  }, [defaultTab]);
+    if (peutVoirAdmin) setQuickFilterFamily(null); 
+  }, [defaultTab, peutVoirAdmin]);
 
   const todayStr = useMemo(() => {
     const d = new Date();
@@ -1547,7 +1547,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { name: "Noël", start: "2026-12-19", end: "2027-01-03" },
       { name: "Hiver", start: "2027-02-13", end: "2027-02-28" },
       { name: "Printemps", start: "2027-04-10", end: "2027-04-25" },
-      { name: "d'Été", start: "2027-06-26", end: "2027-08-31" }
+      { name: "Été", start: "2027-06-26", end: "2027-08-31" }
     ];
 
     function getDateStr(d) {
@@ -1562,6 +1562,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       return !fam.days.includes(dOw);
     };
 
+    // --- INTEGRATION STRICTE DES FICHIERS HISTORIQUES ---
     const historicalCantine = [
       { date: '2026-09-03', p1: 'BOCCA', p2: 'TAISSIDRE-CARVALHO', repasType: 'Filles / Garçons' },
       { date: '2026-09-04', p1: 'RIOBÉ', p2: 'BEZIAT-MENUT', repasType: 'Par cordée' },
@@ -1716,6 +1717,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         } 
         else if (dayOfWeek === 2) { 
           repasType = "Placement libre";
+          // MARDIS
           if (isSemaineImpaire) { 
             requiredParents = 1; p1 = "MME QARIOH"; 
           } else if (isSemainePaire) {
@@ -1727,6 +1729,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         } 
         else if (dayOfWeek === 5) { 
           repasType = "Par cordée";
+          // VENDREDIS
           if (isSemainePaire) { 
             if (dateStr >= "2026-11-02") {
                 requiredParents = 1; p1 = "MME SUBLET"; 
@@ -2050,7 +2053,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     const widthClass = fullWidth ? "w-full justify-center px-0.5 py-0.5 min-h-[16px]" : "px-2 py-1";
     const textClass = fullWidth ? "text-[7.5px] leading-[8.5px] text-center whitespace-normal break-words" : "text-[11px]";
 
-    // CLICS BLOQUÉS : Seuls les admins ou la personne concernée par la pilule peuvent cliquer
     const estMonNom = id === monCompteId;
     const clickable = peutVoirAdmin || estMonNom;
 
@@ -2130,7 +2132,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
   };
 
   const renderCalendarGrid = () => {
-    // SUPPRESSION DE JUILLET
     const months = [
       { y: 2026, m: 8, name: 'Septembre' }, { y: 2026, m: 9, name: 'Octobre' }, { y: 2026, m: 10, name: 'Novembre' },
       { y: 2026, m: 11, name: 'Décembre' }, { y: 2027, m: 0, name: 'Janvier' }, { y: 2027, m: 1, name: 'Février' },
@@ -2140,7 +2141,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     const dayNames = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
     const cells = [];
     
-    // Ajout d'une constante pour les vacances dans le rendu du calendrier
     const vacDataLocal = [
       { name: "Toussaint", start: "2026-10-17", end: "2026-11-01" },
       { name: "Noël", start: "2026-12-19", end: "2027-01-03" },
@@ -2205,10 +2205,9 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         let customStyle = { gridColumn: moIdx + 2, gridRow: `${day + 1} / span ${rowSpan}` };
         let cellClass = "p-1 flex flex-col gap-0.5 border-r border-b border-slate-200 text-[9px] min-h-[45px] relative overflow-hidden ";
         
-        const isEmpty = !cantineEvent && !menageEvent && !isHoliday;
+        const noService = !cantineEvent && !menageEvent;
 
-        // DESIGN DES JOURS VIDES ET VACANCES
-        if (isEmpty) {
+        if (noService && !isHoliday) {
            if (activeVacation) cellClass += "bg-emerald-50/40 ";
            else if (isWeekend) cellClass += "bg-slate-50/60 ";
            else cellClass += "bg-slate-50/30 ";
@@ -2216,6 +2215,15 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
            cellClass += "bg-rose-50/40 ";
         } else if (isWeekend && !menageEvent) {
            cellClass += "bg-slate-50 ";
+        }
+
+        let vacIcon = "🌴";
+        if (activeVacation) {
+            if (activeVacation.name === "Toussaint") vacIcon = "🍂 🍄";
+            if (activeVacation.name === "Noël") vacIcon = "❄️ ⛄";
+            if (activeVacation.name === "Hiver") vacIcon = "🏔️ 🎿";
+            if (activeVacation.name === "Printemps") vacIcon = "🌸 🐝";
+            if (activeVacation.name === "Été" || activeVacation.name === "d'Été") vacIcon = "☀️ 🏖️";
         }
 
         let dayLabel = dayNames[dayWeek];
@@ -2227,25 +2235,24 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
           <div key={`${mo.m}-${day}`} className={cellClass} style={customStyle}>
             <div className="font-bold text-slate-400 mb-0.5 text-center bg-white/60 rounded px-1 w-fit mx-auto print:text-[8px] z-10 relative">{dayLabel}</div>
             
-            {/* AFFICHAGE DES ICÔNES POUR JOURS VIDES */}
-            {isEmpty && !isHoliday && (
-               <div className="absolute inset-0 flex flex-col items-center justify-center opacity-40 pointer-events-none z-0 mt-4">
+            {noService && !isHoliday && (
+               <div className="absolute inset-0 flex flex-col items-center justify-center opacity-60 pointer-events-none z-0 mt-4">
                   {activeVacation ? (
-                     <div className="flex flex-col items-center opacity-60">
-                         <span className="text-[12px] mb-0.5">🌴</span>
-                         <span className="text-[6.5px] font-black text-slate-500 uppercase text-center leading-[8px] px-1">{activeVacation.name}</span>
+                     <div className="flex flex-col items-center">
+                         <span className="text-[18px] mb-1">{vacIcon}</span>
+                         <span className="text-[7px] font-black text-slate-500 uppercase text-center leading-[8px] px-1">{activeVacation.name}</span>
                      </div>
                   ) : (dayWeek === 3) ? (
-                     <span className="text-[14px] opacity-30 grayscale">🎈</span>
+                     <span className="text-[20px] opacity-100">👦 🎈 👧</span>
                   ) : (dayWeek === 0 || dayWeek === 6) ? (
-                     <span className="text-[14px] opacity-30 grayscale">🛋️</span>
+                     <span className="text-[20px] opacity-100">🛋️ ☕</span>
                   ) : null}
                </div>
             )}
             
-            {isHoliday && isEmpty && (
-               <div className="absolute inset-0 flex flex-col items-center justify-center opacity-40 pointer-events-none z-0 mt-4">
-                  <span className="text-[7.5px] font-black text-rose-600 uppercase text-center leading-[9px]">FÉRIÉ</span>
+            {isHoliday && noService && (
+               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-0 mt-4">
+                  <span className="bg-red-500 text-white text-[9px] font-black px-2 py-1 rounded shadow-md uppercase tracking-wider">Férié</span>
                </div>
             )}
             
@@ -2257,11 +2264,10 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
             )}
 
             {menageEvent && (
-              <div className="flex flex-col gap-1 items-center justify-center w-full h-full relative z-10 py-1">
-                <span className={`text-[9px] uppercase font-black flex items-center justify-center w-full py-1 rounded shadow-sm border ${familyStyles[menageEvent.familyId] || 'bg-slate-100 text-slate-700 border-slate-300'}`}>
-                  <Sparkles size={10} className="mr-1" /> MÉNAGE
-                </span>
-                <FamilyPill id={menageEvent.familyId} isOut={false} fullWidth={true} />
+              <div className={`mt-auto flex-1 w-full flex flex-col items-center justify-center relative z-10 rounded-md shadow-sm border p-1 ${familyStyles[menageEvent.familyId] || 'bg-slate-100 text-slate-800 border-slate-300'}`}>
+                <div className="text-[16px] leading-none mb-1">🧹🧽🪣</div>
+                <div className="text-[8px] font-black uppercase tracking-wider opacity-80 mb-0.5">Ménage</div>
+                <div className="text-[9.5px] font-extrabold text-center leading-tight break-words w-full">{menageEvent.familyId}</div>
               </div>
             )}
           </div>
@@ -2271,7 +2277,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
 
     return (
       <div className="overflow-x-auto pb-10 calendar-container print:overflow-visible print:pb-0 print:w-full print:max-w-none" id="capture-zone">
-        {/* Grille ajustée à 10 colonnes (Juillet supprimé) */}
         <div className="grid border-t border-l border-slate-200 min-w-[1100px] calendar-grid print:min-w-0 print:w-full print:h-[95vh]" style={{ gridTemplateColumns: "25px repeat(10, minmax(0, 1fr))", gridTemplateRows: "auto repeat(31, minmax(45px, auto))" }}>
           {cells}
         </div>
