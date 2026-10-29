@@ -1463,8 +1463,14 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
   const [quickFilterFamily, setQuickFilterFamily] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
 
+  // --- NOUVELLE RÈGLE D'AFFICHAGE ---
+  const peutVoirAdmin = 
+    utilisateurConnecte?.role === 'admin' || 
+    utilisateurConnecte?.role === 'Administrateur Global' || 
+    utilisateurConnecte?.role === 'Famille Asso';
+
   useEffect(() => {
-    if (utilisateurConnecte && utilisateurConnecte !== 'admin') {
+    if (utilisateurConnecte && !peutVoirAdmin) {
       const userStr = typeof utilisateurConnecte === 'object' 
         ? JSON.stringify(utilisateurConnecte).toUpperCase() 
         : String(utilisateurConnecte).toUpperCase();
@@ -2375,7 +2381,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
           <button onClick={() => setActiveTab('calendrier')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'calendrier' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><CalendarDays size={16} /> Calendrier</button>
           <button onClick={() => setActiveTab('famille')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'famille' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Search size={16} /> Mon Planning</button>
           
-          {utilisateurConnecte === 'admin' && (
+          {peutVoirAdmin && (
             <>
               <button onClick={() => setActiveTab('stats')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'stats' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><BarChart3 size={16} /> Statistiques</button>
               <button onClick={() => setActiveTab('regles')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'regles' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Info size={16} /> Règles</button>
@@ -2556,7 +2562,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
           {/* TAB FAMILLE */}
           {activeTab === 'famille' && (
             <div className="animate-in fade-in duration-300 max-w-3xl mx-auto pb-12">
-              {utilisateurConnecte === 'admin' && (
+              {peutVoirAdmin && (
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mb-6 flex flex-col items-center print:hidden">
                   <label className="font-bold text-slate-700 mb-3 text-lg">Rechercher le planning d'une famille ou maîtresse :</label>
                   <div className="relative w-full max-w-md">
