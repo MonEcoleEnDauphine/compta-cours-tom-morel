@@ -1456,6 +1456,11 @@ const InfosContact = () => (
 
 // --- MODULE : PLANNINGS (Cantine & Ménage) ---
 
+// --- MODULE : PLANNINGS (Cantine & Ménage) ---
+
+import React, { useState, useMemo, useEffect } from 'react';
+import { CalendarDays, Utensils, Sparkles, Search, Users, AlertTriangle, Download, Printer, BarChart3, Info, Clock, XCircle, Camera } from 'lucide-react';
+
 export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [activePeriod, setActivePeriod] = useState(2);
@@ -1474,11 +1479,13 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         ? JSON.stringify(utilisateurConnecte).toUpperCase() 
         : String(utilisateurConnecte).toUpperCase();
 
+      // AJOUT DES MAÎTRESSES DANS LA LISTE DE DÉTECTION
       const famId = [
         "BOCCA", "CHOMEL", "CORNET-BOUBE", "DE LASTIC ST JAL", "DE SERRES", "FIARD", 
         "GREPAT", "MELLIES", "RIOBÉ", "TAISSIDRE-CARVALHO", "BEZIAT-MENUT", 
         "DE MALAUSSENE", "FAUVAIN", "LE LÉZEC", "DE PONTE", "DURAND", "ESCOBAR", 
-        "DE LA CHARRIE", "PILON", "SHAW"
+        "DE LA CHARRIE", "PILON", "SHAW", 
+        "MME GERARD", "MME SUBLET", "MME HERVET", "MME QARIOH"
       ].find(id => userStr.includes(id));
       
       if (famId) {
@@ -1580,7 +1587,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { date: '2026-10-12', p1: 'DE SERRES', p2: 'TAISSIDRE-CARVALHO', repasType: 'Repas par classe' },
       { date: '2026-10-13', p1: 'GREPAT', p2: 'MELLIES', repasType: 'Placement libre' },
       { date: '2026-10-15', p1: 'CORNET-BOUBE', p2: 'CHOMEL', repasType: 'Filles / Garçons' },
-      { date: '2026-10-16', p1: 'MME SUBLET', p2: 'Mme HERVET', repasType: 'Par cordée' }
+      { date: '2026-10-16', p1: 'MME SUBLET', p2: 'MME HERVET', repasType: 'Par cordée' }
     ];
 
     const historicalMenage = [
@@ -1749,16 +1756,24 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
 
           for (let i = assigned.length; i < requiredParents; i++) {
             let available = famsData.filter(f => {
-              if (assigned.includes(f.id)) {
-                if (f.id === "LE LÉZEC" && [1, 5].includes(dayOfWeek) && assigned.length === 1 && assigned[0] === "LE LÉZEC") {
-                   // Autorisé pour duo Papa/Maman
-                } else {
-                   return false;
-                }
+              // RÈGLE LE LÉZEC (Double Service Strict)
+              if (f.id === "LE LÉZEC") {
+                  if (dateStr === "2026-11-06") return false; 
+                  if (requiredParents < 2) return false; 
+                  if (i === 1 && assigned[0] !== "LE LÉZEC") return false; 
+                  
+                  if (assigned.includes(f.id)) {
+                      if (assigned.length === 1 && assigned[0] === "LE LÉZEC") {
+                         // Autorisé
+                      } else {
+                         return false; 
+                      }
+                  }
+              } else {
+                  if (assigned.includes(f.id)) return false;
               }
 
               if (f.id === "DE LASTIC ST JAL" && dateStr >= "2027-02-01" && dateStr <= "2027-04-15") return false;
-              if (f.id === "LE LÉZEC" && dateStr === "2026-11-06") return false;
 
               let hasDay = f.days.includes(dayOfWeek);
               if (!hasDay) return false;
@@ -1787,6 +1802,10 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
             }
 
             available.sort((a, b) => {
+              // 1. PRIORITÉ ABSOLUE ZÉRO CANTINE (Nouveaux)
+              if (statsObj[a.id].cantine === 0 && statsObj[b.id].cantine > 0) return -1;
+              if (statsObj[a.id].cantine > 0 && statsObj[b.id].cantine === 0) return 1;
+
               let scoreA = statsObj[a.id].total; let scoreB = statsObj[b.id].total;
               
               let monthDiff = statsObj[a.id].monthCantine - statsObj[b.id].monthCantine;
@@ -1857,8 +1876,8 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
           });
           
           eligibleAsso.sort((a, b) => {
-            let scoreA = statsObj[a.id].menage - (a.id === "LE LÉZEC" ? 1 : 0);
-            let scoreB = statsObj[b.id].menage - (b.id === "LE LÉZEC" ? 1 : 0);
+            let scoreA = statsObj[a.id].menage;
+            let scoreB = statsObj[b.id].menage;
             return scoreA - scoreB || a.id.localeCompare(b.id);
           });
           
@@ -1876,7 +1895,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
           });
           
           candidates = candidates.filter(f => {
-             // BLOCAGES MÉNAGES
              if (f.id === "CHOMEL" && statsObj[f.id].menage >= 1) return false;
              if (f.id === "DURAND" && statsObj[f.id].menage >= 1) return false;
              if (f.id === "LE LÉZEC" && statsObj[f.id].menage >= 1) return false;
@@ -2583,7 +2601,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                           <option key={f.id} value={f.id}>{f.id}</option>
                         ))}
                       </optgroup>
-                      <optgroup label="Maîtresses"><option value="MME GERARD">MME GERARD</option><option value="MME SUBLET">MME SUBLET</option><option value="MME HERVET">MME HERVET</option><option value="MME QARIOH">MME QARIOH</option></optgroup>
+                      <optgroup label="Maîtresses"><option value="MME GERARD">MME GERARD</option><option value="MME SUBLET">MME SUBLET</option><option value="MME HERVET">Mme HERVET</option><option value="MME QARIOH">MME QARIOH</option></optgroup>
                     </select>
                   </div>
                 </div>
@@ -2631,7 +2649,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     </div>
   );
 };
-
 
 // --- MODULE : --- TABLEAU DE BORD (DASHBOARD) ---
 const TableauBord = ({ transactionsGlobales }) => {
