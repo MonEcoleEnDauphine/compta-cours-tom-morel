@@ -1463,7 +1463,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
   const [quickFilterFamily, setQuickFilterFamily] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
 
-  // --- NOUVELLE RÈGLE D'AFFICHAGE ---
   const peutVoirAdmin = 
     utilisateurConnecte?.role === 'admin' || 
     utilisateurConnecte?.role === 'Administrateur Global' || 
@@ -1646,7 +1645,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         });
       }
 
-      // CORRECTION : Arrondi mathématique pour l'intégration des Nouveaux SP
       if (dateStr === "2026-11-02" && !spFamiliesIntegrated) {
           let sumCantine = 0; let sumMenage = 0; let countBase = 0;
           famsData.forEach(f => {
@@ -1741,6 +1739,9 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                 }
               }
 
+              // BLOCAGE PONCTUEL : LE LÉZEC indisponible le 6 novembre
+              if (f.id === "LE LÉZEC" && dateStr === "2026-11-06") return false;
+
               let hasDay = f.days.includes(dayOfWeek);
               if (!hasDay) return false;
 
@@ -1767,9 +1768,10 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                 if (lezecObj) available = [lezecObj];
             }
 
-            // CORRECTION : Priorité absolue au Total Annuel
+            // CORRECTION : On simule +1 service pour les familles Asso (isAsso) pour baisser leur charge
             available.sort((a, b) => {
-              let scoreA = statsObj[a.id].total; let scoreB = statsObj[b.id].total;
+              let scoreA = statsObj[a.id].total + (a.isAsso ? 1 : 0); 
+              let scoreB = statsObj[b.id].total + (b.isAsso ? 1 : 0);
               
               if (scoreA !== scoreB) return scoreA - scoreB;
               
@@ -1792,7 +1794,9 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
               statsObj[chosenId].lastCantine = dateStr;
             } else {
               let fallback = famsData.filter(f => !assigned.includes(f.id)).sort((a, b) => {
-                 let tDiff = statsObj[a.id].total - statsObj[b.id].total;
+                 let scoreA = statsObj[a.id].total + (a.isAsso ? 1 : 0); 
+                 let scoreB = statsObj[b.id].total + (b.isAsso ? 1 : 0);
+                 let tDiff = scoreA - scoreB;
                  if (tDiff !== 0) return tDiff;
                  let pDiff = statsObj[a.id].periodCantine - statsObj[b.id].periodCantine;
                  if (pDiff !== 0) return pDiff;
@@ -1842,8 +1846,10 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
             let scoreA = statsObj[a.id].menage - (a.id === "LE LÉZEC" ? 1 : 0);
             let scoreB = statsObj[b.id].menage - (b.id === "LE LÉZEC" ? 1 : 0);
             if (scoreA !== scoreB) return scoreA - scoreB;
-            // CORRECTION : En cas d'égalité sur le ménage, on donne à celui qui a le moins de services au TOTAL
-            return statsObj[a.id].total - statsObj[b.id].total;
+            
+            let totA = statsObj[a.id].total + (a.isAsso ? 1 : 0);
+            let totB = statsObj[b.id].total + (b.isAsso ? 1 : 0);
+            return totA - totB;
           });
           
           if(eligibleAsso.length > 0) {
@@ -1876,8 +1882,10 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
             let scoreA = statsObj[a.id].menage - (a.id === "SHAW" ? 1 : 0);
             let scoreB = statsObj[b.id].menage - (b.id === "SHAW" ? 1 : 0);
             if (scoreA !== scoreB) return scoreA - scoreB;
-            // CORRECTION : En cas d'égalité sur le ménage, on donne à celui qui a le moins de services au TOTAL
-            return statsObj[a.id].total - statsObj[b.id].total;
+            
+            let totA = statsObj[a.id].total + (a.isAsso ? 1 : 0);
+            let totB = statsObj[b.id].total + (b.isAsso ? 1 : 0);
+            return totA - totB;
           });
 
           if(candidates.length > 0) {
@@ -2596,7 +2604,8 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                   <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><AlertCircle className="text-slate-400" size={18}/> Cas Particuliers Strictes</h3>
                   <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
                       <li><strong>DE LASTIC ST JAL (Dispense Naissance) :</strong> Aucune cantine ni ménage attribués entre le 1er Février et le 15 Avril 2027. À leur retour, le lissage mensuel limitera automatiquement la surcharge de rattrapage.</li>
-                      <li><strong>LE LÉZEC (Double garde Maman/Papa) :</strong> Autorisation d'occuper les 2 postes de cantine simultanément le lundi ou le vendredi (comptabilisé comme 2 services réels). En compensation, leurs ménages sont bridés pour forcer l'algorithme à leur donner plus de doubles cantines.</li>
+                      <li><strong>LE LÉZEC (Double garde Maman/Papa) :</strong> Autorisation d'occuper les 2 postes de cantine simultanément le lundi ou le vendredi (comptabilisé comme 2 services réels). Bloqué manuellement le vendredi 6 novembre.</li>
+                      <li><strong>Familles Association :</strong> Avantage accordé aux membres de l'association. Leur score est réduit virtuellement d'un point pour qu'ils soient moins sollicités par le tirage au sort annuel (objectif 13 services au lieu de 14).</li>
                       <li><strong>CHOMEL & DURAND :</strong> Limités manuellement à 1 seul ménage sur l'année. Les cantines sont rééquilibrées automatiquement.</li>
                       <li><strong>SHAW :</strong> Un ménage supplémentaire forcé. Leurs cantines sont réduites en conséquence par le lissage global.</li>
                   </ul>
