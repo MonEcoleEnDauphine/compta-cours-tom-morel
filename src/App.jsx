@@ -1454,6 +1454,8 @@ const InfosContact = () => (
   </div>
 );
 
+// --- MODULE : PLANNINGS (Cantine & Ménage) ---
+
 export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [activePeriod, setActivePeriod] = useState(2);
@@ -1545,7 +1547,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     }
 
     const checkIsOut = (famId, dOw, dStr) => {
-      if (!famId || famId.startsWith("Mme")) return false;
+      if (!famId || famId.startsWith("MME")) return false;
       const fam = famsData.find(f => f.id === famId);
       if (!fam) return false;
       return !fam.days.includes(dOw);
@@ -1556,29 +1558,29 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { date: '2026-09-03', p1: 'BOCCA', p2: 'TAISSIDRE-CARVALHO', repasType: 'Filles / Garçons' },
       { date: '2026-09-04', p1: 'RIOBÉ', p2: 'BEZIAT-MENUT', repasType: 'Par cordée' },
       { date: '2026-09-07', p1: 'DE SERRES', p2: 'DE MALAUSSENE', repasType: 'Repas par classe' },
-      { date: '2026-09-08', p1: 'Mme GERARD', p2: 'Mme SUBLET', repasType: 'Placement libre' },
+      { date: '2026-09-08', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
       { date: '2026-09-10', p1: 'RIOBÉ', p2: 'FAUVAIN', repasType: 'Filles / Garçons' },
       { date: '2026-09-11', p1: 'LE LÉZEC', p2: 'CORNET-BOUBE', repasType: 'Par cordée' },
       { date: '2026-09-14', p1: 'GREPAT', p2: 'DE LASTIC ST JAL', repasType: 'Repas par classe' },
       { date: '2026-09-15', p1: 'MELLIES', p2: 'GREPAT', repasType: 'Placement libre' },
       { date: '2026-09-17', p1: 'CHOMEL', p2: 'LE LÉZEC', repasType: 'Filles / Garçons' },
-      { date: '2026-09-18', p1: 'Mme SUBLET', p2: 'Mme HERVET', repasType: 'Par cordée' },
+      { date: '2026-09-18', p1: 'MME SUBLET', p2: 'MME HERVET', repasType: 'Par cordée' },
       { date: '2026-09-21', p1: 'DE SERRES', p2: 'TAISSIDRE-CARVALHO', repasType: 'Repas par classe' },
-      { date: '2026-09-22', p1: 'Mme GERARD', p2: 'Mme SUBLET', repasType: 'Placement libre' },
+      { date: '2026-09-22', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
       { date: '2026-09-24', p1: 'MELLIES', p2: 'CORNET-BOUBE', repasType: 'Filles / Garçons' },
       { date: '2026-09-25', p1: 'BOCCA', p2: 'BEZIAT-MENUT', repasType: 'Par cordée' },
       { date: '2026-09-28', p1: 'DE MALAUSSENE', p2: 'DE SERRES', repasType: 'Repas par classe' },
       { date: '2026-09-29', p1: 'FIARD', p2: 'GREPAT', repasType: 'Placement libre' },
       { date: '2026-10-01', p1: 'MELLIES', p2: 'CORNET-BOUBE', repasType: 'Filles / Garçons' },
-      { date: '2026-10-02', p1: 'Mme SUBLET', p2: 'Mme HERVET', repasType: 'Par cordée' },
+      { date: '2026-10-02', p1: 'MME SUBLET', p2: 'MME HERVET', repasType: 'Par cordée' },
       { date: '2026-10-05', p1: 'TAISSIDRE-CARVALHO', p2: 'DE MALAUSSENE', repasType: 'Repas par classe' },
-      { date: '2026-10-06', p1: 'Mme GERARD', p2: 'Mme SUBLET', repasType: 'Placement libre' },
+      { date: '2026-10-06', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
       { date: '2026-10-08', p1: 'FIARD', p2: 'DE LASTIC ST JAL', repasType: 'Filles / Garçons' },
       { date: '2026-10-09', p1: 'BOCCA', p2: 'BEZIAT-MENUT', repasType: 'Par cordée' },
       { date: '2026-10-12', p1: 'DE SERRES', p2: 'TAISSIDRE-CARVALHO', repasType: 'Repas par classe' },
       { date: '2026-10-13', p1: 'GREPAT', p2: 'MELLIES', repasType: 'Placement libre' },
       { date: '2026-10-15', p1: 'CORNET-BOUBE', p2: 'CHOMEL', repasType: 'Filles / Garçons' },
-      { date: '2026-10-16', p1: 'Mme SUBLET', p2: 'Mme HERVET', repasType: 'Par cordée' }
+      { date: '2026-10-16', p1: 'MME SUBLET', p2: 'Mme HERVET', repasType: 'Par cordée' }
     ];
 
     const historicalMenage = [
@@ -1707,11 +1709,11 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         } 
         else if (dayOfWeek === 2) { 
           repasType = "Placement libre";
-          // INVERSION MARDIS (Paire: Gerard/Sublet | Impaire: Qarioh)
+          // MARDIS (Paire: Gerard/Sublet | Impaire: Qarioh)
           if (isSemaineImpaire) { 
-            requiredParents = 1; p1 = "Mme QARIOH"; 
+            requiredParents = 1; p1 = "MME QARIOH"; 
           } else if (isSemainePaire) {
-            requiredParents = 0; p1 = "Mme GERARD"; p2 = "Mme SUBLET"; 
+            requiredParents = 0; p1 = "MME GERARD"; p2 = "MME SUBLET"; 
           }
         } 
         else if (dayOfWeek === 4) { 
@@ -1719,12 +1721,12 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         } 
         else if (dayOfWeek === 5) { 
           repasType = "Par cordée";
-          // INVERSION VENDREDIS
+          // VENDREDIS : Inverse par rapport au mardi
           if (isSemainePaire) { 
             if (dateStr >= "2026-11-02") {
-                requiredParents = 1; p1 = "Mme SUBLET"; 
+                requiredParents = 1; p1 = "MME SUBLET"; 
             } else {
-                requiredParents = 0; p1 = "Mme SUBLET"; p2 = "Mme HERVET"; 
+                requiredParents = 0; p1 = "MME SUBLET"; p2 = "MME HERVET"; 
             }
           } 
           else { requiredParents = 2; }
@@ -1874,6 +1876,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
           });
           
           candidates = candidates.filter(f => {
+             // BLOCAGES MÉNAGES
              if (f.id === "CHOMEL" && statsObj[f.id].menage >= 1) return false;
              if (f.id === "DURAND" && statsObj[f.id].menage >= 1) return false;
              if (f.id === "LE LÉZEC" && statsObj[f.id].menage >= 1) return false;
@@ -1914,10 +1917,10 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     });
     
     let teaCantine = (tId) => scheduleArr.filter(s => s.p1 === tId || s.p2 === tId).length;
-    fStats.push({ id: "Mme GERARD", name: "Mme GERARD", isTeacher: true, cantine: teaCantine("Mme GERARD"), menage: 0, total: teaCantine("Mme GERARD") });
-    fStats.push({ id: "Mme SUBLET", name: "Mme SUBLET", isTeacher: true, cantine: teaCantine("Mme SUBLET"), menage: 0, total: teaCantine("Mme SUBLET") });
-    fStats.push({ id: "Mme HERVET", name: "Mme HERVET", isTeacher: true, cantine: teaCantine("Mme HERVET"), menage: 0, total: teaCantine("Mme HERVET") });
-    fStats.push({ id: "Mme QARIOH", name: "Mme QARIOH", isTeacher: true, cantine: teaCantine("Mme QARIOH"), menage: 0, total: teaCantine("Mme QARIOH") });
+    fStats.push({ id: "MME GERARD", name: "MME GERARD", isTeacher: true, cantine: teaCantine("MME GERARD"), menage: 0, total: teaCantine("MME GERARD") });
+    fStats.push({ id: "MME SUBLET", name: "MME SUBLET", isTeacher: true, cantine: teaCantine("MME SUBLET"), menage: 0, total: teaCantine("MME SUBLET") });
+    fStats.push({ id: "MME HERVET", name: "MME HERVET", isTeacher: true, cantine: teaCantine("MME HERVET"), menage: 0, total: teaCantine("MME HERVET") });
+    fStats.push({ id: "MME QARIOH", name: "MME QARIOH", isTeacher: true, cantine: teaCantine("MME QARIOH"), menage: 0, total: teaCantine("MME QARIOH") });
 
     fStats.sort((a, b) => {
       if (a.isTeacher && !b.isTeacher) return 1;
@@ -1992,10 +1995,10 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
   };
 
   const teacherStyles = {
-    "Mme GERARD": "bg-slate-800 text-white border-slate-900",
-    "Mme SUBLET": "bg-neutral-800 text-white border-neutral-900",
-    "Mme HERVET": "bg-zinc-800 text-white border-zinc-900",
-    "Mme QARIOH": "bg-stone-800 text-white border-stone-900"
+    "MME GERARD": "bg-slate-800 text-white border-slate-900",
+    "MME SUBLET": "bg-neutral-800 text-white border-neutral-900",
+    "MME HERVET": "bg-zinc-800 text-white border-zinc-900",
+    "MME QARIOH": "bg-stone-800 text-white border-stone-900"
   };
 
   const familyStyles = {
@@ -2024,7 +2027,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
   const FamilyPill = ({ id, isOut = false, fullWidth = false }) => {
     if (!id || typeof id !== 'string') return <span className={`text-red-500 text-xs italic bg-red-50 px-2 py-0.5 rounded border border-red-300 ${fullWidth ? 'w-full text-center block' : ''}`}>-</span>;
     
-    let isTeacher = id.startsWith("Mme");
+    let isTeacher = id.startsWith("MME");
     let styleClass = isTeacher ? (teacherStyles[id] || "bg-slate-700 text-white") : (familyStyles[id] || "bg-slate-100 text-slate-800 border-slate-300");
     let errBorder = isOut ? "border-red-600 shadow-red-200 border-2" : "border-transparent";
     
@@ -2229,7 +2232,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       );
     }
 
-    const isTeacher = selectedFamilyFilter.startsWith("Mme");
+    const isTeacher = selectedFamilyFilter.startsWith("MME");
     const famInfo = isTeacher ? { type: "Équipe Pédagogique", isAsso: false } : familiesList.find(f => f.id === selectedFamilyFilter);
     let allEvents = [
         ...schedule.filter(s => s.p1 === selectedFamilyFilter || s.p2 === selectedFamilyFilter).map(s => ({ 
@@ -2580,7 +2583,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                           <option key={f.id} value={f.id}>{f.id}</option>
                         ))}
                       </optgroup>
-                      <optgroup label="Maîtresses"><option value="Mme GERARD">Mme GERARD</option><option value="Mme SUBLET">Mme SUBLET</option><option value="Mme HERVET">Mme HERVET</option><option value="Mme QARIOH">Mme QARIOH</option></optgroup>
+                      <optgroup label="Maîtresses"><option value="MME GERARD">MME GERARD</option><option value="MME SUBLET">MME SUBLET</option><option value="MME HERVET">MME HERVET</option><option value="MME QARIOH">MME QARIOH</option></optgroup>
                     </select>
                   </div>
                 </div>
@@ -2628,6 +2631,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     </div>
   );
 };
+
 
 // --- MODULE : --- TABLEAU DE BORD (DASHBOARD) ---
 const TableauBord = ({ transactionsGlobales }) => {
