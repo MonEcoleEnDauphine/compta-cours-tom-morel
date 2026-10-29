@@ -8,7 +8,7 @@ import {
   Globe, Mail, Phone, PlusCircle, Edit2, Send, Clock, Hammer, Menu,
   Megaphone, Bell, Newspaper, Camera, MessageCircle,
   Utensils, BarChart3, AlertCircle, Printer, CalendarDays,
-  ChevronLeft, UploadCloud, Baby, LogOut, Eye, EyeOff
+  ChevronLeft, UploadCloud, Baby, LogOut, Eye, EyeOff, , FlaskConical, Microscope, Beaker, Cog, Compass, FileCheck
 } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
@@ -1533,13 +1533,12 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { id: "SHAW", type: "Nouveau SP", days: [2], isAsso: false }
     ];
 
-    // --- LE THÈME DES INVENTEURS ---
     const perData = [
-      { id: 1, name: "Période Gustave Eiffel 🗼", desc: "03/09 - 16/10", start: "2026-09-03", end: "2026-10-16" },
-      { id: 2, name: "Période A. Lavoisier 🧪", desc: "02/11 - 18/12", start: "2026-11-02", end: "2026-12-18" },
-      { id: 3, name: "Période Louis Pasteur 🔬", desc: "04/01 - 12/02", start: "2027-01-04", end: "2027-02-12" },
-      { id: 4, name: "Période Marie Curie ☢️", desc: "01/03 - 09/04", start: "2027-03-01", end: "2027-04-09" },
-      { id: 5, name: "Période Louis Braille 📖", desc: "26/04 - 25/06", start: "2027-04-26", end: "2027-06-25" }
+      { id: 1, name: "Période G. Eiffel 🗼", desc: "(Rentrée - Toussaint)", start: "2026-09-03", end: "2026-10-16" },
+      { id: 2, name: "Période A. Lavoisier 🧪", desc: "(Toussaint - Noël)", start: "2026-11-02", end: "2026-12-18" },
+      { id: 3, name: "Période L. Pasteur 🔬", desc: "(Noël - Février)", start: "2027-01-04", end: "2027-02-12" },
+      { id: 4, name: "Période Marie Curie ☢️", desc: "(Février - Pâques)", start: "2027-03-01", end: "2027-04-09" },
+      { id: 5, name: "Période L. Braille 📖", desc: "(Pâques - Été)", start: "2027-04-26", end: "2027-06-25" }
     ];
 
     const holiData = ["2026-11-11", "2027-03-26", "2027-03-29", "2027-05-06", "2027-05-07", "2027-05-17"];
@@ -1594,12 +1593,12 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     ];
 
     const historicalMenage = [
-      { date: '2026-09-05', familyId: 'FAUVAIN', label: 'Ménage Hebdomadaire' },
-      { date: '2026-09-12', familyId: 'FIARD', label: 'Ménage Hebdomadaire' },
-      { date: '2026-09-19', familyId: 'CHOMEL', label: 'Ménage Hebdomadaire' },
-      { date: '2026-09-26', familyId: 'DE LASTIC ST JAL', label: 'Ménage Hebdomadaire' },
-      { date: '2026-10-03', familyId: 'RIOBÉ', label: 'Ménage Hebdomadaire' },
-      { date: '2026-10-10', familyId: 'LE LÉZEC', label: 'Ménage Hebdomadaire' },
+      { date: '2026-09-05', familyId: 'FAUVAIN', label: 'Ménage du Week-end' },
+      { date: '2026-09-12', familyId: 'FIARD', label: 'Ménage du Week-end' },
+      { date: '2026-09-19', familyId: 'CHOMEL', label: 'Ménage du Week-end' },
+      { date: '2026-09-26', familyId: 'DE LASTIC ST JAL', label: 'Ménage du Week-end' },
+      { date: '2026-10-03', familyId: 'RIOBÉ', label: 'Ménage du Week-end' },
+      { date: '2026-10-10', familyId: 'LE LÉZEC', label: 'Ménage du Week-end' },
       { date: '2026-10-17', familyId: 'FAUVAIN', label: 'Vacances Toussaint' }
     ];
 
@@ -1920,7 +1919,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
             let chosen = candidates[0].id;
             statsObj[chosen].menage++; statsObj[chosen].total++; statsObj[chosen].lastMenage = dateStr;
             let nextSat = new Date(currentDate); nextSat.setDate(nextSat.getDate() + 1);
-            menageArr.push({ date: getDateStr(nextSat), period: activeP.id, familyId: chosen, isVacances: false, label: "Ménage Hebdomadaire" });
+            menageArr.push({ date: getDateStr(nextSat), period: activeP.id, familyId: chosen, isVacances: false, label: "Ménage du Week-end" });
           }
         }
       }
@@ -1970,6 +1969,52 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     let d2 = new Date(dateString + "T12:00:00");
     d2.setDate(d2.getDate() + 1); 
     return `Sam. ${d1.getDate()} au Dim. ${new Date(d2).toLocaleDateString('fr-FR', {day:'numeric', month:'short'})}`;
+  };
+  
+  // NOUVEAU : Fonction de génération du fichier .ics pour l'agenda
+  const handleAddToCalendar = (event) => {
+      let startDateStr, endDateStr, title, description;
+      
+      if (event.type === 'Cantine') {
+          // Format: 2026-11-03 -> 20261103T120000
+          startDateStr = event.date.replace(/-/g, '') + 'T120000Z';
+          endDateStr = event.date.replace(/-/g, '') + 'T133000Z';
+          title = `Cantine - École`;
+          description = `Service de cantine : ${event.details}.\\nPartenaire : ${event.partner || 'Aucun'}`;
+      } else {
+          // Ménage (Samedi au Dimanche)
+          let d1 = new Date(event.date + "T12:00:00");
+          let d2 = new Date(d1); d2.setDate(d2.getDate() + 1);
+          
+          let y1 = d1.getFullYear(); let m1 = String(d1.getMonth()+1).padStart(2, '0'); let day1 = String(d1.getDate()).padStart(2, '0');
+          let y2 = d2.getFullYear(); let m2 = String(d2.getMonth()+1).padStart(2, '0'); let day2 = String(d2.getDate()).padStart(2, '0');
+          
+          startDateStr = `${y1}${m1}${day1}T080000Z`;
+          endDateStr = `${y2}${m2}${day2}T180000Z`;
+          title = `Ménage de l'école`;
+          description = `Responsabilité ménage : ${event.details}`;
+      }
+
+      const icsContent = [
+          "BEGIN:VCALENDAR",
+          "VERSION:2.0",
+          "BEGIN:VEVENT",
+          `DTSTART:${startDateStr}`,
+          `DTEND:${endDateStr}`,
+          `SUMMARY:${title}`,
+          `DESCRIPTION:${description}`,
+          "END:VEVENT",
+          "END:VCALENDAR"
+      ].join("\n");
+
+      const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${title.replace(/\s+/g, '_')}_${event.date}.ics`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
   };
 
   const handleDownloadImage = async () => {
@@ -2216,6 +2261,10 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
            cellClass += "bg-slate-50 ";
         }
 
+        if (menageEvent && rowSpan === 2) {
+           cellClass += "bg-indigo-50/20 ";
+        }
+
         let vacIcon = "🌴";
         if (activeVacation) {
             if (activeVacation.name === "Toussaint") vacIcon = "🍂 🍄";
@@ -2298,10 +2347,12 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     const famInfo = isTeacher ? { type: "Équipe Pédagogique", isAsso: false } : familiesList.find(f => f.id === selectedFamilyFilter);
     
     let allEvents = [
-        ...schedule.filter(s => s.p1 === selectedFamilyFilter || s.p2 === selectedFamilyFilter).map(s => ({ 
-          date: s.date, type: 'Cantine', details: s.repasType, period: s.period, 
-          isOut: (s.p1 === selectedFamilyFilter && s.p1IsOut) || (s.p2 === selectedFamilyFilter && s.p2IsOut) 
-        })),
+        ...schedule.filter(s => s.p1 === selectedFamilyFilter || s.p2 === selectedFamilyFilter).map(s => {
+          let partner = s.p1 === selectedFamilyFilter ? s.p2 : s.p1;
+          // Si c'est un double service LE LÉZEC, le partenaire est... LE LÉZEC. On nettoie l'affichage.
+          if (selectedFamilyFilter === "LE LÉZEC" && partner === "LE LÉZEC") partner = "Maman/Papa";
+          return { date: s.date, type: 'Cantine', details: s.repasType, period: s.period, isOut: (s.p1 === selectedFamilyFilter && s.p1IsOut) || (s.p2 === selectedFamilyFilter && s.p2IsOut), partner };
+        }),
         ...menagesSchedule.filter(m => m.familyId === selectedFamilyFilter).map(m => ({ date: m.date, type: 'Ménage', details: m.label, isVacances: m.isVacances, period: m.period }))
     ].sort((a, b) => new Date(a.date+"T12:00:00") - new Date(b.date+"T12:00:00"));
 
@@ -2329,7 +2380,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
           {displayedEvents.length === 0 ? <div className="p-8 text-center text-slate-500">Aucun service planifié.</div> : (
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-slate-500 text-[11px] font-bold uppercase tracking-wider">
-                  <tr><th className="p-4 border-b border-slate-200">Date</th><th className="p-4 border-b border-slate-200">Type de service</th></tr>
+                  <tr><th className="p-4 border-b border-slate-200 w-48">Date</th><th className="p-4 border-b border-slate-200">Type de service</th><th className="p-4 border-b border-slate-200 text-right print:hidden">Action</th></tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {(() => {
@@ -2340,7 +2391,8 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                       currentP = e.period;
                       let periodObj = periodsInfo.find(p=>p.id===currentP);
                       let pName = periodObj ? periodObj.name : 'Période inconnue';
-                      pHeader = <tr key={`ph-${idx}`}><td colSpan="2" className="bg-slate-100 px-6 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider">{pName}</td></tr>;
+                      let pDesc = periodObj ? periodObj.desc : '';
+                      pHeader = <tr key={`ph-${idx}`}><td colSpan="3" className="bg-slate-100 px-6 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider">{pName} <span className="font-normal opacity-70 ml-2">{pDesc}</span></td></tr>;
                     }
                     const isCantine = e.type === 'Cantine';
                     const iconClass = isCantine ? 'text-blue-500 bg-blue-100' : (e.isVacances ? 'text-amber-500 bg-amber-100' : 'text-indigo-500 bg-indigo-100');
@@ -2356,9 +2408,20 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                                   <div className={`w-8 h-8 rounded-full flex items-center justify-center ${iconClass}`}>
                                     {isCantine ? <Utensils size={14} /> : (e.isVacances ? <CalendarDays size={14} /> : <Sparkles size={14} />)}
                                   </div>
-                                  <div><strong className="text-slate-800 block">{e.type}</strong><span className="text-slate-500 text-xs">{e.details}</span></div>
+                                  <div>
+                                    <strong className="text-slate-800 block">{e.type}</strong>
+                                    <span className="text-slate-500 text-xs">
+                                        {e.details} 
+                                        {isCantine && <span className="ml-1 font-semibold text-slate-400">• Avec {e.partner || 'Aucun'}</span>}
+                                    </span>
+                                  </div>
                                   {e.isOut && !isTeacher && <span className="ml-2 inline-flex items-center gap-1 text-[10px] font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded uppercase tracking-wider border border-red-300 shadow-sm"><AlertTriangle size={10}/> Dépannage (Hors dispo)</span>}
                               </div>
+                          </td>
+                          <td className="p-4 text-right print:hidden">
+                             <button onClick={() => handleAddToCalendar(e)} className="text-xs bg-slate-100 hover:bg-blue-100 hover:text-blue-700 text-slate-600 font-semibold px-3 py-1.5 rounded border border-slate-200 transition-colors inline-flex items-center gap-1.5">
+                                📅 Ajouter à l'agenda
+                             </button>
                           </td>
                         </tr>
                       </React.Fragment>
@@ -2444,30 +2507,30 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
           <div className="flex gap-3">
             {activeTab !== 'regles' && activeTab !== 'calendrier' && (
               <button onClick={handleExportCSV} className="bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200 px-4 py-2 rounded-lg font-semibold text-sm transition flex items-center gap-2">
-                <Download size={16} /> Exporter l'année complète
+                <FileCheck size={16} /> Exporter .CSV
               </button>
             )}
             <button onClick={() => window.print()} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg font-semibold text-sm transition shadow-sm flex items-center gap-2">
-              <Printer size={16} /> Imprimer
+              <Printer size={16} /> Imprimer format PDF
             </button>
             {activeTab === 'calendrier' && (
               <button onClick={handleDownloadImage} className="bg-teal-600 hover:bg-teal-700 text-white px-5 py-2.5 rounded-lg font-semibold text-sm transition shadow-sm flex items-center gap-2">
-                <Camera size={16} /> Image JPEG
+                <Camera size={16} /> Enregistrer l'image (JPEG)
               </button>
             )}
           </div>
         </header>
 
         <div className="flex flex-wrap justify-center gap-2 mb-8 print:hidden" id="main-nav">
-          <button onClick={() => setActiveTab('cantine')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'cantine' ? 'bg-amber-500 text-white shadow-md shadow-amber-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Utensils size={16} /> Cantine</button>
-          <button onClick={() => setActiveTab('menage')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'menage' ? 'bg-amber-500 text-white shadow-md shadow-amber-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Sparkles size={16} /> Ménage</button>
-          <button onClick={() => setActiveTab('calendrier')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'calendrier' ? 'bg-amber-500 text-white shadow-md shadow-amber-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><CalendarDays size={16} /> Calendrier</button>
-          <button onClick={() => setActiveTab('famille')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'famille' ? 'bg-amber-500 text-white shadow-md shadow-amber-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Search size={16} /> Mon Planning</button>
+          <button onClick={() => setActiveTab('cantine')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'cantine' ? 'bg-amber-500 text-white shadow-md shadow-amber-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><FlaskConical size={16} /> Cantine</button>
+          <button onClick={() => setActiveTab('menage')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'menage' ? 'bg-amber-500 text-white shadow-md shadow-amber-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Beaker size={16} /> Ménage</button>
+          <button onClick={() => setActiveTab('calendrier')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'calendrier' ? 'bg-amber-500 text-white shadow-md shadow-amber-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Microscope size={16} /> Calendrier Annuel</button>
+          <button onClick={() => setActiveTab('famille')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'famille' ? 'bg-amber-500 text-white shadow-md shadow-amber-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Compass size={16} /> Mon Planning</button>
           
           {peutVoirAdmin && (
             <>
               <button onClick={() => setActiveTab('stats')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'stats' ? 'bg-amber-500 text-white shadow-md shadow-amber-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><BarChart3 size={16} /> Statistiques</button>
-              <button onClick={() => setActiveTab('regles')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'regles' ? 'bg-amber-500 text-white shadow-md shadow-amber-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Info size={16} /> Règles</button>
+              <button onClick={() => setActiveTab('regles')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'regles' ? 'bg-amber-500 text-white shadow-md shadow-amber-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Cog size={16} /> Rouages de l'Algorithme</button>
             </>
           )}
         </div>
@@ -2489,13 +2552,14 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
             <div className="animate-in fade-in duration-300">
               <div className="mb-8 text-center print:text-left">
                 <h2 className="text-2xl font-bold text-slate-800 flex items-center justify-center md:justify-start gap-3 mb-4">
-                  <Utensils className="text-amber-500" /> Planning de la Cantine
+                  <FlaskConical className="text-amber-500" /> Planning de la Cantine
                 </h2>
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6 print:hidden">
                   <div className="grid grid-cols-2 md:flex md:flex-wrap gap-2 bg-slate-100 p-2 rounded-xl w-full md:w-auto shadow-inner">
                     {periodsInfo.map(p => (
-                      <button key={p.id} onClick={() => setActivePeriod(p.id)} className={`px-4 py-2 rounded-lg text-xs font-semibold border transition-all flex-1 ${activePeriod === p.id ? 'bg-white shadow-sm text-amber-600 border-amber-200' : 'text-slate-500 border-transparent hover:bg-slate-200'}`}>
-                        {p.name}
+                      <button key={p.id} onClick={() => setActivePeriod(p.id)} className={`px-4 py-2 rounded-lg text-xs font-semibold border transition-all flex-1 ${activePeriod === p.id ? 'bg-white shadow-sm text-amber-600 border-amber-200' : 'text-slate-500 border-transparent hover:bg-slate-200'} flex flex-col items-center gap-0.5`}>
+                        <span>{p.name}</span>
+                        <span className="text-[10px] font-normal opacity-80">{p.desc}</span>
                       </button>
                     ))}
                   </div>
@@ -2516,6 +2580,12 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                   if (row.dayOfWeek === 4) { dayBg = "bg-orange-50/50"; dayBorder = "border-orange-100"; }
                   if (row.dayOfWeek === 5) { dayBg = "bg-teal-50/50"; dayBorder = "border-teal-100"; }
 
+                  let repasIcon = "⚙️";
+                  if (row.repasType === "Repas par classe") repasIcon = "🧬";
+                  if (row.repasType === "Placement libre") repasIcon = "🔭";
+                  if (row.repasType === "Filles / Garçons") repasIcon = "🧲";
+                  if (row.repasType === "Par cordée") repasIcon = "💡";
+
                   return (
                     <div key={i} className={`${dayBg} rounded-xl p-4 border ${dayBorder} shadow-sm relative hover:shadow-md transition-shadow flex flex-col`}>
                       <div className="text-sm font-bold text-slate-700 mb-1 border-b border-slate-200/50 pb-2 capitalize">
@@ -2523,7 +2593,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                       </div>
                       <div className="mt-2 mb-3">
                         <span className="bg-white/80 text-slate-600 px-2 py-1 rounded border border-slate-100 text-xs font-semibold shadow-sm inline-block">
-                          ⚙️ {row.repasType}
+                          {repasIcon} {row.repasType}
                         </span>
                       </div>
                       <div className="space-y-2 mt-auto">
@@ -2553,13 +2623,14 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
             <div className="animate-in fade-in duration-300">
               <div className="mb-8 text-center print:text-left">
                 <h2 className="text-2xl font-bold text-slate-800 flex items-center justify-center md:justify-start gap-3 mb-4">
-                  <Sparkles className="text-amber-500" /> Planning du Ménage
+                  <Beaker className="text-amber-500" /> Planning du Ménage
                 </h2>
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6 print:hidden">
                   <div className="grid grid-cols-2 md:flex md:flex-wrap gap-2 bg-slate-100 p-2 rounded-xl w-full md:w-auto shadow-inner">
                     {periodsInfo.map(p => (
-                      <button key={p.id} onClick={() => setActivePeriod(p.id)} className={`px-4 py-2 rounded-lg text-xs font-semibold border transition-all flex-1 ${activePeriod === p.id ? 'bg-white shadow-sm text-amber-600 border-amber-200' : 'text-slate-500 border-transparent hover:bg-slate-200'}`}>
-                        {p.name}
+                      <button key={p.id} onClick={() => setActivePeriod(p.id)} className={`px-4 py-2 rounded-lg text-xs font-semibold border transition-all flex-1 ${activePeriod === p.id ? 'bg-white shadow-sm text-amber-600 border-amber-200' : 'text-slate-500 border-transparent hover:bg-slate-200'} flex flex-col items-center gap-0.5`}>
+                        <span>{p.name}</span>
+                        <span className="text-[10px] font-normal opacity-80">{p.desc}</span>
                       </button>
                     ))}
                   </div>
@@ -2611,7 +2682,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
           {activeTab === 'calendrier' && (
             <div className="animate-in fade-in duration-300">
               <div className="text-center mb-6 print:text-left">
-                <h2 className="text-2xl font-bold text-slate-800 flex items-center justify-center md:justify-start gap-2"><CalendarDays className="text-amber-500" /> Calendrier Annuel Global</h2>
+                <h2 className="text-2xl font-bold text-slate-800 flex items-center justify-center md:justify-start gap-2"><Microscope className="text-amber-500" /> Calendrier Annuel Global</h2>
               </div>
               {renderCalendarGrid()}
             </div>
@@ -2673,7 +2744,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
           {/* TAB RÈGLES */}
           {activeTab === 'regles' && (
             <div className="max-w-3xl mx-auto space-y-6 pb-12 animate-in fade-in duration-300">
-              <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-3 mb-6"><Info className="text-amber-500" /> Règles de l'Algorithme</h2>
+              <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-3 mb-6"><Cog className="text-amber-500" /> Rouages de l'Algorithme</h2>
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                   <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><Utensils className="text-slate-400" size={18}/> Jours de Cantine</h3>
                   <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
