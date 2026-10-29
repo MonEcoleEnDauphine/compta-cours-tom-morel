@@ -1463,13 +1463,8 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
   const [quickFilterFamily, setQuickFilterFamily] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
 
-  // VARIABLE AJOUTÉE ICI (Étape 6)
-  const estAdmin = utilisateurConnecte?.role === 'admin' || 
-                   utilisateurConnecte?.role === 'Administrateur Global' || 
-                   utilisateurConnecte?.profil === 'Admin';
-
   useEffect(() => {
-    if (utilisateurConnecte && !estAdmin) {
+    if (utilisateurConnecte && utilisateurConnecte !== 'admin') {
       const userStr = typeof utilisateurConnecte === 'object' 
         ? JSON.stringify(utilisateurConnecte).toUpperCase() 
         : String(utilisateurConnecte).toUpperCase();
@@ -1553,7 +1548,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       return !fam.days.includes(dOw);
     };
 
-    // --- INTEGRATION STRICTE DES FICHIERS HISTORIQUES (Ne sera jamais modifiée) ---
+    // --- INTEGRATION STRICTE DES FICHIERS HISTORIQUES ---
     const historicalCantine = [
       { date: '2026-09-03', p1: 'BOCCA', p2: 'TAISSIDRE-CARVALHO', repasType: 'Filles / Garçons' },
       { date: '2026-09-04', p1: 'RIOBÉ', p2: 'BEZIAT-MENUT', repasType: 'Par cordée' },
@@ -1597,7 +1592,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     let menageArr = [];
     let statsObj = {};
     
-    // Ajout du paramètre monthCantine pour le lissage
     famsData.forEach(f => {
       statsObj[f.id] = { cantine: 0, menage: 0, total: 0, periodCantine: 0, monthCantine: 0, lastCantine: null, lastMenage: "2026-01-01", virtualCantine: 0, virtualMenage: 0 };
     });
@@ -1631,9 +1625,9 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     while (currentDate <= endDate) {
       const dateStr = getDateStr(currentDate);
       const dayOfWeek = currentDate.getDay();
-      const monthStr = dateStr.substring(0, 7); // Format "YYYY-MM"
+      const monthStr = dateStr.substring(0, 7);
       
-      // Remise à zéro pour le lissage mensuel (Évite les enchaînements de gardes sur le même mois)
+      // LISSAGE MENSUEL
       if (monthStr !== currentMonthStr) {
           currentMonthStr = monthStr;
           Object.keys(statsObj).forEach(k => {
@@ -1720,7 +1714,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         else if (dayOfWeek === 5) { 
           repasType = "Par cordée";
           if (isSemaineImpaire) { 
-            // MODIFICATION MME HERVET : À partir de novembre, elle est absente. On demande 1 parent à la place.
             if (dateStr >= "2026-11-02") {
                 requiredParents = 1; p1 = "Mme SUBLET"; 
             } else {
@@ -1738,10 +1731,10 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
               // DISPENSE NAISSANCE (DE LASTIC ST JAL)
               if (f.id === "DE LASTIC ST JAL" && dateStr >= "2027-02-01" && dateStr <= "2027-04-15") return false;
 
-              // DOUBLE SERVICE LE LÉZEC (Maman + Papa)
+              // DOUBLE SERVICE LE LÉZEC (Maman + Papa) autorisé le lundi ou vendredi
               if (assigned.includes(f.id)) {
                 if (f.id === "LE LÉZEC" && [1, 5].includes(dayOfWeek) && assigned.length === 1 && assigned[0] === "LE LÉZEC") {
-                   // Ils sont autorisés à remplir le 2ème poste
+                   // Autorisé en p2 s'ils sont déjà en p1
                 } else {
                    return false;
                 }
@@ -1750,12 +1743,17 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
               let hasDay = f.days.includes(dayOfWeek);
               if (!hasDay) return false;
 
-              // SÉPARATION DES NOUVEAUX SP : Jamais deux "Nouveau SP" ensemble
-              if (i === 1 && assigned.length === 1) {
-                const firstFam = famsData.find(family => family.id === assigned[0]);
-                if (firstFam && firstFam.type === "Nouveau SP" && f.type === "Nouveau SP") {
-                   return false;
-                }
+              if (f.type === "Nouveau SP") {
+                  // BLOCAGE 1ÈRE SEMAINE NOVEMBRE
+                  if (dateStr >= "2026-11-02" && dateStr <= "2026-11-08") return false;
+                  
+                  // SÉPARATION DES NOUVEAUX SP UNIQUEMENT JUSQU'AU 15 NOVEMBRE INCLUS
+                  if (dateStr <= "2026-11-15") {
+                      if (i === 1 && assigned.length === 1) {
+                          const firstFam = famsData.find(family => family.id === assigned[0]);
+                          if (firstFam && firstFam.type === "Nouveau SP") return false;
+                      }
+                  }
               }
 
               if (f.type.startsWith("Nouveau") && statsObj[f.id].lastCantine) {
@@ -1766,16 +1764,16 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
               return true;
             });
 
-            available.sort((a, b) => {
-              // FORÇAGE DU DOUBLE SERVICE LE LÉZEC
-              if (assigned.length === 1 && assigned[0] === "LE LÉZEC") {
-                  if (a.id === "LE LÉZEC") return -1;
-                  if (b.id === "LE LÉZEC") return 1;
-              }
+            // Si LE LÉZEC est p1, on force LE LÉZEC en p2 pour créer le double service
+            if (i === 1 && assigned.length === 1 && assigned[0] === "LE LÉZEC") {
+                let lezecObj = available.find(f => f.id === "LE LÉZEC");
+                if (lezecObj) available = [lezecObj];
+            }
 
+            available.sort((a, b) => {
               let scoreA = statsObj[a.id].total; let scoreB = statsObj[b.id].total;
               
-              // 1. PRIORITÉ LISSAGE MENSUEL (Répartit l'effort sur toute l'année)
+              // 1. PRIORITÉ LISSAGE MENSUEL
               let monthDiff = statsObj[a.id].monthCantine - statsObj[b.id].monthCantine;
               if (monthDiff !== 0) return monthDiff;
 
@@ -1841,6 +1839,8 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         if (isHolidayStart) {
           let eligibleAsso = famsData.filter(f => {
             if (f.id === "DE LASTIC ST JAL" && nextSatStr >= "2027-02-01" && nextSatStr <= "2027-04-15") return false;
+            // LE LÉZEC est bloqué pour le ménage afin de baisser leur total et favoriser leurs doubles cantines
+            if (f.id === "LE LÉZEC" && statsObj[f.id].menage >= 1) return false;
             return f.isAsso;
           });
           
@@ -1859,12 +1859,17 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         } else {
           let candidates = famsData.filter(f => {
             if (f.id === "DE LASTIC ST JAL" && nextSatStr >= "2027-02-01" && nextSatStr <= "2027-04-15") return false;
+            // RÈGLE : PAS DE NOUVEAUX SP LA 1ERE SEMAINE DE NOVEMBRE
+            if (f.type === "Nouveau SP" && nextSatStr >= "2026-11-02" && nextSatStr <= "2026-11-08") return false;
             return true;
           });
           
           candidates = candidates.filter(f => {
+             // BLOCAGES MÉNAGES
              if (f.id === "CHOMEL" && statsObj[f.id].menage >= 1) return false;
              if (f.id === "DURAND" && statsObj[f.id].menage >= 1) return false;
+             // LE LÉZEC limité à 1 ménage pour baisser leur total global et forcer des cantines
+             if (f.id === "LE LÉZEC" && statsObj[f.id].menage >= 1) return false;
              return true;
           });
           
@@ -1875,8 +1880,9 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
           if(withCooldown.length > 0) candidates = withCooldown;
           
           candidates.sort((a, b) => {
-            let scoreA = statsObj[a.id].menage - (a.id === "LE LÉZEC" ? 1 : 0) - (a.id === "SHAW" ? 1 : 0);
-            let scoreB = statsObj[b.id].menage - (b.id === "LE LÉZEC" ? 1 : 0) - (b.id === "SHAW" ? 1 : 0);
+            // SHAW Malus : On fait croire qu'ils ont fait un ménage de moins pour les tirer au sort plus vite
+            let scoreA = statsObj[a.id].menage - (a.id === "SHAW" ? 1 : 0);
+            let scoreB = statsObj[b.id].menage - (b.id === "SHAW" ? 1 : 0);
             return scoreA - scoreB || a.id.localeCompare(b.id);
           });
 
@@ -2369,8 +2375,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
           <button onClick={() => setActiveTab('calendrier')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'calendrier' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><CalendarDays size={16} /> Calendrier</button>
           <button onClick={() => setActiveTab('famille')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'famille' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Search size={16} /> Mon Planning</button>
           
-          {/* REMPLACEMENT DE LA CONDITION ICI */}
-          {estAdmin && (
+          {utilisateurConnecte === 'admin' && (
             <>
               <button onClick={() => setActiveTab('stats')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'stats' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><BarChart3 size={16} /> Statistiques</button>
               <button onClick={() => setActiveTab('regles')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'regles' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Info size={16} /> Règles</button>
@@ -2551,9 +2556,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
           {/* TAB FAMILLE */}
           {activeTab === 'famille' && (
             <div className="animate-in fade-in duration-300 max-w-3xl mx-auto pb-12">
-              
-              {/* REMPLACEMENT DE LA CONDITION ICI AUSSI */}
-              {estAdmin && (
+              {utilisateurConnecte === 'admin' && (
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mb-6 flex flex-col items-center print:hidden">
                   <label className="font-bold text-slate-700 mb-3 text-lg">Rechercher le planning d'une famille ou maîtresse :</label>
                   <div className="relative w-full max-w-md">
@@ -2591,7 +2594,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                   <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><Users className="text-slate-400" size={18}/> Période d'intégration & Lissage</h3>
                   <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
                       <li><strong>Lissage Mensuel Anti-Surcharge :</strong> La priorité d'affectation prend en compte le nombre de cantines effectuées *sur le mois en cours*, puis *sur la période*, puis *sur l'année*. Cela garantit une répartition parfaitement lissée et empêche l'accumulation de gardes sur quelques semaines.</li>
-                      <li><strong>Nouvelles Familles SP (Toussaint) :</strong> Intégration à partir du 02 Novembre avec un coefficient virtuel pour lisser la présence. Jamais 2 familles "Nouveau SP" en duo à la cantine.</li>
+                      <li><strong>Nouvelles Familles SP (Toussaint) :</strong> Intégration lissée et différée (aucune présence la première semaine de rentrée de Novembre). Jamais 2 familles "Nouveau SP" en duo à la cantine durant les deux premières semaines de novembre (ensuite c'est autorisé).</li>
                       <li><strong>Historique préservé :</strong> L'algorithme a injecté en dur les données de vos tableaux de Septembre à Octobre pour s'y tenir strictement.</li>
                   </ul>
               </div>
@@ -2599,9 +2602,9 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                   <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><AlertCircle className="text-slate-400" size={18}/> Cas Particuliers Strictes</h3>
                   <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
                       <li><strong>DE LASTIC ST JAL (Dispense Naissance) :</strong> Aucune cantine ni ménage attribués entre le 1er Février et le 15 Avril 2027. À leur retour, le lissage mensuel limitera automatiquement la surcharge de rattrapage.</li>
-                      <li><strong>LE LÉZEC (Duo Papa/Maman) :</strong> Autorisation d'occuper les 2 postes de cantine simultanément le lundi ou le vendredi (comptabilisé comme 2 services réels).</li>
+                      <li><strong>LE LÉZEC (Double garde Maman/Papa) :</strong> Autorisation d'occuper les 2 postes de cantine simultanément le lundi ou le vendredi (comptabilisé comme 2 services réels). En compensation, leurs ménages sont bridés pour forcer l'algorithme à leur donner plus de doubles cantines.</li>
                       <li><strong>CHOMEL & DURAND :</strong> Limités manuellement à 1 seul ménage sur l'année. Les cantines sont rééquilibrées automatiquement.</li>
-                      <li><strong>LE LÉZEC & SHAW :</strong> Un ménage supplémentaire forcé. Leurs cantines sont réduites en conséquence.</li>
+                      <li><strong>SHAW :</strong> Un ménage supplémentaire forcé. Leurs cantines sont réduites en conséquence par le lissage global.</li>
                   </ul>
               </div>
             </div>
