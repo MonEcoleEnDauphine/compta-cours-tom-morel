@@ -1456,11 +1456,6 @@ const InfosContact = () => (
 
 // --- MODULE : PLANNINGS (Cantine & Ménage) ---
 
-// --- MODULE : PLANNINGS (Cantine & Ménage) ---
-
-import React, { useState, useMemo, useEffect } from 'react';
-import { CalendarDays, Utensils, Sparkles, Search, Users, AlertTriangle, Download, Printer, BarChart3, Info, Clock, XCircle, Camera } from 'lucide-react';
-
 export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [activePeriod, setActivePeriod] = useState(2);
@@ -1479,13 +1474,11 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         ? JSON.stringify(utilisateurConnecte).toUpperCase() 
         : String(utilisateurConnecte).toUpperCase();
 
-      // AJOUT DES MAÎTRESSES DANS LA LISTE DE DÉTECTION
       const famId = [
         "BOCCA", "CHOMEL", "CORNET-BOUBE", "DE LASTIC ST JAL", "DE SERRES", "FIARD", 
         "GREPAT", "MELLIES", "RIOBÉ", "TAISSIDRE-CARVALHO", "BEZIAT-MENUT", 
         "DE MALAUSSENE", "FAUVAIN", "LE LÉZEC", "DE PONTE", "DURAND", "ESCOBAR", 
-        "DE LA CHARRIE", "PILON", "SHAW", 
-        "MME GERARD", "MME SUBLET", "MME HERVET", "MME QARIOH"
+        "DE LA CHARRIE", "PILON", "SHAW"
       ].find(id => userStr.includes(id));
       
       if (famId) {
@@ -1626,7 +1619,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         }
     });
 
-    // DATES FORCÉES JEUDIS
     const forcedDePonteDates = ["2026-11-12", "2026-12-10", "2027-01-21", "2027-03-04", "2027-04-01", "2027-05-20"];
     const forcedRiobeDates = ["2026-11-26", "2027-01-07", "2027-02-04", "2027-03-18", "2027-04-29", "2027-06-03", "2027-06-17"];
 
@@ -1728,7 +1720,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         } 
         else if (dayOfWeek === 5) { 
           repasType = "Par cordée";
-          // VENDREDIS : Inverse par rapport au mardi
           if (isSemainePaire) { 
             if (dateStr >= "2026-11-02") {
                 requiredParents = 1; p1 = "MME SUBLET"; 
@@ -1742,7 +1733,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         let assigned = [];
 
         if (requiredParents > 0) {
-            // FORÇAGE DES JEUDIS SPÉCIFIQUES
             if (dayOfWeek === 4) {
                 if (forcedDePonteDates.includes(dateStr) && !assigned.includes("DE PONTE")) {
                     assigned.push("DE PONTE");
@@ -1756,24 +1746,26 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
 
           for (let i = assigned.length; i < requiredParents; i++) {
             let available = famsData.filter(f => {
-              // RÈGLE LE LÉZEC (Double Service Strict)
+              if (f.id === "DE LASTIC ST JAL" && dateStr >= "2027-02-01" && dateStr <= "2027-04-15") return false;
+
+              // --- LOGIQUE LE LÉZEC ---
               if (f.id === "LE LÉZEC") {
-                  if (dateStr === "2026-11-06") return false; 
-                  if (requiredParents < 2) return false; 
-                  if (i === 1 && assigned[0] !== "LE LÉZEC") return false; 
+                  if (dateStr === "2026-11-06") return false; // Absent
                   
-                  if (assigned.includes(f.id)) {
-                      if (assigned.length === 1 && assigned[0] === "LE LÉZEC") {
-                         // Autorisé
-                      } else {
-                         return false; 
-                      }
+                  // Si LE LÉZEC est déjà pris pour la 1ère place, on l'autorise pour la 2ème
+                  if (assigned.length === 1 && assigned[0] === "LE LÉZEC") {
+                     return true; 
                   }
-              } else {
-                  if (assigned.includes(f.id)) return false;
+                  
+                  // Sinon, pour qu'il prenne la 1ère place, il faut qu'il y ait bien une 2ème place dispo derrière
+                  if (requiredParents < 2) return false;
+                  
+                  // Et si une AUTRE famille a déjà pris la 1ère place, LE LÉZEC ne peut pas prendre la 2ème (pas de mélange)
+                  if (assigned.length === 1 && assigned[0] !== "LE LÉZEC") return false;
               }
 
-              if (f.id === "DE LASTIC ST JAL" && dateStr >= "2027-02-01" && dateStr <= "2027-04-15") return false;
+              // Interdiction d'être choisi 2 fois (sauf Le Lézec géré au-dessus)
+              if (assigned.includes(f.id) && f.id !== "LE LÉZEC") return false;
 
               let hasDay = f.days.includes(dayOfWeek);
               if (!hasDay) return false;
@@ -1796,16 +1788,13 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
               return true;
             });
 
+            // Si LE LÉZEC a pris la place 1, on force la liste à ne proposer QUE LE LÉZEC pour la place 2
             if (i === 1 && assigned.length === 1 && assigned[0] === "LE LÉZEC") {
                 let lezecObj = available.find(f => f.id === "LE LÉZEC");
                 if (lezecObj) available = [lezecObj];
             }
 
             available.sort((a, b) => {
-              // 1. PRIORITÉ ABSOLUE ZÉRO CANTINE (Nouveaux)
-              if (statsObj[a.id].cantine === 0 && statsObj[b.id].cantine > 0) return -1;
-              if (statsObj[a.id].cantine > 0 && statsObj[b.id].cantine === 0) return 1;
-
               let scoreA = statsObj[a.id].total; let scoreB = statsObj[b.id].total;
               
               let monthDiff = statsObj[a.id].monthCantine - statsObj[b.id].monthCantine;
@@ -1876,8 +1865,8 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
           });
           
           eligibleAsso.sort((a, b) => {
-            let scoreA = statsObj[a.id].menage;
-            let scoreB = statsObj[b.id].menage;
+            let scoreA = statsObj[a.id].menage - (a.id === "LE LÉZEC" ? 1 : 0);
+            let scoreB = statsObj[b.id].menage - (b.id === "LE LÉZEC" ? 1 : 0);
             return scoreA - scoreB || a.id.localeCompare(b.id);
           });
           
@@ -1895,6 +1884,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
           });
           
           candidates = candidates.filter(f => {
+             // BLOCAGES MÉNAGES
              if (f.id === "CHOMEL" && statsObj[f.id].menage >= 1) return false;
              if (f.id === "DURAND" && statsObj[f.id].menage >= 1) return false;
              if (f.id === "LE LÉZEC" && statsObj[f.id].menage >= 1) return false;
@@ -2601,7 +2591,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                           <option key={f.id} value={f.id}>{f.id}</option>
                         ))}
                       </optgroup>
-                      <optgroup label="Maîtresses"><option value="MME GERARD">MME GERARD</option><option value="MME SUBLET">MME SUBLET</option><option value="MME HERVET">Mme HERVET</option><option value="MME QARIOH">MME QARIOH</option></optgroup>
+                      <optgroup label="Maîtresses"><option value="MME GERARD">MME GERARD</option><option value="MME SUBLET">MME SUBLET</option><option value="MME HERVET">MME HERVET</option><option value="MME QARIOH">MME QARIOH</option></optgroup>
                     </select>
                   </div>
                 </div>
@@ -2636,7 +2626,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                   <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><AlertCircle className="text-slate-400" size={18}/> Cas Particuliers Strictes</h3>
                   <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
                       <li><strong>DE LASTIC ST JAL (Dispense Naissance) :</strong> Aucune cantine ni ménage attribués entre le 1er Février et le 15 Avril 2027. À leur retour, le lissage mensuel limitera automatiquement la surcharge de rattrapage.</li>
-                      <li><strong>LE LÉZEC (Double garde Maman/Papa) :</strong> Autorisation et obligation d'occuper les 2 postes de cantine simultanément lorsqu'ils sont tirés au sort (comptabilisé comme 2 services réels). En compensation, leurs ménages sont bridés pour forcer l'algorithme à leur donner plus de doubles cantines. Indisponibilité ponctuelle respectée le 6 novembre.</li>
+                      <li><strong>LE LÉZEC (Double garde Maman/Papa) :</strong> Autorisation et obligation d'occuper les 2 postes de cantine simultanément lorsqu'ils sont tirés au sort (comptabilisé comme 2 services réels). Ils ne peuvent pas être séparés et assignés avec une autre famille. Indisponibilité ponctuelle respectée le 6 novembre. En compensation, leurs ménages sont bridés pour forcer l'algorithme à leur donner plus de doubles cantines.</li>
                       <li><strong>CHOMEL & DURAND :</strong> Limités manuellement à 1 seul ménage sur l'année. Les cantines sont rééquilibrées automatiquement.</li>
                       <li><strong>SHAW :</strong> Un ménage supplémentaire forcé. Leurs cantines sont réduites en conséquence par le lissage global.</li>
                       <li><strong>Forçages manuels :</strong> Dates de cantines spécifiques verrouillées en dur pour les familles DE PONTE et RIOBÉ.</li>
