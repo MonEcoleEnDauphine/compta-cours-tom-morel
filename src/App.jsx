@@ -1456,6 +1456,8 @@ const InfosContact = () => (
 
 // --- MODULE : PLANNINGS (Cantine & Ménage) ---
 
+import React, { useState, useMemo, useEffect } from 'react';
+import { CalendarDays, Utensils, Sparkles, Search, Users, AlertTriangle, Download, Printer, BarChart3, Info, Clock, XCircle, Camera } from 'lucide-react';
 
 export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
   const [activeTab, setActiveTab] = useState(defaultTab);
@@ -1463,7 +1465,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
   const [selectedFamilyFilter, setSelectedFamilyFilter] = useState('');
   const [quickFilterFamily, setQuickFilterFamily] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
-  const [monCompteId, setMonCompteId] = useState(null); // NOUVEAU : Mémorise l'identité exacte du compte pour les clics
+  const [monCompteId, setMonCompteId] = useState(null);
 
   const peutVoirAdmin = 
     utilisateurConnecte?.role === 'admin' || 
@@ -1491,9 +1493,8 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       }
       
       if (famId) {
-        setSelectedFamilyFilter(famId); // Positionne le menu "Mon Planning" sur leur nom
-        setMonCompteId(famId); // Sauvegarde leur ID pour autoriser le clic sur les étiquettes
-        // Suppression de setQuickFilterFamily(famId) pour qu'ils voient tout le monde par défaut
+        setSelectedFamilyFilter(famId); 
+        setMonCompteId(famId); 
       }
     }
   }, [utilisateurConnecte, peutVoirAdmin]);
@@ -1564,7 +1565,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       return !fam.days.includes(dOw);
     };
 
-    // --- INTEGRATION STRICTE DES FICHIERS HISTORIQUES ---
     const historicalCantine = [
       { date: '2026-09-03', p1: 'BOCCA', p2: 'TAISSIDRE-CARVALHO', repasType: 'Filles / Garçons' },
       { date: '2026-09-04', p1: 'RIOBÉ', p2: 'BEZIAT-MENUT', repasType: 'Par cordée' },
@@ -1719,7 +1719,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         } 
         else if (dayOfWeek === 2) { 
           repasType = "Placement libre";
-          // MARDIS
           if (isSemaineImpaire) { 
             requiredParents = 1; p1 = "MME QARIOH"; 
           } else if (isSemainePaire) {
@@ -1731,7 +1730,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         } 
         else if (dayOfWeek === 5) { 
           repasType = "Par cordée";
-          // VENDREDIS
           if (isSemainePaire) { 
             if (dateStr >= "2026-11-02") {
                 requiredParents = 1; p1 = "MME SUBLET"; 
@@ -2055,6 +2053,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     const widthClass = fullWidth ? "w-full justify-center px-0.5 py-0.5 min-h-[16px]" : "px-2 py-1";
     const textClass = fullWidth ? "text-[7.5px] leading-[8.5px] text-center whitespace-normal break-words" : "text-[11px]";
 
+    // CLICS BLOQUÉS : Seuls les admins ou la personne concernée par la pilule peuvent cliquer
     const estMonNom = id === monCompteId;
     const clickable = peutVoirAdmin || estMonNom;
 
@@ -2134,6 +2133,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
   };
 
   const renderCalendarGrid = () => {
+    // SUPPRESSION DE JUILLET
     const months = [
       { y: 2026, m: 8, name: 'Septembre' }, { y: 2026, m: 9, name: 'Octobre' }, { y: 2026, m: 10, name: 'Novembre' },
       { y: 2026, m: 11, name: 'Décembre' }, { y: 2027, m: 0, name: 'Janvier' }, { y: 2027, m: 1, name: 'Février' },
@@ -2142,6 +2142,15 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     ];
     const dayNames = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
     const cells = [];
+    
+    // Ajout d'une constante pour les vacances dans le rendu du calendrier
+    const vacDataLocal = [
+      { name: "Toussaint", start: "2026-10-17", end: "2026-11-01" },
+      { name: "Noël", start: "2026-12-19", end: "2027-01-03" },
+      { name: "Hiver", start: "2027-02-13", end: "2027-02-28" },
+      { name: "Printemps", start: "2027-04-10", end: "2027-04-25" },
+      { name: "Été", start: "2027-06-26", end: "2027-08-31" }
+    ];
 
     cells.push(<div key="tl" className="bg-slate-100 border-r border-b-2 border-slate-300 sticky top-0 z-20" style={{ gridColumn: 1, gridRow: 1 }}></div>);
 
@@ -2175,6 +2184,8 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         const dayWeek = d.getDay();
         const isWeekend = dayWeek === 0 || dayWeek === 6;
         const isHoliday = holidays.includes(dateStr);
+        
+        let activeVacation = vacDataLocal.find(v => dateStr >= v.start && dateStr <= v.end);
 
         let cantineEvent = schedule.find(s => s.date === dateStr && (!quickFilterFamily || s.p1 === quickFilterFamily || s.p2 === quickFilterFamily));
         let menageEvent = menagesSchedule.find(m => m.date === dateStr && (!quickFilterFamily || m.familyId === quickFilterFamily));
@@ -2196,17 +2207,18 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
 
         let customStyle = { gridColumn: moIdx + 2, gridRow: `${day + 1} / span ${rowSpan}` };
         let cellClass = "p-1 flex flex-col gap-0.5 border-r border-b border-slate-200 text-[9px] min-h-[45px] relative overflow-hidden ";
+        
+        const isEmpty = !cantineEvent && !menageEvent && !isHoliday;
 
-        if (!cantineEvent && !menageEvent && !isHoliday && !isWeekend) {
-           customStyle.backgroundImage = 'repeating-linear-gradient(45deg, #ffffff, #ffffff 6px, #f1f5f9 6px, #f1f5f9 12px)';
+        // DESIGN DES JOURS VIDES ET VACANCES
+        if (isEmpty) {
+           if (activeVacation) cellClass += "bg-emerald-50/40 ";
+           else if (isWeekend) cellClass += "bg-slate-50/60 ";
+           else cellClass += "bg-slate-50/30 ";
         } else if (isHoliday) {
-           cellClass += "bg-slate-100 opacity-60 ";
+           cellClass += "bg-rose-50/40 ";
         } else if (isWeekend && !menageEvent) {
            cellClass += "bg-slate-50 ";
-        }
-
-        if (menageEvent && rowSpan === 2) {
-           cellClass += "bg-indigo-50/20 ";
         }
 
         let dayLabel = dayNames[dayWeek];
@@ -2216,7 +2228,29 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
 
         cells.push(
           <div key={`${mo.m}-${day}`} className={cellClass} style={customStyle}>
-            <div className="font-bold text-slate-400 mb-0.5 text-center bg-white/60 rounded px-1 w-fit mx-auto print:text-[8px]">{dayLabel}</div>
+            <div className="font-bold text-slate-400 mb-0.5 text-center bg-white/60 rounded px-1 w-fit mx-auto print:text-[8px] z-10 relative">{dayLabel}</div>
+            
+            {/* AFFICHAGE DES ICÔNES POUR JOURS VIDES */}
+            {isEmpty && !isHoliday && (
+               <div className="absolute inset-0 flex flex-col items-center justify-center opacity-40 pointer-events-none z-0 mt-4">
+                  {activeVacation ? (
+                     <div className="flex flex-col items-center opacity-60">
+                         <span className="text-[12px] mb-0.5">🌴</span>
+                         <span className="text-[6.5px] font-black text-slate-500 uppercase text-center leading-[8px] px-1">{activeVacation.name}</span>
+                     </div>
+                  ) : (dayWeek === 3) ? (
+                     <span className="text-[14px] opacity-30 grayscale">🎈</span>
+                  ) : (dayWeek === 0 || dayWeek === 6) ? (
+                     <span className="text-[14px] opacity-30 grayscale">🛋️</span>
+                  ) : null}
+               </div>
+            )}
+            
+            {isHoliday && isEmpty && (
+               <div className="absolute inset-0 flex flex-col items-center justify-center opacity-40 pointer-events-none z-0 mt-4">
+                  <span className="text-[7.5px] font-black text-rose-600 uppercase text-center leading-[9px]">FÉRIÉ</span>
+               </div>
+            )}
             
             {cantineEvent && (
               <div className="flex flex-col gap-0.5 items-center w-full relative z-10">
@@ -2226,9 +2260,9 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
             )}
 
             {menageEvent && (
-              <div className={`mt-auto pt-0.5 flex flex-col gap-0.5 items-center w-full relative z-10 ${rowSpan === 2 ? 'mb-auto' : ''}`}>
-                <span className="text-[7px] leading-none text-indigo-700 uppercase font-black flex items-center justify-center bg-indigo-100 border border-indigo-200 w-full py-0.5 rounded shadow-sm">
-                  🧹 MÉNAGE
+              <div className="flex flex-col gap-1 items-center justify-center w-full h-full relative z-10 py-1">
+                <span className={`text-[9px] uppercase font-black flex items-center justify-center w-full py-1 rounded shadow-sm border ${familyStyles[menageEvent.familyId] || 'bg-slate-100 text-slate-700 border-slate-300'}`}>
+                  <Sparkles size={10} className="mr-1" /> MÉNAGE
                 </span>
                 <FamilyPill id={menageEvent.familyId} isOut={false} fullWidth={true} />
               </div>
@@ -2240,7 +2274,8 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
 
     return (
       <div className="overflow-x-auto pb-10 calendar-container print:overflow-visible print:pb-0 print:w-full print:max-w-none" id="capture-zone">
-        <div className="grid border-t border-l border-slate-200 min-w-[1200px] calendar-grid print:min-w-0 print:w-full print:h-[95vh]" style={{ gridTemplateColumns: "25px repeat(10, minmax(0, 1fr))", gridTemplateRows: "auto repeat(31, minmax(45px, auto))" }}>
+        {/* Grille ajustée à 10 colonnes (Juillet supprimé) */}
+        <div className="grid border-t border-l border-slate-200 min-w-[1100px] calendar-grid print:min-w-0 print:w-full print:h-[95vh]" style={{ gridTemplateColumns: "25px repeat(10, minmax(0, 1fr))", gridTemplateRows: "auto repeat(31, minmax(45px, auto))" }}>
           {cells}
         </div>
       </div>
@@ -2260,6 +2295,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
 
     const isTeacher = selectedFamilyFilter.startsWith("MME");
     const famInfo = isTeacher ? { type: "Équipe Pédagogique", isAsso: false } : familiesList.find(f => f.id === selectedFamilyFilter);
+    
     let allEvents = [
         ...schedule.filter(s => s.p1 === selectedFamilyFilter || s.p2 === selectedFamilyFilter).map(s => ({ 
           date: s.date, type: 'Cantine', details: s.repasType, period: s.period, 
@@ -2273,7 +2309,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
 
     return (
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50 flex-wrap gap-4">
             <div className="flex items-center gap-4">
               <div className="text-xl"><FamilyPill id={selectedFamilyFilter} /></div>
               <div>
@@ -2283,7 +2319,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
             </div>
             <button 
               onClick={() => setShowHistory(!showHistory)} 
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 shadow-sm"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 shadow-sm ml-auto"
             >
               <Clock size={16} /> {showHistory ? "Masquer le passé" : "Afficher l'historique"}
             </button>
@@ -2653,7 +2689,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                   <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><AlertCircle className="text-slate-400" size={18}/> Cas Particuliers Strictes</h3>
                   <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
                       <li><strong>DE LASTIC ST JAL (Dispense Naissance) :</strong> Aucune cantine ni ménage attribués entre le 1er Février et le 15 Avril 2027. À leur retour, le lissage mensuel limitera automatiquement la surcharge de rattrapage.</li>
-                      <li><strong>LE LÉZEC (Double garde Maman/Papa) :</strong> Autorisation et obligation d'occuper les 2 postes de cantine simultanément lorsqu'ils sont tirés au sort (comptabilisé comme 2 services réels). Ils ne peuvent pas être séparés et assignés avec une autre famille. Indisponibilité ponctuelle respectée le 6 novembre.</li>
+                      <li><strong>LE LÉZEC (Double garde Maman/Papa) :</strong> Autorisation et obligation d'occuper les 2 postes de cantine simultanément lorsqu'ils sont tirés au sort (comptabilisé comme 2 services réels). Ils ne peuvent pas être séparés et assignés avec une autre famille. Indisponibilité ponctuelle respectée le 6 novembre. En compensation, leurs ménages sont bridés pour forcer l'algorithme à leur donner plus de doubles cantines.</li>
                       <li><strong>CHOMEL & DURAND :</strong> Limités manuellement à 1 seul ménage sur l'année. Les cantines sont rééquilibrées automatiquement. Toutes les autres familles font au moins un ménage.</li>
                       <li><strong>SHAW :</strong> Un ménage supplémentaire forcé. Leurs cantines sont réduites en conséquence par le lissage global.</li>
                       <li><strong>Forçages manuels :</strong> Dates de cantines spécifiques verrouillées en dur pour les familles DE PONTE et RIOBÉ.</li>
