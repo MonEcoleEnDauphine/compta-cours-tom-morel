@@ -1474,7 +1474,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         ? JSON.stringify(utilisateurConnecte).toUpperCase() 
         : String(utilisateurConnecte).toUpperCase();
 
-      // Détection plus souple pour les maîtresses
       let famId = [
         "BOCCA", "CHOMEL", "CORNET-BOUBE", "DE LASTIC ST JAL", "DE SERRES", "FIARD", 
         "GREPAT", "MELLIES", "RIOBÉ", "TAISSIDRE-CARVALHO", "BEZIAT-MENUT", 
@@ -1537,7 +1536,8 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { id: 2, name: "Toussaint - Noël", desc: "02/11 - 18/12", start: "2026-11-02", end: "2026-12-18" },
       { id: 3, name: "Noël - Février", desc: "04/01 - 12/02", start: "2027-01-04", end: "2027-02-12" },
       { id: 4, name: "Février - Pâques", desc: "01/03 - 09/04", start: "2027-03-01", end: "2027-04-09" },
-      { id: 5, name: "Pâques - Été", desc: "26/04 - 02/07", start: "2027-04-26", end: "2027-07-02" }
+      // Modifié pour s'arrêter le 25 Juin (Dernier jour avant les vacances)
+      { id: 5, name: "Pâques - Été", desc: "26/04 - 25/06", start: "2027-04-26", end: "2027-06-25" }
     ];
 
     const holiData = ["2026-11-11", "2027-03-26", "2027-03-29", "2027-05-06", "2027-05-07", "2027-05-17"];
@@ -1546,7 +1546,8 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { name: "Noël", start: "2026-12-19", end: "2027-01-03" },
       { name: "Hiver", start: "2027-02-13", end: "2027-02-28" },
       { name: "Printemps", start: "2027-04-10", end: "2027-04-25" },
-      { name: "d'Été", start: "2027-07-03", end: "2027-08-31" }
+      // Vacances d'été commencent le samedi 26 Juin
+      { name: "d'Été", start: "2027-06-26", end: "2027-08-31" }
     ];
 
     function getDateStr(d) {
@@ -1627,11 +1628,12 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         }
     });
 
+    // DATES FORCÉES JEUDIS
     const forcedDePonteDates = ["2026-11-12", "2026-12-10", "2027-01-21", "2027-03-04", "2027-04-01", "2027-05-20"];
     const forcedRiobeDates = ["2026-11-26", "2027-01-07", "2027-02-04", "2027-03-18", "2027-04-29", "2027-06-03", "2027-06-17"];
 
     let currentDate = new Date(2026, 10, 2, 12, 0, 0); 
-    const endDate = new Date(2027, 6, 3, 12, 0, 0);
+    const endDate = new Date(2027, 6, 30, 12, 0, 0); // On boucle jusqu'à fin juin pour inclure le ménage du 26
     
     let currentPeriodIdx = -1; 
     let currentMonthStr = "";
@@ -1706,9 +1708,9 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       const isSemaineImpaire = weekIndex >= 0 && weekIndex % 2 === 1;
 
       // ----------------------------
-      // GESTION CANTINE
+      // GESTION CANTINE (S'arrête le 25 juin max)
       // ----------------------------
-      if (isSchoolDayFlag) {
+      if (isSchoolDayFlag && dateStr <= "2027-06-25") {
         let requiredParents = 2; let p1 = null; let p2 = null; let repasType = ""; let forcedError = false;
 
         if (dayOfWeek === 1) { 
@@ -1728,8 +1730,8 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         } 
         else if (dayOfWeek === 5) { 
           repasType = "Par cordée";
-          // VENDREDIS : Inverse par rapport au mardi
-          if (isSemainePaire) { 
+          // VENDREDIS : On met Mme Sublet les semaines IMPAIRES (à l'inverse du mardi)
+          if (isSemaineImpaire) { 
             if (dateStr >= "2026-11-02") {
                 requiredParents = 1; p1 = "MME SUBLET"; 
             } else {
@@ -1753,6 +1755,12 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                 }
             }
 
+            // FORÇAGE VENDREDI 13 NOVEMBRE (Mme Sublet + Le Lézec)
+            if (dateStr === "2026-11-13" && dayOfWeek === 5 && !assigned.includes("LE LÉZEC")) {
+                assigned.push("LE LÉZEC");
+                statsObj["LE LÉZEC"].cantine++; statsObj["LE LÉZEC"].periodCantine++; statsObj["LE LÉZEC"].monthCantine++; statsObj["LE LÉZEC"].total++; statsObj["LE LÉZEC"].lastCantine = dateStr;
+            }
+
           for (let i = assigned.length; i < requiredParents; i++) {
             let available = famsData.filter(f => {
               if (assigned.includes(f.id)) {
@@ -1765,7 +1773,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
 
               if (f.id === "DE LASTIC ST JAL" && dateStr >= "2027-02-01" && dateStr <= "2027-04-15") return false;
               
-              // --- LOGIQUE LE LÉZEC SÉCURISÉE ---
+              // LOGIQUE LE LÉZEC
               if (f.id === "LE LÉZEC") {
                   if (dateStr === "2026-11-06") return false; 
                   if (requiredParents < 2) return false; 
@@ -1799,6 +1807,10 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
             }
 
             available.sort((a, b) => {
+              // PRIORITÉ ABSOLUE ZÉRO CANTINE
+              if (statsObj[a.id].cantine === 0 && statsObj[b.id].cantine > 0) return -1;
+              if (statsObj[a.id].cantine > 0 && statsObj[b.id].cantine === 0) return 1;
+
               let scoreA = statsObj[a.id].total; let scoreB = statsObj[b.id].total;
               
               let monthDiff = statsObj[a.id].monthCantine - statsObj[b.id].monthCantine;
@@ -1888,7 +1900,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
           });
           
           candidates = candidates.filter(f => {
-             // BLOCAGES MÉNAGES
              if (f.id === "CHOMEL" && statsObj[f.id].menage >= 1) return false;
              if (f.id === "DURAND" && statsObj[f.id].menage >= 1) return false;
              if (f.id === "LE LÉZEC" && statsObj[f.id].menage >= 1) return false;
@@ -2597,7 +2608,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                           <option key={f.id} value={f.id}>{f.id}</option>
                         ))}
                       </optgroup>
-                      <optgroup label="Maîtresses"><option value="MME GERARD">MME GERARD</option><option value="MME SUBLET">Mme SUBLET</option><option value="MME HERVET">MME HERVET</option><option value="MME QARIOH">MME QARIOH</option></optgroup>
+                      <optgroup label="Maîtresses"><option value="MME GERARD">MME GERARD</option><option value="MME SUBLET">MME SUBLET</option><option value="MME HERVET">MME HERVET</option><option value="MME QARIOH">MME QARIOH</option></optgroup>
                     </select>
                   </div>
                 </div>
@@ -2633,7 +2644,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                   <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
                       <li><strong>DE LASTIC ST JAL (Dispense Naissance) :</strong> Aucune cantine ni ménage attribués entre le 1er Février et le 15 Avril 2027. À leur retour, le lissage mensuel limitera automatiquement la surcharge de rattrapage.</li>
                       <li><strong>LE LÉZEC (Double garde Maman/Papa) :</strong> Autorisation et obligation d'occuper les 2 postes de cantine simultanément lorsqu'ils sont tirés au sort (comptabilisé comme 2 services réels). Ils ne peuvent pas être séparés et assignés avec une autre famille. Indisponibilité ponctuelle respectée le 6 novembre.</li>
-                      <li><strong>CHOMEL & DURAND :</strong> Limités manuellement à 1 seul ménage sur l'année. Les cantines sont rééquilibrées automatiquement.</li>
+                      <li><strong>CHOMEL & DURAND :</strong> Limités manuellement à 1 seul ménage sur l'année. Les cantines sont rééquilibrées automatiquement. Toutes les autres familles font au moins un ménage.</li>
                       <li><strong>SHAW :</strong> Un ménage supplémentaire forcé. Leurs cantines sont réduites en conséquence par le lissage global.</li>
                       <li><strong>Forçages manuels :</strong> Dates de cantines spécifiques verrouillées en dur pour les familles DE PONTE et RIOBÉ.</li>
                   </ul>
