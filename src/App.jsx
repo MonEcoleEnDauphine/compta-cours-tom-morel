@@ -1456,9 +1456,6 @@ const InfosContact = () => (
 
 // --- MODULE : PLANNINGS (Cantine & Ménage) ---
 
-import React, { useState, useMemo, useEffect } from 'react';
-import { CalendarDays, Utensils, Sparkles, Search, Users, AlertTriangle, Download, Printer, BarChart3, Info, Clock, XCircle, Camera } from 'lucide-react';
-
 export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [activePeriod, setActivePeriod] = useState(2);
