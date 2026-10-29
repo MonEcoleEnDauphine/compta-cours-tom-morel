@@ -1463,6 +1463,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
   const [selectedFamilyFilter, setSelectedFamilyFilter] = useState('');
   const [quickFilterFamily, setQuickFilterFamily] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [monCompteId, setMonCompteId] = useState(null); // NOUVEAU : Mémorise l'identité exacte du compte pour les clics
 
   const peutVoirAdmin = 
     utilisateurConnecte?.role === 'admin' || 
@@ -1490,16 +1491,17 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       }
       
       if (famId) {
-        setSelectedFamilyFilter(famId);
-        setQuickFilterFamily(famId);
+        setSelectedFamilyFilter(famId); // Positionne le menu "Mon Planning" sur leur nom
+        setMonCompteId(famId); // Sauvegarde leur ID pour autoriser le clic sur les étiquettes
+        // Suppression de setQuickFilterFamily(famId) pour qu'ils voient tout le monde par défaut
       }
     }
   }, [utilisateurConnecte, peutVoirAdmin]);
 
   useEffect(() => {
     setActiveTab(defaultTab);
-    if (peutVoirAdmin) setQuickFilterFamily(null); 
-  }, [defaultTab, peutVoirAdmin]);
+    setQuickFilterFamily(null); 
+  }, [defaultTab]);
 
   const todayStr = useMemo(() => {
     const d = new Date();
@@ -1562,6 +1564,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       return !fam.days.includes(dOw);
     };
 
+    // --- INTEGRATION STRICTE DES FICHIERS HISTORIQUES ---
     const historicalCantine = [
       { date: '2026-09-03', p1: 'BOCCA', p2: 'TAISSIDRE-CARVALHO', repasType: 'Filles / Garçons' },
       { date: '2026-09-04', p1: 'RIOBÉ', p2: 'BEZIAT-MENUT', repasType: 'Par cordée' },
@@ -1716,6 +1719,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         } 
         else if (dayOfWeek === 2) { 
           repasType = "Placement libre";
+          // MARDIS
           if (isSemaineImpaire) { 
             requiredParents = 1; p1 = "MME QARIOH"; 
           } else if (isSemainePaire) {
@@ -1727,6 +1731,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         } 
         else if (dayOfWeek === 5) { 
           repasType = "Par cordée";
+          // VENDREDIS
           if (isSemainePaire) { 
             if (dateStr >= "2026-11-02") {
                 requiredParents = 1; p1 = "MME SUBLET"; 
@@ -2050,13 +2055,16 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     const widthClass = fullWidth ? "w-full justify-center px-0.5 py-0.5 min-h-[16px]" : "px-2 py-1";
     const textClass = fullWidth ? "text-[7.5px] leading-[8.5px] text-center whitespace-normal break-words" : "text-[11px]";
 
+    const estMonNom = id === monCompteId;
+    const clickable = peutVoirAdmin || estMonNom;
+
     return (
       <button 
         onClick={() => {
-          if (peutVoirAdmin) setQuickFilterFamily(id);
+          if (clickable) setQuickFilterFamily(id);
         }}
-        className={`inline-flex items-center gap-1 rounded-md border font-extrabold shadow-sm transition-all hover:opacity-80 active:scale-95 ${peutVoirAdmin ? 'cursor-pointer' : 'cursor-default'} ${styleClass} ${errBorder} ${widthClass} ${textClass}`}
-        title={isOut ? `⚠️ Jour non souhaité par ${id}` : (peutVoirAdmin ? `Filtrer sur ${id}` : undefined)}
+        className={`inline-flex items-center gap-1 rounded-md border font-extrabold shadow-sm transition-all hover:opacity-80 active:scale-95 ${clickable ? 'cursor-pointer' : 'cursor-default'} ${styleClass} ${errBorder} ${widthClass} ${textClass}`}
+        title={isOut ? `⚠️ Jour non souhaité par ${id}` : (clickable ? `Filtrer sur ${id}` : undefined)}
       >
         {isTeacher && <Users size={10} className="shrink-0" />} 
         {isOut && <AlertTriangle size={10} className="text-red-600 shrink-0" />} 
@@ -2126,7 +2134,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
   };
 
   const renderCalendarGrid = () => {
-    // SUPPRESSION DU MOIS DE JUILLET
     const months = [
       { y: 2026, m: 8, name: 'Septembre' }, { y: 2026, m: 9, name: 'Octobre' }, { y: 2026, m: 10, name: 'Novembre' },
       { y: 2026, m: 11, name: 'Décembre' }, { y: 2027, m: 0, name: 'Janvier' }, { y: 2027, m: 1, name: 'Février' },
@@ -2253,7 +2260,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
 
     const isTeacher = selectedFamilyFilter.startsWith("MME");
     const famInfo = isTeacher ? { type: "Équipe Pédagogique", isAsso: false } : familiesList.find(f => f.id === selectedFamilyFilter);
-    
     let allEvents = [
         ...schedule.filter(s => s.p1 === selectedFamilyFilter || s.p2 === selectedFamilyFilter).map(s => ({ 
           date: s.date, type: 'Cantine', details: s.repasType, period: s.period, 
@@ -2262,7 +2268,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         ...menagesSchedule.filter(m => m.familyId === selectedFamilyFilter).map(m => ({ date: m.date, type: 'Ménage', details: m.label, isVacances: m.isVacances, period: m.period }))
     ].sort((a, b) => new Date(a.date+"T12:00:00") - new Date(b.date+"T12:00:00"));
 
-    // CORRECTION : Filtrage du passé et mise à jour du compteur
     const futureEvents = allEvents.filter(e => e.date >= todayStr);
     const displayedEvents = showHistory ? allEvents : futureEvents;
 
@@ -2425,7 +2430,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
           )}
         </div>
 
-        {/* CORRECTION : Le bandeau apparaît désormais aussi sur le Calendrier global */}
         {quickFilterFamily && (activeTab === 'cantine' || activeTab === 'menage' || activeTab === 'calendrier') && (
           <div className="bg-indigo-50 border border-indigo-200 text-indigo-900 px-6 py-3 mb-4 rounded-xl flex justify-between items-center shadow-sm print:hidden animate-fade-in max-w-4xl mx-auto">
             <span className="font-bold text-sm flex items-center gap-2">
