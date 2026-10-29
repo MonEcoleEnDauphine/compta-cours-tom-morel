@@ -8115,7 +8115,7 @@ export default function App() {
               
               {/* REMPLACEMENT DU PROFIL ICI (Étape 4) */}
               <div className="text-xs text-slate-500">
-                Profil : {utilisateurConnecte?.profil || 'Famille'}
+                Profil : {utilisateurConnecte?.role === 'admin' || utilisateurConnecte?.role === 'Administrateur Global' ? 'Administrateur' : (utilisateurConnecte?.profil || 'Famille')}
               </div>
 
             </div>
