@@ -1456,6 +1456,9 @@ const InfosContact = () => (
 
 // --- MODULE : PLANNINGS (Cantine & Ménage) ---
 
+// --- MODULE : PLANNINGS (Cantine & Ménage) ---
+
+
 export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [activePeriod, setActivePeriod] = useState(2);
@@ -1490,9 +1493,11 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       
       if (famId) {
         setSelectedFamilyFilter(famId);
+        // CORRECTION : Active automatiquement le filtre visuel partout pour la personne connectée
+        setQuickFilterFamily(famId);
       }
     }
-  }, [utilisateurConnecte]);
+  }, [utilisateurConnecte, peutVoirAdmin]);
 
   useEffect(() => {
     setActiveTab(defaultTab);
@@ -1536,7 +1541,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { id: 2, name: "Toussaint - Noël", desc: "02/11 - 18/12", start: "2026-11-02", end: "2026-12-18" },
       { id: 3, name: "Noël - Février", desc: "04/01 - 12/02", start: "2027-01-04", end: "2027-02-12" },
       { id: 4, name: "Février - Pâques", desc: "01/03 - 09/04", start: "2027-03-01", end: "2027-04-09" },
-      // Modifié pour s'arrêter le 25 Juin (Dernier jour avant les vacances)
       { id: 5, name: "Pâques - Été", desc: "26/04 - 25/06", start: "2027-04-26", end: "2027-06-25" }
     ];
 
@@ -1546,7 +1550,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { name: "Noël", start: "2026-12-19", end: "2027-01-03" },
       { name: "Hiver", start: "2027-02-13", end: "2027-02-28" },
       { name: "Printemps", start: "2027-04-10", end: "2027-04-25" },
-      // Vacances d'été commencent le samedi 26 Juin
       { name: "d'Été", start: "2027-06-26", end: "2027-08-31" }
     ];
 
@@ -1562,7 +1565,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       return !fam.days.includes(dOw);
     };
 
-    // --- INTEGRATION STRICTE DES FICHIERS HISTORIQUES ---
     const historicalCantine = [
       { date: '2026-09-03', p1: 'BOCCA', p2: 'TAISSIDRE-CARVALHO', repasType: 'Filles / Garçons' },
       { date: '2026-09-04', p1: 'RIOBÉ', p2: 'BEZIAT-MENUT', repasType: 'Par cordée' },
@@ -1628,12 +1630,11 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         }
     });
 
-    // DATES FORCÉES JEUDIS
     const forcedDePonteDates = ["2026-11-12", "2026-12-10", "2027-01-21", "2027-03-04", "2027-04-01", "2027-05-20"];
     const forcedRiobeDates = ["2026-11-26", "2027-01-07", "2027-02-04", "2027-03-18", "2027-04-29", "2027-06-03", "2027-06-17"];
 
     let currentDate = new Date(2026, 10, 2, 12, 0, 0); 
-    const endDate = new Date(2027, 6, 30, 12, 0, 0); // On boucle jusqu'à fin juin pour inclure le ménage du 26
+    const endDate = new Date(2027, 6, 30, 12, 0, 0);
     
     let currentPeriodIdx = -1; 
     let currentMonthStr = "";
@@ -1708,7 +1709,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       const isSemaineImpaire = weekIndex >= 0 && weekIndex % 2 === 1;
 
       // ----------------------------
-      // GESTION CANTINE (S'arrête le 25 juin max)
+      // GESTION CANTINE
       // ----------------------------
       if (isSchoolDayFlag && dateStr <= "2027-06-25") {
         let requiredParents = 2; let p1 = null; let p2 = null; let repasType = ""; let forcedError = false;
@@ -1718,7 +1719,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         } 
         else if (dayOfWeek === 2) { 
           repasType = "Placement libre";
-          // MARDIS (Paire: Gerard/Sublet | Impaire: Qarioh)
           if (isSemaineImpaire) { 
             requiredParents = 1; p1 = "MME QARIOH"; 
           } else if (isSemainePaire) {
@@ -1730,7 +1730,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         } 
         else if (dayOfWeek === 5) { 
           repasType = "Par cordée";
-          // VENDREDIS : On met Mme Sublet les semaines IMPAIRES (à l'inverse du mardi)
           if (isSemaineImpaire) { 
             if (dateStr >= "2026-11-02") {
                 requiredParents = 1; p1 = "MME SUBLET"; 
@@ -1755,7 +1754,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                 }
             }
 
-            // FORÇAGE VENDREDI 13 NOVEMBRE (Mme Sublet + Le Lézec)
             if (dateStr === "2026-11-13" && dayOfWeek === 5 && !assigned.includes("LE LÉZEC")) {
                 assigned.push("LE LÉZEC");
                 statsObj["LE LÉZEC"].cantine++; statsObj["LE LÉZEC"].periodCantine++; statsObj["LE LÉZEC"].monthCantine++; statsObj["LE LÉZEC"].total++; statsObj["LE LÉZEC"].lastCantine = dateStr;
@@ -1765,7 +1763,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
             let available = famsData.filter(f => {
               if (assigned.includes(f.id)) {
                 if (f.id === "LE LÉZEC" && [1, 5].includes(dayOfWeek) && assigned.length === 1 && assigned[0] === "LE LÉZEC") {
-                   // Autorisé pour duo Papa/Maman
+                   // OK
                 } else {
                    return false;
                 }
@@ -1773,7 +1771,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
 
               if (f.id === "DE LASTIC ST JAL" && dateStr >= "2027-02-01" && dateStr <= "2027-04-15") return false;
               
-              // LOGIQUE LE LÉZEC
               if (f.id === "LE LÉZEC") {
                   if (dateStr === "2026-11-06") return false; 
                   if (requiredParents < 2) return false; 
@@ -1807,7 +1804,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
             }
 
             available.sort((a, b) => {
-              // PRIORITÉ ABSOLUE ZÉRO CANTINE
               if (statsObj[a.id].cantine === 0 && statsObj[b.id].cantine > 0) return -1;
               if (statsObj[a.id].cantine > 0 && statsObj[b.id].cantine === 0) return 1;
 
@@ -2060,10 +2056,11 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     return (
       <button 
         onClick={() => {
-          if (peutVoirAdmin) setQuickFilterFamily(id);
+          // Tout le monde peut cliquer pour filtrer
+          setQuickFilterFamily(id);
         }}
-        className={`inline-flex items-center gap-1 rounded-md border font-extrabold shadow-sm transition-all hover:opacity-80 active:scale-95 ${peutVoirAdmin ? 'cursor-pointer' : 'cursor-default'} ${styleClass} ${errBorder} ${widthClass} ${textClass}`}
-        title={isOut ? `⚠️ Jour non souhaité par ${id}` : (peutVoirAdmin ? `Filtrer sur ${id}` : undefined)}
+        className={`inline-flex items-center gap-1 rounded-md border font-extrabold shadow-sm transition-all hover:opacity-80 active:scale-95 cursor-pointer ${styleClass} ${errBorder} ${widthClass} ${textClass}`}
+        title={isOut ? `⚠️ Jour non souhaité par ${id}` : `Filtrer sur ${id}`}
       >
         {isTeacher && <Users size={10} className="shrink-0" />} 
         {isOut && <AlertTriangle size={10} className="text-red-600 shrink-0" />} 
@@ -2175,13 +2172,14 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         const isWeekend = dayWeek === 0 || dayWeek === 6;
         const isHoliday = holidays.includes(dateStr);
 
-        let cantineEvent = schedule.find(s => s.date === dateStr);
-        let menageEvent = menagesSchedule.find(m => m.date === dateStr);
+        // CORRECTION CALENDRIER GLOBAL : Le calendrier réagit désormais au filtre !
+        let cantineEvent = schedule.find(s => s.date === dateStr && (!quickFilterFamily || s.p1 === quickFilterFamily || s.p2 === quickFilterFamily));
+        let menageEvent = menagesSchedule.find(m => m.date === dateStr && (!quickFilterFamily || m.familyId === quickFilterFamily));
 
         if (!menageEvent && dayWeek === 0) {
            let satDate = new Date(d);
            satDate.setDate(satDate.getDate() - 1);
-           menageEvent = menagesSchedule.find(m => m.date === getLocalDateString(satDate));
+           menageEvent = menagesSchedule.find(m => m.date === getLocalDateString(satDate) && (!quickFilterFamily || m.familyId === quickFilterFamily));
         }
 
         if (dayWeek === 0 && day > 1 && menageEvent) {
