@@ -1463,8 +1463,13 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
   const [quickFilterFamily, setQuickFilterFamily] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
 
+  // VARIABLE AJOUTÉE ICI (Étape 6)
+  const estAdmin = utilisateurConnecte?.role === 'admin' || 
+                   utilisateurConnecte?.role === 'Administrateur Global' || 
+                   utilisateurConnecte?.profil === 'Admin';
+
   useEffect(() => {
-    if (utilisateurConnecte && utilisateurConnecte !== 'admin') {
+    if (utilisateurConnecte && !estAdmin) {
       const userStr = typeof utilisateurConnecte === 'object' 
         ? JSON.stringify(utilisateurConnecte).toUpperCase() 
         : String(utilisateurConnecte).toUpperCase();
@@ -2364,7 +2369,8 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
           <button onClick={() => setActiveTab('calendrier')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'calendrier' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><CalendarDays size={16} /> Calendrier</button>
           <button onClick={() => setActiveTab('famille')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'famille' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Search size={16} /> Mon Planning</button>
           
-          {utilisateurConnecte === 'admin' && (
+          {/* REMPLACEMENT DE LA CONDITION ICI */}
+          {estAdmin && (
             <>
               <button onClick={() => setActiveTab('stats')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'stats' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><BarChart3 size={16} /> Statistiques</button>
               <button onClick={() => setActiveTab('regles')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'regles' ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Info size={16} /> Règles</button>
@@ -2545,7 +2551,9 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
           {/* TAB FAMILLE */}
           {activeTab === 'famille' && (
             <div className="animate-in fade-in duration-300 max-w-3xl mx-auto pb-12">
-              {utilisateurConnecte === 'admin' && (
+              
+              {/* REMPLACEMENT DE LA CONDITION ICI AUSSI */}
+              {estAdmin && (
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mb-6 flex flex-col items-center print:hidden">
                   <label className="font-bold text-slate-700 mb-3 text-lg">Rechercher le planning d'une famille ou maîtresse :</label>
                   <div className="relative w-full max-w-md">
@@ -7093,15 +7101,55 @@ const GestionEvenements = ({ transactionsGlobales }) => {
   );
 };
 
+
 // --- MODULE : GESTION DES ACCÈS ---
 const ModuleGestionAcces = () => {
   const [utilisateurs, setUtilisateurs] = useState([]);
   const [form, setForm] = useState({ identifiant: '', mdp: '', role: 'famille', familleId: '', modules: ['accueil_famille'] });
   
-  // Nouveaux états pour l'édition et la visibilité des mots de passe
   const [modalConfig, setModalConfig] = useState({ isOpen: false, type: 'success', message: '' });
   const [editingUserId, setEditingUserId] = useState(null);
   const [visiblePasswords, setVisiblePasswords] = useState({});
+
+  const permissionsParRole = {
+    'Administrateur Global': {
+      accueil_famille: true, vie_ecole: true, scolarite: true, factures_parents: true, plannings: true, fiche_travaux: true, inscriptions: true, contact: true,
+      tableau_bord: true, etat_financier: true,
+      grand_livre: true, plan_comptable: true, budget: true, notes_frais: true, dons_recus: true, evenements: true,
+      gestion_acces: true, parametres_familles: true, dossiers_facturation: true, equipe_contrats: true, uniformes_stock: true
+    },
+    'Direction': {
+      accueil_famille: true, vie_ecole: false, scolarite: false, factures_parents: false, plannings: true, fiche_travaux: true, inscriptions: true, contact: true,
+      tableau_bord: false, etat_financier: false,
+      grand_livre: false, plan_comptable: false, budget: false, notes_frais: true, dons_recus: false, evenements: false,
+      gestion_acces: false, parametres_familles: false, dossiers_facturation: true, equipe_contrats: false, uniformes_stock: false
+    },
+    'Famille': {
+      accueil_famille: true, vie_ecole: true, scolarite: true, factures_parents: true, plannings: true, fiche_travaux: true, inscriptions: true, contact: true,
+      tableau_bord: false, etat_financier: false,
+      grand_livre: false, plan_comptable: false, budget: false, notes_frais: true, dons_recus: false, evenements: false,
+      gestion_acces: false, parametres_familles: false, dossiers_facturation: false, equipe_contrats: false, uniformes_stock: false
+    },
+    'Famille Asso': {
+      accueil_famille: true, vie_ecole: true, scolarite: true, factures_parents: true, plannings: true, fiche_travaux: true, inscriptions: true, contact: true,
+      tableau_bord: true, etat_financier: true,
+      grand_livre: false, plan_comptable: false, budget: true, notes_frais: true, dons_recus: true, evenements: true,
+      gestion_acces: false, parametres_familles: true, dossiers_facturation: true, equipe_contrats: true, uniformes_stock: true
+    }
+  };
+
+  const handleRoleChange = (e) => {
+    const nouveauRole = e.target.value;
+    const nouvellesPermissions = permissionsParRole[nouveauRole] 
+      ? Object.keys(permissionsParRole[nouveauRole]).filter(k => permissionsParRole[nouveauRole][k]) 
+      : [];
+    
+    setForm(prev => ({
+      ...prev,
+      role: nouveauRole,
+      modules: nouvellesPermissions
+    }));
+  };
 
   const CATEGORIES = {
     "Espace Famille": ['accueil_famille', 'vie_ecole', 'scolarite', 'factures_parents', 'plannings', 'fiche_travaux', 'inscriptions', 'contact'],
@@ -7154,7 +7202,7 @@ const ModuleGestionAcces = () => {
       modules: user.modulesAutorises || []
     });
     setEditingUserId(user.id);
-    window.scrollTo({ top: 0, behavior: 'smooth' }); // Remonte en haut pour éditer
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDeleteUser = async (id, identifiant) => {
@@ -7177,10 +7225,16 @@ const ModuleGestionAcces = () => {
   const handleSaveUser = async (e) => {
     e.preventDefault();
     try {
+      let profilDefini = 'Famille';
+      if (form.role === 'Administrateur Global') profilDefini = 'Admin';
+      if (form.role === 'Direction') profilDefini = 'Direction';
+      if (form.role === 'Famille Asso') profilDefini = 'Asso';
+
       const userData = {
         identifiant: form.identifiant.toUpperCase().trim(),
         mdp: form.mdp,
         role: form.role,
+        profil: profilDefini,
         familleId: form.familleId.toUpperCase().trim(),
         modulesAutorises: form.modules
       };
@@ -7238,7 +7292,17 @@ const ModuleGestionAcces = () => {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div><label className="block text-xs font-bold mb-1 text-slate-700">Identifiant de connexion</label><input type="text" required value={form.identifiant} onChange={e => setForm({...form, identifiant: e.target.value})} className="w-full p-2.5 bg-white border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" /></div>
             <div><label className="block text-xs font-bold mb-1 text-slate-700">Mot de passe</label><input type="text" required value={form.mdp} onChange={e => setForm({...form, mdp: e.target.value})} className="w-full p-2.5 bg-white border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" /></div>
-            <div><label className="block text-xs font-bold mb-1 text-slate-700">Rôle Global</label><select value={form.role} onChange={e => setForm({...form, role: e.target.value})} className="w-full p-2.5 bg-white border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"><option value="famille">Famille / Bureau</option><option value="admin">Administrateur Total</option></select></div>
+            
+            <div>
+              <label className="block text-xs font-bold mb-1 text-slate-700">Rôle Global</label>
+              <select value={form.role} onChange={handleRoleChange} className="w-full p-2.5 bg-white border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm">
+                <option value="Administrateur Global">Administrateur Global</option>
+                <option value="Direction">Direction</option>
+                <option value="Famille Asso">Famille Asso (Bureau)</option>
+                <option value="Famille">Famille (Régulier)</option>
+              </select>
+            </div>
+            
             <div><label className="block text-xs font-bold mb-1 text-slate-700">Lier à la famille (Planning)</label><input type="text" value={form.familleId} onChange={e => setForm({...form, familleId: e.target.value})} placeholder="Ex: BEZIAT-MENUT" className="w-full p-2.5 bg-white border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm" /></div>
           </div>
           
@@ -7284,7 +7348,6 @@ const ModuleGestionAcces = () => {
             {utilisateurs.map(u => (
               <div key={u.id} className={`bg-white border p-4 rounded-xl flex flex-col justify-between shadow-sm relative group transition-all ${editingUserId === u.id ? 'border-amber-400 ring-2 ring-amber-50' : 'border-slate-200 hover:border-indigo-300'}`}>
                 
-                {/* Actions (Éditer / Supprimer) */}
                 <div className="absolute top-3 right-3 flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                   <button onClick={() => handleEditUser(u)} className="p-1.5 bg-slate-100 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Modifier">
                     <Edit2 size={16}/>
@@ -7296,7 +7359,7 @@ const ModuleGestionAcces = () => {
 
                 <div className="pr-16 mb-3">
                   <span className="font-black text-slate-800 text-lg">{u.identifiant}</span>
-                  <span className={`text-[10px] font-bold uppercase ml-2 px-2 py-0.5 rounded border ${u.role === 'admin' ? 'bg-rose-50 text-rose-700 border-rose-100' : 'bg-indigo-50 text-indigo-700 border-indigo-100'}`}>
+                  <span className={`text-[10px] font-bold uppercase ml-2 px-2 py-0.5 rounded border ${u.role === 'admin' || u.role === 'Administrateur Global' ? 'bg-rose-50 text-rose-700 border-rose-100' : 'bg-indigo-50 text-indigo-700 border-indigo-100'}`}>
                     {u.role}
                   </span>
                 </div>
@@ -7322,7 +7385,7 @@ const ModuleGestionAcces = () => {
                 <div>
                   <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Droits d'accès :</span>
                   <div className="text-[10px] text-slate-600 leading-relaxed font-mono">
-                    {u.role === 'admin' ? (
+                    {u.role === 'admin' || u.role === 'Administrateur Global' ? (
                       <span className="text-rose-600 font-bold">🔒 Accès total (Administrateur)</span>
                     ) : (
                       u.modulesAutorises?.length > 0 ? u.modulesAutorises.join(' • ') : <span className="italic text-slate-400">Aucun accès accordé</span>
@@ -7337,6 +7400,7 @@ const ModuleGestionAcces = () => {
     </div>
   );
 };
+
 
 // --- MODULE : GESTION DU PLANNING CANTINES & MENAGES PAR FAMILLE---
 const ModuleGestionPlanningCantinesMenages = () => {
@@ -7963,10 +8027,12 @@ export default function App() {
         <nav className="flex-1 overflow-y-auto py-4 px-3 custom-scrollbar">
           {(() => {
             const hasAccess = (moduleName) => {
-              if (utilisateurConnecte?.role === 'admin') return true;
+              // REMPLACEMENT DE LA CONDITION ADMIN ICI (Étape 5)
+              if (utilisateurConnecte?.role === 'admin' || utilisateurConnecte?.role === 'Administrateur Global') return true;
               return utilisateurConnecte?.modulesAutorises?.includes(moduleName);
             };
 
+            // ... (La liste de vos constantes hasAnyFamilyAccess etc. reste la même)
             const hasAnyFamilyAccess = ['accueil_famille', 'vie_ecole', 'scolarite', 'factures_parents', 'plannings', 'fiche_travaux', 'inscriptions', 'contact'].some(hasAccess);
             const hasAnyPilotageAccess = ['tableau_bord', 'etat_financier'].some(hasAccess);
             const hasAnyComptaAccess = ['grand_livre', 'plan_comptable', 'budget', 'notes_frais', 'dons_recus', 'evenements'].some(hasAccess);
@@ -8009,7 +8075,7 @@ export default function App() {
                 )}
 
                 {hasAnyAdminAccess && (
-                 <div className="mb-6">
+                  <div className="mb-6">
                     <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Administration</h3>
                     {hasAccess('gestion_acces') && <a href="#gestion_acces" onClick={() => handleNavigation('gestion_acces')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'gestion_acces' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><Lock size={18} /> Gestion Accès</a>}
                     {hasAccess('parametres_familles') && <a href="#parametres_familles" onClick={() => handleNavigation('parametres_familles')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'parametres_familles' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><Users size={18} /> Base Familles</a>}
@@ -8044,14 +8110,17 @@ export default function App() {
         <div className="flex items-center gap-4">
             <div className="text-right hidden md:block">
               <div className="text-sm font-bold text-slate-800">
-                {utilisateurConnecte?.role === 'admin' ? 'Admin' : utilisateurConnecte?.identifiant}
+                {utilisateurConnecte?.role === 'admin' || utilisateurConnecte?.role === 'Administrateur Global' ? 'Admin' : utilisateurConnecte?.identifiant}
               </div>
+              
+              {/* REMPLACEMENT DU PROFIL ICI (Étape 4) */}
               <div className="text-xs text-slate-500">
-                {utilisateurConnecte?.role === 'admin' ? 'Profil : Direction' : 'Profil : Parent'}
+                Profil : {utilisateurConnecte?.profil || 'Famille'}
               </div>
+
             </div>
             <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-lg border-2 border-indigo-200 uppercase">
-              {utilisateurConnecte?.role === 'admin' ? 'A' : (utilisateurConnecte?.identifiant ? utilisateurConnecte.identifiant.charAt(0) : '?')}
+              {utilisateurConnecte?.role === 'admin' || utilisateurConnecte?.role === 'Administrateur Global' ? 'A' : (utilisateurConnecte?.identifiant ? utilisateurConnecte.identifiant.charAt(0) : '?')}
             </div>
           </div>
         </header>
