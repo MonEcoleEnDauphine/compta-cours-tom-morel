@@ -1554,7 +1554,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       return !fam.days.includes(dOw);
     };
 
-    // --- INTEGRATION STRICTE DES FICHIERS HISTORIQUES ---
     const historicalCantine = [
       { date: '2026-09-03', p1: 'BOCCA', p2: 'TAISSIDRE-CARVALHO', repasType: 'Filles / Garçons' },
       { date: '2026-09-04', p1: 'RIOBÉ', p2: 'BEZIAT-MENUT', repasType: 'Par cordée' },
@@ -1597,7 +1596,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     let scheduleArr = [];
     let menageArr = [];
     let statsObj = {};
-
+    
     famsData.forEach(f => {
       statsObj[f.id] = { cantine: 0, menage: 0, total: 0, periodCantine: 0, monthCantine: 0, lastCantine: null, lastMenage: "2026-01-01", virtualCantine: 0, virtualMenage: 0 };
     });
@@ -1620,10 +1619,9 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         }
     });
 
-    // REPRISE DE L'ALGORITHME LE 2 NOVEMBRE 2026
     let currentDate = new Date(2026, 10, 2, 12, 0, 0); 
     const endDate = new Date(2027, 6, 3, 12, 0, 0);
-
+    
     let currentPeriodIdx = -1; 
     let currentMonthStr = "";
     let spFamiliesIntegrated = false; 
@@ -1632,8 +1630,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       const dateStr = getDateStr(currentDate);
       const dayOfWeek = currentDate.getDay();
       const monthStr = dateStr.substring(0, 7);
-
-      // LISSAGE MENSUEL
+      
       if (monthStr !== currentMonthStr) {
           currentMonthStr = monthStr;
           Object.keys(statsObj).forEach(k => {
@@ -1649,6 +1646,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         });
       }
 
+      // CORRECTION : Arrondi mathématique pour l'intégration des Nouveaux SP
       if (dateStr === "2026-11-02" && !spFamiliesIntegrated) {
           let sumCantine = 0; let sumMenage = 0; let countBase = 0;
           famsData.forEach(f => {
@@ -1658,22 +1656,22 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                   countBase++; 
               }
           });
-          const avgCantine = Math.floor(sumCantine / countBase);
-          const avgMenage = Math.floor(sumMenage / countBase);
-
+          const avgCantine = Math.round(sumCantine / countBase);
+          const avgMenage = Math.round(sumMenage / countBase);
+          
           famsData.forEach(f => {
               if (f.type === "Nouveau SP") {
                   statsObj[f.id].cantine = avgCantine;
                   statsObj[f.id].menage = avgMenage;
                   statsObj[f.id].total = avgCantine + avgMenage;
-
+                  
                   statsObj[f.id].virtualCantine = avgCantine;
                   statsObj[f.id].virtualMenage = avgMenage;
               }
           });
           spFamiliesIntegrated = true;
       }
-
+      
       let activeP = perData[0];
       for (let i = 0; i < perData.length; i++) {
         if (dateStr >= perData[i].start && dateStr <= perData[i].end) {
@@ -1734,15 +1732,12 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         if (requiredParents > 0) {
           for (let i = assigned.length; i < requiredParents; i++) {
             let available = famsData.filter(f => {
-              // DISPENSE NAISSANCE (DE LASTIC ST JAL)
               if (f.id === "DE LASTIC ST JAL" && dateStr >= "2027-02-01" && dateStr <= "2027-04-15") return false;
 
-              // DOUBLE SERVICE LE LÉZEC : On ne les supprime pas de la liste s'ils sont déjà p1
               if (assigned.includes(f.id)) {
                 if (f.id === "LE LÉZEC" && [1, 5].includes(dayOfWeek) && assigned.length === 1 && assigned[0] === "LE LÉZEC") {
-                   // Autorisé : le Lézec peut faire p2 s'il est déjà p1
                 } else {
-                   return false; // Les autres familles sont retirées de la liste
+                   return false;
                 }
               }
 
@@ -1750,10 +1745,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
               if (!hasDay) return false;
 
               if (f.type === "Nouveau SP") {
-                  // BLOCAGE 1ÈRE SEMAINE NOVEMBRE
                   if (dateStr >= "2026-11-02" && dateStr <= "2026-11-08") return false;
-
-                  // SÉPARATION DES NOUVEAUX SP UNIQUEMENT JUSQU'AU 15 NOVEMBRE INCLUS
                   if (dateStr <= "2026-11-15") {
                       if (i === 1 && assigned.length === 1) {
                           const firstFam = famsData.find(family => family.id === assigned[0]);
@@ -1762,7 +1754,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                   }
               }
 
-              // Pas 2 jours de suite pour les nouveaux
               if (f.type.startsWith("Nouveau") && statsObj[f.id].lastCantine) {
                 let lastD = new Date(statsObj[f.id].lastCantine + "T12:00:00");
                 let diffDays = Math.ceil(Math.abs(currentDate - lastD) / (1000 * 60 * 60 * 24));
@@ -1771,26 +1762,23 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
               return true;
             });
 
-            // Si LE LÉZEC est p1, on FORÇE la liste disponible à ne contenir que LE LÉZEC pour que le système les choisisse obligatoirement en p2
             if (i === 1 && assigned.length === 1 && assigned[0] === "LE LÉZEC") {
                 let lezecObj = available.find(f => f.id === "LE LÉZEC");
                 if (lezecObj) available = [lezecObj];
             }
 
+            // CORRECTION : Priorité absolue au Total Annuel
             available.sort((a, b) => {
               let scoreA = statsObj[a.id].total; let scoreB = statsObj[b.id].total;
-
-              // 1. PRIORITÉ LISSAGE MENSUEL
-              let monthDiff = statsObj[a.id].monthCantine - statsObj[b.id].monthCantine;
-              if (monthDiff !== 0) return monthDiff;
-
-              // 2. LISSAGE INTRA-PÉRIODE
+              
+              if (scoreA !== scoreB) return scoreA - scoreB;
+              
               let periodDiff = statsObj[a.id].periodCantine - statsObj[b.id].periodCantine;
               if (periodDiff !== 0) return periodDiff;
 
-              // 3. TOTAL ANNUEL
-              if (scoreA !== scoreB) return scoreA - scoreB;
-
+              let monthDiff = statsObj[a.id].monthCantine - statsObj[b.id].monthCantine;
+              if (monthDiff !== 0) return monthDiff;
+              
               return a.days.length - b.days.length;
             });
 
@@ -1804,11 +1792,11 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
               statsObj[chosenId].lastCantine = dateStr;
             } else {
               let fallback = famsData.filter(f => !assigned.includes(f.id)).sort((a, b) => {
-                 let mDiff = statsObj[a.id].monthCantine - statsObj[b.id].monthCantine;
-                 if (mDiff !== 0) return mDiff;
+                 let tDiff = statsObj[a.id].total - statsObj[b.id].total;
+                 if (tDiff !== 0) return tDiff;
                  let pDiff = statsObj[a.id].periodCantine - statsObj[b.id].periodCantine;
                  if (pDiff !== 0) return pDiff;
-                 return statsObj[a.id].total - statsObj[b.id].total;
+                 return statsObj[a.id].monthCantine - statsObj[b.id].monthCantine;
               });
               if (fallback.length > 0) {
                 const chosenId = fallback[0].id;
@@ -1837,7 +1825,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       if (dayOfWeek === 5 && isSchoolDayFlag) {
         let nextSat = new Date(currentDate); nextSat.setDate(nextSat.getDate() + 1);
         let nextSatStr = getDateStr(nextSat);
-
+        
         let isHolidayStart = false; let holidayName = "";
         for (let i = 0; i < vacData.length; i++) {
           if (nextSatStr === vacData[i].start) { isHolidayStart = true; holidayName = "Vacances " + vacData[i].name; }
@@ -1846,17 +1834,18 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         if (isHolidayStart) {
           let eligibleAsso = famsData.filter(f => {
             if (f.id === "DE LASTIC ST JAL" && nextSatStr >= "2027-02-01" && nextSatStr <= "2027-04-15") return false;
-            // LE LÉZEC est bloqué pour le ménage afin de baisser leur total et favoriser leurs doubles cantines
             if (f.id === "LE LÉZEC" && statsObj[f.id].menage >= 1) return false;
             return f.isAsso;
           });
-
+          
           eligibleAsso.sort((a, b) => {
             let scoreA = statsObj[a.id].menage - (a.id === "LE LÉZEC" ? 1 : 0);
             let scoreB = statsObj[b.id].menage - (b.id === "LE LÉZEC" ? 1 : 0);
-            return scoreA - scoreB || a.id.localeCompare(b.id);
+            if (scoreA !== scoreB) return scoreA - scoreB;
+            // CORRECTION : En cas d'égalité sur le ménage, on donne à celui qui a le moins de services au TOTAL
+            return statsObj[a.id].total - statsObj[b.id].total;
           });
-
+          
           if(eligibleAsso.length > 0) {
             let chosen = eligibleAsso[0].id;
             statsObj[chosen].menage++; statsObj[chosen].total++; statsObj[chosen].lastMenage = dateStr;
@@ -1866,31 +1855,29 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         } else {
           let candidates = famsData.filter(f => {
             if (f.id === "DE LASTIC ST JAL" && nextSatStr >= "2027-02-01" && nextSatStr <= "2027-04-15") return false;
-            // RÈGLE : PAS DE NOUVEAUX SP LA 1ERE SEMAINE DE NOVEMBRE
             if (f.type === "Nouveau SP" && nextSatStr >= "2026-11-02" && nextSatStr <= "2026-11-08") return false;
             return true;
           });
-
+          
           candidates = candidates.filter(f => {
-             // BLOCAGES MÉNAGES
              if (f.id === "CHOMEL" && statsObj[f.id].menage >= 1) return false;
              if (f.id === "DURAND" && statsObj[f.id].menage >= 1) return false;
-             // LE LÉZEC limité à 1 ménage pour baisser leur total global et forcer des cantines
              if (f.id === "LE LÉZEC" && statsObj[f.id].menage >= 1) return false;
              return true;
           });
-
+          
           let withCooldown = candidates.filter(f => {
             let lastDate = new Date(statsObj[f.id].lastMenage + "T12:00:00").getTime();
             return (currentDate.getTime() - lastDate) >= 28 * 24 * 60 * 60 * 1000;
           });
           if(withCooldown.length > 0) candidates = withCooldown;
-
+          
           candidates.sort((a, b) => {
-            // SHAW Malus : On fait croire qu'ils ont fait un ménage de moins pour les tirer au sort plus vite
             let scoreA = statsObj[a.id].menage - (a.id === "SHAW" ? 1 : 0);
             let scoreB = statsObj[b.id].menage - (b.id === "SHAW" ? 1 : 0);
-            return scoreA - scoreB || a.id.localeCompare(b.id);
+            if (scoreA !== scoreB) return scoreA - scoreB;
+            // CORRECTION : En cas d'égalité sur le ménage, on donne à celui qui a le moins de services au TOTAL
+            return statsObj[a.id].total - statsObj[b.id].total;
           });
 
           if(candidates.length > 0) {
@@ -1910,7 +1897,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       let realTotal = realCantine + realMenage;
       return { id: id, name: id, cantine: realCantine, menage: realMenage, total: realTotal, isTeacher: false };
     });
-
+    
     let teaCantine = (tId) => scheduleArr.filter(s => s.p1 === tId || s.p2 === tId).length;
     fStats.push({ id: "Mme GERARD", name: "Mme GERARD", isTeacher: true, cantine: teaCantine("Mme GERARD"), menage: 0, total: teaCantine("Mme GERARD") });
     fStats.push({ id: "Mme SUBLET", name: "Mme SUBLET", isTeacher: true, cantine: teaCantine("Mme SUBLET"), menage: 0, total: teaCantine("Mme SUBLET") });
@@ -1953,12 +1940,12 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     try {
       const captureZone = document.getElementById('capture-zone');
       if (!captureZone) return;
-
+      
       const originalOverflow = captureZone.style.overflow;
       const originalHeight = captureZone.style.height;
       captureZone.style.overflow = 'visible';
       captureZone.style.height = 'auto';
-
+      
       if (!window.html2canvas) {
         await new Promise((resolve, reject) => {
           const script = document.createElement('script');
@@ -1968,16 +1955,16 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
           document.head.appendChild(script);
         });
       }
-
+      
       const canvas = await window.html2canvas(captureZone, {
           scale: 2, 
           backgroundColor: '#ffffff',
           logging: false
       });
-
+      
       captureZone.style.overflow = originalOverflow;
       captureZone.style.height = originalHeight;
-
+      
       const image = canvas.toDataURL("image/jpeg", 0.9);
       const link = document.createElement("a");
       link.href = image;
@@ -2573,11 +2560,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                       value={selectedFamilyFilter} onChange={(e) => setSelectedFamilyFilter(e.target.value)}
                     >
                       <option value="">Sélectionnez un nom...</option>
-                      <optgroup label="Familles">
-                        {[...familiesList].sort((a, b) => a.id.localeCompare(b.id)).map(f => (
-                          <option key={f.id} value={f.id}>{f.id}</option>
-                        ))}
-                      </optgroup>
+                      <optgroup label="Familles">{familiesList.map(f => <option key={f.id} value={f.id}>{f.id}</option>)}</optgroup>
                       <optgroup label="Maîtresses"><option value="Mme GERARD">Mme GERARD</option><option value="Mme SUBLET">Mme SUBLET</option><option value="Mme HERVET">Mme HERVET</option><option value="Mme QARIOH">Mme QARIOH</option></optgroup>
                     </select>
                   </div>
