@@ -1463,6 +1463,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
   const [quickFilterFamily, setQuickFilterFamily] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
 
+  // --- RÈGLE D'AFFICHAGE DES ONGLETS ADMIN ---
   const peutVoirAdmin = 
     utilisateurConnecte?.role === 'admin' || 
     utilisateurConnecte?.role === 'Administrateur Global' || 
@@ -1485,7 +1486,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         setSelectedFamilyFilter(famId);
       }
     }
-  }, [utilisateurConnecte]);
+  }, [utilisateurConnecte, peutVoirAdmin]);
 
   useEffect(() => {
     setActiveTab(defaultTab);
@@ -1529,7 +1530,8 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { id: 2, name: "Toussaint - Noël", desc: "02/11 - 18/12", start: "2026-11-02", end: "2026-12-18" },
       { id: 3, name: "Noël - Février", desc: "04/01 - 12/02", start: "2027-01-04", end: "2027-02-12" },
       { id: 4, name: "Février - Pâques", desc: "01/03 - 09/04", start: "2027-03-01", end: "2027-04-09" },
-      { id: 5, name: "Pâques - Été", desc: "26/04 - 02/07", start: "2027-04-26", end: "2027-07-02" }
+      // RÈGLE : Fin d'année fixée au 25 Juin 2027
+      { id: 5, name: "Pâques - Été", desc: "26/04 - 25/06", start: "2027-04-26", end: "2027-06-25" }
     ];
 
     const holiData = ["2026-11-11", "2027-03-26", "2027-03-29", "2027-05-06", "2027-05-07", "2027-05-17"];
@@ -1619,7 +1621,8 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     });
 
     let currentDate = new Date(2026, 10, 2, 12, 0, 0); 
-    const endDate = new Date(2027, 6, 3, 12, 0, 0);
+    // RÈGLE : Arrêt de l'algorithme le 25 Juin 2027 (Mois 5 = Juin)
+    const endDate = new Date(2027, 5, 25, 12, 0, 0);
     
     let currentPeriodIdx = -1; 
     let currentMonthStr = "";
@@ -1739,7 +1742,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                 }
               }
 
-              // BLOCAGE PONCTUEL : LE LÉZEC indisponible le 6 novembre
+              // RÈGLE : LE LÉZEC bloqué le vendredi 6 novembre
               if (f.id === "LE LÉZEC" && dateStr === "2026-11-06") return false;
 
               let hasDay = f.days.includes(dayOfWeek);
@@ -1768,7 +1771,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                 if (lezecObj) available = [lezecObj];
             }
 
-            // CORRECTION : On simule +1 service pour les familles Asso (isAsso) pour baisser leur charge
             available.sort((a, b) => {
               let scoreA = statsObj[a.id].total + (a.isAsso ? 1 : 0); 
               let scoreB = statsObj[b.id].total + (b.isAsso ? 1 : 0);
@@ -1843,6 +1845,11 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
           });
           
           eligibleAsso.sort((a, b) => {
+            // RÈGLE : Minimum 1 ménage pour tous
+            let aZero = statsObj[a.id].menage === 0 ? 0 : 1;
+            let bZero = statsObj[b.id].menage === 0 ? 0 : 1;
+            if (aZero !== bZero) return aZero - bZero;
+
             let scoreA = statsObj[a.id].menage - (a.id === "LE LÉZEC" ? 1 : 0);
             let scoreB = statsObj[b.id].menage - (b.id === "LE LÉZEC" ? 1 : 0);
             if (scoreA !== scoreB) return scoreA - scoreB;
@@ -1879,6 +1886,11 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
           if(withCooldown.length > 0) candidates = withCooldown;
           
           candidates.sort((a, b) => {
+            // RÈGLE : Minimum 1 ménage pour tous
+            let aZero = statsObj[a.id].menage === 0 ? 0 : 1;
+            let bZero = statsObj[b.id].menage === 0 ? 0 : 1;
+            if (aZero !== bZero) return aZero - bZero;
+
             let scoreA = statsObj[a.id].menage - (a.id === "SHAW" ? 1 : 0);
             let scoreB = statsObj[b.id].menage - (b.id === "SHAW" ? 1 : 0);
             if (scoreA !== scoreB) return scoreA - scoreB;
@@ -2603,6 +2615,8 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                   <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><AlertCircle className="text-slate-400" size={18}/> Cas Particuliers Strictes</h3>
                   <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
+                      <li><strong>Fin d'année :</strong> L'année s'arrête le Vendredi 25 Juin 2027 (le dernier ménage est attribué sur ce week-end).</li>
+                      <li><strong>Ménage garanti :</strong> Chaque famille a l'obligation stricte d'effectuer au minimum 1 ménage sur l'année.</li>
                       <li><strong>DE LASTIC ST JAL (Dispense Naissance) :</strong> Aucune cantine ni ménage attribués entre le 1er Février et le 15 Avril 2027. À leur retour, le lissage mensuel limitera automatiquement la surcharge de rattrapage.</li>
                       <li><strong>LE LÉZEC (Double garde Maman/Papa) :</strong> Autorisation d'occuper les 2 postes de cantine simultanément le lundi ou le vendredi (comptabilisé comme 2 services réels). Bloqué manuellement le vendredi 6 novembre.</li>
                       <li><strong>Familles Association :</strong> Avantage accordé aux membres de l'association. Leur score est réduit virtuellement d'un point pour qu'ils soient moins sollicités par le tirage au sort annuel (objectif 13 services au lieu de 14).</li>
