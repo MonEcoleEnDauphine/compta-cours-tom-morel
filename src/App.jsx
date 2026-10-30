@@ -1717,10 +1717,19 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         } 
         else if (dayOfWeek === 2) { 
           repasType = "Placement libre";
+          // MARDIS (Paire: Gerard/Sublet | Impaire: Qarioh)
           if (isSemaineImpaire) { 
-            requiredParents = 1; p1 = "MME QARIOH"; 
+            if (dateStr >= "2026-11-10") {
+                requiredParents = 0; p1 = "MME GERARD"; p2 = "MME SUBLET"; 
+            } else {
+                requiredParents = 2;
+            }
           } else if (isSemainePaire) {
-            requiredParents = 0; p1 = "MME GERARD"; p2 = "MME SUBLET"; 
+            if (dateStr >= "2026-11-17") {
+                requiredParents = 1; p1 = "MME QARIOH"; 
+            } else {
+                requiredParents = 2;
+            }
           }
         } 
         else if (dayOfWeek === 4) { 
@@ -1728,11 +1737,12 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         } 
         else if (dayOfWeek === 5) { 
           repasType = "Par cordée";
+          // VENDREDIS : Inverse par rapport au mardi
           if (isSemainePaire) { 
-            if (dateStr >= "2026-11-02") {
+            if (dateStr >= "2026-11-20") {
                 requiredParents = 1; p1 = "MME SUBLET"; 
             } else {
-                requiredParents = 0; p1 = "MME SUBLET"; p2 = "MME HERVET"; 
+                requiredParents = 2;
             }
           } 
           else { requiredParents = 2; }
@@ -1752,7 +1762,8 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                 }
             }
 
-            if (dateStr === "2026-11-13" && dayOfWeek === 5 && !assigned.includes("LE LÉZEC")) {
+            // FORCAGE VENDREDI 20 NOVEMBRE (Mme Sublet + Le Lézec)
+            if (dateStr === "2026-11-20" && dayOfWeek === 5 && !assigned.includes("LE LÉZEC")) {
                 assigned.push("LE LÉZEC");
                 statsObj["LE LÉZEC"].cantine++; statsObj["LE LÉZEC"].periodCantine++; statsObj["LE LÉZEC"].monthCantine++; statsObj["LE LÉZEC"].total++; statsObj["LE LÉZEC"].lastCantine = dateStr;
             }
@@ -1761,7 +1772,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
             let available = famsData.filter(f => {
               if (assigned.includes(f.id)) {
                 if (f.id === "LE LÉZEC" && [1, 5].includes(dayOfWeek) && assigned.length === 1 && assigned[0] === "LE LÉZEC") {
-                   // OK
+                   // Autorisé pour duo Papa/Maman
                 } else {
                    return false;
                 }
@@ -1771,8 +1782,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
               
               if (f.id === "LE LÉZEC") {
                   if (dateStr === "2026-11-06") return false; 
-                  if (requiredParents < 2) return false; 
-                  if (i === 1 && assigned[0] !== "LE LÉZEC") return false; 
+                  if (requiredParents === 2 && i === 1 && assigned[0] !== "LE LÉZEC") return false; 
               }
 
               let hasDay = f.days.includes(dayOfWeek);
@@ -1970,19 +1980,16 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     d2.setDate(d2.getDate() + 1); 
     return `Sam. ${d1.getDate()} au Dim. ${new Date(d2).toLocaleDateString('fr-FR', {day:'numeric', month:'short'})}`;
   };
-  
-  // NOUVEAU : Fonction de génération du fichier .ics pour l'agenda
+
   const handleAddToCalendar = (event) => {
       let startDateStr, endDateStr, title, description;
       
       if (event.type === 'Cantine') {
-          // Format: 2026-11-03 -> 20261103T120000
           startDateStr = event.date.replace(/-/g, '') + 'T120000Z';
           endDateStr = event.date.replace(/-/g, '') + 'T133000Z';
           title = `Cantine - École`;
           description = `Service de cantine : ${event.details}.\\nPartenaire : ${event.partner || 'Aucun'}`;
       } else {
-          // Ménage (Samedi au Dimanche)
           let d1 = new Date(event.date + "T12:00:00");
           let d2 = new Date(d1); d2.setDate(d2.getDate() + 1);
           
@@ -2349,7 +2356,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     let allEvents = [
         ...schedule.filter(s => s.p1 === selectedFamilyFilter || s.p2 === selectedFamilyFilter).map(s => {
           let partner = s.p1 === selectedFamilyFilter ? s.p2 : s.p1;
-          // Si c'est un double service LE LÉZEC, le partenaire est... LE LÉZEC. On nettoie l'affichage.
           if (selectedFamilyFilter === "LE LÉZEC" && partner === "LE LÉZEC") partner = "Maman/Papa";
           return { date: s.date, type: 'Cantine', details: s.repasType, period: s.period, isOut: (s.p1 === selectedFamilyFilter && s.p1IsOut) || (s.p2 === selectedFamilyFilter && s.p2IsOut), partner };
         }),
@@ -2395,6 +2401,13 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                       pHeader = <tr key={`ph-${idx}`}><td colSpan="3" className="bg-slate-100 px-6 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider">{pName} <span className="font-normal opacity-70 ml-2">{pDesc}</span></td></tr>;
                     }
                     const isCantine = e.type === 'Cantine';
+                    
+                    let repasIcon = "⚙️";
+                    if (e.details === "Repas par classe") repasIcon = "🧬";
+                    if (e.details === "Placement libre") repasIcon = "🔭";
+                    if (e.details === "Filles / Garçons") repasIcon = "🧲";
+                    if (e.details === "Par cordée") repasIcon = "💡";
+
                     const iconClass = isCantine ? 'text-blue-500 bg-blue-100' : (e.isVacances ? 'text-amber-500 bg-amber-100' : 'text-indigo-500 bg-indigo-100');
                     const dateDisplay = (e.type === 'Ménage' && !e.isVacances) ? formatMenageDate(e.date) : formatDate(e.date);
 
@@ -2406,7 +2419,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                           <td className="p-4">
                               <div className="flex flex-wrap items-center gap-3">
                                   <div className={`w-8 h-8 rounded-full flex items-center justify-center ${iconClass}`}>
-                                    {isCantine ? <Utensils size={14} /> : (e.isVacances ? <CalendarDays size={14} /> : <Sparkles size={14} />)}
+                                    {isCantine ? <span className="text-[14px] leading-none">{repasIcon}</span> : (e.isVacances ? <CalendarDays size={14} /> : <Sparkles size={14} />)}
                                   </div>
                                   <div>
                                     <strong className="text-slate-800 block">{e.type}</strong>
@@ -2749,9 +2762,9 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                   <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><Utensils className="text-slate-400" size={18}/> Jours de Cantine</h3>
                   <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
                       <li><strong>Lundi :</strong> Repas par classe (2 parents)</li>
-                      <li><strong>Mardi :</strong> Alternance. Semaine Paire : Mme Gerard + Mme Sublet (0 parent). Semaine Impaire : Mme Qarioh + 1 parent.</li>
+                      <li><strong>Mardi :</strong> Alternance. Semaine Impaire (dès le 10 Nov) : Mme Gerard + Mme Sublet (0 parent). Semaine Paire (dès le 17 Nov) : Mme Qarioh + 1 parent.</li>
                       <li><strong>Jeudi :</strong> Filles/Garçons (2 parents)</li>
-                      <li><strong>Vendredi :</strong> Par cordée. Alternance. Semaine Paire : 2 parents. Semaine Impaire (à partir de Novembre) : Mme Sublet + 1 parent.</li>
+                      <li><strong>Vendredi :</strong> Par cordée. Alternance. Semaine Impaire : 2 parents. Semaine Paire (dès le 20 Nov) : Mme Sublet + 1 parent.</li>
                   </ul>
               </div>
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
@@ -2766,7 +2779,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                   <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><AlertCircle className="text-slate-400" size={18}/> Cas Particuliers Strictes</h3>
                   <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
                       <li><strong>DE LASTIC ST JAL (Dispense Naissance) :</strong> Aucune cantine ni ménage attribués entre le 1er Février et le 15 Avril 2027. À leur retour, le lissage mensuel limitera automatiquement la surcharge de rattrapage.</li>
-                      <li><strong>LE LÉZEC (Double garde Maman/Papa) :</strong> Autorisation et obligation d'occuper les 2 postes de cantine simultanément lorsqu'ils sont tirés au sort (comptabilisé comme 2 services réels). Ils ne peuvent pas être séparés et assignés avec une autre famille. Indisponibilité ponctuelle respectée le 6 novembre. En compensation, leurs ménages sont bridés pour forcer l'algorithme à leur donner plus de doubles cantines.</li>
+                      <li><strong>LE LÉZEC (Double garde Maman/Papa) :</strong> Autorisation et obligation d'occuper les 2 postes de cantine simultanément lorsqu'ils sont tirés au sort (comptabilisé comme 2 services réels). Ils ne peuvent pas être séparés et assignés avec une autre famille (sauf s'ils complètent la place restante avec une maîtresse). Indisponibilité ponctuelle respectée le 6 novembre.</li>
                       <li><strong>CHOMEL & DURAND :</strong> Limités manuellement à 1 seul ménage sur l'année. Les cantines sont rééquilibrées automatiquement. Toutes les autres familles font au moins un ménage.</li>
                       <li><strong>SHAW :</strong> Un ménage supplémentaire forcé. Leurs cantines sont réduites en conséquence par le lissage global.</li>
                       <li><strong>Forçages manuels :</strong> Dates de cantines spécifiques verrouillées en dur pour les familles DE PONTE et RIOBÉ.</li>
