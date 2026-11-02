@@ -1454,8 +1454,6 @@ const InfosContact = () => (
   </div>
 );
 
-// --- MODULE : PLANNINGS (Cantine & Ménage) ---
-
 export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [activePeriod, setActivePeriod] = useState(2);
@@ -1520,7 +1518,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     // type : 'cantine' ou 'menage'
     // date : format "YYYY-MM-DD"
     // initial : La famille prévue par l'algorithme à retirer
-    // remplacant : La famille qui prend la place
+    // remplacant : La famille qui prend la place (utilisez "ANNULÉ" pour vider la place)
     // ============================================================================
     const remplacementsManuels = [
       // Exemples NEUTRES (ne modifient rien au planning actuel, prêts à être changés) :
@@ -1531,7 +1529,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       // { date: "YYYY-MM-DD", type: "cantine", initial: "ANCIEN_NOM", remplacant: "NOUVEAU_NOM" }
     ];
     // ============================================================================
-
 
     const famsData = [
       { id: "BOCCA", type: "Ancien", days: [1, 5], isAsso: false },
@@ -1958,7 +1955,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
 
     // --- APPLICATION DES REMPLACEMENTS MANUELS A POSTERIORI ---
     remplacementsManuels.forEach(remp => {
-        if (remp.initial === remp.remplacant) return;
+        if (remp.initial === remp.remplacant) return; 
 
         if (remp.type === 'cantine') {
             let event = scheduleArr.find(s => s.date === remp.date);
@@ -1967,7 +1964,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                 if (event.p1 === remp.initial) { event.p1 = remp.remplacant; replaced = true; }
                 else if (event.p2 === remp.initial) { event.p2 = remp.remplacant; replaced = true; }
                 
-                // Modification ici : on rembourse l'initial, même si le remplaçant n'existe pas ("ANNULÉ")
                 if (replaced && statsObj[remp.initial]) {
                     statsObj[remp.initial].cantine--;
                     statsObj[remp.initial].total--;
@@ -1981,7 +1977,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
             let event = menageArr.find(m => m.date === remp.date && m.familyId === remp.initial);
             if (event) {
                 event.familyId = remp.remplacant;
-                // Modification ici
                 if (statsObj[remp.initial]) {
                     statsObj[remp.initial].menage--;
                     statsObj[remp.initial].total--;
@@ -2816,6 +2811,30 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
           {activeTab === 'regles' && (
             <div className="max-w-3xl mx-auto space-y-6 pb-12 animate-in fade-in duration-300">
               <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-3 mb-6"><Cog className="text-amber-500" /> Rouages de l'Algorithme</h2>
+              
+              {/* NOUVEAU BLOC ADMIN */}
+              {peutVoirAdmin && (
+                <div className="bg-amber-50 p-6 rounded-xl border border-amber-200 shadow-sm mb-8">
+                  <h3 className="font-bold text-lg text-amber-900 mb-3 border-b border-amber-200 pb-2 flex items-center gap-2">
+                    <AlertTriangle className="text-amber-600" size={18}/> 🛠️ Guide Admin : Modifications Manuelles
+                  </h3>
+                  <p className="text-amber-800 text-sm mb-3">
+                    Pour forcer un échange, une absence ou une annulation sans casser le calcul d'équité global, vous devez modifier directement le code source du fichier.
+                  </p>
+                  <ol className="list-decimal list-inside space-y-2 text-amber-800 text-sm font-medium">
+                    <li>Ouvrez le fichier contenant le code (ex: <code>ModulePlannings.jsx</code> ou <code>App.jsx</code>).</li>
+                    <li>Cherchez le texte : <strong>🚨 ZONE DE MODIFICATION MANUELLE 🚨</strong> (vers la ligne 110).</li>
+                    <li>Ajoutez votre modification dans le tableau <code>remplacementsManuels</code> en suivant ce modèle :</li>
+                  </ol>
+                  <pre className="bg-amber-100/50 p-3 rounded-lg text-xs font-mono text-amber-900 mt-3 border border-amber-200 overflow-x-auto">
+                    {`{ date: "2026-11-13", type: "cantine", initial: "LE LÉZEC", remplacant: "DE PONTE" },\n{ date: "2027-06-26", type: "menage", initial: "DE MALAUSSENE", remplacant: "ANNULÉ" }`}
+                  </pre>
+                  <p className="text-amber-800 text-xs mt-3 italic">
+                    Note : Si vous utilisez "ANNULÉ" ou un nom non répertorié pour remplacer, le point de service sera tout de même proprement remboursé à la famille initiale.
+                  </p>
+                </div>
+              )}
+
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                   <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><Utensils className="text-slate-400" size={18}/> Jours de Cantine</h3>
                   <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
