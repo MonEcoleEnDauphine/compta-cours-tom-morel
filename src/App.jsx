@@ -1510,6 +1510,29 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
   }, []);
 
   const data = useMemo(() => {
+    
+    // ============================================================================
+    // 🚨 ZONE DE MODIFICATION MANUELLE (REMPLACEMENTS A POSTERIORI) 🚨
+    // ============================================================================
+    // Utilisez ce tableau pour forcer un changement de planning exceptionnel.
+    // L'algorithme d'équité sera automatiquement corrigé (points transférés).
+    //
+    // type : 'cantine' ou 'menage'
+    // date : format "YYYY-MM-DD"
+    // initial : La famille prévue par l'algorithme à retirer
+    // remplacant : La famille qui prend la place
+    // ============================================================================
+    const remplacementsManuels = [
+      // Exemples NEUTRES (ne modifient rien au planning actuel, prêts à être changés) :
+      { date: "2026-11-13", type: "cantine", initial: "LE LÉZEC", remplacant: "LE LÉZEC" },
+      { date: "2026-10-10", type: "menage",  initial: "LE LÉZEC", remplacant: "LE LÉZEC" }
+      
+      // Ajoutez vos futurs changements ci-dessous en copiant le modèle :
+      // { date: "YYYY-MM-DD", type: "cantine", initial: "ANCIEN_NOM", remplacant: "NOUVEAU_NOM" }
+    ];
+    // ============================================================================
+
+
     const famsData = [
       { id: "BOCCA", type: "Ancien", days: [1, 5], isAsso: false },
       { id: "CHOMEL", type: "Nouveau", days: [4, 5], isAsso: false },
@@ -1562,7 +1585,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       return !fam.days.includes(dOw);
     };
 
-    // --- INTEGRATION STRICTE DES FICHIERS HISTORIQUES ---
     const historicalCantine = [
       { date: '2026-09-03', p1: 'BOCCA', p2: 'TAISSIDRE-CARVALHO', repasType: 'Filles / Garçons' },
       { date: '2026-09-04', p1: 'RIOBÉ', p2: 'BEZIAT-MENUT', repasType: 'Par cordée' },
@@ -1717,7 +1739,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         } 
         else if (dayOfWeek === 2) { 
           repasType = "Placement libre";
-          // MARDIS (Paire: Gerard/Sublet | Impaire: Qarioh)
           if (isSemaineImpaire) { 
             if (dateStr >= "2026-11-10") {
                 requiredParents = 0; p1 = "MME GERARD"; p2 = "MME SUBLET"; 
@@ -1737,7 +1758,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         } 
         else if (dayOfWeek === 5) { 
           repasType = "Par cordée";
-          // VENDREDIS : Inverse par rapport au mardi
           if (isSemainePaire) { 
             if (dateStr >= "2026-11-20") {
                 requiredParents = 1; p1 = "MME SUBLET"; 
@@ -1762,8 +1782,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                 }
             }
 
-            // FORCAGE VENDREDI 20 NOVEMBRE (Mme Sublet + Le Lézec)
-            if (dateStr === "2026-11-20" && dayOfWeek === 5 && !assigned.includes("LE LÉZEC")) {
+            if (dateStr === "2026-11-13" && dayOfWeek === 5 && !assigned.includes("LE LÉZEC")) {
                 assigned.push("LE LÉZEC");
                 statsObj["LE LÉZEC"].cantine++; statsObj["LE LÉZEC"].periodCantine++; statsObj["LE LÉZEC"].monthCantine++; statsObj["LE LÉZEC"].total++; statsObj["LE LÉZEC"].lastCantine = dateStr;
             }
@@ -1772,7 +1791,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
             let available = famsData.filter(f => {
               if (assigned.includes(f.id)) {
                 if (f.id === "LE LÉZEC" && [1, 5].includes(dayOfWeek) && assigned.length === 1 && assigned[0] === "LE LÉZEC") {
-                   // Autorisé pour duo Papa/Maman
+                   // OK
                 } else {
                    return false;
                 }
@@ -1782,7 +1801,8 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
               
               if (f.id === "LE LÉZEC") {
                   if (dateStr === "2026-11-06") return false; 
-                  if (requiredParents === 2 && i === 1 && assigned[0] !== "LE LÉZEC") return false; 
+                  if (requiredParents < 2) return false; 
+                  if (i === 1 && assigned[0] !== "LE LÉZEC") return false; 
               }
 
               let hasDay = f.days.includes(dayOfWeek);
@@ -1935,6 +1955,38 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       }
       currentDate.setDate(currentDate.getDate() + 1);
     }
+
+    // --- APPLICATION DES REMPLACEMENTS MANUELS A POSTERIORI ---
+    remplacementsManuels.forEach(remp => {
+        if (remp.initial === remp.remplacant) return; // Exemple neutre, on ignore
+
+        if (remp.type === 'cantine') {
+            let event = scheduleArr.find(s => s.date === remp.date);
+            if (event) {
+                let replaced = false;
+                if (event.p1 === remp.initial) { event.p1 = remp.remplacant; replaced = true; }
+                else if (event.p2 === remp.initial) { event.p2 = remp.remplacant; replaced = true; }
+                
+                if (replaced && statsObj[remp.initial] && statsObj[remp.remplacant]) {
+                    statsObj[remp.initial].cantine--;
+                    statsObj[remp.initial].total--;
+                    statsObj[remp.remplacant].cantine++;
+                    statsObj[remp.remplacant].total++;
+                }
+            }
+        } else if (remp.type === 'menage') {
+            let event = menageArr.find(m => m.date === remp.date && m.familyId === remp.initial);
+            if (event) {
+                event.familyId = remp.remplacant;
+                if (statsObj[remp.initial] && statsObj[remp.remplacant]) {
+                    statsObj[remp.initial].menage--;
+                    statsObj[remp.initial].total--;
+                    statsObj[remp.remplacant].menage++;
+                    statsObj[remp.remplacant].total++;
+                }
+            }
+        }
+    });
 
     let fStats = Object.keys(statsObj).map(id => {
       let realCantine = statsObj[id].cantine - (statsObj[id].virtualCantine || 0);
@@ -2792,6 +2844,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     </div>
   );
 };
+
 
 // --- MODULE : --- TABLEAU DE BORD (DASHBOARD) ---
 const TableauBord = ({ transactionsGlobales }) => {
