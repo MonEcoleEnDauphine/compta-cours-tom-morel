@@ -1958,7 +1958,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
 
     // --- APPLICATION DES REMPLACEMENTS MANUELS A POSTERIORI ---
     remplacementsManuels.forEach(remp => {
-        if (remp.initial === remp.remplacant) return; // Exemple neutre, on ignore
+        if (remp.initial === remp.remplacant) return;
 
         if (remp.type === 'cantine') {
             let event = scheduleArr.find(s => s.date === remp.date);
@@ -1967,22 +1967,28 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                 if (event.p1 === remp.initial) { event.p1 = remp.remplacant; replaced = true; }
                 else if (event.p2 === remp.initial) { event.p2 = remp.remplacant; replaced = true; }
                 
-                if (replaced && statsObj[remp.initial] && statsObj[remp.remplacant]) {
+                // Modification ici : on rembourse l'initial, même si le remplaçant n'existe pas ("ANNULÉ")
+                if (replaced && statsObj[remp.initial]) {
                     statsObj[remp.initial].cantine--;
                     statsObj[remp.initial].total--;
-                    statsObj[remp.remplacant].cantine++;
-                    statsObj[remp.remplacant].total++;
+                    if (statsObj[remp.remplacant]) {
+                        statsObj[remp.remplacant].cantine++;
+                        statsObj[remp.remplacant].total++;
+                    }
                 }
             }
         } else if (remp.type === 'menage') {
             let event = menageArr.find(m => m.date === remp.date && m.familyId === remp.initial);
             if (event) {
                 event.familyId = remp.remplacant;
-                if (statsObj[remp.initial] && statsObj[remp.remplacant]) {
+                // Modification ici
+                if (statsObj[remp.initial]) {
                     statsObj[remp.initial].menage--;
                     statsObj[remp.initial].total--;
-                    statsObj[remp.remplacant].menage++;
-                    statsObj[remp.remplacant].total++;
+                    if (statsObj[remp.remplacant]) {
+                        statsObj[remp.remplacant].menage++;
+                        statsObj[remp.remplacant].total++;
+                    }
                 }
             }
         }
