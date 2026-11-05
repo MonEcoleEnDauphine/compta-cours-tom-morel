@@ -376,9 +376,58 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
         </div>
       )}
 
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-8 rounded-2xl shadow-md text-white">
-        <h1 className="text-3xl font-black mb-2">Bienvenue sur le portail Familles</h1>
-        <p className="text-blue-100 text-sm">Toutes les informations, plannings et actualités du Cours Tom Morel centralisées ici.</p>
+      {/* BANNIÈRE THÉMATIQUE : LES INVENTEURS */}
+      <div className="bg-slate-900 rounded-3xl shadow-xl overflow-hidden mb-2 relative border border-slate-800">
+        {/* Décoration lumineuse en arrière-plan */}
+        <div className="absolute top-0 right-0 -mr-20 -mt-20 w-72 h-72 rounded-full bg-amber-500/20 blur-3xl pointer-events-none"></div>
+        <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-64 h-64 rounded-full bg-indigo-500/20 blur-3xl pointer-events-none"></div>
+        
+        <div className="p-8 md:p-10 relative z-10">
+          <div className="flex items-center gap-3 mb-4">
+            <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest flex items-center gap-1.5">
+              <Sparkles size={14} /> Thème 2026-2027
+            </span>
+          </div>
+          <h1 className="text-3xl md:text-4xl font-black text-white mb-4 tracking-tight">
+            L'Année des Inventeurs <span className="text-amber-400">💡⚙️</span>
+          </h1>
+          <p className="text-slate-300 text-sm md:text-base max-w-2xl leading-relaxed mb-8 font-medium">
+            Bienvenue sur le portail familles du Cours Tom Morel. Cette année, nous partons à la découverte des grands esprits qui ont façonné notre monde moderne par leur ingéniosité.
+          </p>
+          
+          {/* Cartes des 5 inventeurs */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-4 hover:bg-white/20 transition-all hover:-translate-y-1 group">
+              <div className="text-3xl mb-2 group-hover:scale-110 transition-transform origin-left">🗼</div>
+              <h4 className="text-white font-bold text-sm">G. Eiffel</h4>
+              <p className="text-slate-400 text-[11px] mt-0.5 font-semibold uppercase tracking-wider">La Tour Eiffel</p>
+            </div>
+            
+            <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-4 hover:bg-white/20 transition-all hover:-translate-y-1 group">
+              <div className="text-3xl mb-2 group-hover:scale-110 transition-transform origin-left">⚗️</div>
+              <h4 className="text-white font-bold text-sm">A. Lavoisier</h4>
+              <p className="text-slate-400 text-[11px] mt-0.5 font-semibold uppercase tracking-wider">La Chimie</p>
+            </div>
+            
+            <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-4 hover:bg-white/20 transition-all hover:-translate-y-1 group">
+              <div className="text-3xl mb-2 group-hover:scale-110 transition-transform origin-left">✈️</div>
+              <h4 className="text-white font-bold text-sm">C. Ader</h4>
+              <p className="text-slate-400 text-[11px] mt-0.5 font-semibold uppercase tracking-wider">L'Aviation</p>
+            </div>
+            
+            <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-4 hover:bg-white/20 transition-all hover:-translate-y-1 group">
+              <div className="text-3xl mb-2 group-hover:scale-110 transition-transform origin-left">🛞</div>
+              <h4 className="text-white font-bold text-sm">É. Michelin</h4>
+              <p className="text-slate-400 text-[11px] mt-0.5 font-semibold uppercase tracking-wider">Le Pneu</p>
+            </div>
+            
+            <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-4 hover:bg-white/20 transition-all hover:-translate-y-1 group">
+              <div className="text-3xl mb-2 group-hover:scale-110 transition-transform origin-left">🗺️</div>
+              <h4 className="text-white font-bold text-sm">A. Michelin</h4>
+              <p className="text-slate-400 text-[11px] mt-0.5 font-semibold uppercase tracking-wider">Le Guide</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1554,11 +1603,11 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     ];
 
     const perData = [
-      { id: 1, name: "Période G. Eiffel 🗼", desc: "(Rentrée - Toussaint)", start: "2026-09-03", end: "2026-10-16" },
-      { id: 2, name: "Période A. Lavoisier 🧪", desc: "(Toussaint - Noël)", start: "2026-11-02", end: "2026-12-18" },
-      { id: 3, name: "Période L. Pasteur 🔬", desc: "(Noël - Février)", start: "2027-01-04", end: "2027-02-12" },
-      { id: 4, name: "Période Marie Curie ☢️", desc: "(Février - Pâques)", start: "2027-03-01", end: "2027-04-09" },
-      { id: 5, name: "Période L. Braille 📖", desc: "(Pâques - Été)", start: "2027-04-26", end: "2027-06-25" }
+      { id: 1, name: "G. Eiffel 🗼", desc: "La Tour Eiffel (Rentrée - Toussaint)", start: "2026-09-03", end: "2026-10-16" },
+      { id: 2, name: "A. Lavoisier ⚗️", desc: "La Chimie Moderne (Toussaint - Noël)", start: "2026-11-02", end: "2026-12-18" },
+      { id: 3, name: "C. Ader ✈️", desc: "L'Aviation (Noël - Février)", start: "2027-01-04", end: "2027-02-12" },
+      { id: 4, name: "É. Michelin 🛞", desc: "Le Pneu démontable (Fév - Pâques)", start: "2027-03-01", end: "2027-04-09" },
+      { id: 5, name: "A. Michelin 🗺️", desc: "Le Guide de Voyage (Pâques - Été)", start: "2027-04-26", end: "2027-06-25" }
     ];
 
     const holiData = ["2026-11-11", "2027-03-26", "2027-03-29", "2027-05-06", "2027-05-07", "2027-05-17"];
