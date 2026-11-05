@@ -523,21 +523,22 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
   );
 };
 
-// --- MODULE : VIE DE L'ÉCOLE (Thème Inventeurs) ---
+// --- MODULE : VIE DE L'ÉCOLE (Thème Inventrices & Inventeurs) ---
 const VieEcole = ({ utilisateurConnecte }) => {
   const isAdmin = utilisateurConnecte?.role === 'admin' || utilisateurConnecte?.role === 'Administrateur Global';
   
-  // 3 Bases de données distinctes
-  const [documents, setDocuments] = useState([]);     // Pour les Trait d'union
-  const [newsletters, setNewsletters] = useState([]); // Pour les Newsletters
-  const [photos, setPhotos] = useState([]);           // Pour la Galerie
+  const [documents, setDocuments] = useState([]);
+  const [newsletters, setNewsletters] = useState([]);
+  const [photos, setPhotos] = useState([]);
   
   const [modal, setModal] = useState({ isOpen: false, type: '' });
   const [formValue, setFormValue] = useState({ titre: '', desc: '', url: '', coverUrl: '' });
+  
+  // État pour la visionneuse plein écran (Lightbox)
+  const [lightboxIndex, setLightboxIndex] = useState(null);
 
   const DEFAULT_COVER = "https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=600&q=80";
 
-  // Transformation automatique des liens de partage Drive en flux image direct
   const formatDriveImageUrl = (url) => {
     if (!url) return '';
     const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
@@ -548,15 +549,12 @@ const VieEcole = ({ utilisateurConnecte }) => {
   };
 
   useEffect(() => {
-    // Écoute des Trait d'union
     const unsubDocs = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'documents_ecole'), (snapshot) => {
       setDocuments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => new Date(b.date_creation) - new Date(a.date_creation)));
     });
-    // Écoute des Newsletters
     const unsubNews = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'newsletters'), (snapshot) => {
       setNewsletters(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => new Date(b.date_creation) - new Date(a.date_creation)));
     });
-    // Écoute des Photos
     const unsubPhotos = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'galerie_photos'), (snapshot) => {
       setPhotos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => new Date(b.date_creation) - new Date(a.date_creation)));
     });
@@ -572,7 +570,6 @@ const VieEcole = ({ utilisateurConnecte }) => {
   const handleSave = async (e) => {
     e.preventDefault();
     try {
-      // Routage vers la bonne collection selon le bouton cliqué
       const collectionName = 
         modal.type === 'document' ? 'documents_ecole' : 
         modal.type === 'newsletter' ? 'newsletters' : 'galerie_photos';
@@ -598,9 +595,58 @@ const VieEcole = ({ utilisateurConnecte }) => {
     }
   };
 
+  // Navigation dans la visionneuse
+  const prevPhoto = () => {
+    setLightboxIndex((prev) => (prev === 0 ? photos.length - 1 : prev - 1));
+  };
+
+  const nextPhoto = () => {
+    setLightboxIndex((prev) => (prev + 1) % photos.length);
+  };
+
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-10 font-sans animate-fade-in relative">
       
+      {/* VISIONNEUSE PLEIN ÉCRAN (LIGHTBOX) */}
+      {lightboxIndex !== null && photos[lightboxIndex] && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/95 backdrop-blur-xl animate-fade-in">
+          <button onClick={() => setLightboxIndex(null)} className="absolute top-6 right-6 text-slate-400 hover:text-white transition-colors z-50 bg-slate-800/50 p-2 rounded-full">
+            <XCircle size={32} />
+          </button>
+          
+          <button onClick={prevPhoto} className="absolute left-4 md:left-10 text-white/50 hover:text-white p-4 hover:bg-white/10 rounded-full transition-all z-50">
+            <ChevronLeft size={48} />
+          </button>
+          
+          <div className="relative flex flex-col items-center max-w-5xl w-full px-16 h-[85vh] justify-center">
+            <img 
+              src={photos[lightboxIndex].coverUrl || DEFAULT_COVER} 
+              alt={photos[lightboxIndex].titre} 
+              className="max-h-[70vh] max-w-full rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] object-contain border border-slate-700/50"
+              onError={(e) => { e.target.src = DEFAULT_COVER; }}
+            />
+            
+            <div className="mt-8 text-center bg-slate-900/60 p-6 rounded-3xl border border-slate-700 w-full max-w-2xl backdrop-blur-md">
+              <h3 className="text-2xl font-black text-white mb-2">{photos[lightboxIndex].titre}</h3>
+              <p className="text-blue-300 text-sm mb-5 font-medium">{photos[lightboxIndex].description || "Collection photographique"}</p>
+              
+              <a 
+                href={photos[lightboxIndex].url} 
+                target="_blank" 
+                rel="noreferrer" 
+                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-bold transition-all active:scale-95 shadow-lg shadow-blue-500/20"
+              >
+                <Globe size={18} /> Voir le dossier complet (Google Drive)
+              </a>
+            </div>
+          </div>
+          
+          <button onClick={nextPhoto} className="absolute right-4 md:right-10 text-white/50 hover:text-white p-4 hover:bg-white/10 rounded-full transition-all z-50">
+            <ChevronRight size={48} />
+          </button>
+        </div>
+      )}
+
       {/* FENÊTRE MODALE D'AJOUT (ADMIN) */}
       {modal.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
@@ -649,22 +695,29 @@ const VieEcole = ({ utilisateurConnecte }) => {
         </div>
       )}
 
-      {/* BANNIÈRE HERO : LES ARCHIVES */}
+      {/* BANNIÈRE HERO : L'ACADÉMIE DES INVENTEURS */}
       <div className="bg-slate-900 rounded-3xl shadow-xl overflow-hidden relative border border-slate-800 p-8 md:p-10">
         <div className="absolute top-0 right-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/blueprint.png')] opacity-20 pointer-events-none"></div>
         <div className="absolute top-[-50px] right-[-50px] w-64 h-64 bg-amber-500/20 rounded-full blur-3xl pointer-events-none"></div>
         <div className="absolute bottom-[-50px] left-[-50px] w-64 h-64 bg-blue-500/20 rounded-full blur-3xl pointer-events-none"></div>
         
-        <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-3">
-            <span className="bg-slate-800 text-amber-400 border border-slate-700 px-3 py-1 rounded-lg text-xs font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-              <Microscope size={14} /> Centre de documentation
-            </span>
+        <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+          <div>
+            <div className="flex items-center gap-3 mb-3">
+              <span className="bg-slate-800 text-amber-400 border border-slate-700 px-3 py-1 rounded-lg text-xs font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+                <Microscope size={14} /> Centre d'archives
+              </span>
+            </div>
+            <h2 className="text-3xl md:text-4xl font-black text-white mb-2 tracking-tight">L'Académie des Découvertes</h2>
+            <p className="text-slate-300 text-sm max-w-xl leading-relaxed font-medium">
+              Explorez les rapports de Marie Curie, captez les ondes d'Hedy Lamarr et observez les clichés de Rosalind Franklin.
+            </p>
           </div>
-          <h2 className="text-3xl md:text-4xl font-black text-white mb-2 tracking-tight">Les Archives des Inventeurs</h2>
-          <p className="text-slate-300 text-sm max-w-xl leading-relaxed">
-            Consultez les Trait d'union de la direction, lisez les Newsletters de l'association et parcourez la pellicule photographique de nos découvertes.
-          </p>
+          <div className="flex -space-x-4 shrink-0">
+            <div className="w-12 h-12 rounded-full border-2 border-slate-800 bg-amber-100 flex items-center justify-center text-xl shadow-md z-30" title="Marie Curie">🧪</div>
+            <div className="w-12 h-12 rounded-full border-2 border-slate-800 bg-emerald-100 flex items-center justify-center text-xl shadow-md z-20" title="Hedy Lamarr">📻</div>
+            <div className="w-12 h-12 rounded-full border-2 border-slate-800 bg-blue-100 flex items-center justify-center text-xl shadow-md z-10" title="Rosalind Franklin">🧬</div>
+          </div>
         </div>
       </div>
 
@@ -673,16 +726,16 @@ const VieEcole = ({ utilisateurConnecte }) => {
         {/* COLONNE GAUCHE : DOCUMENTS (Trait d'union + Newsletters) */}
         <div className="lg:col-span-5 flex flex-col gap-6">
            
-           {/* ENCART 1 : TRAIT D'UNION */}
+           {/* ENCART 1 : TRAIT D'UNION (MARIE CURIE) */}
            <div className="bg-amber-50/50 rounded-3xl shadow-sm border-4 border-white p-6 relative overflow-hidden flex flex-col max-h-[450px]">
              <div className="absolute top-0 right-0 w-32 h-32 bg-amber-100/50 rounded-bl-[100px] -z-10"></div>
              
              <div className="flex justify-between items-start mb-6 border-b border-amber-200/60 pb-4">
                <div>
                  <h3 className="text-xl font-black text-amber-900 flex items-center gap-2">
-                   <BookOpen className="text-amber-600" size={24} /> Trait d'union
+                   <FlaskConical className="text-amber-600" size={24} /> Les Rayons X
                  </h3>
-                 <p className="text-xs text-amber-700/70 mt-1 font-bold">Brevets & Bulletins Pédagogiques</p>
+                 <p className="text-xs text-amber-700/70 mt-1 font-bold">Carnets de Bord (Marie Curie)</p>
                </div>
                {isAdmin && (
                  <button onClick={() => openAddModal('document')} className="bg-amber-500 text-amber-950 px-3 py-2 rounded-xl text-xs font-black hover:bg-amber-400 shadow-md shadow-amber-500/20 flex items-center gap-1.5 transition-transform active:scale-95 shrink-0">
@@ -695,11 +748,13 @@ const VieEcole = ({ utilisateurConnecte }) => {
                {documents.map(doc => (
                  <div key={doc.id} className="flex justify-between items-center p-3 bg-white rounded-2xl border border-amber-100 hover:border-amber-400 hover:shadow-md transition-all group relative shrink-0">
                    <a href={doc.url} target="_blank" rel="noreferrer" className="flex items-center gap-4 flex-1 min-w-0 pr-8">
+                     
                      <div className="w-12 h-14 shrink-0 bg-slate-100 border-2 border-slate-200 rounded-lg overflow-hidden shadow-sm relative flex items-center justify-center group-hover:border-amber-300 transition-colors">
                        <img src={formatDriveImageUrl(doc.url)} alt={doc.titre} className="w-full h-full object-cover object-top relative z-10 grayscale group-hover:grayscale-0 transition-all duration-500" onError={(e) => { e.target.style.display = 'none'; }} />
                        <div className="absolute inset-0 flex items-center justify-center text-slate-300 bg-white"><FileText size={20} /></div>
                        <div className="absolute inset-0 bg-amber-900/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-20 backdrop-blur-[1px]"><Search className="text-white drop-shadow-md" size={16}/></div>
                      </div>
+
                      <div className="truncate">
                        <p className="font-bold text-sm text-slate-800 group-hover:text-amber-700 transition-colors truncate">{doc.titre}</p>
                        <p className="text-[10px] font-bold text-slate-400 mt-0.5 truncate uppercase tracking-wider flex items-center gap-1">
@@ -721,16 +776,16 @@ const VieEcole = ({ utilisateurConnecte }) => {
              </div>
            </div>
 
-           {/* ENCART 2 : NEWSLETTERS */}
+           {/* ENCART 2 : NEWSLETTERS (HEDY LAMARR) */}
            <div className="bg-emerald-50/50 rounded-3xl shadow-sm border-4 border-white p-6 relative overflow-hidden flex flex-col max-h-[450px]">
              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-100/50 rounded-bl-[100px] -z-10"></div>
              
              <div className="flex justify-between items-start mb-6 border-b border-emerald-200/60 pb-4">
                <div>
                  <h3 className="text-xl font-black text-emerald-900 flex items-center gap-2">
-                   <Send className="text-emerald-600" size={24} /> Newsletters
+                   <Send className="text-emerald-600" size={24} /> Les Transmissions
                  </h3>
-                 <p className="text-xs text-emerald-700/70 mt-1 font-bold">Le Télégraphe de l'Asso</p>
+                 <p className="text-xs text-emerald-700/70 mt-1 font-bold">Le Télégraphe (Hedy Lamarr)</p>
                </div>
                {isAdmin && (
                  <button onClick={() => openAddModal('newsletter')} className="bg-emerald-500 text-emerald-950 px-3 py-2 rounded-xl text-xs font-black hover:bg-emerald-400 shadow-md shadow-emerald-500/20 flex items-center gap-1.5 transition-transform active:scale-95 shrink-0">
@@ -770,7 +825,7 @@ const VieEcole = ({ utilisateurConnecte }) => {
            </div>
         </div>
 
-        {/* COLONNE DROITE : GALERIE PHOTOS (OBSERVATOIRE) */}
+        {/* COLONNE DROITE : GALERIE PHOTOS (ROSALIND FRANKLIN) */}
         <div className="lg:col-span-7 flex flex-col gap-6">
            <div className="bg-slate-900 rounded-3xl shadow-lg border-4 border-slate-800 p-6 md:p-8 relative h-full flex flex-col min-h-[600px]">
              <div className="absolute top-0 right-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/blueprint.png')] opacity-10 pointer-events-none"></div>
@@ -780,7 +835,7 @@ const VieEcole = ({ utilisateurConnecte }) => {
                  <h3 className="text-xl font-black text-white flex items-center gap-2">
                    <Camera className="text-blue-400" size={24} /> L'Observatoire
                  </h3>
-                 <p className="text-xs text-slate-400 mt-1 font-medium">Les pellicules photographiques des différentes périodes.</p>
+                 <p className="text-xs text-slate-400 mt-1 font-medium">La chambre noire de Rosalind Franklin (La Photo 51).</p>
                </div>
                {isAdmin && (
                  <button onClick={() => openAddModal('photo')} className="bg-blue-500 text-white px-4 py-2 rounded-xl text-xs font-black hover:bg-blue-400 shadow-lg shadow-blue-500/20 flex items-center gap-1.5 transition-transform active:scale-95 shrink-0">
@@ -791,9 +846,9 @@ const VieEcole = ({ utilisateurConnecte }) => {
 
              <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 relative z-10">
                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                 {photos.map(photo => (
+                 {photos.map((photo, idx) => (
                    <div key={photo.id} className="relative group rounded-2xl bg-slate-800 border-2 border-slate-700 overflow-hidden hover:border-blue-400 transition-colors shadow-lg aspect-[4/3] flex flex-col shrink-0">
-                     <a href={photo.url} target="_blank" rel="noreferrer" className="block w-full h-full relative">
+                     <button onClick={() => setLightboxIndex(idx)} className="block w-full h-full relative text-left">
                        <img 
                          src={photo.coverUrl || DEFAULT_COVER} 
                          alt={photo.titre} 
@@ -802,12 +857,18 @@ const VieEcole = ({ utilisateurConnecte }) => {
                        />
                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-900/20 to-transparent"></div>
                        
+                       <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                         <div className="bg-blue-500/80 backdrop-blur-sm text-white px-4 py-2 rounded-full font-bold text-xs flex items-center gap-2 shadow-lg">
+                           <Search size={16} /> Diaporama
+                         </div>
+                       </div>
+                       
                        <div className="absolute bottom-0 w-full p-4">
                          <span className="text-white text-sm font-black flex items-center gap-2 drop-shadow-md">
-                           <FlaskConical size={16} className="text-blue-400 shrink-0"/> {photo.titre}
+                           <Microscope size={16} className="text-blue-400 shrink-0"/> {photo.titre}
                          </span>
                        </div>
-                     </a>
+                     </button>
                      {isAdmin && (
                        <button onClick={() => handleDelete('galerie_photos', photo.id)} className="absolute top-3 right-3 bg-rose-600/90 text-white p-2 rounded-lg opacity-0 group-hover:opacity-100 shadow-md z-20 hover:bg-rose-500 transition-opacity backdrop-blur-sm">
                          <Trash2 size={14}/>
