@@ -175,7 +175,6 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
   const [modal, setModal] = useState({ isOpen: false, type: '', payload: null });
   const [formValue, setFormValue] = useState({});
 
-  // Fonction pour afficher les images Google Drive
   const formatDriveImageUrl = (url) => {
     if (!url) return '';
     const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
@@ -202,7 +201,6 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
     return () => { unsubParams(); unsubRappels(); unsubEvts(); unsubEquipe(); };
   }, []);
 
-  // Tri chronologique automatique des événements
   const evenementsTries = [...evenements].sort((a, b) => {
     if (!a.date) return 1;
     if (!b.date) return -1;
@@ -232,7 +230,7 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
         setFormValue({ date: '', titre: '', desc: '' });
       }
     } else if (type === 'equipe') {
-      setFormValue({ nom: '', role: '', imageUrl: '' });
+      setFormValue({ nom: '', imageUrl: '' });
     }
     setModal({ isOpen: true, type, payload });
   };
@@ -315,7 +313,7 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
                   </div>
                 </>
               )}
-             {modal.type === 'equipe' && (
+              {modal.type === 'equipe' && (
                 <>
                   <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Titre du panneau</label>
@@ -391,6 +389,7 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-4">
         <div className="lg:col-span-2 space-y-6">
+          
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 relative group">
             {isAdmin && <button onClick={() => openEditModal('mot')} className="absolute top-4 right-4 bg-indigo-50 text-indigo-600 p-2 rounded-lg opacity-0 group-hover:opacity-100"><Edit2 size={16} /></button>}
             <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3"><Megaphone className="text-indigo-500" size={20} /> Le mot de l'équipe</h2>
@@ -400,11 +399,7 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 relative">
-            <div className="flex justify-between border-b border-slate-100 pb-3 mb-6">
-              <div>
-                <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Camera className="text-emerald-500" size={20} /> Trombinoscope parents & pédagogie</h2>
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8 relative">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8 relative">
             <div className="flex justify-between border-b border-slate-100 pb-4 mb-8">
               <div>
                 <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
@@ -423,14 +418,12 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
               {equipe.map((affiche) => (
                 <div key={affiche.id} className="relative group rounded-xl overflow-hidden shadow-md bg-slate-50 border-4 border-slate-100 hover:border-amber-200 transition-all duration-300">
                   
-                  {/* Bouton de suppression Admin */}
                   {isAdmin && (
                     <button onClick={() => handleDelete('equipe', affiche.id)} className="absolute top-4 right-4 text-rose-600 bg-white/90 p-2.5 rounded-xl shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-20 hover:bg-rose-50 border border-rose-100">
                       <Trash2 size={18}/>
                     </button>
                   )}
                   
-                  {/* Cartouche d'ingénieur en haut */}
                   {affiche.nom && (
                     <div className="absolute top-0 left-0 bg-slate-900/80 backdrop-blur-sm text-white px-5 py-2.5 rounded-br-2xl z-10 border-b border-r border-slate-700 shadow-md flex items-center gap-2">
                       <Cog size={14} className="text-amber-400" />
@@ -438,7 +431,6 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
                     </div>
                   )}
 
-                  {/* L'image du montage (pleine largeur) */}
                   <div className="w-full flex justify-center items-center bg-[url('https://www.transparenttextures.com/patterns/blueprint.png')]">
                     {affiche.imageUrl ? (
                       <img 
@@ -466,6 +458,7 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
               )}
             </div>
           </div>
+        </div>
 
         <div className="space-y-6">
           <div className="bg-white rounded-2xl shadow-sm border border-rose-100 p-6 bg-gradient-to-b from-white to-rose-50/30 relative">
