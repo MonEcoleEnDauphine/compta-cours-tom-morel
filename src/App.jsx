@@ -522,11 +522,14 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
   );
 };
 
-// --- MODULE : VIE DE L'ÉCOLE (Avec miniatures personnalisables) ---
+// --- MODULE : VIE DE L'ÉCOLE (Thème Inventeurs) ---
 const VieEcole = ({ utilisateurConnecte }) => {
-  const isAdmin = utilisateurConnecte?.role === 'admin';
-  const [documents, setDocuments] = useState([]);
-  const [photos, setPhotos] = useState([]);
+  const isAdmin = utilisateurConnecte?.role === 'admin' || utilisateurConnecte?.role === 'Administrateur Global';
+  
+  // 3 Bases de données distinctes
+  const [documents, setDocuments] = useState([]);     // Pour les Trait d'union
+  const [newsletters, setNewsletters] = useState([]); // Pour les Newsletters
+  const [photos, setPhotos] = useState([]);           // Pour la Galerie
   
   const [modal, setModal] = useState({ isOpen: false, type: '' });
   const [formValue, setFormValue] = useState({ titre: '', desc: '', url: '', coverUrl: '' });
@@ -544,13 +547,20 @@ const VieEcole = ({ utilisateurConnecte }) => {
   };
 
   useEffect(() => {
+    // Écoute des Trait d'union
     const unsubDocs = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'documents_ecole'), (snapshot) => {
-      setDocuments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setDocuments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => new Date(b.date_creation) - new Date(a.date_creation)));
     });
+    // Écoute des Newsletters
+    const unsubNews = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'newsletters'), (snapshot) => {
+      setNewsletters(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => new Date(b.date_creation) - new Date(a.date_creation)));
+    });
+    // Écoute des Photos
     const unsubPhotos = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'galerie_photos'), (snapshot) => {
-      setPhotos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setPhotos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => new Date(b.date_creation) - new Date(a.date_creation)));
     });
-    return () => { unsubDocs(); unsubPhotos(); };
+    
+    return () => { unsubDocs(); unsubNews(); unsubPhotos(); };
   }, []);
 
   const openAddModal = (type) => {
@@ -561,7 +571,11 @@ const VieEcole = ({ utilisateurConnecte }) => {
   const handleSave = async (e) => {
     e.preventDefault();
     try {
-      const collectionName = modal.type === 'document' ? 'documents_ecole' : 'galerie_photos';
+      // Routage vers la bonne collection selon le bouton cliqué
+      const collectionName = 
+        modal.type === 'document' ? 'documents_ecole' : 
+        modal.type === 'newsletter' ? 'newsletters' : 'galerie_photos';
+        
       const cleanCoverUrl = formatDriveImageUrl(formValue.coverUrl);
 
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', collectionName), {
@@ -578,140 +592,239 @@ const VieEcole = ({ utilisateurConnecte }) => {
   };
 
   const handleDelete = async (collectionName, id) => {
-    if (window.confirm("Supprimer cet élément ?")) {
+    if (window.confirm("Supprimer cet élément des archives ?")) {
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', collectionName, id));
     }
   };
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-10 font-sans animate-fade-in relative">
+    <div className="space-y-8 max-w-7xl mx-auto pb-10 font-sans animate-fade-in relative">
+      
+      {/* FENÊTRE MODALE D'AJOUT (ADMIN) */}
       {modal.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
           <div className="bg-white rounded-3xl shadow-2xl border border-indigo-100 w-full max-w-md overflow-hidden">
-            <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 p-6 text-white flex justify-between items-center">
-              <h3 className="font-bold text-lg leading-tight">
-                {modal.type === 'document' ? "Lier un document PDF" : "Lier un album photo"}
+            <div className="bg-gradient-to-r from-slate-800 to-slate-900 p-6 text-white flex justify-between items-center border-b-4 border-amber-500">
+              <h3 className="font-bold text-lg leading-tight flex items-center gap-2">
+                <Cog className="text-amber-500" size={20}/>
+                {modal.type === 'document' ? "Archiver un Trait d'union" : modal.type === 'newsletter' ? "Envoyer une Newsletter" : "Développer une Pellicule"}
               </h3>
-              <button onClick={() => setModal({ isOpen: false, type: '' })} className="text-white/70 hover:text-white"><XCircle size={20} /></button>
+              <button onClick={() => setModal({ isOpen: false, type: '' })} className="text-slate-400 hover:text-white transition-colors"><XCircle size={20} /></button>
             </div>
             <form onSubmit={handleSave} className="p-6 space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Titre *</label>
-                <input type="text" value={formValue.titre} onChange={e => setFormValue({...formValue, titre: e.target.value})} className="w-full border rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-600" placeholder="Ex: Sortie Forêt / Rentrée 2026" required />
+                <input type="text" value={formValue.titre} onChange={e => setFormValue({...formValue, titre: e.target.value})} className="w-full border-2 border-slate-200 rounded-xl p-3 text-sm bg-slate-50 outline-none focus:border-amber-500 transition-colors font-bold text-slate-800" placeholder="Ex: Trait d'union Septembre / Newsletter Rentrée" required />
               </div>
               
-              {modal.type === 'document' && (
+              {(modal.type === 'document' || modal.type === 'newsletter') && (
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Description (Optionnel)</label>
-                  <input type="text" value={formValue.desc} onChange={e => setFormValue({...formValue, desc: e.target.value})} className="w-full border rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-600" placeholder="Ex: Période 1" />
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Note (Optionnel)</label>
+                  <input type="text" value={formValue.desc} onChange={e => setFormValue({...formValue, desc: e.target.value})} className="w-full border-2 border-slate-200 rounded-xl p-3 text-sm bg-slate-50 outline-none focus:border-amber-500 transition-colors text-slate-600" placeholder="Ex: Résumé de la réunion..." />
                 </div>
               )}
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Lien Google Drive / Photos *</label>
-                <input type="url" value={formValue.url} onChange={e => setFormValue({...formValue, url: e.target.value})} className="w-full border rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-600" placeholder="https://drive.google.com/..." required />
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Lien Google Drive *</label>
+                <input type="url" value={formValue.url} onChange={e => setFormValue({...formValue, url: e.target.value})} className="w-full border-2 border-slate-200 rounded-xl p-3 text-sm bg-slate-50 outline-none focus:border-amber-500 transition-colors text-blue-600 font-mono" placeholder="https://drive.google.com/..." required />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Lien d'image de couverture / miniature (Optionnel)</label>
-                <input type="url" value={formValue.coverUrl} onChange={e => setFormValue({...formValue, coverUrl: e.target.value})} className="w-full border rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-600" placeholder="https://drive.google.com/file/d/..." />
-                <p className="text-[10px] text-slate-400 mt-1">Colle le lien de partage Drive du fichier photo. L'ERP l'affiche automatiquement en miniature.</p>
-              </div>
+              {modal.type === 'photo' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Lien d'image de couverture (Drive)</label>
+                  <input type="url" value={formValue.coverUrl} onChange={e => setFormValue({...formValue, coverUrl: e.target.value})} className="w-full border-2 border-slate-200 rounded-xl p-3 text-sm bg-slate-50 outline-none focus:border-amber-500 transition-colors text-blue-600 font-mono" placeholder="https://drive.google.com/file/d/..." />
+                  <p className="text-[10px] text-slate-400 mt-1 font-medium">Collez le lien de partage Drive d'une photo marquante. Elle sera développée automatiquement.</p>
+                </div>
+              )}
 
-              <div className="pt-4 flex justify-end gap-3 mt-6">
-                <button type="button" onClick={() => setModal({ isOpen: false, type: '' })} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100">Annuler</button>
-                <button type="submit" className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md">Enregistrer</button>
+              <div className="pt-4 flex justify-end gap-3 mt-6 border-t border-slate-100">
+                <button type="button" onClick={() => setModal({ isOpen: false, type: '' })} className="px-4 py-2.5 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-100">Annuler</button>
+                <button type="submit" className="px-5 py-2.5 rounded-xl text-sm font-bold text-slate-900 bg-amber-400 hover:bg-amber-500 shadow-md flex items-center gap-2 transition-transform active:scale-95">
+                  <CheckCircle2 size={16}/> Enregistrer
+                </button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex justify-between items-center mt-6">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2"><Newspaper className="text-indigo-600" /> Vie de l'école</h2>
-          <p className="text-slate-500 text-sm mt-1">Retrouvez les dernières lettres aux parents, les photos et les actualités.</p>
+      {/* BANNIÈRE HERO : LES ARCHIVES */}
+      <div className="bg-slate-900 rounded-3xl shadow-xl overflow-hidden relative border border-slate-800 p-8 md:p-10">
+        <div className="absolute top-0 right-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/blueprint.png')] opacity-20 pointer-events-none"></div>
+        <div className="absolute top-[-50px] right-[-50px] w-64 h-64 bg-amber-500/20 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute bottom-[-50px] left-[-50px] w-64 h-64 bg-blue-500/20 rounded-full blur-3xl pointer-events-none"></div>
+        
+        <div className="relative z-10">
+          <div className="flex items-center gap-3 mb-3">
+            <span className="bg-slate-800 text-amber-400 border border-slate-700 px-3 py-1 rounded-lg text-xs font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+              <Microscope size={14} /> Centre de documentation
+            </span>
+          </div>
+          <h2 className="text-3xl md:text-4xl font-black text-white mb-2 tracking-tight">Les Archives des Inventeurs</h2>
+          <p className="text-slate-300 text-sm max-w-xl leading-relaxed">
+            Consultez les Trait d'union de la direction, lisez les Newsletters de l'association et parcourez la pellicule photographique de nos découvertes.
+          </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-           <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
-             <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><FileText className="text-blue-500" size={20} /> Lettres aux parents</h3>
-             {isAdmin && (
-               <button onClick={() => openAddModal('document')} className="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors shadow-sm">
-                 + Ajouter un lien PDF
-               </button>
-             )}
-           </div>
-<div className="space-y-3">
-             {documents.map(doc => (
-               <div key={doc.id} className="flex justify-between items-center p-3 hover:bg-slate-50 rounded-xl border border-slate-100 transition-colors group">
-                 <a href={doc.url} target="_blank" rel="noreferrer" className="flex items-center gap-4 flex-1">
-                   
-                   {/* MINIATURE 1ÈRE PAGE PDF */}
-                   <div className="w-12 h-16 shrink-0 bg-slate-100 border border-slate-200 rounded-lg overflow-hidden shadow-sm relative flex items-center justify-center">
-                     <img 
-                       src={formatDriveImageUrl(doc.url)} 
-                       alt={doc.titre} 
-                       className="w-full h-full object-cover object-top relative z-10"
-                       onError={(e) => { e.target.style.display = 'none'; }}
-                     />
-                     {/* Icône de secours en arrière-plan */}
-                     <div className="absolute inset-0 flex items-center justify-center text-blue-500 bg-blue-50">
-                       <FileText size={20} />
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        {/* COLONNE GAUCHE : DOCUMENTS (Trait d'union + Newsletters) */}
+        <div className="lg:col-span-5 flex flex-col gap-6">
+           
+           {/* ENCART 1 : TRAIT D'UNION */}
+           <div className="bg-amber-50/50 rounded-3xl shadow-sm border-4 border-white p-6 relative overflow-hidden flex flex-col max-h-[450px]">
+             <div className="absolute top-0 right-0 w-32 h-32 bg-amber-100/50 rounded-bl-[100px] -z-10"></div>
+             
+             <div className="flex justify-between items-start mb-6 border-b border-amber-200/60 pb-4">
+               <div>
+                 <h3 className="text-xl font-black text-amber-900 flex items-center gap-2">
+                   <BookOpen className="text-amber-600" size={24} /> Trait d'union
+                 </h3>
+                 <p className="text-xs text-amber-700/70 mt-1 font-bold">Brevets & Bulletins Pédagogiques</p>
+               </div>
+               {isAdmin && (
+                 <button onClick={() => openAddModal('document')} className="bg-amber-500 text-amber-950 px-3 py-2 rounded-xl text-xs font-black hover:bg-amber-400 shadow-md shadow-amber-500/20 flex items-center gap-1.5 transition-transform active:scale-95 shrink-0">
+                   <PlusCircle size={16}/> Déposer
+                 </button>
+               )}
+             </div>
+
+             <div className="flex-1 flex flex-col gap-3 overflow-y-auto custom-scrollbar pr-2">
+               {documents.map(doc => (
+                 <div key={doc.id} className="flex justify-between items-center p-3 bg-white rounded-2xl border border-amber-100 hover:border-amber-400 hover:shadow-md transition-all group relative shrink-0">
+                   <a href={doc.url} target="_blank" rel="noreferrer" className="flex items-center gap-4 flex-1 min-w-0 pr-8">
+                     <div className="w-12 h-14 shrink-0 bg-slate-100 border-2 border-slate-200 rounded-lg overflow-hidden shadow-sm relative flex items-center justify-center group-hover:border-amber-300 transition-colors">
+                       <img src={formatDriveImageUrl(doc.url)} alt={doc.titre} className="w-full h-full object-cover object-top relative z-10 grayscale group-hover:grayscale-0 transition-all duration-500" onError={(e) => { e.target.style.display = 'none'; }} />
+                       <div className="absolute inset-0 flex items-center justify-center text-slate-300 bg-white"><FileText size={20} /></div>
+                       <div className="absolute inset-0 bg-amber-900/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-20 backdrop-blur-[1px]"><Search className="text-white drop-shadow-md" size={16}/></div>
                      </div>
-                   </div>
+                     <div className="truncate">
+                       <p className="font-bold text-sm text-slate-800 group-hover:text-amber-700 transition-colors truncate">{doc.titre}</p>
+                       <p className="text-[10px] font-bold text-slate-400 mt-0.5 truncate uppercase tracking-wider flex items-center gap-1">
+                         <Cog size={10} className="text-amber-500 shrink-0"/> {doc.description || "Ouvrir l'archive"}
+                       </p>
+                     </div>
+                   </a>
+                   {isAdmin && (
+                     <button onClick={() => handleDelete('documents_ecole', doc.id)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-rose-500 p-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white rounded-lg shadow-sm"><Trash2 size={16}/></button>
+                   )}
+                 </div>
+               ))}
+               {documents.length === 0 && (
+                 <div className="flex-1 flex flex-col items-center justify-center text-center py-6 opacity-60">
+                   <BookOpen size={28} className="text-amber-300 mb-2"/>
+                   <p className="text-xs font-bold text-amber-800">Aucun Trait d'union.</p>
+                 </div>
+               )}
+             </div>
+           </div>
 
-                   <div>
-                     <p className="font-bold text-sm text-slate-700 group-hover:text-blue-700 transition-colors">{doc.titre}</p>
-                     <p className="text-[10px] text-slate-400 mt-0.5">{doc.description || "Cliquez pour ouvrir dans Google Drive"}</p>
-                   </div>
-                 </a>
-
-                 {isAdmin && (
-                   <button onClick={() => handleDelete('documents_ecole', doc.id)} className="text-slate-300 hover:text-rose-500 p-2"><Trash2 size={16}/></button>
-                 )}
+           {/* ENCART 2 : NEWSLETTERS */}
+           <div className="bg-emerald-50/50 rounded-3xl shadow-sm border-4 border-white p-6 relative overflow-hidden flex flex-col max-h-[450px]">
+             <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-100/50 rounded-bl-[100px] -z-10"></div>
+             
+             <div className="flex justify-between items-start mb-6 border-b border-emerald-200/60 pb-4">
+               <div>
+                 <h3 className="text-xl font-black text-emerald-900 flex items-center gap-2">
+                   <Send className="text-emerald-600" size={24} /> Newsletters
+                 </h3>
+                 <p className="text-xs text-emerald-700/70 mt-1 font-bold">Le Télégraphe de l'Asso</p>
                </div>
-             ))}
-             {documents.length === 0 && <p className="text-xs text-slate-400 italic text-center py-4">Aucun document publié.</p>}
+               {isAdmin && (
+                 <button onClick={() => openAddModal('newsletter')} className="bg-emerald-500 text-emerald-950 px-3 py-2 rounded-xl text-xs font-black hover:bg-emerald-400 shadow-md shadow-emerald-500/20 flex items-center gap-1.5 transition-transform active:scale-95 shrink-0">
+                   <PlusCircle size={16}/> Déposer
+                 </button>
+               )}
+             </div>
+
+             <div className="flex-1 flex flex-col gap-3 overflow-y-auto custom-scrollbar pr-2">
+               {newsletters.map(news => (
+                 <div key={news.id} className="flex justify-between items-center p-3 bg-white rounded-2xl border border-emerald-100 hover:border-emerald-400 hover:shadow-md transition-all group relative shrink-0">
+                   <a href={news.url} target="_blank" rel="noreferrer" className="flex items-center gap-4 flex-1 min-w-0 pr-8">
+                     <div className="w-12 h-14 shrink-0 bg-slate-100 border-2 border-slate-200 rounded-lg overflow-hidden shadow-sm relative flex items-center justify-center group-hover:border-emerald-300 transition-colors">
+                       <img src={formatDriveImageUrl(news.url)} alt={news.titre} className="w-full h-full object-cover object-top relative z-10 grayscale group-hover:grayscale-0 transition-all duration-500" onError={(e) => { e.target.style.display = 'none'; }} />
+                       <div className="absolute inset-0 flex items-center justify-center text-slate-300 bg-white"><Mail size={20} /></div>
+                       <div className="absolute inset-0 bg-emerald-900/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-20 backdrop-blur-[1px]"><Search className="text-white drop-shadow-md" size={16}/></div>
+                     </div>
+                     <div className="truncate">
+                       <p className="font-bold text-sm text-slate-800 group-hover:text-emerald-700 transition-colors truncate">{news.titre}</p>
+                       <p className="text-[10px] font-bold text-slate-400 mt-0.5 truncate uppercase tracking-wider flex items-center gap-1">
+                         <Cog size={10} className="text-emerald-500 shrink-0"/> {news.description || "Ouvrir la transmission"}
+                       </p>
+                     </div>
+                   </a>
+                   {isAdmin && (
+                     <button onClick={() => handleDelete('newsletters', news.id)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-rose-500 p-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white rounded-lg shadow-sm"><Trash2 size={16}/></button>
+                   )}
+                 </div>
+               ))}
+               {newsletters.length === 0 && (
+                 <div className="flex-1 flex flex-col items-center justify-center text-center py-6 opacity-60">
+                   <Send size={28} className="text-emerald-300 mb-2"/>
+                   <p className="text-xs font-bold text-emerald-800">Aucune transmission en cours.</p>
+                 </div>
+               )}
+             </div>
            </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-           <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
-             <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Camera className="text-emerald-500" size={20} /> Galerie Photos</h3>
-             {isAdmin && (
-               <button onClick={() => openAddModal('photo')} className="bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-100 transition-colors shadow-sm">
-                 + Lier un album
-               </button>
-             )}
-           </div>
-           <div className="grid grid-cols-2 gap-3">
-             {photos.map(photo => (
-               <div key={photo.id} className="relative group rounded-2xl overflow-hidden border border-slate-200 aspect-video bg-slate-900 shadow-sm">
-                 <a href={photo.url} target="_blank" rel="noreferrer" className="block w-full h-full">
-                   <img 
-                     src={photo.coverUrl || DEFAULT_COVER} 
-                     alt={photo.titre} 
-                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-80 group-hover:opacity-100" 
-                     onError={(e) => { e.target.src = DEFAULT_COVER; }}
-                   />
-                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent"></div>
-                   <span className="absolute bottom-2.5 left-3 right-3 text-white text-xs font-bold truncate drop-shadow-md flex items-center gap-1.5">
-                     <Camera size={14} className="text-emerald-400 shrink-0"/> {photo.titre}
-                   </span>
-                 </a>
-                 {isAdmin && (
-                   <button onClick={() => handleDelete('galerie_photos', photo.id)} className="absolute top-2 right-2 bg-white/90 text-rose-500 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 shadow-sm z-20 hover:bg-rose-50 transition-opacity">
-                     <Trash2 size={14}/>
-                   </button>
+        {/* COLONNE DROITE : GALERIE PHOTOS (OBSERVATOIRE) */}
+        <div className="lg:col-span-7 flex flex-col gap-6">
+           <div className="bg-slate-900 rounded-3xl shadow-lg border-4 border-slate-800 p-6 md:p-8 relative h-full flex flex-col min-h-[600px]">
+             <div className="absolute top-0 right-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/blueprint.png')] opacity-10 pointer-events-none"></div>
+             
+             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 border-b border-slate-700 pb-4 relative z-10 gap-4">
+               <div>
+                 <h3 className="text-xl font-black text-white flex items-center gap-2">
+                   <Camera className="text-blue-400" size={24} /> L'Observatoire
+                 </h3>
+                 <p className="text-xs text-slate-400 mt-1 font-medium">Les pellicules photographiques des différentes périodes.</p>
+               </div>
+               {isAdmin && (
+                 <button onClick={() => openAddModal('photo')} className="bg-blue-500 text-white px-4 py-2 rounded-xl text-xs font-black hover:bg-blue-400 shadow-lg shadow-blue-500/20 flex items-center gap-1.5 transition-transform active:scale-95 shrink-0">
+                   <PlusCircle size={16}/> Lier une pellicule
+                 </button>
+               )}
+             </div>
+
+             <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 relative z-10">
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                 {photos.map(photo => (
+                   <div key={photo.id} className="relative group rounded-2xl bg-slate-800 border-2 border-slate-700 overflow-hidden hover:border-blue-400 transition-colors shadow-lg aspect-[4/3] flex flex-col shrink-0">
+                     <a href={photo.url} target="_blank" rel="noreferrer" className="block w-full h-full relative">
+                       <img 
+                         src={photo.coverUrl || DEFAULT_COVER} 
+                         alt={photo.titre} 
+                         className="w-full h-full object-cover opacity-70 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700" 
+                         onError={(e) => { e.target.src = DEFAULT_COVER; }}
+                       />
+                       <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-900/20 to-transparent"></div>
+                       
+                       <div className="absolute bottom-0 w-full p-4">
+                         <span className="text-white text-sm font-black flex items-center gap-2 drop-shadow-md">
+                           <FlaskConical size={16} className="text-blue-400 shrink-0"/> {photo.titre}
+                         </span>
+                       </div>
+                     </a>
+                     {isAdmin && (
+                       <button onClick={() => handleDelete('galerie_photos', photo.id)} className="absolute top-3 right-3 bg-rose-600/90 text-white p-2 rounded-lg opacity-0 group-hover:opacity-100 shadow-md z-20 hover:bg-rose-500 transition-opacity backdrop-blur-sm">
+                         <Trash2 size={14}/>
+                       </button>
+                     )}
+                   </div>
+                 ))}
+                 {photos.length === 0 && (
+                   <div className="col-span-full flex flex-col items-center justify-center text-center py-20 opacity-40">
+                     <Camera size={48} className="text-blue-300 mb-3"/>
+                     <p className="text-sm font-bold text-blue-200">La chambre noire est vide.</p>
+                   </div>
                  )}
                </div>
-             ))}
-             {photos.length === 0 && <div className="col-span-2 text-xs text-slate-400 italic text-center py-6">Aucun album lié.</div>}
+             </div>
            </div>
         </div>
+
       </div>
     </div>
   );
