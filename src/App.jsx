@@ -1403,9 +1403,9 @@ const InfosContact = () => (
         <p className="text-slate-600 text-sm font-medium mb-1">Mme Laurence Gérard</p>
         <p className="text-slate-400 text-xs mb-5">Équipe enseignante: Mme Cécile Sublet <br /> & <br /> Mme Florence Hervet</p>
         
-        <a href="tel:0667909576" className="w-full border border-slate-200 hover:bg-slate-50 rounded-lg py-2 mb-3 flex items-center justify-center gap-2 text-slate-600 text-sm font-bold transition-colors">
-          <Phone size={16} /> 06 67 90 95 76
-        </a>
+        <a href="tel:+33667909576" className="w-full border border-slate-200 hover:bg-slate-50 rounded-lg py-2 mb-3 flex items-center justify-center gap-2 text-slate-600 text-sm font-bold transition-colors">
+  <Phone size={16} /> 06 67 90 95 76
+      </a>
         
         <a href="mailto:direction.tom.morel@gmail.com" className="w-full inline-flex items-center justify-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 px-4 py-2.5 rounded-lg transition-colors font-medium text-sm">
           <Mail size={18} /> Écrire
@@ -1443,7 +1443,7 @@ const InfosContact = () => (
         <a href="https://wa.me/33783424110" target="_blank" rel="noreferrer" className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-4 py-2.5 rounded-xl transition-colors font-bold text-sm">
           <MessageCircle size={16} /> WhatsApp
         </a>
-        <a href="sms:0783424110" className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl transition-colors font-bold text-sm">
+        <a href="tel:+33783424110" className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl transition-colors font-bold text-sm">
           <MessageCircle size={16} /> SMS
         </a>
         <a href="mailto:lvlelezec@gmail.com" className="w-full md:w-auto inline-flex items-center justify-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-4 py-2.5 rounded-xl transition-colors font-bold text-sm">
@@ -8270,8 +8270,7 @@ export default function App() {
         />
       )}
 
-      <aside className={`fixed inset-y-0 left-0 z-30 w-64 bg-slate-900 text-slate-300 flex flex-col shadow-xl transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="p-6 flex flex-col items-center border-b border-slate-800 shrink-0">
+<aside className={`fixed inset-y-0 left-0 z-30 w-64 bg-slate-900 text-slate-300 flex flex-col shadow-xl transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>        <div className="p-6 flex flex-col items-center border-b border-slate-800 shrink-0">
           <div className="bg-white p-2 rounded-xl mb-3 shadow-lg">
             <img src={LOGO_URL} alt="Logo" className="w-16 h-16 object-contain" />
           </div>
@@ -8359,7 +8358,7 @@ export default function App() {
       <main className="flex-1 flex flex-col h-screen overflow-hidden w-full">
         <header className="bg-white h-16 border-b border-slate-200 flex items-center justify-between px-4 md:px-8 shrink-0 z-10">
           <div className="flex items-center gap-4 text-slate-500">
-            <button onClick={() => setIsMobileMenuOpen(true)} className="md:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-lg">
+            <button onClick={() => setIsMobileMenuOpen(true)} className="lg:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-lg">
               <Menu size={24} />
             </button>
             <h2 className="font-semibold text-slate-800 hidden sm:block">
@@ -8367,7 +8366,7 @@ export default function App() {
             </h2>
           </div>
         <div className="flex items-center gap-4">
-            <div className="text-right hidden md:block">
+            <div className="text-right hidden lg:block">
               <div className="text-sm font-bold text-slate-800">
                 {utilisateurConnecte?.role === 'admin' || utilisateurConnecte?.role === 'Administrateur Global' ? 'Admin' : utilisateurConnecte?.identifiant}
               </div>
