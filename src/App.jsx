@@ -2,7 +2,7 @@ import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { 
   LayoutDashboard, Users, BookOpen, GraduationCap, FileSignature, 
   AlertTriangle, Building, Calendar, PieChart, Lock, FileText, 
-  Download, Trash2, XCircle, Search, ChevronRight, CheckCircle2, 
+  Download, Trash2, XCircle, Search, Chevro{modal.type === 'equipe' && (nRight, CheckCircle2, 
   Paperclip, Sparkles, Receipt, Heart, FileSpreadsheet, 
   Package, Target, TrendingUp, Info, Euro, ChevronDown, 
   Globe, Mail, Phone, PlusCircle, Edit2, Send, Clock, Hammer, Menu,
@@ -315,14 +315,16 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
                   </div>
                 </>
               )}
-              {modal.type === 'equipe' && (
+             {modal.type === 'equipe' && (
                 <>
-                  <input type="text" value={formValue.nom} onChange={e => setFormValue({...formValue, nom: e.target.value})} className="w-full border rounded-xl p-3 text-sm" placeholder="Prénom et Nom" required />
-                  <input type="text" value={formValue.role} onChange={e => setFormValue({...formValue, role: e.target.value})} className="w-full border rounded-xl p-3 text-sm" placeholder="Rôle (ex: Pédagogie, Bureau...)" required />
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Lien photo Google Drive</label>
-                    <input type="url" value={formValue.imageUrl} onChange={e => setFormValue({...formValue, imageUrl: e.target.value})} className="w-full border rounded-xl p-3 text-sm" placeholder="https://drive.google.com/file/d/..." required />
-                    <p className="text-[10px] text-slate-400 mt-1">Collez le lien de partage du fichier photo. L'application génèrera l'image automatiquement.</p>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Titre du panneau</label>
+                    <input type="text" value={formValue.nom} onChange={e => setFormValue({...formValue, nom: e.target.value})} className="w-full border rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-amber-500" placeholder="Ex: Familles A à F (2026)" required />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Lien Google Drive du montage photo</label>
+                    <input type="url" value={formValue.imageUrl} onChange={e => setFormValue({...formValue, imageUrl: e.target.value})} className="w-full border rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-amber-500" placeholder="https://drive.google.com/file/d/..." required />
+                    <p className="text-[10px] text-slate-400 mt-1">L'image sera affichée en grand format dans le présentoir.</p>
                   </div>
                 </>
               )}
@@ -402,33 +404,68 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
             <div className="flex justify-between border-b border-slate-100 pb-3 mb-6">
               <div>
                 <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Camera className="text-emerald-500" size={20} /> Trombinoscope parents & pédagogie</h2>
-                <p className="text-xs text-slate-500 mt-1">L'équipe éducative et les membres de l'association.</p>
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8 relative">
+            <div className="flex justify-between border-b border-slate-100 pb-4 mb-8">
+              <div>
+                <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
+                  <Camera className="text-amber-500" size={24} /> Galerie des Familles & Pédagogie
+                </h2>
+                <p className="text-sm text-slate-500 mt-1">Retrouvez tous les visages de notre école sur nos planches officielles.</p>
               </div>
-              {isAdmin && <button onClick={() => openEditModal('equipe')} className="bg-emerald-50 text-emerald-600 p-2 rounded-lg h-fit"><PlusCircle size={16}/></button>}
+              {isAdmin && (
+                <button onClick={() => openEditModal('equipe')} className="bg-amber-50 text-amber-700 border border-amber-200 px-3 py-2 rounded-xl text-xs font-bold hover:bg-amber-100 transition-colors h-fit flex items-center gap-2 shadow-sm">
+                  <PlusCircle size={16}/> Ajouter une planche
+                </button>
+              )}
             </div>
             
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
-              {equipe.map((membre) => (
-                <div key={membre.id} className="flex flex-col items-center p-4 bg-gradient-to-b from-slate-50 to-white hover:shadow-md rounded-2xl border border-slate-200 relative group transition-all">
-                  {isAdmin && <button onClick={() => handleDelete('equipe', membre.id)} className="absolute top-2 right-2 text-rose-500 bg-white p-1.5 rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-10"><Trash2 size={14}/></button>}
+            <div className="flex flex-col gap-8">
+              {equipe.map((affiche) => (
+                <div key={affiche.id} className="relative group rounded-xl overflow-hidden shadow-md bg-slate-50 border-4 border-slate-100 hover:border-amber-200 transition-all duration-300">
                   
-                  <div className="w-20 h-20 rounded-full border-4 border-white shadow-md overflow-hidden mb-3 bg-slate-100 flex items-center justify-center relative">
-                    {membre.imageUrl ? (
-                      <img src={formatDriveImageUrl(membre.imageUrl)} alt={membre.nom} className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
+                  {/* Bouton de suppression Admin */}
+                  {isAdmin && (
+                    <button onClick={() => handleDelete('equipe', affiche.id)} className="absolute top-4 right-4 text-rose-600 bg-white/90 p-2.5 rounded-xl shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-20 hover:bg-rose-50 border border-rose-100">
+                      <Trash2 size={18}/>
+                    </button>
+                  )}
+                  
+                  {/* Cartouche d'ingénieur en haut */}
+                  {affiche.nom && (
+                    <div className="absolute top-0 left-0 bg-slate-900/80 backdrop-blur-sm text-white px-5 py-2.5 rounded-br-2xl z-10 border-b border-r border-slate-700 shadow-md flex items-center gap-2">
+                      <Cog size={14} className="text-amber-400" />
+                      <span className="font-bold text-sm tracking-wide">{affiche.nom}</span>
+                    </div>
+                  )}
+
+                  {/* L'image du montage (pleine largeur) */}
+                  <div className="w-full flex justify-center items-center bg-[url('https://www.transparenttextures.com/patterns/blueprint.png')]">
+                    {affiche.imageUrl ? (
+                      <img 
+                        src={formatDriveImageUrl(affiche.imageUrl)} 
+                        alt={affiche.nom} 
+                        className="w-full h-auto object-contain max-h-[800px]"
+                        onError={(e) => { e.target.style.display = 'none'; }} 
+                      />
                     ) : (
-                      <Users size={24} className="text-slate-300" />
+                      <div className="py-20 text-slate-300 flex flex-col items-center">
+                        <Camera size={48} className="mb-2 opacity-50" />
+                        <span className="text-sm font-medium">Image introuvable</span>
+                      </div>
                     )}
-                    <div className="absolute -bottom-1 -right-1 text-lg drop-shadow-md">⚙️</div>
                   </div>
-                  
-                  <span className="text-sm font-bold text-slate-800 leading-tight text-center">{membre.nom}</span>
-                  <span className="text-[10px] font-bold text-emerald-700 uppercase mt-1.5 text-center bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">{membre.role}</span>
                 </div>
               ))}
-              {equipe.length === 0 && <div className="col-span-full text-slate-400 text-sm text-center py-4">Aucun membre ajouté au trombinoscope.</div>}
+              
+              {equipe.length === 0 && (
+                <div className="text-center py-12 px-6 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-300">
+                  <Camera size={32} className="mx-auto text-slate-300 mb-3" />
+                  <p className="text-sm font-bold text-slate-600">Le mur des familles est encore vide.</p>
+                  <p className="text-xs text-slate-400 mt-1">Les grandes planches photos apparaîtront ici.</p>
+                </div>
+              )}
             </div>
           </div>
-        </div>
 
         <div className="space-y-6">
           <div className="bg-white rounded-2xl shadow-sm border border-rose-100 p-6 bg-gradient-to-b from-white to-rose-50/30 relative">
