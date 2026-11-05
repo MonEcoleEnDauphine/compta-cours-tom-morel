@@ -2,7 +2,7 @@ import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { 
   LayoutDashboard, Users, BookOpen, GraduationCap, FileSignature, 
   AlertTriangle, Building, Calendar, PieChart, Lock, FileText, 
-  Download, Trash2, XCircle, Search, Chevro{modal.type === 'equipe' && (nRight, CheckCircle2, 
+  Download, Trash2, XCircle, Search, ChevronRight, CheckCircle2, 
   Paperclip, Sparkles, Receipt, Heart, FileSpreadsheet, 
   Package, Target, TrendingUp, Info, Euro, ChevronDown, 
   Globe, Mail, Phone, PlusCircle, Edit2, Send, Clock, Hammer, Menu,
