@@ -163,11 +163,10 @@ const PlaceholderPage = ({ title }) => (
 
 // --- MODULE : ACCUEIL FAMILLE (Tableau de Bord Dynamique) ---
 const AccueilFamille = ({ utilisateurConnecte }) => {
-  const isAdmin = utilisateurConnecte?.role === 'admin';
+  const isAdmin = utilisateurConnecte?.role === 'admin' || utilisateurConnecte?.role === 'Administrateur Global';
 
-  const [dons, setDons] = useState([]);
   const [parametres, setParametres] = useState({ 
-    motEquipe: "Bienvenue pour cette nouvelle année.", titreMot: "Préparation de la rentrée", budgetGoal: 58724, annee: "2025/2026"
+    motEquipe: "Bienvenue pour cette nouvelle année.", titreMot: "Préparation de la rentrée"
   });
   const [rappels, setRappels] = useState([]);
   const [evenements, setEvenements] = useState([]);
@@ -176,10 +175,17 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
   const [modal, setModal] = useState({ isOpen: false, type: '', payload: null });
   const [formValue, setFormValue] = useState({});
 
+  // Fonction pour afficher les images Google Drive
+  const formatDriveImageUrl = (url) => {
+    if (!url) return '';
+    const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+    if (match && match[1]) {
+      return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1000`;
+    }
+    return url;
+  };
+
   useEffect(() => {
-    const unsubDons = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'dons'), (snapshot) => {
-      setDons(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
     const unsubParams = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'accueil'), (docSnap) => {
       if (docSnap.exists()) setParametres(docSnap.data());
     });
@@ -193,22 +199,16 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
       setEquipe(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    return () => { unsubDons(); unsubParams(); unsubRappels(); unsubEvts(); unsubEquipe(); };
+    return () => { unsubParams(); unsubRappels(); unsubEvts(); unsubEquipe(); };
   }, []);
 
-  const totalDons = dons.reduce((acc, d) => acc + (Number(d.montant) || 0), 0);
-  const pctProgression = parametres.budgetGoal > 0 ? Math.min((totalDons / parametres.budgetGoal) * 100, 100).toFixed(2) : 0;
-  const resteCollecter = Math.max(0, parametres.budgetGoal - totalDons);
-  const formatMontant = (val) => new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val || 0);
-
-  // Tri chronologique automatique des événements (du plus proche au plus lointain)
+  // Tri chronologique automatique des événements
   const evenementsTries = [...evenements].sort((a, b) => {
     if (!a.date) return 1;
     if (!b.date) return -1;
     return a.date.localeCompare(b.date);
   });
 
-  // Calcul du badge jour/mois à partir de la date ISO (ex: "2026-11-11")
   const getBadgeDate = (evt) => {
     if (evt.date) {
       const d = new Date(evt.date + 'T00:00:00');
@@ -223,8 +223,6 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
   const openEditModal = (type, payload = null) => {
     if (type === 'mot') {
       setFormValue({ titre: parametres.titreMot, contenu: parametres.motEquipe });
-    } else if (type === 'objectif') {
-      setFormValue({ budgetGoal: parametres.budgetGoal, annee: parametres.annee });
     } else if (type === 'rappel') {
       setFormValue({ texte: '' });
     } else if (type === 'evenement') {
@@ -234,7 +232,7 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
         setFormValue({ date: '', titre: '', desc: '' });
       }
     } else if (type === 'equipe') {
-      setFormValue({ nom: '', role: '', initials: '', color: 'bg-blue-600' });
+      setFormValue({ nom: '', role: '', imageUrl: '' });
     }
     setModal({ isOpen: true, type, payload });
   };
@@ -242,11 +240,9 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
   const handleSave = async (e) => {
     e.preventDefault();
     try {
-      if (modal.type === 'mot' || modal.type === 'objectif') {
-        let newData = { ...parametres };
-        if (modal.type === 'mot') { newData.titreMot = formValue.titre; newData.motEquipe = formValue.contenu; }
-        if (modal.type === 'objectif') { newData.budgetGoal = Number(formValue.budgetGoal); newData.annee = formValue.annee; }
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'parametres_globaux'), parametres, { merge: true });
+      if (modal.type === 'mot') {
+        let newData = { ...parametres, titreMot: formValue.titre, motEquipe: formValue.contenu };
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'accueil'), newData, { merge: true });
       } else if (modal.type === 'rappel') {
         await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'rappels'), formValue);
       } else if (modal.type === 'evenement') {
@@ -258,7 +254,6 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
           mois: d.toLocaleDateString('fr-FR', { month: 'short' }).replace('.', '').toUpperCase(),
           jour: String(d.getDate()).padStart(2, '0')
         };
-
         if (modal.payload?.id) {
           await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'evenements', modal.payload.id), evtData);
         } else {
@@ -301,12 +296,6 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
                   <textarea value={formValue.contenu} onChange={e => setFormValue({...formValue, contenu: e.target.value})} rows="4" className="w-full border rounded-xl p-3 text-sm" required />
                 </>
               )}
-              {modal.type === 'objectif' && (
-                <>
-                  <input type="text" value={formValue.annee} onChange={e => setFormValue({...formValue, annee: e.target.value})} className="w-full border rounded-xl p-3 text-sm" placeholder="Période" required />
-                  <input type="number" value={formValue.budgetGoal} onChange={e => setFormValue({...formValue, budgetGoal: e.target.value})} className="w-full border rounded-xl p-3 text-sm" required />
-                </>
-              )}
               {modal.type === 'rappel' && (
                 <textarea value={formValue.texte} onChange={e => setFormValue({...formValue, texte: e.target.value})} rows="3" className="w-full border rounded-xl p-3 text-sm" placeholder="Texte du rappel..." required />
               )}
@@ -314,52 +303,26 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
                 <>
                   <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Date de l'événement</label>
-                    <input 
-                      type="date" 
-                      value={formValue.date} 
-                      onChange={e => setFormValue({...formValue, date: e.target.value})} 
-                      className="w-full border rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-600" 
-                      required 
-                    />
+                    <input type="date" value={formValue.date} onChange={e => setFormValue({...formValue, date: e.target.value})} className="w-full border rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-600" required />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Titre</label>
-                    <input 
-                      type="text" 
-                      value={formValue.titre} 
-                      onChange={e => setFormValue({...formValue, titre: e.target.value})} 
-                      className="w-full border rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-600" 
-                      placeholder="Ex: Fête de l'école" 
-                      required 
-                    />
+                    <input type="text" value={formValue.titre} onChange={e => setFormValue({...formValue, titre: e.target.value})} className="w-full border rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-600" placeholder="Ex: Fête de l'école" required />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Description / Heure / Lieu</label>
-                    <input 
-                      type="text" 
-                      value={formValue.desc} 
-                      onChange={e => setFormValue({...formValue, desc: e.target.value})} 
-                      className="w-full border rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-600" 
-                      placeholder="Ex: 09h00 à l'école" 
-                      required 
-                    />
+                    <input type="text" value={formValue.desc} onChange={e => setFormValue({...formValue, desc: e.target.value})} className="w-full border rounded-xl p-3 text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-600" placeholder="Ex: 09h00 à l'école" required />
                   </div>
                 </>
               )}
               {modal.type === 'equipe' && (
                 <>
                   <input type="text" value={formValue.nom} onChange={e => setFormValue({...formValue, nom: e.target.value})} className="w-full border rounded-xl p-3 text-sm" placeholder="Prénom et Nom" required />
-                  <input type="text" value={formValue.role} onChange={e => setFormValue({...formValue, role: e.target.value})} className="w-full border rounded-xl p-3 text-sm" placeholder="Rôle (ex: Enseignante)" required />
-                  <div className="flex gap-2">
-                    <input type="text" value={formValue.initials} onChange={e => setFormValue({...formValue, initials: e.target.value})} maxLength="2" className="w-1/3 border rounded-xl p-3 text-sm uppercase" placeholder="Initiales" required />
-                    <select value={formValue.color} onChange={e => setFormValue({...formValue, color: e.target.value})} className="w-2/3 border rounded-xl p-3 text-sm">
-                      <option value="bg-blue-600">Bleu</option>
-                      <option value="bg-sky-500">Bleu Clair</option>
-                      <option value="bg-emerald-500">Vert</option>
-                      <option value="bg-purple-500">Violet</option>
-                      <option value="bg-amber-500">Orange</option>
-                      <option value="bg-rose-500">Rouge</option>
-                    </select>
+                  <input type="text" value={formValue.role} onChange={e => setFormValue({...formValue, role: e.target.value})} className="w-full border rounded-xl p-3 text-sm" placeholder="Rôle (ex: Pédagogie, Bureau...)" required />
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Lien photo Google Drive</label>
+                    <input type="url" value={formValue.imageUrl} onChange={e => setFormValue({...formValue, imageUrl: e.target.value})} className="w-full border rounded-xl p-3 text-sm" placeholder="https://drive.google.com/file/d/..." required />
+                    <p className="text-[10px] text-slate-400 mt-1">Collez le lien de partage du fichier photo. L'application génèrera l'image automatiquement.</p>
                   </div>
                 </>
               )}
@@ -378,7 +341,6 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
 
       {/* BANNIÈRE THÉMATIQUE : LES INVENTEURS */}
       <div className="bg-slate-900 rounded-3xl shadow-xl overflow-hidden mb-2 relative border border-slate-800">
-        {/* Décoration lumineuse en arrière-plan */}
         <div className="absolute top-0 right-0 -mr-20 -mt-20 w-72 h-72 rounded-full bg-amber-500/20 blur-3xl pointer-events-none"></div>
         <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-64 h-64 rounded-full bg-indigo-500/20 blur-3xl pointer-events-none"></div>
         
@@ -395,32 +357,27 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
             Bienvenue sur le portail familles du Cours Tom Morel. Cette année, nous partons à la découverte des grands esprits qui ont façonné notre monde moderne par leur ingéniosité.
           </p>
           
-          {/* Cartes des 5 inventeurs */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-4 hover:bg-white/20 transition-all hover:-translate-y-1 group">
               <div className="text-3xl mb-2 group-hover:scale-110 transition-transform origin-left">🗼</div>
               <h4 className="text-white font-bold text-sm">G. Eiffel</h4>
               <p className="text-slate-400 text-[11px] mt-0.5 font-semibold uppercase tracking-wider">La Tour Eiffel</p>
             </div>
-            
             <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-4 hover:bg-white/20 transition-all hover:-translate-y-1 group">
               <div className="text-3xl mb-2 group-hover:scale-110 transition-transform origin-left">⚗️</div>
               <h4 className="text-white font-bold text-sm">A. Lavoisier</h4>
               <p className="text-slate-400 text-[11px] mt-0.5 font-semibold uppercase tracking-wider">La Chimie</p>
             </div>
-            
             <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-4 hover:bg-white/20 transition-all hover:-translate-y-1 group">
               <div className="text-3xl mb-2 group-hover:scale-110 transition-transform origin-left">✈️</div>
               <h4 className="text-white font-bold text-sm">C. Ader</h4>
               <p className="text-slate-400 text-[11px] mt-0.5 font-semibold uppercase tracking-wider">L'Aviation</p>
             </div>
-            
             <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-4 hover:bg-white/20 transition-all hover:-translate-y-1 group">
               <div className="text-3xl mb-2 group-hover:scale-110 transition-transform origin-left">🛞</div>
               <h4 className="text-white font-bold text-sm">É. Michelin</h4>
               <p className="text-slate-400 text-[11px] mt-0.5 font-semibold uppercase tracking-wider">Le Pneu</p>
             </div>
-            
             <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-4 hover:bg-white/20 transition-all hover:-translate-y-1 group">
               <div className="text-3xl mb-2 group-hover:scale-110 transition-transform origin-left">🗺️</div>
               <h4 className="text-white font-bold text-sm">A. Michelin</h4>
@@ -430,7 +387,7 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-4">
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 relative group">
             {isAdmin && <button onClick={() => openEditModal('mot')} className="absolute top-4 right-4 bg-indigo-50 text-indigo-600 p-2 rounded-lg opacity-0 group-hover:opacity-100"><Edit2 size={16} /></button>}
@@ -441,32 +398,34 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 relative group">
-            {isAdmin && <button onClick={() => openEditModal('objectif')} className="absolute top-4 right-4 bg-rose-50 text-rose-600 p-2 rounded-lg opacity-0 group-hover:opacity-100"><Edit2 size={16} /></button>}
-            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3"><Target className="text-rose-500" size={20} /> Objectif {parametres.annee}</h2>
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <div className="bg-slate-50 p-4 rounded-xl text-center"><p className="text-xl font-black text-indigo-600">{formatMontant(parametres.budgetGoal)} €</p></div>
-              <div className="bg-emerald-50 p-4 rounded-xl text-center"><p className="text-xl font-black text-emerald-700">{formatMontant(totalDons)} €</p></div>
-              <div className="bg-rose-50 p-4 rounded-xl text-center"><p className="text-xl font-black text-rose-700">{formatMontant(resteCollecter)} €</p></div>
-            </div>
-            <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden shadow-inner"><div className="bg-gradient-to-r from-indigo-500 to-indigo-600 h-full" style={{ width: `${pctProgression}%` }}></div></div>
-          </div>
-
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 relative">
-            <div className="flex justify-between border-b border-slate-100 pb-3 mb-4">
-              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Users className="text-emerald-500" size={20} /> L'équipe (Trombinoscope)</h2>
-              {isAdmin && <button onClick={() => openEditModal('equipe')} className="bg-emerald-50 text-emerald-600 p-2 rounded-lg"><PlusCircle size={16}/></button>}
+            <div className="flex justify-between border-b border-slate-100 pb-3 mb-6">
+              <div>
+                <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Camera className="text-emerald-500" size={20} /> Trombinoscope parents & pédagogie</h2>
+                <p className="text-xs text-slate-500 mt-1">L'équipe éducative et les membres de l'association.</p>
+              </div>
+              {isAdmin && <button onClick={() => openEditModal('equipe')} className="bg-emerald-50 text-emerald-600 p-2 rounded-lg h-fit"><PlusCircle size={16}/></button>}
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+            
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
               {equipe.map((membre) => (
-                <div key={membre.id} className="flex flex-col items-center p-3 hover:bg-slate-50 rounded-xl relative group">
-                  {isAdmin && <button onClick={() => handleDelete('equipe', membre.id)} className="absolute top-0 right-0 text-rose-500 opacity-0 group-hover:opacity-100"><Trash2 size={14}/></button>}
-                  <div className={`w-16 h-16 rounded-full flex items-center justify-center text-white font-black text-xl mb-3 shadow-md ${membre.color}`}>{membre.initials}</div>
+                <div key={membre.id} className="flex flex-col items-center p-4 bg-gradient-to-b from-slate-50 to-white hover:shadow-md rounded-2xl border border-slate-200 relative group transition-all">
+                  {isAdmin && <button onClick={() => handleDelete('equipe', membre.id)} className="absolute top-2 right-2 text-rose-500 bg-white p-1.5 rounded-lg shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-10"><Trash2 size={14}/></button>}
+                  
+                  <div className="w-20 h-20 rounded-full border-4 border-white shadow-md overflow-hidden mb-3 bg-slate-100 flex items-center justify-center relative">
+                    {membre.imageUrl ? (
+                      <img src={formatDriveImageUrl(membre.imageUrl)} alt={membre.nom} className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
+                    ) : (
+                      <Users size={24} className="text-slate-300" />
+                    )}
+                    <div className="absolute -bottom-1 -right-1 text-lg drop-shadow-md">⚙️</div>
+                  </div>
+                  
                   <span className="text-sm font-bold text-slate-800 leading-tight text-center">{membre.nom}</span>
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase mt-1 text-center">{membre.role}</span>
+                  <span className="text-[10px] font-bold text-emerald-700 uppercase mt-1.5 text-center bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">{membre.role}</span>
                 </div>
               ))}
-              {equipe.length === 0 && <div className="col-span-full text-slate-400 text-sm text-center">Aucun membre ajouté.</div>}
+              {equipe.length === 0 && <div className="col-span-full text-slate-400 text-sm text-center py-4">Aucun membre ajouté au trombinoscope.</div>}
             </div>
           </div>
         </div>
@@ -491,7 +450,6 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
             </ul>
           </div>
 
-          {/* SECTION PROCHAINS ÉVÉNEMENTS (TRIÉE ET ÉDITABLE) */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 relative">
             <div className="flex justify-between border-b border-slate-100 pb-3 mb-4">
               <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2"><Calendar className="text-blue-500" size={18} /> Prochains événements</h2>
@@ -516,23 +474,10 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
                         <p className="text-xs text-slate-500 mt-0.5 truncate">{evt.desc}</p>
                       </div>
                     </div>
-
                     {isAdmin && (
                       <div className="flex items-center gap-1 opacity-0 group-hover/event:opacity-100 transition-opacity shrink-0">
-                        <button 
-                          onClick={() => openEditModal('evenement', evt)} 
-                          className="text-slate-400 hover:text-indigo-600 p-1.5 hover:bg-indigo-50 rounded-lg transition-colors" 
-                          title="Modifier"
-                        >
-                          <Edit2 size={14}/>
-                        </button>
-                        <button 
-                          onClick={() => handleDelete('evenements', evt.id)} 
-                          className="text-slate-400 hover:text-rose-600 p-1.5 hover:bg-rose-50 rounded-lg transition-colors" 
-                          title="Supprimer"
-                        >
-                          <Trash2 size={14}/>
-                        </button>
+                        <button onClick={() => openEditModal('evenement', evt)} className="text-slate-400 hover:text-indigo-600 p-1.5 hover:bg-indigo-50 rounded-lg transition-colors"><Edit2 size={14}/></button>
+                        <button onClick={() => handleDelete('evenements', evt.id)} className="text-slate-400 hover:text-rose-600 p-1.5 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 size={14}/></button>
                       </div>
                     )}
                   </div>
