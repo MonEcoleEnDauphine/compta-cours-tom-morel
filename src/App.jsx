@@ -8,7 +8,8 @@ import {
   Globe, Mail, Phone, PlusCircle, Edit2, Send, Clock, Hammer, Menu,
   Megaphone, Bell, Newspaper, Camera, MessageCircle,
   Utensils, BarChart3, AlertCircle, Printer, CalendarDays,
-  ChevronLeft, UploadCloud, Baby, LogOut, Eye, EyeOff, FlaskConical, Microscope, Beaker, Cog, Compass, FileCheck
+  ChevronLeft, UploadCloud, Baby, LogOut, Eye, EyeOff, FlaskConical, Microscope, Beaker, Cog, Compass, FileCheck,
+  Compass, FileCheck, Key, Wrench
 } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
@@ -1510,6 +1511,283 @@ const GestionInscriptions = () => {
           )}
         </div>
 
+      </div>
+    </div>
+  );
+};
+
+// --- MODULE : FICHE TRAVAUX (L'Atelier Gustave Eiffel) ---
+const FicheTravaux = ({ utilisateurConnecte }) => {
+  const isAdmin = utilisateurConnecte?.role === 'admin' || utilisateurConnecte?.role === 'Administrateur Global' || utilisateurConnecte?.profil === 'Admin';
+  const userName = utilisateurConnecte?.familleId || utilisateurConnecte?.identifiant || "Inconnu";
+
+  const [missions, setMissions] = useState([]);
+  const [modal, setModal] = useState({ isOpen: false, payload: null });
+  const [formValue, setFormValue] = useState({ titre: '', desc: '', dateLimite: '' });
+  const [showHistorique, setShowHistorique] = useState(false);
+
+  useEffect(() => {
+    const q = collection(db, 'artifacts', appId, 'public', 'data', 'travaux');
+    const unsub = onSnapshot(q, (snapshot) => {
+      const liste = [];
+      snapshot.forEach(doc => liste.push({ id: doc.id, ...doc.data() }));
+      // Tri par date limite croissante
+      liste.sort((a, b) => new Date(a.dateLimite || '2099-01-01') - new Date(b.dateLimite || '2099-01-01'));
+      setMissions(liste);
+    });
+    return () => unsub();
+  }, []);
+
+  const missionsActives = missions.filter(m => m.statut !== 'Terminé');
+  const missionsTerminees = missions.filter(m => m.statut === 'Terminé');
+
+  // Calcul des points de participation (Combien de tâches chaque famille a pris/terminé)
+  const palmares = useMemo(() => {
+    const scores = {};
+    missions.forEach(m => {
+      if (m.volontaire) {
+        scores[m.volontaire] = (scores[m.volontaire] || 0) + 1;
+      }
+    });
+    return Object.entries(scores).sort((a, b) => b[1] - a[1]);
+  }, [missions]);
+
+  const openModal = (mission = null) => {
+    if (mission) {
+      setFormValue({ titre: mission.titre, desc: mission.desc, dateLimite: mission.dateLimite });
+    } else {
+      setFormValue({ titre: '', desc: '', dateLimite: '' });
+    }
+    setModal({ isOpen: true, payload: mission });
+  };
+
+  const handleSaveMission = async (e) => {
+    e.preventDefault();
+    try {
+      const missionData = {
+        titre: formValue.titre,
+        desc: formValue.desc,
+        dateLimite: formValue.dateLimite,
+        // Si c'est une création, on initialise les champs
+        ...(modal.payload ? {} : { volontaire: '', statut: 'À faire', date_creation: new Date().toISOString() })
+      };
+
+      if (modal.payload?.id) {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'travaux', modal.payload.id), missionData);
+      } else {
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'travaux'), missionData);
+      }
+      setModal({ isOpen: false, payload: null });
+    } catch (err) {
+      alert("Erreur lors de l'enregistrement de la mission.");
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm("Voulez-vous vraiment supprimer cette mission du chantier ?")) {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'travaux', id));
+    }
+  };
+
+  const handleClaim = async (id) => {
+    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'travaux', id), {
+      volontaire: userName,
+      statut: 'En cours'
+    });
+  };
+
+  const handleUnclaim = async (id) => {
+    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'travaux', id), {
+      volontaire: '',
+      statut: 'À faire'
+    });
+  };
+
+  const handleComplete = async (id) => {
+    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'travaux', id), {
+      statut: 'Terminé'
+    });
+  };
+
+  const formatDateAffichage = (dateString) => {
+    if (!dateString) return 'Non définie';
+    return new Date(dateString).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
+  return (
+    <div className="space-y-6 max-w-7xl mx-auto pb-10 font-sans animate-fade-in relative">
+      
+      {/* FENÊTRE MODALE ADMIN */}
+      {modal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl border-4 border-slate-700 w-full max-w-md overflow-hidden">
+            <div className="bg-slate-800 p-6 text-white flex justify-between items-center border-b-4 border-amber-500">
+              <h3 className="font-black text-lg flex items-center gap-2">
+                <Hammer className="text-amber-500" size={20}/>
+                {modal.payload ? "Modifier la mission" : "Nouvelle mission (Chantier)"}
+              </h3>
+              <button onClick={() => setModal({ isOpen: false, payload: null })} className="text-slate-400 hover:text-white transition-colors"><XCircle size={20} /></button>
+            </div>
+            <form onSubmit={handleSaveMission} className="p-6 space-y-4 bg-slate-50">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Titre de la tâche *</label>
+                <input type="text" value={formValue.titre} onChange={e => setFormValue({...formValue, titre: e.target.value})} className="w-full border-2 border-slate-300 rounded-xl p-3 text-sm bg-white outline-none focus:border-amber-500 font-bold" placeholder="Ex: Peindre le portail principal" required />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Description & Matériel</label>
+                <textarea value={formValue.desc} onChange={e => setFormValue({...formValue, desc: e.target.value})} rows="3" className="w-full border-2 border-slate-300 rounded-xl p-3 text-sm bg-white outline-none focus:border-amber-500" placeholder="Ex: Peinture fournie, prévoir pinceaux et tenue adaptée." />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Date limite souhaitée</label>
+                <input type="date" value={formValue.dateLimite} onChange={e => setFormValue({...formValue, dateLimite: e.target.value})} className="w-full border-2 border-slate-300 rounded-xl p-3 text-sm bg-white outline-none focus:border-amber-500 font-mono" />
+              </div>
+              <div className="pt-4 flex justify-end gap-3 mt-6">
+                <button type="button" onClick={() => setModal({ isOpen: false, payload: null })} className="px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-200">Annuler</button>
+                <button type="submit" className="px-5 py-2.5 rounded-xl text-sm font-black text-slate-900 bg-amber-400 hover:bg-amber-500 shadow-md flex items-center gap-2 active:scale-95 transition-transform">
+                  <CheckCircle2 size={16}/> Valider l'ordre
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* BANNIÈRE HERO : L'ATELIER EIFFEL */}
+      <div className="bg-slate-900 rounded-3xl shadow-xl overflow-hidden relative border-4 border-slate-800 p-8 md:p-10 mb-2">
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/blueprint.png')] opacity-20 pointer-events-none"></div>
+        <div className="absolute top-[-50px] right-[-50px] w-64 h-64 bg-amber-500/20 rounded-full blur-3xl pointer-events-none"></div>
+        
+        <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+          <div>
+            <div className="flex items-center gap-3 mb-3">
+              <span className="bg-slate-800 text-amber-400 border border-amber-500/30 px-3 py-1 rounded-lg text-xs font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+                <Wrench size={14} /> Fiche de travaux
+              </span>
+            </div>
+            <h2 className="text-3xl md:text-4xl font-black text-white mb-2 tracking-tight">L'Atelier Gustave Eiffel 🗼</h2>
+            <p className="text-slate-300 text-sm max-w-xl leading-relaxed">
+              Devenez les bâtisseurs de notre école ! Choisissez une mission sur le tableau d'affichage et validez vos heures d'engagement annuel.
+            </p>
+          </div>
+          
+          <div className="bg-slate-800/80 backdrop-blur-sm border border-slate-700 p-4 rounded-2xl shrink-0 w-full md:w-64">
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2"><Target size={14} className="text-amber-500"/> Palmarès des Bâtisseurs</h4>
+            <div className="space-y-1.5 max-h-24 overflow-y-auto custom-scrollbar pr-2">
+              {palmares.length === 0 ? <p className="text-xs text-slate-500 italic">Aucune mission prise.</p> : null}
+              {palmares.map(([fam, score], idx) => (
+                <div key={idx} className="flex justify-between items-center text-xs">
+                  <span className="text-slate-300 font-medium truncate pr-2"><span className="text-amber-500 font-black mr-1">#{idx+1}</span> {fam}</span>
+                  <span className="text-white font-black bg-slate-700 px-2 py-0.5 rounded">{score}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+        <div className="flex bg-slate-100 p-1 rounded-xl">
+          <button onClick={() => setShowHistorique(false)} className={`px-5 py-2 rounded-lg text-sm font-bold transition-all ${!showHistorique ? 'bg-white shadow-sm text-amber-700' : 'text-slate-500 hover:text-slate-700'}`}>Missions en cours ({missionsActives.length})</button>
+          <button onClick={() => setShowHistorique(true)} className={`px-5 py-2 rounded-lg text-sm font-bold transition-all ${showHistorique ? 'bg-white shadow-sm text-amber-700' : 'text-slate-500 hover:text-slate-700'}`}>Historique terminé ({missionsTerminees.length})</button>
+        </div>
+        {isAdmin && (
+          <button onClick={() => openModal()} className="bg-amber-400 text-slate-900 px-4 py-2.5 rounded-xl text-xs font-black hover:bg-amber-500 shadow-md flex items-center gap-2 transition-transform active:scale-95 w-full md:w-auto justify-center">
+            <PlusCircle size={16}/> Créer un ordre de mission
+          </button>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {(showHistorique ? missionsTerminees : missionsActives).map(mission => {
+          const estLeMien = mission.volontaire === userName;
+          const estPris = mission.volontaire && mission.volontaire !== '';
+          const estTermine = mission.statut === 'Terminé';
+
+          // Styles des cartes
+          let cardStyle = "bg-white border-slate-200";
+          let badgeStyle = "bg-slate-100 text-slate-600 border-slate-200";
+          let icon = <Hammer size={16} />;
+
+          if (estTermine) {
+            cardStyle = "bg-slate-50 border-slate-200 opacity-70 grayscale hover:grayscale-0";
+            badgeStyle = "bg-slate-200 text-slate-600 border-slate-300";
+            icon = <CheckCircle2 size={16} />;
+          } else if (estLeMien) {
+            cardStyle = "bg-blue-50/50 border-blue-300 shadow-md shadow-blue-100 ring-2 ring-blue-100";
+            badgeStyle = "bg-blue-100 text-blue-700 border-blue-200";
+            icon = <Wrench size={16} />;
+          } else if (estPris) {
+            cardStyle = "bg-slate-50 border-slate-200";
+            badgeStyle = "bg-amber-100 text-amber-700 border-amber-200";
+            icon = <Cog size={16} />;
+          } else {
+            cardStyle = "bg-white border-amber-300 shadow-md shadow-amber-100/50";
+            badgeStyle = "bg-rose-100 text-rose-700 border-rose-200 animate-pulse";
+            icon = <AlertTriangle size={16} />;
+          }
+
+          return (
+            <div key={mission.id} className={`rounded-2xl border-2 p-5 flex flex-col relative group transition-all duration-300 ${cardStyle}`}>
+              
+              {/* Outils Admin Hover */}
+              {isAdmin && (
+                <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                  {!estTermine && (
+                    <button onClick={() => handleComplete(mission.id)} className="bg-emerald-100 text-emerald-700 p-1.5 rounded-lg hover:bg-emerald-200 border border-emerald-200" title="Marquer comme terminé"><CheckCircle2 size={14}/></button>
+                  )}
+                  <button onClick={() => openModal(mission)} className="bg-slate-100 text-slate-600 p-1.5 rounded-lg hover:bg-slate-200 border border-slate-200" title="Modifier"><Edit2 size={14}/></button>
+                  <button onClick={() => handleDelete(mission.id)} className="bg-rose-100 text-rose-600 p-1.5 rounded-lg hover:bg-rose-200 border border-rose-200" title="Supprimer"><Trash2 size={14}/></button>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 mb-3 pr-16">
+                <span className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase flex items-center gap-1 border ${badgeStyle}`}>
+                  {icon} {mission.statut}
+                </span>
+                {mission.dateLimite && (
+                  <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                    <Clock size={12}/> {formatDateAffichage(mission.dateLimite)}
+                  </span>
+                )}
+              </div>
+
+              <h3 className="font-black text-lg text-slate-800 mb-2 leading-tight">{mission.titre}</h3>
+              <p className="text-sm text-slate-600 mb-6 flex-1 whitespace-pre-line leading-relaxed">{mission.desc}</p>
+
+              <div className="mt-auto border-t border-slate-200/60 pt-4 flex items-center justify-between">
+                {estTermine ? (
+                  <div className="w-full text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Mission accomplie par {mission.volontaire}
+                  </div>
+                ) : estPris ? (
+                  <div className="w-full flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-[9px] uppercase font-black text-slate-400">Pris en charge par</span>
+                      <span className={`font-bold text-sm ${estLeMien ? 'text-blue-700' : 'text-amber-700'}`}>{estLeMien ? 'VOUS' : mission.volontaire}</span>
+                    </div>
+                    {estLeMien && (
+                      <button onClick={() => handleUnclaim(mission.id)} className="text-[10px] bg-white border border-slate-300 text-slate-600 px-3 py-1.5 rounded-lg font-bold hover:bg-slate-100 transition-colors shadow-sm">
+                        Se désister
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <button onClick={() => handleClaim(mission.id)} className="w-full bg-slate-800 hover:bg-slate-900 text-amber-400 px-4 py-3 rounded-xl font-black text-sm transition-all shadow-md active:scale-95 flex items-center justify-center gap-2">
+                    <Hammer size={16} /> Je m'en charge !
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+
+        {(showHistorique ? missionsTerminees : missionsActives).length === 0 && (
+          <div className="col-span-full py-16 flex flex-col items-center justify-center text-center bg-slate-50 rounded-3xl border-2 border-dashed border-slate-300">
+            <Hammer size={40} className="text-slate-300 mb-3" />
+            <h3 className="font-bold text-slate-600 text-lg">L'Atelier est vide</h3>
+            <p className="text-sm text-slate-400 mt-1 max-w-md">Aucun ordre de mission {showHistorique ? 'terminé pour le moment' : 'en attente de constructeurs'}.</p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -8446,7 +8724,7 @@ export default function App() {
       case 'scolarite': return <PlaceholderPage title="Scolarité" />;
       case 'factures_parents': return <PlaceholderPage title="Mes Factures (Parents)" />;
       case 'plannings': return <ModulePlannings defaultTab="cantine" utilisateurConnecte={utilisateurConnecte} />;
-      case 'fiche_travaux': return <PlaceholderPage title="Fiche_travaux" />;
+      case 'fiche_travaux': return <FicheTravaux utilisateurConnecte={utilisateurConnecte} />;
       case 'budget': return <BudgetPrevisionnel transactionsGlobales={transactionsGlobales} />;
       case 'notes_frais': return <NotesFrais transactionsGlobales={transactionsGlobales} />;
       case 'dons_recus': return <DonsRecus transactionsGlobales={transactionsGlobales} />;
