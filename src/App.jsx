@@ -1515,81 +1515,149 @@ const GestionInscriptions = () => {
   );
 };
 
-// --- MODULE : CONTACT ---
+// --- MODULE : CONTACT (Thème Le Standard des Inventeurs) ---
 const InfosContact = () => (
-  <div className="space-y-6 max-w-6xl mx-auto animate-fade-in pb-10">
+  <div className="space-y-8 max-w-7xl mx-auto animate-fade-in pb-12 font-sans">
     
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center">
-        <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center mb-4">
-          <Globe size={24} />
-        </div>
-        <h3 className="text-lg font-bold text-slate-800 mb-1">Le Cours Tom Morel</h3>
-        <p className="text-blue-500 text-sm mb-6">24, rue de la Chapelle <br /> 38890 Saint-Chef-en-Dauphiné</p>
-        <div className="flex-1"></div>
-        <a href="https://sites.google.com/view/courstommorel/cours-tom-morel" target="_blank" rel="noreferrer" className="w-full inline-flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-600 px-4 py-2.5 rounded-lg transition-colors font-medium text-sm">
-          <Globe size={18} /> Visiter le site
-        </a>
-      </div>
-
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center">
-        <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center mb-4">
-          <Mail size={24} />
-        </div>
-        <h3 className="text-lg font-bold text-slate-800 mb-1">Direction de l'École</h3>
-        <p className="text-slate-600 text-sm font-medium mb-1">Mme Laurence Gérard</p>
-        <p className="text-slate-400 text-xs mb-5">Équipe enseignante: Mme Cécile Sublet <br /> & <br /> Mme Florence Hervet</p>
-        
-        <a href="tel:+33667909576" className="w-full border border-slate-200 hover:bg-slate-50 rounded-lg py-2 mb-3 flex items-center justify-center gap-2 text-slate-600 text-sm font-bold transition-colors">
-  <Phone size={16} /> 06 67 90 95 76
-      </a>
-        
-        <a href="mailto:direction.tom.morel@gmail.com" className="w-full inline-flex items-center justify-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 px-4 py-2.5 rounded-lg transition-colors font-medium text-sm">
-          <Mail size={18} /> Écrire
-        </a>
-      </div>
-
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center">
-        <div className="w-12 h-12 rounded-full bg-purple-50 text-purple-500 flex items-center justify-center mb-4">
-          <Building size={24} />
-        </div>
-        <h3 className="text-lg font-bold text-slate-800 mb-1">Association (Bureau)</h3>
-        <p className="text-purple-500 text-sm mb-6">Mon École en Dauphiné</p>
-        <div className="flex-1"></div>
-        <div className="w-full border border-slate-200 rounded-lg py-2 mb-3 flex items-center justify-center gap-2 text-slate-400 text-sm font-medium">
-          <Phone size={16} /> -
-        </div>
-        <a href="mailto:monecoleendauphine@gmail.com" className="w-full inline-flex items-center justify-center gap-2 bg-purple-50 hover:bg-purple-100 text-purple-600 px-4 py-2.5 rounded-lg transition-colors font-medium text-sm">
-          <Mail size={18} /> Écrire
-        </a>
-      </div>
-    </div>
-
-    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row items-center justify-between gap-6">
-      <div className="flex items-center gap-4 text-center md:text-left">
-        <div className="hidden md:flex w-12 h-12 rounded-full bg-amber-50 text-amber-500 items-center justify-center shrink-0">
-          <AlertTriangle size={24} />
-        </div>
-        <div>
-          <h3 className="text-lg font-bold text-slate-800">Support Technique ERP</h3>
-          <p className="text-slate-500 text-sm mt-1">Un souci avec l'application, un bug ou une erreur dans vos données ? Contactez l'administrateur (L. Le Lezec).</p>
-        </div>
-      </div>
+    {/* BANNIÈRE HERO : LE STANDARD DES INVENTIONS */}
+    <div className="mt-6 bg-slate-900 rounded-3xl shadow-2xl overflow-hidden relative border-4 border-slate-800 p-8 md:p-12">
+      {/* Effets de fond industriels et lumineux */}
+      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-30 pointer-events-none"></div>
+      <div className="absolute top-[-50px] right-[-50px] w-64 h-64 bg-amber-500/20 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="absolute bottom-[-50px] left-[-50px] w-72 h-72 bg-blue-500/20 rounded-full blur-3xl pointer-events-none"></div>
       
-      <div className="flex flex-wrap items-center justify-center md:justify-end gap-3 w-full md:w-auto shrink-0">
-        <a href="https://wa.me/33783424110" target="_blank" rel="noreferrer" className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-4 py-2.5 rounded-xl transition-colors font-bold text-sm">
-          <MessageCircle size={16} /> WhatsApp
-        </a>
-        <a href="tel:+33783424110" className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl transition-colors font-bold text-sm">
-          <MessageCircle size={16} /> SMS
-        </a>
-        <a href="mailto:lvlelezec@gmail.com" className="w-full md:w-auto inline-flex items-center justify-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-4 py-2.5 rounded-xl transition-colors font-bold text-sm">
-          <Mail size={16} /> E-mail
-        </a>
+      <div className="relative z-10 text-center">
+        <div className="flex justify-center mb-4">
+          <span className="bg-slate-800 text-amber-400 border border-amber-500/30 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-amber-500/10">
+            <Phone size={14} className="animate-pulse" /> Le Standard des Inventions
+          </span>
+        </div>
+        <h2 className="text-4xl md:text-5xl font-black text-white mb-4 tracking-tight drop-shadow-lg">
+          Bureau des <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-500">Télécommunications</span> 📞
+        </h2>
+        <p className="text-slate-300 text-sm md:text-base max-w-2xl mx-auto leading-relaxed font-medium">
+          Télégraphe, signaux de fumée, courrier aérien ou ondes radio... Choisissez votre moyen de communication pour joindre les différents pôles de notre grande machinerie.
+        </p>
       </div>
     </div>
+
+    {/* GRILLE DES 3 PÔLES (Michelin, Ader, Lavoisier) */}
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      
+      {/* 1. L'ÉCOLE (THÈME MICHELIN - VOYAGE/GUIDE) */}
+      <div className="bg-gradient-to-br from-yellow-50 to-amber-100 p-1 rounded-3xl shadow-lg hover:-translate-y-2 transition-transform duration-300 group">
+        <div className="bg-white/80 backdrop-blur-sm h-full rounded-[22px] p-6 flex flex-col items-center text-center relative overflow-hidden border border-white">
+          <div className="absolute -right-4 -top-4 text-8xl opacity-10 group-hover:rotate-45 transition-transform duration-700">🛞</div>
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center mb-5 shadow-lg shadow-amber-500/30 transform group-hover:scale-110 transition-transform">
+            <Compass size={32} />
+          </div>
+          <h3 className="text-xl font-black text-amber-900 mb-1">Le Relais Michelin 🗺️</h3>
+          <p className="text-amber-700 font-bold text-xs uppercase tracking-wider mb-6">Le Cours Tom Morel</p>
+          
+          <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl w-full mb-6 relative z-10">
+            <p className="text-amber-900 font-medium text-sm">24, rue de la Chapelle <br /> 38890 Saint-Chef-en-Dauphiné</p>
+          </div>
+          
+          <div className="flex-1"></div>
+          <a href="https://sites.google.com/view/courstommorel/cours-tom-morel" target="_blank" rel="noreferrer" className="w-full relative z-10 inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-3 rounded-xl transition-all font-black text-sm shadow-md hover:shadow-xl">
+            <Globe size={18} /> Consulter le plan
+          </a>
+        </div>
+      </div>
+
+      {/* 2. LA DIRECTION (THÈME ADER - AVIATION/AÉROPOSTALE) */}
+      <div className="bg-gradient-to-br from-sky-100 to-blue-200 p-1 rounded-3xl shadow-lg hover:-translate-y-2 transition-transform duration-300 group">
+        <div className="bg-white/80 backdrop-blur-sm h-full rounded-[22px] p-6 flex flex-col items-center text-center relative overflow-hidden border border-white">
+          <div className="absolute -left-6 -bottom-4 text-8xl opacity-10 group-hover:translate-x-4 group-hover:-translate-y-4 transition-transform duration-700">✈️</div>
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-sky-400 to-blue-600 text-white flex items-center justify-center mb-5 shadow-lg shadow-blue-500/30 transform group-hover:scale-110 transition-transform">
+            <Send size={32} />
+          </div>
+          <h3 className="text-xl font-black text-blue-900 mb-1">L'Aéropostale ✈️</h3>
+          <p className="text-blue-700 font-bold text-xs uppercase tracking-wider mb-6">Direction de l'École</p>
+          
+          <div className="bg-blue-50 border border-blue-200 p-4 rounded-2xl w-full mb-6 relative z-10">
+            <p className="text-blue-900 font-bold text-sm mb-2">Mme Laurence Gérard</p>
+            <p className="text-blue-700 text-xs font-medium">Équipe : Mme Sublet & Mme Hervet</p>
+          </div>
+          
+          <div className="flex-1"></div>
+          <div className="w-full flex flex-col gap-2 relative z-10">
+            <a href="tel:+33667909576" className="w-full border-2 border-blue-600 hover:bg-blue-50 rounded-xl py-2.5 flex items-center justify-center gap-2 text-blue-700 text-sm font-black transition-colors">
+              <Phone size={16} /> +33 6 67 90 95 76
+            </a>
+            <a href="mailto:direction.tom.morel@gmail.com" className="w-full inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl transition-all font-black text-sm shadow-md hover:shadow-xl">
+              <Mail size={18} /> Télégraphier (Écrire)
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. L'ASSOCIATION (THÈME LAVOISIER - CHIMIE/LABO) */}
+      <div className="bg-gradient-to-br from-emerald-100 to-teal-200 p-1 rounded-3xl shadow-lg hover:-translate-y-2 transition-transform duration-300 group">
+        <div className="bg-white/80 backdrop-blur-sm h-full rounded-[22px] p-6 flex flex-col items-center text-center relative overflow-hidden border border-white">
+          <div className="absolute -right-4 -bottom-4 text-8xl opacity-10 group-hover:scale-125 transition-transform duration-700">⚗️</div>
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 text-white flex items-center justify-center mb-5 shadow-lg shadow-emerald-500/30 transform group-hover:scale-110 transition-transform">
+            <FlaskConical size={32} />
+          </div>
+          <h3 className="text-xl font-black text-teal-900 mb-1">Le Laboratoire ⚗️</h3>
+          <p className="text-teal-700 font-bold text-xs uppercase tracking-wider mb-6">Bureau de l'Association</p>
+          
+          <div className="bg-teal-50 border border-teal-200 p-4 rounded-2xl w-full mb-6 relative z-10">
+            <p className="text-teal-900 font-bold text-sm">Mon École en Dauphiné</p>
+            <p className="text-teal-700 text-xs font-medium mt-1">Créateurs de solutions</p>
+          </div>
+          
+          <div className="flex-1"></div>
+          <div className="w-full flex flex-col gap-2 relative z-10">
+            <div className="w-full border-2 border-teal-200 rounded-xl py-2.5 flex items-center justify-center gap-2 text-teal-400 text-sm font-black opacity-50 cursor-not-allowed">
+              <Phone size={16} /> Pas de ligne vocale
+            </div>
+            <a href="mailto:monecoleendauphine@gmail.com" className="w-full inline-flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-xl transition-all font-black text-sm shadow-md hover:shadow-xl">
+              <Mail size={18} /> Transmettre la formule
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* FOOTER : LA SALLE DES MACHINES (THÈME EIFFEL / ERP SUPPORT) */}
+    <div className="mt-8 bg-slate-800 rounded-3xl shadow-xl border-4 border-slate-700 p-2 relative overflow-hidden group">
+      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/diagmonds-light.png')] opacity-10 pointer-events-none"></div>
+      
+      <div className="bg-slate-900 rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
+        
+        <div className="flex items-center gap-5 text-center md:text-left">
+          <div className="w-16 h-16 rounded-full bg-slate-800 border-2 border-amber-500 text-amber-500 flex items-center justify-center shrink-0 shadow-[0_0_15px_rgba(245,158,11,0.3)] group-hover:rotate-180 transition-transform duration-1000">
+            <Cog size={32} />
+          </div>
+          <div>
+            <h3 className="text-xl font-black text-white flex items-center justify-center md:justify-start gap-2">
+              La Salle des Machines <span className="text-amber-500">⚙️</span>
+            </h3>
+            <p className="text-slate-400 text-sm mt-1 max-w-lg font-medium">
+              Un rouage coincé dans l'application ? Une erreur dans vos données ? Contactez l'ingénieur en chef (L. Le Lezec).
+            </p>
+          </div>
+        </div>
+        
+        <div className="flex flex-wrap items-center justify-center md:justify-end gap-3 w-full md:w-auto shrink-0">
+          <a href="https://wa.me/33783424110" target="_blank" rel="noreferrer" className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-900 px-5 py-3 rounded-xl transition-all font-black text-sm shadow-lg shadow-emerald-500/20 active:scale-95">
+            <MessageCircle size={18} /> WhatsApp
+          </a>
+          <a href="sms:+33783424110" className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 text-white border border-slate-600 px-5 py-3 rounded-xl transition-all font-black text-sm active:scale-95">
+            <MessageCircle size={18} /> SMS
+          </a>
+          <a href="mailto:lvlelezec@gmail.com" className="w-full md:w-auto inline-flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-900 px-5 py-3 rounded-xl transition-all font-black text-sm shadow-lg shadow-amber-500/20 active:scale-95">
+            <Hammer size={18} /> E-mail
+          </a>
+        </div>
+      </div>
+    </div>
+    
   </div>
 );
+
+// --- MODULE : PLANNINGS (Cantine & Ménage) ---
 
 export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte }) => {
   const [activeTab, setActiveTab] = useState(defaultTab);
