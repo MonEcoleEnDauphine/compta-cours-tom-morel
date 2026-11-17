@@ -2060,8 +2060,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     const remplacementsManuels = [
       { date: "2026-11-13", type: "cantine", initial: "LE LÉZEC", remplacant: "LE LÉZEC" },
       { date: "2026-10-10", type: "menage",  initial: "LE LÉZEC", remplacant: "LE LÉZEC" }
-      // Ajoutez Mme Ben Geloune ici au fur et à mesure :
-      // { date: "2026-11-20", type: "cantine", initial: "BOCCA", remplacant: "MME BEN GELOUNE" }
     ];
     // ============================================================================
 
@@ -2088,13 +2086,12 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { id: "SHAW", type: "Nouveau SP", days: [2], isAsso: false }
     ];
 
-    // NOUVEAUX INVENTEURS ASSIGNÉS AUX PÉRIODES
     const perData = [
       { id: 1, name: "H. Becquerel ☢️", desc: "Radioactivité (Rentrée - Toussaint)", start: "2026-09-03", end: "2026-10-16" },
-      { id: 2, name: "N-J. Cugnot 🚂", desc: "L'Auto à vapeur (Toussaint - Noël)", start: "2026-11-02", end: "2026-12-18" },
+      { id: 2, name: "N-J. Cugnot ⚙️", desc: "L'Auto à vapeur (Toussaint - Noël)", start: "2026-11-02", end: "2026-12-18" },
       { id: 3, name: "H. Giffard 🎈", desc: "L'Aérostat (Noël - Fév)", start: "2027-01-04", end: "2027-02-12" },
-      { id: 4, name: "M. Curie 🚑", desc: "Petites Curies (Fév - Pâques)", start: "2027-03-01", end: "2027-04-09" },
-      { id: 5, name: "D. Papin ♨️", desc: "Machine à vapeur (Pâques - Été)", start: "2027-04-26", end: "2027-06-25" }
+      { id: 4, name: "M. Curie 🩻", desc: "Petites Curies (Fév - Pâques)", start: "2027-03-01", end: "2027-04-09" },
+      { id: 5, name: "D. Papin 🍲", desc: "Machine à vapeur (Pâques - Été)", start: "2027-04-26", end: "2027-06-25" }
     ];
 
     const holiData = ["2026-11-11", "2027-03-26", "2027-03-29", "2027-05-06", "2027-05-07", "2027-05-17"];
@@ -2106,7 +2103,19 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { name: "Été", start: "2027-06-26", end: "2027-08-31" }
     ];
 
-    // --- INTEGRATION STRICTE DES FICHIERS CSV (Année complète) ---
+    // DONNÉES DES CORDÉES MISES À JOUR
+    const cordeesData = [
+      { id: 1, name: "Henri Becquerel", theme: "La Radioactivité", icon: "☢️", members: ["Henri", "Anne-Victoria", "Florence", "Camille", "Karol", "Charlotte"], bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-800", iconCol: "text-emerald-600" },
+      { id: 2, name: "Nicolas-Joseph Cugnot", theme: "L'Automobile à vapeur", icon: "⚙️", members: ["Élisabeth C", "Joseph BC", "Sixtine", "Aymeric DS", "Domitille", "Pierre"], bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-800", iconCol: "text-blue-600" },
+      { id: 3, name: "Henri Giffard", theme: "L'Aérostat", icon: "🎈", members: ["Jacques DP", "Alice", "Pénélope", "Priscille", "Thalia", "François"], bg: "bg-rose-50", border: "border-rose-200", text: "text-rose-800", iconCol: "text-rose-600" },
+      { id: 4, name: "Marie Curie", theme: "Les Petites Curies", icon: "🩻", members: ["Léon", "Élie", "Armel", "Liz", "Honorine"], bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-800", iconCol: "text-amber-600" },
+      { id: 5, name: "Denis Papin", theme: "La Machine à vapeur", icon: "🍲", members: ["Laëtitia", "Séraphin", "Sophie", "Madeleine", "Jacques BC"], bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-800", iconCol: "text-orange-600" },
+      { id: 6, name: "André-Marie Ampère", theme: "Le Télégraphe", icon: "⚡", members: ["Aymeric BM", "Élisabeth R", "Thaïs", "Éléna", "Lou", "Joseph C"], bg: "bg-purple-50", border: "border-purple-200", text: "text-purple-800", iconCol: "text-purple-600" }
+    ];
+
+    // ============================================================================
+    // EXTRACTION DIRECTE ET ABSOLUE DES FICHIERS CSV (PLANNING DE TOUTE L'ANNÉE)
+    // ============================================================================
     const historicalCantine = [
       { date: '2026-09-03', p1: 'BOCCA', p2: 'TAISSIDRE-CARVALHO', repasType: 'Filles / Garçons' },
       { date: '2026-09-04', p1: 'RIOBÉ', p2: 'BEZIAT-MENUT', repasType: 'Par cordée' },
@@ -2134,113 +2143,113 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { date: '2026-10-13', p1: 'GREPAT', p2: 'MELLIES', repasType: 'Placement libre' },
       { date: '2026-10-15', p1: 'CORNET-BOUBE', p2: 'CHOMEL', repasType: 'Filles / Garçons' },
       { date: '2026-10-16', p1: 'MME SUBLET', p2: 'MME HERVET', repasType: 'Par cordée' },
-      { date: '2026-11-02', p1: 'DE LA CHARRIE', p2: 'DURAND', repasType: 'Repas par classe' },
-      { date: '2026-11-03', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
+      { date: '2026-11-02', p1: 'DE MALAUSSENE', p2: 'BOCCA', repasType: 'Repas par classe' },
+      { date: '2026-11-03', p1: 'FIARD', p2: 'FAUVAIN', repasType: 'Placement libre' },
       { date: '2026-11-05', p1: 'RIOBÉ', p2: 'CHOMEL', repasType: 'Filles / Garçons' },
-      { date: '2026-11-06', p1: 'MME SUBLET', p2: 'BEZIAT-MENUT', repasType: 'Par cordée' },
-      { date: '2026-11-09', p1: 'DURAND', p2: 'FAUVAIN', repasType: 'Repas par classe' },
-      { date: '2026-11-10', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
-      { date: '2026-11-12', p1: 'DE PONTE', p2: 'FIARD', repasType: 'Filles / Garçons' },
+      { date: '2026-11-06', p1: 'BEZIAT-MENUT', p2: 'DE LASTIC ST JAL', repasType: 'Par cordée' },
+      { date: '2026-11-09', p1: 'DURAND', p2: 'DE SERRES', repasType: 'Repas par classe' },
+      { date: '2026-11-10', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
+      { date: '2026-11-12', p1: 'DE PONTE', p2: 'CORNET-BOUBE', repasType: 'Filles / Garçons' },
       { date: '2026-11-13', p1: 'LE LÉZEC', p2: 'LE LÉZEC', repasType: 'Par cordée' },
-      { date: '2026-11-16', p1: 'PILON', p2: 'BOCCA', repasType: 'Repas par classe' },
-      { date: '2026-11-17', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
+      { date: '2026-11-16', p1: 'DE LA CHARRIE', p2: 'PILON', repasType: 'Repas par classe' },
+      { date: '2026-11-17', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
       { date: '2026-11-19', p1: 'ESCOBAR', p2: 'MELLIES', repasType: 'Filles / Garçons' },
-      { date: '2026-11-20', p1: 'MME SUBLET', p2: 'BOCCA', repasType: 'Par cordée' },
-      { date: '2026-11-23', p1: 'TAISSIDRE-CARVALHO', p2: 'DE MALAUSSENE', repasType: 'Repas par classe' },
-      { date: '2026-11-24', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
-      { date: '2026-11-26', p1: 'RIOBÉ', p2: 'CORNET-BOUBE', repasType: 'Filles / Garçons' },
-      { date: '2026-11-27', p1: 'BEZIAT-MENUT', p2: 'LE LÉZEC', repasType: 'Par cordée' },
-      { date: '2026-11-30', p1: 'DE SERRES', p2: 'GREPAT', repasType: 'Repas par classe' },
-      { date: '2026-12-01', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
-      { date: '2026-12-03', p1: 'DE LASTIC ST JAL', p2: 'CHOMEL', repasType: 'Filles / Garçons' },
-      { date: '2026-12-04', p1: 'MME SUBLET', p2: 'FAUVAIN', repasType: 'Par cordée' },
-      { date: '2026-12-07', p1: 'DE LA CHARRIE', p2: 'DURAND', repasType: 'Repas par classe' },
-      { date: '2026-12-08', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
+      { date: '2026-11-20', p1: 'MME SUBLET', p2: 'MME BEN GELOUNE', repasType: 'Par cordée' },
+      { date: '2026-11-23', p1: 'TAISSIDRE-CARVALHO', p2: 'GREPAT', repasType: 'Repas par classe' },
+      { date: '2026-11-24', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
+      { date: '2026-11-26', p1: 'RIOBÉ', p2: 'DE PONTE', repasType: 'Filles / Garçons' },
+      { date: '2026-11-27', p1: 'CHOMEL', p2: 'FAUVAIN', repasType: 'Par cordée' },
+      { date: '2026-11-30', p1: 'DURAND', p2: 'DE LA CHARRIE', repasType: 'Repas par classe' },
+      { date: '2026-12-01', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
+      { date: '2026-12-03', p1: 'ESCOBAR', p2: 'PILON', repasType: 'Filles / Garçons' },
+      { date: '2026-12-04', p1: 'MME SUBLET', p2: 'MME BEN GELOUNE', repasType: 'Par cordée' },
+      { date: '2026-12-07', p1: 'DE MALAUSSENE', p2: 'DE SERRES', repasType: 'Repas par classe' },
+      { date: '2026-12-08', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
       { date: '2026-12-10', p1: 'DE PONTE', p2: 'FIARD', repasType: 'Filles / Garçons' },
-      { date: '2026-12-11', p1: 'LE LÉZEC', p2: 'LE LÉZEC', repasType: 'Par cordée' },
-      { date: '2026-12-14', p1: 'PILON', p2: 'TAISSIDRE-CARVALHO', repasType: 'Repas par classe' },
-      { date: '2026-12-15', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
-      { date: '2026-12-17', p1: 'ESCOBAR', p2: 'MELLIES', repasType: 'Filles / Garçons' },
-      { date: '2026-12-18', p1: 'MME SUBLET', p2: 'BOCCA', repasType: 'Par cordée' },
-      { date: '2027-01-04', p1: 'DE MALAUSSENE', p2: 'DE SERRES', repasType: 'Repas par classe' },
-      { date: '2027-01-05', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
-      { date: '2027-01-07', p1: 'RIOBÉ', p2: 'CORNET-BOUBE', repasType: 'Filles / Garçons' },
-      { date: '2027-01-08', p1: 'BEZIAT-MENUT', p2: 'LE LÉZEC', repasType: 'Par cordée' },
-      { date: '2027-01-11', p1: 'GREPAT', p2: 'DE LA CHARRIE', repasType: 'Repas par classe' },
-      { date: '2027-01-12', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
-      { date: '2027-01-14', p1: 'DE LASTIC ST JAL', p2: 'CHOMEL', repasType: 'Filles / Garçons' },
-      { date: '2027-01-15', p1: 'MME SUBLET', p2: 'FAUVAIN', repasType: 'Par cordée' },
-      { date: '2027-01-18', p1: 'DURAND', p2: 'PILON', repasType: 'Repas par classe' },
-      { date: '2027-01-19', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
-      { date: '2027-01-21', p1: 'DE PONTE', p2: 'FIARD', repasType: 'Filles / Garçons' },
-      { date: '2027-01-22', p1: 'LE LÉZEC', p2: 'LE LÉZEC', repasType: 'Par cordée' },
-      { date: '2027-01-25', p1: 'TAISSIDRE-CARVALHO', p2: 'DE MALAUSSENE', repasType: 'Repas par classe' },
-      { date: '2027-01-26', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
-      { date: '2027-01-28', p1: 'ESCOBAR', p2: 'MELLIES', repasType: 'Filles / Garçons' },
-      { date: '2027-01-29', p1: 'MME SUBLET', p2: 'BOCCA', repasType: 'Par cordée' },
-      { date: '2027-02-01', p1: 'DE SERRES', p2: 'GREPAT', repasType: 'Repas par classe' },
-      { date: '2027-02-02', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
-      { date: '2027-02-04', p1: 'RIOBÉ', p2: 'CORNET-BOUBE', repasType: 'Filles / Garçons' },
-      { date: '2027-02-05', p1: 'BEZIAT-MENUT', p2: 'LE LÉZEC', repasType: 'Par cordée' },
-      { date: '2027-02-08', p1: 'DE LA CHARRIE', p2: 'DURAND', repasType: 'Repas par classe' },
-      { date: '2027-02-09', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
-      { date: '2027-02-11', p1: 'CHOMEL', p2: 'DE PONTE', repasType: 'Filles / Garçons' },
-      { date: '2027-02-12', p1: 'MME SUBLET', p2: 'FAUVAIN', repasType: 'Par cordée' },
-      { date: '2027-03-01', p1: 'PILON', p2: 'TAISSIDRE-CARVALHO', repasType: 'Repas par classe' },
-      { date: '2027-03-02', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
-      { date: '2027-03-04', p1: 'DE PONTE', p2: 'FIARD', repasType: 'Filles / Garçons' },
+      { date: '2026-12-11', p1: 'MELLIES', p2: 'BEZIAT-MENUT', repasType: 'Par cordée' },
+      { date: '2026-12-14', p1: 'TAISSIDRE-CARVALHO', p2: 'GREPAT', repasType: 'Repas par classe' },
+      { date: '2026-12-15', p1: 'MME QARIOH', p2: 'DE LA CHARRIE', repasType: 'Placement libre' },
+      { date: '2026-12-17', p1: 'CORNET-BOUBE', p2: 'DURAND', repasType: 'Filles / Garçons' },
+      { date: '2026-12-18', p1: 'MME SUBLET', p2: 'MME BEN GELOUNE', repasType: 'Par cordée' },
+      { date: '2027-01-04', p1: 'PILON', p2: 'DURAND', repasType: 'Repas par classe' },
+      { date: '2027-01-05', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
+      { date: '2027-01-07', p1: 'RIOBÉ', p2: 'ESCOBAR', repasType: 'Filles / Garçons' },
+      { date: '2027-01-08', p1: 'LE LÉZEC', p2: 'LE LÉZEC', repasType: 'Par cordée' },
+      { date: '2027-01-11', p1: 'FAUVAIN', p2: 'DE LASTIC ST JAL', repasType: 'Repas par classe' },
+      { date: '2027-01-12', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
+      { date: '2027-01-14', p1: 'FIARD', p2: 'DE PONTE', repasType: 'Filles / Garçons' },
+      { date: '2027-01-15', p1: 'MME SUBLET', p2: 'MME BEN GELOUNE', repasType: 'Par cordée' },
+      { date: '2027-01-18', p1: 'TAISSIDRE-CARVALHO', p2: 'DE MALAUSSENE', repasType: 'Repas par classe' },
+      { date: '2027-01-19', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
+      { date: '2027-01-21', p1: 'DE PONTE', p2: 'CHOMEL', repasType: 'Filles / Garçons' },
+      { date: '2027-01-22', p1: 'MELLIES', p2: 'BEZIAT-MENUT', repasType: 'Par cordée' },
+      { date: '2027-01-25', p1: 'GREPAT', p2: 'DE LA CHARRIE', repasType: 'Repas par classe' },
+      { date: '2027-01-26', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
+      { date: '2027-01-28', p1: 'CORNET-BOUBE', p2: 'ESCOBAR', repasType: 'Filles / Garçons' },
+      { date: '2027-01-29', p1: 'MME SUBLET', p2: 'MME BEN GELOUNE', repasType: 'Par cordée' },
+      { date: '2027-02-01', p1: 'DE SERRES', p2: 'PILON', repasType: 'Repas par classe' },
+      { date: '2027-02-02', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
+      { date: '2027-02-04', p1: 'RIOBÉ', p2: 'FIARD', repasType: 'Filles / Garçons' },
+      { date: '2027-02-05', p1: 'BOCCA', p2: 'CHOMEL', repasType: 'Par cordée' },
+      { date: '2027-02-08', p1: 'TAISSIDRE-CARVALHO', p2: 'DE MALAUSSENE', repasType: 'Repas par classe' },
+      { date: '2027-02-09', p1: 'MME QARIOH', p2: 'DE LA CHARRIE', repasType: 'Placement libre' },
+      { date: '2027-02-11', p1: 'MELLIES', p2: 'DURAND', repasType: 'Filles / Garçons' },
+      { date: '2027-02-12', p1: 'MME SUBLET', p2: 'MME BEN GELOUNE', repasType: 'Par cordée' },
+      { date: '2027-03-01', p1: 'PILON', p2: 'FAUVAIN', repasType: 'Repas par classe' },
+      { date: '2027-03-02', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
+      { date: '2027-03-04', p1: 'DE PONTE', p2: 'RIOBÉ', repasType: 'Filles / Garçons' },
       { date: '2027-03-05', p1: 'LE LÉZEC', p2: 'LE LÉZEC', repasType: 'Par cordée' },
-      { date: '2027-03-08', p1: 'DE MALAUSSENE', p2: 'DE SERRES', repasType: 'Repas par classe' },
-      { date: '2027-03-09', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
-      { date: '2027-03-11', p1: 'ESCOBAR', p2: 'MELLIES', repasType: 'Filles / Garçons' },
-      { date: '2027-03-12', p1: 'MME SUBLET', p2: 'BOCCA', repasType: 'Par cordée' },
-      { date: '2027-03-15', p1: 'GREPAT', p2: 'DE LA CHARRIE', repasType: 'Repas par classe' },
-      { date: '2027-03-16', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
+      { date: '2027-03-08', p1: 'DE SERRES', p2: 'TAISSIDRE-CARVALHO', repasType: 'Repas par classe' },
+      { date: '2027-03-09', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
+      { date: '2027-03-11', p1: 'ESCOBAR', p2: 'FIARD', repasType: 'Filles / Garçons' },
+      { date: '2027-03-12', p1: 'MME SUBLET', p2: 'MME BEN GELOUNE', repasType: 'Par cordée' },
+      { date: '2027-03-15', p1: 'GREPAT', p2: 'DURAND', repasType: 'Repas par classe' },
+      { date: '2027-03-16', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
       { date: '2027-03-18', p1: 'RIOBÉ', p2: 'CORNET-BOUBE', repasType: 'Filles / Garçons' },
-      { date: '2027-03-19', p1: 'BEZIAT-MENUT', p2: 'LE LÉZEC', repasType: 'Par cordée' },
-      { date: '2027-03-22', p1: 'DURAND', p2: 'PILON', repasType: 'Repas par classe' },
-      { date: '2027-03-23', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
-      { date: '2027-03-25', p1: 'CHOMEL', p2: 'DE PONTE', repasType: 'Filles / Garçons' },
-      { date: '2027-03-30', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
-      { date: '2027-04-01', p1: 'DE PONTE', p2: 'FIARD', repasType: 'Filles / Garçons' },
-      { date: '2027-04-02', p1: 'MME SUBLET', p2: 'FAUVAIN', repasType: 'Par cordée' },
-      { date: '2027-04-05', p1: 'TAISSIDRE-CARVALHO', p2: 'DE MALAUSSENE', repasType: 'Repas par classe' },
-      { date: '2027-04-06', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
-      { date: '2027-04-08', p1: 'ESCOBAR', p2: 'MELLIES', repasType: 'Filles / Garçons' },
-      { date: '2027-04-09', p1: 'LE LÉZEC', p2: 'LE LÉZEC', repasType: 'Par cordée' },
-      { date: '2027-04-26', p1: 'DE SERRES', p2: 'GREPAT', repasType: 'Repas par classe' },
-      { date: '2027-04-27', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
-      { date: '2027-04-29', p1: 'RIOBÉ', p2: 'CORNET-BOUBE', repasType: 'Filles / Garçons' },
-      { date: '2027-04-30', p1: 'MME SUBLET', p2: 'BOCCA', repasType: 'Par cordée' },
-      { date: '2027-05-03', p1: 'DE LA CHARRIE', p2: 'DURAND', repasType: 'Repas par classe' },
-      { date: '2027-05-04', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
-      { date: '2027-05-10', p1: 'PILON', p2: 'TAISSIDRE-CARVALHO', repasType: 'Repas par classe' },
-      { date: '2027-05-11', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
-      { date: '2027-05-13', p1: 'DE LASTIC ST JAL', p2: 'CHOMEL', repasType: 'Filles / Garçons' },
-      { date: '2027-05-14', p1: 'BEZIAT-MENUT', p2: 'FAUVAIN', repasType: 'Par cordée' },
-      { date: '2027-05-18', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
-      { date: '2027-05-20', p1: 'DE PONTE', p2: 'FIARD', repasType: 'Filles / Garçons' },
-      { date: '2027-05-21', p1: 'LE LÉZEC', p2: 'LE LÉZEC', repasType: 'Par cordée' },
-      { date: '2027-05-24', p1: 'DE MALAUSSENE', p2: 'DE SERRES', repasType: 'Repas par classe' },
-      { date: '2027-05-25', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
-      { date: '2027-05-27', p1: 'ESCOBAR', p2: 'MELLIES', repasType: 'Filles / Garçons' },
-      { date: '2027-05-28', p1: 'MME SUBLET', p2: 'BOCCA', repasType: 'Par cordée' },
-      { date: '2027-05-31', p1: 'GREPAT', p2: 'DE LA CHARRIE', repasType: 'Repas par classe' },
-      { date: '2027-06-01', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
-      { date: '2027-06-03', p1: 'RIOBÉ', p2: 'CORNET-BOUBE', repasType: 'Filles / Garçons' },
-      { date: '2027-06-04', p1: 'BOCCA', p2: 'BEZIAT-MENUT', repasType: 'Par cordée' },
-      { date: '2027-06-07', p1: 'DURAND', p2: 'PILON', repasType: 'Repas par classe' },
-      { date: '2027-06-08', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
-      { date: '2027-06-10', p1: 'CHOMEL', p2: 'DE PONTE', repasType: 'Filles / Garçons' },
-      { date: '2027-06-11', p1: 'LE LÉZEC', p2: 'LE LÉZEC', repasType: 'Par cordée' },
+      { date: '2027-03-19', p1: 'CHOMEL', p2: 'MELLIES', repasType: 'Par cordée' },
+      { date: '2027-03-22', p1: 'DE LA CHARRIE', p2: 'DE MALAUSSENE', repasType: 'Repas par classe' },
+      { date: '2027-03-23', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
+      { date: '2027-03-25', p1: 'ESCOBAR', p2: 'FIARD', repasType: 'Filles / Garçons' },
+      { date: '2027-03-30', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
+      { date: '2027-04-01', p1: 'DE PONTE', p2: 'PILON', repasType: 'Filles / Garçons' },
+      { date: '2027-04-02', p1: 'BEZIAT-MENUT', p2: 'FAUVAIN', repasType: 'Par cordée' },
+      { date: '2027-04-05', p1: 'DE SERRES', p2: 'BOCCA', repasType: 'Repas par classe' },
+      { date: '2027-04-06', p1: 'MME QARIOH', p2: 'GREPAT', repasType: 'Placement libre' },
+      { date: '2027-04-08', p1: 'CORNET-BOUBE', p2: 'CHOMEL', repasType: 'Filles / Garçons' },
+      { date: '2027-04-09', p1: 'MME SUBLET', p2: 'MME BEN GELOUNE', repasType: 'Par cordée' },
+      { date: '2027-04-26', p1: 'DE LASTIC ST JAL', p2: 'DURAND', repasType: 'Repas par classe' },
+      { date: '2027-04-27', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
+      { date: '2027-04-29', p1: 'RIOBÉ', p2: 'ESCOBAR', repasType: 'Filles / Garçons' },
+      { date: '2027-04-30', p1: 'LE LÉZEC', p2: 'LE LÉZEC', repasType: 'Par cordée' },
+      { date: '2027-05-03', p1: 'DE LA CHARRIE', p2: 'PILON', repasType: 'Repas par classe' },
+      { date: '2027-05-04', p1: 'MME QARIOH', p2: 'FIARD', repasType: 'Placement libre' },
+      { date: '2027-05-10', p1: 'FAUVAIN', p2: 'DE SERRES', repasType: 'Repas par classe' },
+      { date: '2027-05-11', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
+      { date: '2027-05-13', p1: 'CORNET-BOUBE', p2: 'DE PONTE', repasType: 'Filles / Garçons' },
+      { date: '2027-05-14', p1: 'CHOMEL', p2: 'BOCCA', repasType: 'Par cordée' },
+      { date: '2027-05-18', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
+      { date: '2027-05-20', p1: 'DE PONTE', p2: 'MELLIES', repasType: 'Filles / Garçons' },
+      { date: '2027-05-21', p1: 'MME SUBLET', p2: 'MME BEN GELOUNE', repasType: 'Par cordée' },
+      { date: '2027-05-24', p1: 'TAISSIDRE-CARVALHO', p2: 'DE MALAUSSENE', repasType: 'Repas par classe' },
+      { date: '2027-05-25', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
+      { date: '2027-05-27', p1: 'DE LASTIC ST JAL', p2: 'RIOBÉ', repasType: 'Filles / Garçons' },
+      { date: '2027-05-28', p1: 'LE LÉZEC', p2: 'LE LÉZEC', repasType: 'Par cordée' },
+      { date: '2027-05-31', p1: 'GREPAT', p2: 'DURAND', repasType: 'Repas par classe' },
+      { date: '2027-06-01', p1: 'MME QARIOH', p2: 'FIARD', repasType: 'Placement libre' },
+      { date: '2027-06-03', p1: 'RIOBÉ', p2: 'ESCOBAR', repasType: 'Filles / Garçons' },
+      { date: '2027-06-04', p1: 'MME SUBLET', p2: 'MME BEN GELOUNE', repasType: 'Par cordée' },
+      { date: '2027-06-07', p1: 'PILON', p2: 'DE SERRES', repasType: 'Repas par classe' },
+      { date: '2027-06-08', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
+      { date: '2027-06-10', p1: 'CHOMEL', p2: 'CORNET-BOUBE', repasType: 'Filles / Garçons' },
+      { date: '2027-06-11', p1: 'BOCCA', p2: 'MELLIES', repasType: 'Par cordée' },
       { date: '2027-06-14', p1: 'TAISSIDRE-CARVALHO', p2: 'DE MALAUSSENE', repasType: 'Repas par classe' },
       { date: '2027-06-15', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
       { date: '2027-06-17', p1: 'RIOBÉ', p2: 'DE LASTIC ST JAL', repasType: 'Filles / Garçons' },
-      { date: '2027-06-18', p1: 'MME SUBLET', p2: 'FAUVAIN', repasType: 'Par cordée' },
+      { date: '2027-06-18', p1: 'MME SUBLET', p2: 'MME BEN GELOUNE', repasType: 'Par cordée' },
       { date: '2027-06-21', p1: 'GREPAT', p2: 'DE LA CHARRIE', repasType: 'Repas par classe' },
       { date: '2027-06-22', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
       { date: '2027-06-24', p1: 'DURAND', p2: 'DE PONTE', repasType: 'Filles / Garçons' },
-      { date: '2027-06-25', p1: 'LE LÉZEC', p2: 'LE LÉZEC', repasType: 'Par cordée' },
+      { date: '2027-06-25', p1: 'LE LÉZEC', p2: 'LE LÉZEC', repasType: 'Par cordée' }
     ];
 
     const historicalMenage = [
@@ -2251,8 +2260,8 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { date: '2026-10-03', familyId: 'RIOBÉ', label: 'Ménage du Week-end' },
       { date: '2026-10-10', familyId: 'LE LÉZEC', label: 'Ménage du Week-end' },
       { date: '2026-10-17', familyId: 'FAUVAIN', label: 'Vacances Toussaint' },
-      { date: '2026-11-07', familyId: 'MELLIES', label: 'Ménage du Week-end' },
-      { date: '2026-11-14', familyId: 'BEZIAT-MENUT', label: 'Ménage du Week-end' },
+      { date: '2026-11-07', familyId: 'BEZIAT-MENUT', label: 'Ménage du Week-end' },
+      { date: '2026-11-14', familyId: 'SHAW', label: 'Ménage du Week-end' },
       { date: '2026-11-21', familyId: 'BOCCA', label: 'Ménage du Week-end' },
       { date: '2026-11-28', familyId: 'CORNET-BOUBE', label: 'Ménage du Week-end' },
       { date: '2026-12-05', familyId: 'DE LA CHARRIE', label: 'Ménage du Week-end' },
@@ -2262,12 +2271,11 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { date: '2027-01-16', familyId: 'DE SERRES', label: 'Ménage du Week-end' },
       { date: '2027-01-23', familyId: 'DURAND', label: 'Ménage du Week-end' },
       { date: '2027-01-30', familyId: 'ESCOBAR', label: 'Ménage du Week-end' },
-      { date: '2027-02-06', familyId: 'FIARD', label: 'Ménage du Week-end' },
-      { date: '2027-02-13', familyId: 'LE LÉZEC', label: 'Vacances Hiver' },
-      { date: '2027-03-06', familyId: 'GREPAT', label: 'Ménage du Week-end' },
-      { date: '2027-03-13', familyId: 'MELLIES', label: 'Ménage du Week-end' },
-      { date: '2027-03-20', familyId: 'PILON', label: 'Ménage du Week-end' },
-      { date: '2027-03-27', familyId: 'RIOBÉ', label: 'Ménage du Week-end' },
+      { date: '2027-02-06', familyId: 'GREPAT', label: 'Ménage du Week-end' },
+      { date: '2027-02-13', familyId: 'DE MALAUSSENE', label: 'Vacances Hiver' },
+      { date: '2027-03-06', familyId: 'MELLIES', label: 'Ménage du Week-end' },
+      { date: '2027-03-13', familyId: 'PILON', label: 'Ménage du Week-end' },
+      { date: '2027-03-20', familyId: 'TAISSIDRE-CARVALHO', label: 'Ménage du Week-end' },
       { date: '2027-04-03', familyId: 'SHAW', label: 'Ménage du Week-end' },
       { date: '2027-04-10', familyId: 'BEZIAT-MENUT', label: 'Vacances Printemps' },
       { date: '2027-05-01', familyId: 'BOCCA', label: 'Ménage du Week-end' },
@@ -2278,16 +2286,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { date: '2027-06-12', familyId: 'DE SERRES', label: 'Ménage du Week-end' },
       { date: '2027-06-19', familyId: 'ESCOBAR', label: 'Ménage du Week-end' },
       { date: '2027-06-26', familyId: 'DE MALAUSSENE', label: 'Vacances Été' }
-    ];
-
-    // DONNÉES DES NOUVELLES CORDÉES
-    const cordeesData = [
-      { id: 1, name: "Henri Becquerel", theme: "La Radioactivité", icon: "☢️", members: ["Henri", "Anne-Victoria", "Florence", "Camille", "Karol", "Charlotte"], bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-800", iconCol: "text-emerald-600" },
-      { id: 2, name: "Nicolas-Joseph Cugnot", theme: "L'Automobile à vapeur", icon: "🚂", members: ["Élisabeth C", "Joseph BC", "Sixtine", "Aymeric DS", "Domitille", "Pierre"], bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-800", iconCol: "text-blue-600" },
-      { id: 3, name: "Henri Giffard", theme: "L'Aérostat", icon: "🎈", members: ["Jacques DP", "Alice", "Pénélope", "Priscille", "Thalia", "François"], bg: "bg-rose-50", border: "border-rose-200", text: "text-rose-800", iconCol: "text-rose-600" },
-      { id: 4, name: "Marie Curie", theme: "Les Petites Curies", icon: "🚑", members: ["Léon", "Élie", "Armel", "Liz", "Honorine"], bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-800", iconCol: "text-amber-600" },
-      { id: 5, name: "Denis Papin", theme: "La Machine à vapeur", icon: "♨️", members: ["Laëtitia", "Séraphin", "Sophie", "Madeleine", "Jacques BC"], bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-800", iconCol: "text-orange-600" },
-      { id: 6, name: "André-Marie Ampère", theme: "Le Télégraphe", icon: "⚡", members: ["Aymeric", "P", "M", "Élisabeth", "R", "Thaïs", "Éléna", "Lou", "Joseph C"], bg: "bg-purple-50", border: "border-purple-200", text: "text-purple-800", iconCol: "text-purple-600" }
     ];
 
     let scheduleArr = [];
@@ -2494,7 +2492,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     "MME SUBLET": "bg-neutral-800 text-white border-neutral-900",
     "MME HERVET": "bg-zinc-800 text-white border-zinc-900",
     "MME QARIOH": "bg-stone-800 text-white border-stone-900",
-    "MME BEN GELOUNE": "bg-violet-800 text-white border-violet-900"
+    "MME BEN GELOUNE": "bg-gray-800 text-white border-gray-900"
   };
 
   const familyStyles = {
@@ -2988,7 +2986,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
 
         <div className="bg-transparent border-none">
           
-          {/* TAB CORDÉES (NOUVEAU) */}
+          {/* TAB CORDÉES */}
           {activeTab === 'cordees' && (
             <div className="animate-in fade-in duration-300 max-w-6xl mx-auto pb-12">
               <div className="text-center mb-8 print:text-left">
@@ -3230,7 +3228,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
             <div className="max-w-3xl mx-auto space-y-6 pb-12 animate-in fade-in duration-300">
               <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-3 mb-6"><Cog className="text-amber-500" /> Rouages de l'Algorithme</h2>
               
-              {/* NOUVEAU BLOC ADMIN */}
               {peutVoirAdmin && (
                 <div className="bg-amber-50 p-6 rounded-xl border border-amber-200 shadow-sm mb-8">
                   <h3 className="font-bold text-lg text-amber-900 mb-3 border-b border-amber-200 pb-2 flex items-center gap-2">
@@ -3240,7 +3237,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                     Pour forcer un échange, une absence ou une annulation sans casser le calcul d'équité global, vous devez modifier directement le code source du fichier.
                   </p>
                   <ol className="list-decimal list-inside space-y-2 text-amber-800 text-sm font-medium">
-                    <li>Ouvrez le fichier contenant le code (ex: <code>ModulePlannings.jsx</code> ou <code>App.jsx</code>).</li>
+                    <li>Ouvrez le fichier contenant le code (ex: <code>ModulePlannings.jsx</code>).</li>
                     <li>Cherchez le texte : <strong>🚨 ZONE DE MODIFICATION MANUELLE 🚨</strong> (vers la ligne 110).</li>
                     <li>Ajoutez votre modification dans le tableau <code>remplacementsManuels</code> en suivant ce modèle :</li>
                   </ol>
@@ -3259,7 +3256,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                       <li><strong>Lundi :</strong> Repas par classe (2 parents)</li>
                       <li><strong>Mardi :</strong> Alternance. Semaine Impaire (dès le 10 Nov) : Mme Gerard + Mme Sublet (0 parent). Semaine Paire (dès le 17 Nov) : Mme Qarioh + 1 parent.</li>
                       <li><strong>Jeudi :</strong> Filles/Garçons (2 parents)</li>
-                      <li><strong>Vendredi :</strong> Par cordée. Alternance. Semaine Impaire : 2 parents. Semaine Paire (dès le 20 Nov) : Mme Sublet + 1 parent.</li>
+                      <li><strong>Vendredi :</strong> Par cordée. Alternance. Semaine Impaire : 2 parents. Semaine Paire (dès le 20 Nov) : Mme Sublet + Mme Ben Geloune.</li>
                   </ul>
               </div>
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
@@ -3268,16 +3265,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                       <li><strong>Lissage Mensuel Anti-Surcharge :</strong> La priorité d'affectation prend en compte le nombre de cantines effectuées *sur le mois en cours*, puis *sur la période*, puis *sur l'année*. Cela garantit une répartition parfaitement lissée et empêche l'accumulation de gardes sur quelques semaines.</li>
                       <li><strong>Nouvelles Familles SP (Toussaint) :</strong> Intégration lissée et différée (aucune présence la première semaine de rentrée de Novembre). Jamais 2 familles "Nouveau SP" en duo à la cantine durant les deux premières semaines de novembre (ensuite c'est autorisé).</li>
                       <li><strong>Historique préservé :</strong> L'algorithme a injecté en dur les données de vos tableaux de Septembre à Octobre pour s'y tenir strictement.</li>
-                  </ul>
-              </div>
-              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                  <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><AlertCircle className="text-slate-400" size={18}/> Cas Particuliers Strictes</h3>
-                  <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
-                      <li><strong>DE LASTIC ST JAL (Dispense Naissance) :</strong> Aucune cantine ni ménage attribués entre le 1er Février et le 15 Avril 2027. À leur retour, le lissage mensuel limitera automatiquement la surcharge de rattrapage.</li>
-                      <li><strong>LE LÉZEC (Double garde Maman/Papa) :</strong> Autorisation et obligation d'occuper les 2 postes de cantine simultanément lorsqu'ils sont tirés au sort (comptabilisé comme 2 services réels). Ils ne peuvent pas être séparés et assignés avec une autre famille (sauf s'ils complètent la place restante avec une maîtresse). Indisponibilité ponctuelle respectée le 6 novembre.</li>
-                      <li><strong>CHOMEL & DURAND :</strong> Limités manuellement à 1 seul ménage sur l'année. Les cantines sont rééquilibrées automatiquement. Toutes les autres familles font au moins un ménage.</li>
-                      <li><strong>SHAW :</strong> Un ménage supplémentaire forcé. Leurs cantines sont réduites en conséquence par le lissage global.</li>
-                      <li><strong>Forçages manuels :</strong> Dates de cantines spécifiques verrouillées en dur pour les familles DE PONTE et RIOBÉ.</li>
                   </ul>
               </div>
             </div>
