@@ -2059,7 +2059,13 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     // ============================================================================
     const remplacementsManuels = [
       { date: "2026-11-13", type: "cantine", initial: "LE LÉZEC", remplacant: "LE LÉZEC" },
-      { date: "2026-10-10", type: "menage",  initial: "LE LÉZEC", remplacant: "LE LÉZEC" }
+      { date: "2026-10-10", type: "menage",  initial: "LE LÉZEC", remplacant: "LE LÉZEC" },
+      { date: "2026-10-30", type: "cantine", initial: "DE LA CHARRIE", remplacant: "PILON" },
+      { date: "2026-12-15", type: "cantine", initial: "DE LA CHARRIE", remplacant: "SHAW" },
+      { date: "2027-04-05", type: "cantine", initial: "DE LA CHARRIE", remplacant: "DE MALAUSSENE" },
+      { date: "2027-05-03", type: "cantine", initial: "DE LA CHARRIE", remplacant: "FAUVAIN" },
+      { date: "2027-02-01", type: "cantine", initial: "FAUVAIN", remplacant: "DE LA CHARRIE" },
+      { date: "2027-02-08", type: "cantine", initial: "DE MALAUSSENE", remplacant: "DE LA CHARRIE" }
     ];
     // ============================================================================
 
