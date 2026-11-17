@@ -2060,6 +2060,8 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     const remplacementsManuels = [
       // 1. EXEMPLES DE REMPLACEMENTS SIMPLES (Dépannage, Annulation)
       { date: "2026-11-13", type: "cantine", initial: "LE LÉZEC", remplacant: "LE LÉZEC" },
+      { date: "2027-05-30", type: "cantine", initial: "LE LÉZEC", remplacant: "BOCCA" },
+      { date: "2027-05-30", type: "cantine", initial: "LE LÉZEC", remplacant: "BEZIAT-MENUT" },
        { date: "2026-10-30", type: "cantine", initial: "DE LA CHARRIE", remplacant: "PILON" },
       { date: "2026-12-15", type: "cantine", initial: "DE LA CHARRIE", remplacant: "SHAW" },
       { date: "2027-04-05", type: "cantine", initial: "DE LA CHARRIE", remplacant: "DE MALAUSSENE" },
@@ -2068,7 +2070,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { date: "2027-02-08", type: "cantine", initial: "DE MALAUSSENE", remplacant: "DE LA CHARRIE" },
       { date: "2027-01-14", type: "cantine", initial: "DE PONTE", remplacant: "DE LASTIC ST JAL" },
       { date: "2027-05-13", type: "cantine", initial: "DE PONTE", remplacant: "DE LASTIC ST JAL" }
-
       // 2. EXEMPLES D'ÉCHANGES CROISÉS (Ménage contre Cantine, etc.)
       // Pour échanger, il suffit de faire 2 lignes ! Les statistiques se croiseront parfaitement.
       // Exemple : BEZIAT-MENUT donne son ménage (19/12) à BOCCA, qui lui donne sa cantine (25/09).
@@ -2486,6 +2487,58 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       document.body.removeChild(link);
   };
 
+  // --- NOUVELLE FONCTION : TOUT AJOUTER À L'AGENDA EN UN CLIC ---
+  const handleAddAllToCalendar = (events, familyName) => {
+    if (!events || events.length === 0) return;
+    
+    let icsContent = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//Ecole//Planning//FR"
+    ];
+
+    events.forEach(event => {
+        let startDateStr, endDateStr, title, description;
+        if (event.type === 'Cantine') {
+            startDateStr = event.date.replace(/-/g, '') + 'T120000Z';
+            endDateStr = event.date.replace(/-/g, '') + 'T133000Z';
+            title = `Cantine - École`;
+            description = `Service de cantine : ${event.details}.\\nPartenaire : ${event.partner || 'Aucun'}`;
+        } else {
+            let d1 = new Date(event.date + "T12:00:00");
+            let d2 = new Date(d1); d2.setDate(d2.getDate() + 1);
+            
+            let y1 = d1.getFullYear(); let m1 = String(d1.getMonth()+1).padStart(2, '0'); let day1 = String(d1.getDate()).padStart(2, '0');
+            let y2 = d2.getFullYear(); let m2 = String(d2.getMonth()+1).padStart(2, '0'); let day2 = String(d2.getDate()).padStart(2, '0');
+            
+            startDateStr = `${y1}${m1}${day1}T080000Z`;
+            endDateStr = `${y2}${m2}${day2}T180000Z`;
+            title = `Ménage de l'école`;
+            description = `Responsabilité ménage : ${event.details}`;
+        }
+
+        icsContent.push(
+            "BEGIN:VEVENT",
+            `DTSTART:${startDateStr}`,
+            `DTEND:${endDateStr}`,
+            `SUMMARY:${title}`,
+            `DESCRIPTION:${description}`,
+            "END:VEVENT"
+        );
+    });
+
+    icsContent.push("END:VCALENDAR");
+
+    const blob = new Blob([icsContent.join("\n")], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Planning_${familyName.replace(/\s+/g, '_')}.ics`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleDownloadImage = async () => {
     try {
       const captureZone = document.getElementById('capture-zone');
@@ -2838,12 +2891,20 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                 <div className="text-slate-800 font-bold mt-1">Total : {allEvents.length} services (dont {futureEvents.length} à venir)</div>
               </div>
             </div>
-            <button 
-              onClick={() => setShowHistory(!showHistory)} 
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 shadow-sm ml-auto"
-            >
-              <Clock size={16} /> {showHistory ? "Masquer le passé" : "Afficher l'historique"}
-            </button>
+            <div className="flex items-center gap-2 ml-auto">
+              <button 
+                onClick={() => handleAddAllToCalendar(displayedEvents, selectedFamilyFilter)} 
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all bg-amber-500 text-white hover:bg-amber-600 shadow-sm"
+              >
+                📅 Tout ajouter à l'agenda
+              </button>
+              <button 
+                onClick={() => setShowHistory(!showHistory)} 
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 shadow-sm"
+              >
+                <Clock size={16} /> {showHistory ? "Masquer le passé" : "Afficher l'historique"}
+              </button>
+            </div>
         </div>
         <div className="p-0">
           {displayedEvents.length === 0 ? <div className="p-8 text-center text-slate-500">Aucun service planifié.</div> : (
@@ -2896,7 +2957,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                           </td>
                           <td className="p-4 text-right print:hidden">
                              <button onClick={() => handleAddToCalendar(e)} className="text-xs bg-slate-100 hover:bg-blue-100 hover:text-blue-700 text-slate-600 font-semibold px-3 py-1.5 rounded border border-slate-200 transition-colors inline-flex items-center gap-1.5">
-                                📅 Ajouter à l'agenda
+                                📅 Ajouter
                              </button>
                           </td>
                         </tr>
