@@ -2029,6 +2029,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
           else if (userStr.includes("SUBLET")) famId = "MME SUBLET";
           else if (userStr.includes("HERVET")) famId = "MME HERVET";
           else if (userStr.includes("QARIOH") || userStr.includes("CARIO")) famId = "MME QARIOH";
+          else if (userStr.includes("BEN GELOUNE") || userStr.includes("BENGELOUNE")) famId = "MME BEN GELOUNE";
       }
       
       if (famId) {
@@ -2056,21 +2057,11 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     // ============================================================================
     // 🚨 ZONE DE MODIFICATION MANUELLE (REMPLACEMENTS A POSTERIORI) 🚨
     // ============================================================================
-    // Utilisez ce tableau pour forcer un changement de planning exceptionnel.
-    // L'algorithme d'équité sera automatiquement corrigé (points transférés).
-    //
-    // type : 'cantine' ou 'menage'
-    // date : format "YYYY-MM-DD"
-    // initial : La famille prévue par l'algorithme à retirer
-    // remplacant : La famille qui prend la place (utilisez "ANNULÉ" pour vider la place)
-    // ============================================================================
     const remplacementsManuels = [
-      // Exemples NEUTRES (ne modifient rien au planning actuel, prêts à être changés) :
       { date: "2026-11-13", type: "cantine", initial: "LE LÉZEC", remplacant: "LE LÉZEC" },
       { date: "2026-10-10", type: "menage",  initial: "LE LÉZEC", remplacant: "LE LÉZEC" }
-      
-      // Ajoutez vos futurs changements ci-dessous en copiant le modèle :
-      // { date: "YYYY-MM-DD", type: "cantine", initial: "ANCIEN_NOM", remplacant: "NOUVEAU_NOM" }
+      // Ajoutez Mme Ben Geloune ici au fur et à mesure :
+      // { date: "2026-11-20", type: "cantine", initial: "BOCCA", remplacant: "MME BEN GELOUNE" }
     ];
     // ============================================================================
 
@@ -2097,12 +2088,13 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { id: "SHAW", type: "Nouveau SP", days: [2], isAsso: false }
     ];
 
+    // NOUVEAUX INVENTEURS ASSIGNÉS AUX PÉRIODES
     const perData = [
-      { id: 1, name: "G. Eiffel 🗼", desc: "La Tour Eiffel (Rentrée - Toussaint)", start: "2026-09-03", end: "2026-10-16" },
-      { id: 2, name: "A. Lavoisier ⚗️", desc: "La Chimie Moderne (Toussaint - Noël)", start: "2026-11-02", end: "2026-12-18" },
-      { id: 3, name: "C. Ader ✈️", desc: "L'Aviation (Noël - Février)", start: "2027-01-04", end: "2027-02-12" },
-      { id: 4, name: "É. Michelin 🛞", desc: "Le Pneu démontable (Fév - Pâques)", start: "2027-03-01", end: "2027-04-09" },
-      { id: 5, name: "A. Michelin 🗺️", desc: "Le Guide de Voyage (Pâques - Été)", start: "2027-04-26", end: "2027-06-25" }
+      { id: 1, name: "H. Becquerel ☢️", desc: "Radioactivité (Rentrée - Toussaint)", start: "2026-09-03", end: "2026-10-16" },
+      { id: 2, name: "N-J. Cugnot 🚂", desc: "L'Auto à vapeur (Toussaint - Noël)", start: "2026-11-02", end: "2026-12-18" },
+      { id: 3, name: "H. Giffard 🎈", desc: "L'Aérostat (Noël - Fév)", start: "2027-01-04", end: "2027-02-12" },
+      { id: 4, name: "M. Curie 🚑", desc: "Petites Curies (Fév - Pâques)", start: "2027-03-01", end: "2027-04-09" },
+      { id: 5, name: "D. Papin ♨️", desc: "Machine à vapeur (Pâques - Été)", start: "2027-04-26", end: "2027-06-25" }
     ];
 
     const holiData = ["2026-11-11", "2027-03-26", "2027-03-29", "2027-05-06", "2027-05-07", "2027-05-17"];
@@ -2114,18 +2106,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { name: "Été", start: "2027-06-26", end: "2027-08-31" }
     ];
 
-    function getDateStr(d) {
-      let year = d.getFullYear(); let month = String(d.getMonth() + 1).padStart(2, '0'); let day = String(d.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    }
-
-    const checkIsOut = (famId, dOw, dStr) => {
-      if (!famId || famId.startsWith("MME")) return false;
-      const fam = famsData.find(f => f.id === famId);
-      if (!fam) return false;
-      return !fam.days.includes(dOw);
-    };
-
+    // --- INTEGRATION STRICTE DES FICHIERS CSV (Année complète) ---
     const historicalCantine = [
       { date: '2026-09-03', p1: 'BOCCA', p2: 'TAISSIDRE-CARVALHO', repasType: 'Filles / Garçons' },
       { date: '2026-09-04', p1: 'RIOBÉ', p2: 'BEZIAT-MENUT', repasType: 'Par cordée' },
@@ -2152,7 +2133,114 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { date: '2026-10-12', p1: 'DE SERRES', p2: 'TAISSIDRE-CARVALHO', repasType: 'Repas par classe' },
       { date: '2026-10-13', p1: 'GREPAT', p2: 'MELLIES', repasType: 'Placement libre' },
       { date: '2026-10-15', p1: 'CORNET-BOUBE', p2: 'CHOMEL', repasType: 'Filles / Garçons' },
-      { date: '2026-10-16', p1: 'MME SUBLET', p2: 'MME HERVET', repasType: 'Par cordée' }
+      { date: '2026-10-16', p1: 'MME SUBLET', p2: 'MME HERVET', repasType: 'Par cordée' },
+      { date: '2026-11-02', p1: 'DE LA CHARRIE', p2: 'DURAND', repasType: 'Repas par classe' },
+      { date: '2026-11-03', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
+      { date: '2026-11-05', p1: 'RIOBÉ', p2: 'CHOMEL', repasType: 'Filles / Garçons' },
+      { date: '2026-11-06', p1: 'MME SUBLET', p2: 'BEZIAT-MENUT', repasType: 'Par cordée' },
+      { date: '2026-11-09', p1: 'DURAND', p2: 'FAUVAIN', repasType: 'Repas par classe' },
+      { date: '2026-11-10', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
+      { date: '2026-11-12', p1: 'DE PONTE', p2: 'FIARD', repasType: 'Filles / Garçons' },
+      { date: '2026-11-13', p1: 'LE LÉZEC', p2: 'LE LÉZEC', repasType: 'Par cordée' },
+      { date: '2026-11-16', p1: 'PILON', p2: 'BOCCA', repasType: 'Repas par classe' },
+      { date: '2026-11-17', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
+      { date: '2026-11-19', p1: 'ESCOBAR', p2: 'MELLIES', repasType: 'Filles / Garçons' },
+      { date: '2026-11-20', p1: 'MME SUBLET', p2: 'BOCCA', repasType: 'Par cordée' },
+      { date: '2026-11-23', p1: 'TAISSIDRE-CARVALHO', p2: 'DE MALAUSSENE', repasType: 'Repas par classe' },
+      { date: '2026-11-24', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
+      { date: '2026-11-26', p1: 'RIOBÉ', p2: 'CORNET-BOUBE', repasType: 'Filles / Garçons' },
+      { date: '2026-11-27', p1: 'BEZIAT-MENUT', p2: 'LE LÉZEC', repasType: 'Par cordée' },
+      { date: '2026-11-30', p1: 'DE SERRES', p2: 'GREPAT', repasType: 'Repas par classe' },
+      { date: '2026-12-01', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
+      { date: '2026-12-03', p1: 'DE LASTIC ST JAL', p2: 'CHOMEL', repasType: 'Filles / Garçons' },
+      { date: '2026-12-04', p1: 'MME SUBLET', p2: 'FAUVAIN', repasType: 'Par cordée' },
+      { date: '2026-12-07', p1: 'DE LA CHARRIE', p2: 'DURAND', repasType: 'Repas par classe' },
+      { date: '2026-12-08', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
+      { date: '2026-12-10', p1: 'DE PONTE', p2: 'FIARD', repasType: 'Filles / Garçons' },
+      { date: '2026-12-11', p1: 'LE LÉZEC', p2: 'LE LÉZEC', repasType: 'Par cordée' },
+      { date: '2026-12-14', p1: 'PILON', p2: 'TAISSIDRE-CARVALHO', repasType: 'Repas par classe' },
+      { date: '2026-12-15', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
+      { date: '2026-12-17', p1: 'ESCOBAR', p2: 'MELLIES', repasType: 'Filles / Garçons' },
+      { date: '2026-12-18', p1: 'MME SUBLET', p2: 'BOCCA', repasType: 'Par cordée' },
+      { date: '2027-01-04', p1: 'DE MALAUSSENE', p2: 'DE SERRES', repasType: 'Repas par classe' },
+      { date: '2027-01-05', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
+      { date: '2027-01-07', p1: 'RIOBÉ', p2: 'CORNET-BOUBE', repasType: 'Filles / Garçons' },
+      { date: '2027-01-08', p1: 'BEZIAT-MENUT', p2: 'LE LÉZEC', repasType: 'Par cordée' },
+      { date: '2027-01-11', p1: 'GREPAT', p2: 'DE LA CHARRIE', repasType: 'Repas par classe' },
+      { date: '2027-01-12', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
+      { date: '2027-01-14', p1: 'DE LASTIC ST JAL', p2: 'CHOMEL', repasType: 'Filles / Garçons' },
+      { date: '2027-01-15', p1: 'MME SUBLET', p2: 'FAUVAIN', repasType: 'Par cordée' },
+      { date: '2027-01-18', p1: 'DURAND', p2: 'PILON', repasType: 'Repas par classe' },
+      { date: '2027-01-19', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
+      { date: '2027-01-21', p1: 'DE PONTE', p2: 'FIARD', repasType: 'Filles / Garçons' },
+      { date: '2027-01-22', p1: 'LE LÉZEC', p2: 'LE LÉZEC', repasType: 'Par cordée' },
+      { date: '2027-01-25', p1: 'TAISSIDRE-CARVALHO', p2: 'DE MALAUSSENE', repasType: 'Repas par classe' },
+      { date: '2027-01-26', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
+      { date: '2027-01-28', p1: 'ESCOBAR', p2: 'MELLIES', repasType: 'Filles / Garçons' },
+      { date: '2027-01-29', p1: 'MME SUBLET', p2: 'BOCCA', repasType: 'Par cordée' },
+      { date: '2027-02-01', p1: 'DE SERRES', p2: 'GREPAT', repasType: 'Repas par classe' },
+      { date: '2027-02-02', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
+      { date: '2027-02-04', p1: 'RIOBÉ', p2: 'CORNET-BOUBE', repasType: 'Filles / Garçons' },
+      { date: '2027-02-05', p1: 'BEZIAT-MENUT', p2: 'LE LÉZEC', repasType: 'Par cordée' },
+      { date: '2027-02-08', p1: 'DE LA CHARRIE', p2: 'DURAND', repasType: 'Repas par classe' },
+      { date: '2027-02-09', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
+      { date: '2027-02-11', p1: 'CHOMEL', p2: 'DE PONTE', repasType: 'Filles / Garçons' },
+      { date: '2027-02-12', p1: 'MME SUBLET', p2: 'FAUVAIN', repasType: 'Par cordée' },
+      { date: '2027-03-01', p1: 'PILON', p2: 'TAISSIDRE-CARVALHO', repasType: 'Repas par classe' },
+      { date: '2027-03-02', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
+      { date: '2027-03-04', p1: 'DE PONTE', p2: 'FIARD', repasType: 'Filles / Garçons' },
+      { date: '2027-03-05', p1: 'LE LÉZEC', p2: 'LE LÉZEC', repasType: 'Par cordée' },
+      { date: '2027-03-08', p1: 'DE MALAUSSENE', p2: 'DE SERRES', repasType: 'Repas par classe' },
+      { date: '2027-03-09', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
+      { date: '2027-03-11', p1: 'ESCOBAR', p2: 'MELLIES', repasType: 'Filles / Garçons' },
+      { date: '2027-03-12', p1: 'MME SUBLET', p2: 'BOCCA', repasType: 'Par cordée' },
+      { date: '2027-03-15', p1: 'GREPAT', p2: 'DE LA CHARRIE', repasType: 'Repas par classe' },
+      { date: '2027-03-16', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
+      { date: '2027-03-18', p1: 'RIOBÉ', p2: 'CORNET-BOUBE', repasType: 'Filles / Garçons' },
+      { date: '2027-03-19', p1: 'BEZIAT-MENUT', p2: 'LE LÉZEC', repasType: 'Par cordée' },
+      { date: '2027-03-22', p1: 'DURAND', p2: 'PILON', repasType: 'Repas par classe' },
+      { date: '2027-03-23', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
+      { date: '2027-03-25', p1: 'CHOMEL', p2: 'DE PONTE', repasType: 'Filles / Garçons' },
+      { date: '2027-03-30', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
+      { date: '2027-04-01', p1: 'DE PONTE', p2: 'FIARD', repasType: 'Filles / Garçons' },
+      { date: '2027-04-02', p1: 'MME SUBLET', p2: 'FAUVAIN', repasType: 'Par cordée' },
+      { date: '2027-04-05', p1: 'TAISSIDRE-CARVALHO', p2: 'DE MALAUSSENE', repasType: 'Repas par classe' },
+      { date: '2027-04-06', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
+      { date: '2027-04-08', p1: 'ESCOBAR', p2: 'MELLIES', repasType: 'Filles / Garçons' },
+      { date: '2027-04-09', p1: 'LE LÉZEC', p2: 'LE LÉZEC', repasType: 'Par cordée' },
+      { date: '2027-04-26', p1: 'DE SERRES', p2: 'GREPAT', repasType: 'Repas par classe' },
+      { date: '2027-04-27', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
+      { date: '2027-04-29', p1: 'RIOBÉ', p2: 'CORNET-BOUBE', repasType: 'Filles / Garçons' },
+      { date: '2027-04-30', p1: 'MME SUBLET', p2: 'BOCCA', repasType: 'Par cordée' },
+      { date: '2027-05-03', p1: 'DE LA CHARRIE', p2: 'DURAND', repasType: 'Repas par classe' },
+      { date: '2027-05-04', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
+      { date: '2027-05-10', p1: 'PILON', p2: 'TAISSIDRE-CARVALHO', repasType: 'Repas par classe' },
+      { date: '2027-05-11', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
+      { date: '2027-05-13', p1: 'DE LASTIC ST JAL', p2: 'CHOMEL', repasType: 'Filles / Garçons' },
+      { date: '2027-05-14', p1: 'BEZIAT-MENUT', p2: 'FAUVAIN', repasType: 'Par cordée' },
+      { date: '2027-05-18', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
+      { date: '2027-05-20', p1: 'DE PONTE', p2: 'FIARD', repasType: 'Filles / Garçons' },
+      { date: '2027-05-21', p1: 'LE LÉZEC', p2: 'LE LÉZEC', repasType: 'Par cordée' },
+      { date: '2027-05-24', p1: 'DE MALAUSSENE', p2: 'DE SERRES', repasType: 'Repas par classe' },
+      { date: '2027-05-25', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
+      { date: '2027-05-27', p1: 'ESCOBAR', p2: 'MELLIES', repasType: 'Filles / Garçons' },
+      { date: '2027-05-28', p1: 'MME SUBLET', p2: 'BOCCA', repasType: 'Par cordée' },
+      { date: '2027-05-31', p1: 'GREPAT', p2: 'DE LA CHARRIE', repasType: 'Repas par classe' },
+      { date: '2027-06-01', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
+      { date: '2027-06-03', p1: 'RIOBÉ', p2: 'CORNET-BOUBE', repasType: 'Filles / Garçons' },
+      { date: '2027-06-04', p1: 'BOCCA', p2: 'BEZIAT-MENUT', repasType: 'Par cordée' },
+      { date: '2027-06-07', p1: 'DURAND', p2: 'PILON', repasType: 'Repas par classe' },
+      { date: '2027-06-08', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
+      { date: '2027-06-10', p1: 'CHOMEL', p2: 'DE PONTE', repasType: 'Filles / Garçons' },
+      { date: '2027-06-11', p1: 'LE LÉZEC', p2: 'LE LÉZEC', repasType: 'Par cordée' },
+      { date: '2027-06-14', p1: 'TAISSIDRE-CARVALHO', p2: 'DE MALAUSSENE', repasType: 'Repas par classe' },
+      { date: '2027-06-15', p1: 'MME QARIOH', p2: 'SHAW', repasType: 'Placement libre' },
+      { date: '2027-06-17', p1: 'RIOBÉ', p2: 'DE LASTIC ST JAL', repasType: 'Filles / Garçons' },
+      { date: '2027-06-18', p1: 'MME SUBLET', p2: 'FAUVAIN', repasType: 'Par cordée' },
+      { date: '2027-06-21', p1: 'GREPAT', p2: 'DE LA CHARRIE', repasType: 'Repas par classe' },
+      { date: '2027-06-22', p1: 'MME GERARD', p2: 'MME SUBLET', repasType: 'Placement libre' },
+      { date: '2027-06-24', p1: 'DURAND', p2: 'DE PONTE', repasType: 'Filles / Garçons' },
+      { date: '2027-06-25', p1: 'LE LÉZEC', p2: 'LE LÉZEC', repasType: 'Par cordée' },
     ];
 
     const historicalMenage = [
@@ -2162,7 +2250,44 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { date: '2026-09-26', familyId: 'DE LASTIC ST JAL', label: 'Ménage du Week-end' },
       { date: '2026-10-03', familyId: 'RIOBÉ', label: 'Ménage du Week-end' },
       { date: '2026-10-10', familyId: 'LE LÉZEC', label: 'Ménage du Week-end' },
-      { date: '2026-10-17', familyId: 'FAUVAIN', label: 'Vacances Toussaint' }
+      { date: '2026-10-17', familyId: 'FAUVAIN', label: 'Vacances Toussaint' },
+      { date: '2026-11-07', familyId: 'MELLIES', label: 'Ménage du Week-end' },
+      { date: '2026-11-14', familyId: 'BEZIAT-MENUT', label: 'Ménage du Week-end' },
+      { date: '2026-11-21', familyId: 'BOCCA', label: 'Ménage du Week-end' },
+      { date: '2026-11-28', familyId: 'CORNET-BOUBE', label: 'Ménage du Week-end' },
+      { date: '2026-12-05', familyId: 'DE LA CHARRIE', label: 'Ménage du Week-end' },
+      { date: '2026-12-12', familyId: 'DE MALAUSSENE', label: 'Ménage du Week-end' },
+      { date: '2026-12-19', familyId: 'BEZIAT-MENUT', label: 'Vacances Noël' },
+      { date: '2027-01-09', familyId: 'DE PONTE', label: 'Ménage du Week-end' },
+      { date: '2027-01-16', familyId: 'DE SERRES', label: 'Ménage du Week-end' },
+      { date: '2027-01-23', familyId: 'DURAND', label: 'Ménage du Week-end' },
+      { date: '2027-01-30', familyId: 'ESCOBAR', label: 'Ménage du Week-end' },
+      { date: '2027-02-06', familyId: 'FIARD', label: 'Ménage du Week-end' },
+      { date: '2027-02-13', familyId: 'LE LÉZEC', label: 'Vacances Hiver' },
+      { date: '2027-03-06', familyId: 'GREPAT', label: 'Ménage du Week-end' },
+      { date: '2027-03-13', familyId: 'MELLIES', label: 'Ménage du Week-end' },
+      { date: '2027-03-20', familyId: 'PILON', label: 'Ménage du Week-end' },
+      { date: '2027-03-27', familyId: 'RIOBÉ', label: 'Ménage du Week-end' },
+      { date: '2027-04-03', familyId: 'SHAW', label: 'Ménage du Week-end' },
+      { date: '2027-04-10', familyId: 'BEZIAT-MENUT', label: 'Vacances Printemps' },
+      { date: '2027-05-01', familyId: 'BOCCA', label: 'Ménage du Week-end' },
+      { date: '2027-05-15', familyId: 'CORNET-BOUBE', label: 'Ménage du Week-end' },
+      { date: '2027-05-22', familyId: 'DE LA CHARRIE', label: 'Ménage du Week-end' },
+      { date: '2027-05-29', familyId: 'DE LASTIC ST JAL', label: 'Ménage du Week-end' },
+      { date: '2027-06-05', familyId: 'DE PONTE', label: 'Ménage du Week-end' },
+      { date: '2027-06-12', familyId: 'DE SERRES', label: 'Ménage du Week-end' },
+      { date: '2027-06-19', familyId: 'ESCOBAR', label: 'Ménage du Week-end' },
+      { date: '2027-06-26', familyId: 'DE MALAUSSENE', label: 'Vacances Été' }
+    ];
+
+    // DONNÉES DES NOUVELLES CORDÉES
+    const cordeesData = [
+      { id: 1, name: "Henri Becquerel", theme: "La Radioactivité", icon: "☢️", members: ["Henri", "Anne-Victoria", "Florence", "Camille", "Karol", "Charlotte"], bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-800", iconCol: "text-emerald-600" },
+      { id: 2, name: "Nicolas-Joseph Cugnot", theme: "L'Automobile à vapeur", icon: "🚂", members: ["Élisabeth C", "Joseph BC", "Sixtine", "Aymeric DS", "Domitille", "Pierre"], bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-800", iconCol: "text-blue-600" },
+      { id: 3, name: "Henri Giffard", theme: "L'Aérostat", icon: "🎈", members: ["Jacques DP", "Alice", "Pénélope", "Priscille", "Thalia", "François"], bg: "bg-rose-50", border: "border-rose-200", text: "text-rose-800", iconCol: "text-rose-600" },
+      { id: 4, name: "Marie Curie", theme: "Les Petites Curies", icon: "🚑", members: ["Léon", "Élie", "Armel", "Liz", "Honorine"], bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-800", iconCol: "text-amber-600" },
+      { id: 5, name: "Denis Papin", theme: "La Machine à vapeur", icon: "♨️", members: ["Laëtitia", "Séraphin", "Sophie", "Madeleine", "Jacques BC"], bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-800", iconCol: "text-orange-600" },
+      { id: 6, name: "André-Marie Ampère", theme: "Le Télégraphe", icon: "⚡", members: ["Aymeric", "P", "M", "Élisabeth", "R", "Thaïs", "Éléna", "Lou", "Joseph C"], bg: "bg-purple-50", border: "border-purple-200", text: "text-purple-800", iconCol: "text-purple-600" }
     ];
 
     let scheduleArr = [];
@@ -2174,7 +2299,11 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     });
 
     historicalCantine.forEach(item => {
-        scheduleArr.push({ ...item, period: 1, dayOfWeek: new Date(item.date).getDay(), isError: false, p1IsOut: false, p2IsOut: false });
+        let periodId = 1;
+        let pIdx = perData.findIndex(p => item.date >= p.start && item.date <= p.end);
+        if (pIdx !== -1) periodId = perData[pIdx].id;
+
+        scheduleArr.push({ ...item, period: periodId, dayOfWeek: new Date(item.date).getDay(), isError: false, p1IsOut: false, p2IsOut: false });
         if (item.p1 && statsObj[item.p1]) {
             statsObj[item.p1].cantine++; statsObj[item.p1].periodCantine++; statsObj[item.p1].monthCantine++; statsObj[item.p1].total++; statsObj[item.p1].lastCantine = item.date;
         }
@@ -2184,318 +2313,16 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     });
 
     historicalMenage.forEach(item => {
+        let periodId = 1;
+        let pIdx = perData.findIndex(p => item.date >= p.start && item.date <= p.end);
+        if (pIdx !== -1) periodId = perData[pIdx].id;
+
         let isVacances = item.label.includes('Vacances');
-        menageArr.push({ ...item, period: 1, isVacances });
+        menageArr.push({ ...item, period: periodId, isVacances });
         if (item.familyId && statsObj[item.familyId]) {
             statsObj[item.familyId].menage++; statsObj[item.familyId].total++; statsObj[item.familyId].lastMenage = item.date;
         }
     });
-
-    const forcedDePonteDates = ["2026-11-12", "2026-12-10", "2027-01-21", "2027-03-04", "2027-04-01", "2027-05-20"];
-    const forcedRiobeDates = ["2026-11-26", "2027-01-07", "2027-02-04", "2027-03-18", "2027-04-29", "2027-06-03", "2027-06-17"];
-
-    let currentDate = new Date(2026, 10, 2, 12, 0, 0); 
-    const endDate = new Date(2027, 6, 30, 12, 0, 0);
-    
-    let currentPeriodIdx = -1; 
-    let currentMonthStr = "";
-    let spFamiliesIntegrated = false; 
-
-    while (currentDate <= endDate) {
-      const dateStr = getDateStr(currentDate);
-      const dayOfWeek = currentDate.getDay();
-      const monthStr = dateStr.substring(0, 7);
-      
-      if (monthStr !== currentMonthStr) {
-          currentMonthStr = monthStr;
-          Object.keys(statsObj).forEach(k => {
-              statsObj[k].monthCantine = 0;
-          });
-      }
-
-      let pIdx = perData.findIndex(p => dateStr >= p.start && dateStr <= p.end);
-      if (pIdx !== -1 && pIdx !== currentPeriodIdx) {
-        currentPeriodIdx = pIdx;
-        Object.keys(statsObj).forEach(k => {
-          statsObj[k].periodCantine = 0;
-        });
-      }
-
-      if (dateStr === "2026-11-02" && !spFamiliesIntegrated) {
-          let sumCantine = 0; let sumMenage = 0; let countBase = 0;
-          famsData.forEach(f => {
-              if (f.type !== "Nouveau SP") { 
-                  sumCantine += statsObj[f.id].cantine;
-                  sumMenage += statsObj[f.id].menage;
-                  countBase++; 
-              }
-          });
-          const avgCantine = Math.floor(sumCantine / countBase);
-          const avgMenage = Math.floor(sumMenage / countBase);
-          
-          famsData.forEach(f => {
-              if (f.type === "Nouveau SP") {
-                  statsObj[f.id].cantine = avgCantine;
-                  statsObj[f.id].menage = avgMenage;
-                  statsObj[f.id].total = avgCantine + avgMenage;
-                  
-                  statsObj[f.id].virtualCantine = avgCantine;
-                  statsObj[f.id].virtualMenage = avgMenage;
-              }
-          });
-          spFamiliesIntegrated = true;
-      }
-      
-      let activeP = perData[0];
-      for (let i = 0; i < perData.length; i++) {
-        if (dateStr >= perData[i].start && dateStr <= perData[i].end) {
-          activeP = perData[i]; break;
-        }
-      }
-
-      let isVacance = false;
-      for (let i = 0; i < vacData.length; i++) {
-        if (dateStr >= vacData[i].start && dateStr <= vacData[i].end) { isVacance = true; break; }
-      }
-
-      const isSchoolDayFlag = !holiData.includes(dateStr) && !isVacance && [1,2,4,5].includes(dayOfWeek);
-
-      let weekIndex = -1;
-      if (dateStr >= "2026-09-07") {
-         const d1 = new Date(2026, 8, 7, 12, 0, 0);
-         const diffDays = Math.round((currentDate - d1) / (24 * 60 * 60 * 1000));
-         weekIndex = Math.floor(diffDays / 7);
-      }
-      const isSemainePaire = weekIndex >= 0 && weekIndex % 2 === 0;
-      const isSemaineImpaire = weekIndex >= 0 && weekIndex % 2 === 1;
-
-      // ----------------------------
-      // GESTION CANTINE
-      // ----------------------------
-      if (isSchoolDayFlag && dateStr <= "2027-06-25") {
-        let requiredParents = 2; let p1 = null; let p2 = null; let repasType = ""; let forcedError = false;
-
-        if (dayOfWeek === 1) { 
-          repasType = "Repas par classe"; 
-        } 
-        else if (dayOfWeek === 2) { 
-          repasType = "Placement libre";
-          if (isSemaineImpaire) { 
-            if (dateStr >= "2026-11-10") {
-                requiredParents = 0; p1 = "MME GERARD"; p2 = "MME SUBLET"; 
-            } else {
-                requiredParents = 2;
-            }
-          } else if (isSemainePaire) {
-            if (dateStr >= "2026-11-17") {
-                requiredParents = 1; p1 = "MME QARIOH"; 
-            } else {
-                requiredParents = 2;
-            }
-          }
-        } 
-        else if (dayOfWeek === 4) { 
-          repasType = "Filles / Garçons"; 
-        } 
-        else if (dayOfWeek === 5) { 
-          repasType = "Par cordée";
-          if (isSemainePaire) { 
-            if (dateStr >= "2026-11-20") {
-                requiredParents = 1; p1 = "MME SUBLET"; 
-            } else {
-                requiredParents = 2;
-            }
-          } 
-          else { requiredParents = 2; }
-        }
-
-        let assigned = [];
-
-        if (requiredParents > 0) {
-            if (dayOfWeek === 4) {
-                if (forcedDePonteDates.includes(dateStr) && !assigned.includes("DE PONTE")) {
-                    assigned.push("DE PONTE");
-                    statsObj["DE PONTE"].cantine++; statsObj["DE PONTE"].periodCantine++; statsObj["DE PONTE"].monthCantine++; statsObj["DE PONTE"].total++; statsObj["DE PONTE"].lastCantine = dateStr;
-                }
-                if (forcedRiobeDates.includes(dateStr) && !assigned.includes("RIOBÉ")) {
-                    assigned.push("RIOBÉ");
-                    statsObj["RIOBÉ"].cantine++; statsObj["RIOBÉ"].periodCantine++; statsObj["RIOBÉ"].monthCantine++; statsObj["RIOBÉ"].total++; statsObj["RIOBÉ"].lastCantine = dateStr;
-                }
-            }
-
-            if (dateStr === "2026-11-13" && dayOfWeek === 5 && !assigned.includes("LE LÉZEC")) {
-                assigned.push("LE LÉZEC");
-                statsObj["LE LÉZEC"].cantine++; statsObj["LE LÉZEC"].periodCantine++; statsObj["LE LÉZEC"].monthCantine++; statsObj["LE LÉZEC"].total++; statsObj["LE LÉZEC"].lastCantine = dateStr;
-            }
-
-          for (let i = assigned.length; i < requiredParents; i++) {
-            let available = famsData.filter(f => {
-              if (assigned.includes(f.id)) {
-                if (f.id === "LE LÉZEC" && [1, 5].includes(dayOfWeek) && assigned.length === 1 && assigned[0] === "LE LÉZEC") {
-                   // OK
-                } else {
-                   return false;
-                }
-              }
-
-              if (f.id === "DE LASTIC ST JAL" && dateStr >= "2027-02-01" && dateStr <= "2027-04-15") return false;
-              
-              if (f.id === "LE LÉZEC") {
-                  if (dateStr === "2026-11-06") return false; 
-                  if (requiredParents < 2) return false; 
-                  if (i === 1 && assigned[0] !== "LE LÉZEC") return false; 
-              }
-
-              let hasDay = f.days.includes(dayOfWeek);
-              if (!hasDay) return false;
-
-              if (f.type === "Nouveau SP") {
-                  if (dateStr >= "2026-11-02" && dateStr <= "2026-11-08") return false;
-                  if (dateStr <= "2026-11-15") {
-                      if (i === 1 && assigned.length === 1) {
-                          const firstFam = famsData.find(family => family.id === assigned[0]);
-                          if (firstFam && firstFam.type === "Nouveau SP") return false;
-                      }
-                  }
-              }
-
-              if (f.type.startsWith("Nouveau") && statsObj[f.id].lastCantine) {
-                let lastD = new Date(statsObj[f.id].lastCantine + "T12:00:00");
-                let diffDays = Math.ceil(Math.abs(currentDate - lastD) / (1000 * 60 * 60 * 24));
-                if (diffDays <= 3) return false; 
-              }
-              return true;
-            });
-
-            if (i === 1 && assigned.length === 1 && assigned[0] === "LE LÉZEC") {
-                let lezecObj = available.find(f => f.id === "LE LÉZEC");
-                if (lezecObj) available = [lezecObj];
-            }
-
-            available.sort((a, b) => {
-              if (statsObj[a.id].cantine === 0 && statsObj[b.id].cantine > 0) return -1;
-              if (statsObj[a.id].cantine > 0 && statsObj[b.id].cantine === 0) return 1;
-
-              let scoreA = statsObj[a.id].total; let scoreB = statsObj[b.id].total;
-              
-              let monthDiff = statsObj[a.id].monthCantine - statsObj[b.id].monthCantine;
-              if (monthDiff !== 0) return monthDiff;
-
-              let periodDiff = statsObj[a.id].periodCantine - statsObj[b.id].periodCantine;
-              if (periodDiff !== 0) return periodDiff;
-
-              if (scoreA !== scoreB) return scoreA - scoreB;
-              
-              return a.days.length - b.days.length;
-            });
-
-            if (available.length > 0) {
-              const chosenId = available[0].id;
-              assigned.push(chosenId);
-              statsObj[chosenId].cantine++; 
-              statsObj[chosenId].periodCantine++; 
-              statsObj[chosenId].monthCantine++; 
-              statsObj[chosenId].total++; 
-              statsObj[chosenId].lastCantine = dateStr;
-            } else {
-              let fallback = famsData.filter(f => !assigned.includes(f.id)).sort((a, b) => {
-                 let mDiff = statsObj[a.id].monthCantine - statsObj[b.id].monthCantine;
-                 if (mDiff !== 0) return mDiff;
-                 let pDiff = statsObj[a.id].periodCantine - statsObj[b.id].periodCantine;
-                 if (pDiff !== 0) return pDiff;
-                 return statsObj[a.id].total - statsObj[b.id].total;
-              });
-              if (fallback.length > 0) {
-                const chosenId = fallback[0].id;
-                assigned.push(chosenId);
-                statsObj[chosenId].cantine++; statsObj[chosenId].periodCantine++; statsObj[chosenId].monthCantine++; statsObj[chosenId].total++; statsObj[chosenId].lastCantine = dateStr;
-                forcedError = true;
-              }
-            }
-          }
-        }
-
-        let finalP1 = null; let finalP2 = null;
-        if (requiredParents === 2) { finalP1 = assigned[0]; finalP2 = assigned[1]; }
-        else if (requiredParents === 1) { finalP1 = p1; finalP2 = assigned[0]; }
-        else if (requiredParents === 0) { finalP1 = p1; finalP2 = p2; }
-
-        let p1Out = checkIsOut(finalP1, dayOfWeek, dateStr);
-        let p2Out = checkIsOut(finalP2, dayOfWeek, dateStr);
-
-        scheduleArr.push({ date: dateStr, period: activeP.id, dayOfWeek, p1: finalP1, p2: finalP2, repasType, p1IsOut: p1Out, p2IsOut: p2Out, isError: forcedError });
-      }
-
-      // ----------------------------
-      // GESTION MÉNAGE STRICTE
-      // ----------------------------
-      if (dayOfWeek === 5 && isSchoolDayFlag) {
-        let nextSat = new Date(currentDate); nextSat.setDate(nextSat.getDate() + 1);
-        let nextSatStr = getDateStr(nextSat);
-        
-        let isHolidayStart = false; let holidayName = "";
-        for (let i = 0; i < vacData.length; i++) {
-          if (nextSatStr === vacData[i].start) { isHolidayStart = true; holidayName = "Vacances " + vacData[i].name; }
-        }
-
-        if (isHolidayStart) {
-          let eligibleAsso = famsData.filter(f => {
-            if (f.id === "DE LASTIC ST JAL" && nextSatStr >= "2027-02-01" && nextSatStr <= "2027-04-15") return false;
-            if (f.id === "LE LÉZEC" && statsObj[f.id].menage >= 1) return false;
-            return f.isAsso;
-          });
-          
-          eligibleAsso.sort((a, b) => {
-            let scoreA = statsObj[a.id].menage - (a.id === "LE LÉZEC" ? 1 : 0);
-            let scoreB = statsObj[b.id].menage - (b.id === "LE LÉZEC" ? 1 : 0);
-            return scoreA - scoreB || a.id.localeCompare(b.id);
-          });
-          
-          if(eligibleAsso.length > 0) {
-            let chosen = eligibleAsso[0].id;
-            statsObj[chosen].menage++; statsObj[chosen].total++; statsObj[chosen].lastMenage = dateStr;
-            let vacDate = new Date(currentDate); vacDate.setDate(vacDate.getDate() + 1);
-            menageArr.push({ date: getDateStr(vacDate), period: activeP.id, familyId: chosen, isVacances: true, label: holidayName });
-          }
-        } else {
-          let candidates = famsData.filter(f => {
-            if (f.id === "DE LASTIC ST JAL" && nextSatStr >= "2027-02-01" && nextSatStr <= "2027-04-15") return false;
-            if (f.type === "Nouveau SP" && nextSatStr >= "2026-11-02" && nextSatStr <= "2026-11-08") return false;
-            return true;
-          });
-          
-          candidates = candidates.filter(f => {
-             if (f.id === "CHOMEL" && statsObj[f.id].menage >= 1) return false;
-             if (f.id === "DURAND" && statsObj[f.id].menage >= 1) return false;
-             if (f.id === "LE LÉZEC" && statsObj[f.id].menage >= 1) return false;
-             return true;
-          });
-          
-          let withCooldown = candidates.filter(f => {
-            let lastDate = new Date(statsObj[f.id].lastMenage + "T12:00:00").getTime();
-            return (currentDate.getTime() - lastDate) >= 28 * 24 * 60 * 60 * 1000;
-          });
-          if(withCooldown.length > 0) candidates = withCooldown;
-          
-          candidates.sort((a, b) => {
-            if (statsObj[a.id].menage === 0 && statsObj[b.id].menage > 0) return -1;
-            if (statsObj[a.id].menage > 0 && statsObj[b.id].menage === 0) return 1;
-
-            let scoreA = statsObj[a.id].menage - (a.id === "SHAW" ? 1 : 0);
-            let scoreB = statsObj[b.id].menage - (b.id === "SHAW" ? 1 : 0);
-            return scoreA - scoreB || a.id.localeCompare(b.id);
-          });
-
-          if(candidates.length > 0) {
-            let chosen = candidates[0].id;
-            statsObj[chosen].menage++; statsObj[chosen].total++; statsObj[chosen].lastMenage = dateStr;
-            let nextSat = new Date(currentDate); nextSat.setDate(nextSat.getDate() + 1);
-            menageArr.push({ date: getDateStr(nextSat), period: activeP.id, familyId: chosen, isVacances: false, label: "Ménage du Week-end" });
-          }
-        }
-      }
-      currentDate.setDate(currentDate.getDate() + 1);
-    }
 
     // --- APPLICATION DES REMPLACEMENTS MANUELS A POSTERIORI ---
     remplacementsManuels.forEach(remp => {
@@ -2545,6 +2372,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     fStats.push({ id: "MME SUBLET", name: "MME SUBLET", isTeacher: true, cantine: teaCantine("MME SUBLET"), menage: 0, total: teaCantine("MME SUBLET") });
     fStats.push({ id: "MME HERVET", name: "MME HERVET", isTeacher: true, cantine: teaCantine("MME HERVET"), menage: 0, total: teaCantine("MME HERVET") });
     fStats.push({ id: "MME QARIOH", name: "MME QARIOH", isTeacher: true, cantine: teaCantine("MME QARIOH"), menage: 0, total: teaCantine("MME QARIOH") });
+    fStats.push({ id: "MME BEN GELOUNE", name: "MME BEN GELOUNE", isTeacher: true, cantine: teaCantine("MME BEN GELOUNE"), menage: 0, total: teaCantine("MME BEN GELOUNE") });
 
     fStats.sort((a, b) => {
       if (a.isTeacher && !b.isTeacher) return 1;
@@ -2553,10 +2381,10 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       return String(a.id).localeCompare(String(b.id));
     });
 
-    return { familiesList: famsData, periodsInfo: perData, schedule: scheduleArr, menagesSchedule: menageArr, familyStats: fStats, holidays: holiData };
+    return { familiesList: famsData, periodsInfo: perData, schedule: scheduleArr, menagesSchedule: menageArr, familyStats: fStats, holidays: holiData, cordeesData };
   }, []);
 
-  const { familiesList, periodsInfo, schedule, menagesSchedule, familyStats, holidays } = data;
+  const { familiesList, periodsInfo, schedule, menagesSchedule, familyStats, holidays, cordeesData } = data;
 
   const getLocalDateString = (d) => {
     let year = d.getFullYear(); let month = String(d.getMonth() + 1).padStart(2, '0'); let day = String(d.getDate()).padStart(2, '0');
@@ -2665,7 +2493,8 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     "MME GERARD": "bg-slate-800 text-white border-slate-900",
     "MME SUBLET": "bg-neutral-800 text-white border-neutral-900",
     "MME HERVET": "bg-zinc-800 text-white border-zinc-900",
-    "MME QARIOH": "bg-stone-800 text-white border-stone-900"
+    "MME QARIOH": "bg-stone-800 text-white border-stone-900",
+    "MME BEN GELOUNE": "bg-violet-800 text-white border-violet-900"
   };
 
   const familyStyles = {
@@ -3000,10 +2829,10 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                     const isCantine = e.type === 'Cantine';
                     
                     let repasIcon = "⚙️";
-                    if (e.details === "Repas par classe") repasIcon = "🧬";
+                    if (e.details === "Repas par classe") repasIcon = "🎒";
                     if (e.details === "Placement libre") repasIcon = "🔭";
                     if (e.details === "Filles / Garçons") repasIcon = "🧲";
-                    if (e.details === "Par cordée") repasIcon = "💡";
+                    if (e.details === "Par cordée") repasIcon = "🔗";
 
                     const iconClass = isCantine ? 'text-blue-500 bg-blue-100' : (e.isVacances ? 'text-amber-500 bg-amber-100' : 'text-indigo-500 bg-indigo-100');
                     const dateDisplay = (e.type === 'Ménage' && !e.isVacances) ? formatMenageDate(e.date) : formatDate(e.date);
@@ -3115,7 +2944,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
             </div>
           </div>
           <div className="flex gap-3">
-            {activeTab !== 'regles' && activeTab !== 'calendrier' && (
+            {activeTab !== 'regles' && activeTab !== 'calendrier' && activeTab !== 'cordees' && (
               <button onClick={handleExportCSV} className="bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200 px-4 py-2 rounded-lg font-semibold text-sm transition flex items-center gap-2">
                 <FileCheck size={16} /> Exporter .CSV
               </button>
@@ -3135,6 +2964,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
           <button onClick={() => setActiveTab('cantine')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'cantine' ? 'bg-amber-500 text-white shadow-md shadow-amber-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><FlaskConical size={16} /> Cantine</button>
           <button onClick={() => setActiveTab('menage')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'menage' ? 'bg-amber-500 text-white shadow-md shadow-amber-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Beaker size={16} /> Ménage</button>
           <button onClick={() => setActiveTab('calendrier')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'calendrier' ? 'bg-amber-500 text-white shadow-md shadow-amber-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Microscope size={16} /> Calendrier Annuel</button>
+          <button onClick={() => setActiveTab('cordees')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'cordees' ? 'bg-amber-500 text-white shadow-md shadow-amber-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Users size={16} /> Équipes (Cordées)</button>
           <button onClick={() => setActiveTab('famille')} className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm transition-all ${activeTab === 'famille' ? 'bg-amber-500 text-white shadow-md shadow-amber-200' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}><Compass size={16} /> Mon Planning</button>
           
           {peutVoirAdmin && (
@@ -3158,6 +2988,44 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
 
         <div className="bg-transparent border-none">
           
+          {/* TAB CORDÉES (NOUVEAU) */}
+          {activeTab === 'cordees' && (
+            <div className="animate-in fade-in duration-300 max-w-6xl mx-auto pb-12">
+              <div className="text-center mb-8 print:text-left">
+                <h2 className="text-2xl font-bold text-slate-800 flex items-center justify-center md:justify-start gap-2"><Users className="text-amber-500" /> Les Cordées des Inventeurs</h2>
+                <p className="text-slate-500 mt-2 font-medium">Répartition des élèves par équipe thématique pour l'année scolaire.</p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {cordeesData.map((cordee, idx) => (
+                  <div key={idx} className={`rounded-2xl p-6 border ${cordee.border} ${cordee.bg} shadow-sm flex flex-col h-full hover:shadow-md transition-shadow`}>
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className={`w-14 h-14 rounded-full bg-white flex items-center justify-center text-3xl shadow-sm border ${cordee.border}`}>
+                        {cordee.icon}
+                      </div>
+                      <div>
+                        <h3 className={`text-lg font-bold ${cordee.text}`}>{cordee.name}</h3>
+                        <span className={`text-xs font-bold uppercase tracking-wider ${cordee.iconCol}`}>{cordee.theme}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-4 bg-white/60 p-4 rounded-xl border border-white/40 flex-1">
+                      <h4 className="text-xs font-bold text-slate-400 mb-3 uppercase">Membres de l'équipe ({cordee.members.length})</h4>
+                      <ul className="grid grid-cols-2 gap-2">
+                        {cordee.members.map((member, mIdx) => (
+                          <li key={mIdx} className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                            <span className={`w-1.5 h-1.5 rounded-full ${cordee.bg.replace('50', '400')}`}></span>
+                            {member}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {activeTab === 'cantine' && (
             <div className="animate-in fade-in duration-300">
               <div className="mb-8 text-center print:text-left">
@@ -3191,10 +3059,10 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                   if (row.dayOfWeek === 5) { dayBg = "bg-teal-50/50"; dayBorder = "border-teal-100"; }
 
                   let repasIcon = "⚙️";
-                  if (row.repasType === "Repas par classe") repasIcon = "🧬";
+                  if (row.repasType === "Repas par classe") repasIcon = "🎒";
                   if (row.repasType === "Placement libre") repasIcon = "🔭";
                   if (row.repasType === "Filles / Garçons") repasIcon = "🧲";
-                  if (row.repasType === "Par cordée") repasIcon = "💡";
+                  if (row.repasType === "Par cordée") repasIcon = "🔗";
 
                   return (
                     <div key={i} className={`${dayBg} rounded-xl p-4 border ${dayBorder} shadow-sm relative hover:shadow-md transition-shadow flex flex-col`}>
@@ -3341,7 +3209,13 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                           <option key={f.id} value={f.id}>{f.id}</option>
                         ))}
                       </optgroup>
-                      <optgroup label="Maîtresses"><option value="MME GERARD">MME GERARD</option><option value="MME SUBLET">MME SUBLET</option><option value="MME HERVET">MME HERVET</option><option value="MME QARIOH">MME QARIOH</option></optgroup>
+                      <optgroup label="Maîtresses">
+                         <option value="MME GERARD">MME GERARD</option>
+                         <option value="MME SUBLET">MME SUBLET</option>
+                         <option value="MME HERVET">MME HERVET</option>
+                         <option value="MME QARIOH">MME QARIOH</option>
+                         <option value="MME BEN GELOUNE">MME BEN GELOUNE</option>
+                      </optgroup>
                     </select>
                   </div>
                 </div>
@@ -3413,7 +3287,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     </div>
   );
 };
-
 
 // --- MODULE : --- TABLEAU DE BORD (DASHBOARD) ---
 const TableauBord = ({ transactionsGlobales }) => {
