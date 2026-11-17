@@ -2065,7 +2065,9 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { date: "2027-04-05", type: "cantine", initial: "DE LA CHARRIE", remplacant: "DE MALAUSSENE" },
       { date: "2027-05-03", type: "cantine", initial: "DE LA CHARRIE", remplacant: "FAUVAIN" },
       { date: "2027-02-01", type: "cantine", initial: "FAUVAIN", remplacant: "DE LA CHARRIE" },
-      { date: "2027-02-08", type: "cantine", initial: "DE MALAUSSENE", remplacant: "DE LA CHARRIE" }
+      { date: "2027-02-08", type: "cantine", initial: "DE MALAUSSENE", remplacant: "DE LA CHARRIE" },
+      { date: "2027-01-14", type: "cantine", initial: "DE PONTE", remplacant: "DE LASTIC ST JAL" },
+      { date: "2027-05-13", type: "cantine", initial: "DE PONTE", remplacant: "DE LASTIC ST JAL" }
     ];
     // ============================================================================
 
