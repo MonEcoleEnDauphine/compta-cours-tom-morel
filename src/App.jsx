@@ -2060,7 +2060,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     const remplacementsManuels = [
       // 1. EXEMPLES DE REMPLACEMENTS SIMPLES (Dépannage, Annulation)
       { date: "2026-11-13", type: "cantine", initial: "LE LÉZEC", remplacant: "LE LÉZEC" },
-      { date: "2026-10-30", type: "cantine", initial: "DE LA CHARRIE", remplacant: "PILON" },
+       { date: "2026-10-30", type: "cantine", initial: "DE LA CHARRIE", remplacant: "PILON" },
       { date: "2026-12-15", type: "cantine", initial: "DE LA CHARRIE", remplacant: "SHAW" },
       { date: "2027-04-05", type: "cantine", initial: "DE LA CHARRIE", remplacant: "DE MALAUSSENE" },
       { date: "2027-05-03", type: "cantine", initial: "DE LA CHARRIE", remplacant: "FAUVAIN" },
@@ -2100,7 +2100,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { id: "SHAW", type: "Nouveau SP", days: [2], isAsso: false }
     ];
 
-    // CORRECTION : Les périodes englobent désormais les vacances pour ne plus "perdre" les ménages de vacances
     const perData = [
       { id: 1, name: "H. Becquerel ☢️", desc: "Radioactivité (Rentrée - Toussaint)", start: "2026-09-03", end: "2026-11-01" },
       { id: 2, name: "N-J. Cugnot ⚙️", desc: "L'Auto à vapeur (Toussaint - Noël)", start: "2026-11-02", end: "2027-01-03" },
@@ -2372,19 +2371,45 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         }
     });
 
+    // --- FONCTION DE CALCUL DU JOUR PRÉFÉRENTIEL ---
+    const dayNamesMap = { 1: 'Lundi', 2: 'Mardi', 3: 'Mercredi', 4: 'Jeudi', 5: 'Vendredi' };
+    const calcJourPref = (famId) => {
+        let counts = { 1: 0, 2: 0, 4: 0, 5: 0 };
+        scheduleArr.forEach(s => {
+            if (s.p1 === famId || s.p2 === famId) {
+                counts[s.dayOfWeek] = (counts[s.dayOfWeek] || 0) + 1;
+            }
+        });
+        let max = 0;
+        for (let d in counts) {
+            if (counts[d] > max) max = counts[d];
+        }
+        if (max === 0) return "-";
+        
+        let topDays = [];
+        [1, 2, 4, 5].forEach(d => {
+            if (counts[d] === max) topDays.push(dayNamesMap[d]);
+        });
+        
+        if (topDays.length === 1) return topDays[0];
+        if (topDays.length === 2) return topDays.join(' et ');
+        if (topDays.length === 4) return "Tous les jours";
+        return topDays.slice(0, -1).join(', ') + ' et ' + topDays[topDays.length - 1];
+    };
+
     let fStats = Object.keys(statsObj).map(id => {
       let realCantine = statsObj[id].cantine - (statsObj[id].virtualCantine || 0);
       let realMenage = statsObj[id].menage - (statsObj[id].virtualMenage || 0);
       let realTotal = realCantine + realMenage;
-      return { id: id, name: id, cantine: realCantine, menage: realMenage, total: realTotal, isTeacher: false };
+      return { id: id, name: id, cantine: realCantine, menage: realMenage, total: realTotal, isTeacher: false, jourPref: calcJourPref(id) };
     });
     
     let teaCantine = (tId) => scheduleArr.filter(s => s.p1 === tId || s.p2 === tId).length;
-    fStats.push({ id: "MME GERARD", name: "MME GERARD", isTeacher: true, cantine: teaCantine("MME GERARD"), menage: 0, total: teaCantine("MME GERARD") });
-    fStats.push({ id: "MME SUBLET", name: "MME SUBLET", isTeacher: true, cantine: teaCantine("MME SUBLET"), menage: 0, total: teaCantine("MME SUBLET") });
-    fStats.push({ id: "MME HERVET", name: "MME HERVET", isTeacher: true, cantine: teaCantine("MME HERVET"), menage: 0, total: teaCantine("MME HERVET") });
-    fStats.push({ id: "MME QARIOH", name: "MME QARIOH", isTeacher: true, cantine: teaCantine("MME QARIOH"), menage: 0, total: teaCantine("MME QARIOH") });
-    fStats.push({ id: "MME BEN GELOUNE", name: "MME BEN GELOUNE", isTeacher: true, cantine: teaCantine("MME BEN GELOUNE"), menage: 0, total: teaCantine("MME BEN GELOUNE") });
+    fStats.push({ id: "MME GERARD", name: "MME GERARD", isTeacher: true, cantine: teaCantine("MME GERARD"), menage: 0, total: teaCantine("MME GERARD"), jourPref: calcJourPref("MME GERARD") });
+    fStats.push({ id: "MME SUBLET", name: "MME SUBLET", isTeacher: true, cantine: teaCantine("MME SUBLET"), menage: 0, total: teaCantine("MME SUBLET"), jourPref: calcJourPref("MME SUBLET") });
+    fStats.push({ id: "MME HERVET", name: "MME HERVET", isTeacher: true, cantine: teaCantine("MME HERVET"), menage: 0, total: teaCantine("MME HERVET"), jourPref: calcJourPref("MME HERVET") });
+    fStats.push({ id: "MME QARIOH", name: "MME QARIOH", isTeacher: true, cantine: teaCantine("MME QARIOH"), menage: 0, total: teaCantine("MME QARIOH"), jourPref: calcJourPref("MME QARIOH") });
+    fStats.push({ id: "MME BEN GELOUNE", name: "MME BEN GELOUNE", isTeacher: true, cantine: teaCantine("MME BEN GELOUNE"), menage: 0, total: teaCantine("MME BEN GELOUNE"), jourPref: calcJourPref("MME BEN GELOUNE") });
 
     fStats.sort((a, b) => {
       if (a.isTeacher && !b.isTeacher) return 1;
@@ -2594,8 +2619,8 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         }
       });
     } else if (activeTab === 'stats') {
-      headers.push('Famille / Intervenant', 'Tours de Cantine', 'Tours de Ménage', 'Total Services');
-      familyStats.forEach(s => exportData.push([s.name, s.cantine, s.menage, s.total]));
+      headers.push('Famille / Intervenant', 'Tours de Cantine', 'Jour(s) Préférentiel(s)', 'Tours de Ménage', 'Total Services');
+      familyStats.forEach(s => exportData.push([s.name, s.cantine, s.jourPref, s.menage, s.total]));
     } else if (activeTab === 'famille') {
       if (!selectedFamilyFilter) return alert("Sélectionnez un nom.");
       headers.push('Type', 'Période', 'Date', 'Détails');
@@ -3187,13 +3212,21 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
               <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
                 <table className="w-full text-left text-sm">
                   <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
-                    <tr><th className="p-4 font-bold">Famille</th><th className="p-4 font-bold text-center">Cantine</th><th className="p-4 font-bold text-center">Ménage</th><th className="p-4 font-bold text-center">Total Services</th></tr>
+                    <tr>
+                      <th className="p-4 font-bold">Famille</th>
+                      <th className="p-4 font-bold text-center">Cantine</th>
+                      <th className="p-4 font-bold text-center">Jour(s) Préférentiel(s)</th>
+                      <th className="p-4 font-bold text-center">Ménage</th>
+                      <th className="p-4 font-bold text-center">Total Services</th>
+                    </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {familyStats.map((stat, i) => (
                       <tr key={i} className="hover:bg-slate-50 transition">
                         <td className="p-4 font-semibold text-slate-800"><FamilyPill id={stat.id} /></td>
-                        <td className="p-4 text-center text-blue-600 font-bold">{stat.cantine}</td><td className="p-4 text-center text-indigo-600 font-bold">{stat.menage}</td>
+                        <td className="p-4 text-center text-blue-600 font-bold">{stat.cantine}</td>
+                        <td className="p-4 text-center text-slate-500 font-medium text-xs">{stat.jourPref}</td>
+                        <td className="p-4 text-center text-indigo-600 font-bold">{stat.menage}</td>
                         <td className="p-4 text-center"><span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-full font-bold border border-slate-200">{stat.total}</span></td>
                       </tr>
                     ))}
@@ -3275,6 +3308,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                   <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
                       <li>Le code n'utilise plus de calcul mathématique de probabilité. Il affiche <strong>strictement et intégralement</strong> les 133 cantines et 33 ménages issus de votre fichier CSV validé (incluant les vendredis modifiés avec Mme Ben Geloune).</li>
                       <li>Le tableau des statistiques continue cependant de s'additionner et de se corriger automatiquement si vous appliquez des remplacements d'urgence dans la zone manuelle de l'en-tête.</li>
+                      <li>Le <strong>Jour Préférentiel</strong> se calcule dynamiquement en analysant l'ensemble de l'année après intégration de vos modifications manuelles.</li>
                   </ul>
               </div>
             </div>
