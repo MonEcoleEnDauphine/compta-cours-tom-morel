@@ -2058,8 +2058,8 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     // 🚨 ZONE DE MODIFICATION MANUELLE (REMPLACEMENTS A POSTERIORI) 🚨
     // ============================================================================
     const remplacementsManuels = [
+      // 1. EXEMPLES DE REMPLACEMENTS SIMPLES (Dépannage, Annulation)
       { date: "2026-11-13", type: "cantine", initial: "LE LÉZEC", remplacant: "LE LÉZEC" },
-      { date: "2026-10-10", type: "menage",  initial: "LE LÉZEC", remplacant: "LE LÉZEC" },
       { date: "2026-10-30", type: "cantine", initial: "DE LA CHARRIE", remplacant: "PILON" },
       { date: "2026-12-15", type: "cantine", initial: "DE LA CHARRIE", remplacant: "SHAW" },
       { date: "2027-04-05", type: "cantine", initial: "DE LA CHARRIE", remplacant: "DE MALAUSSENE" },
@@ -2068,6 +2068,12 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { date: "2027-02-08", type: "cantine", initial: "DE MALAUSSENE", remplacant: "DE LA CHARRIE" },
       { date: "2027-01-14", type: "cantine", initial: "DE PONTE", remplacant: "DE LASTIC ST JAL" },
       { date: "2027-05-13", type: "cantine", initial: "DE PONTE", remplacant: "DE LASTIC ST JAL" }
+
+      // 2. EXEMPLES D'ÉCHANGES CROISÉS (Ménage contre Cantine, etc.)
+      // Pour échanger, il suffit de faire 2 lignes ! Les statistiques se croiseront parfaitement.
+      // Exemple : BEZIAT-MENUT donne son ménage (19/12) à BOCCA, qui lui donne sa cantine (25/09).
+      // { date: "2026-12-19", type: "menage",  initial: "BEZIAT-MENUT", remplacant: "BOCCA" },
+      // { date: "2026-09-25", type: "cantine", initial: "BOCCA",        remplacant: "BEZIAT-MENUT" }
     ];
     // ============================================================================
 
@@ -2094,12 +2100,13 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { id: "SHAW", type: "Nouveau SP", days: [2], isAsso: false }
     ];
 
+    // CORRECTION : Les périodes englobent désormais les vacances pour ne plus "perdre" les ménages de vacances
     const perData = [
-      { id: 1, name: "H. Becquerel ☢️", desc: "Radioactivité (Rentrée - Toussaint)", start: "2026-09-03", end: "2026-10-16" },
-      { id: 2, name: "N-J. Cugnot ⚙️", desc: "L'Auto à vapeur (Toussaint - Noël)", start: "2026-11-02", end: "2026-12-18" },
-      { id: 3, name: "H. Giffard 🎈", desc: "L'Aérostat (Noël - Fév)", start: "2027-01-04", end: "2027-02-12" },
-      { id: 4, name: "M. Curie 🩻", desc: "Petites Curies (Fév - Pâques)", start: "2027-03-01", end: "2027-04-09" },
-      { id: 5, name: "D. Papin 🍲", desc: "Machine à vapeur (Pâques - Été)", start: "2027-04-26", end: "2027-06-25" }
+      { id: 1, name: "H. Becquerel ☢️", desc: "Radioactivité (Rentrée - Toussaint)", start: "2026-09-03", end: "2026-11-01" },
+      { id: 2, name: "N-J. Cugnot ⚙️", desc: "L'Auto à vapeur (Toussaint - Noël)", start: "2026-11-02", end: "2027-01-03" },
+      { id: 3, name: "H. Giffard 🎈", desc: "L'Aérostat (Noël - Fév)", start: "2027-01-04", end: "2027-02-28" },
+      { id: 4, name: "M. Curie 🩻", desc: "Petites Curies (Fév - Pâques)", start: "2027-03-01", end: "2027-04-25" },
+      { id: 5, name: "D. Papin 🍲", desc: "Machine à vapeur (Pâques - Été)", start: "2027-04-26", end: "2027-08-31" }
     ];
 
     const holiData = ["2026-11-11", "2027-03-26", "2027-03-29", "2027-05-06", "2027-05-07", "2027-05-17"];
@@ -2111,7 +2118,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { name: "Été", start: "2027-06-26", end: "2027-08-31" }
     ];
 
-    // DONNÉES DES CORDÉES MISES À JOUR
     const cordeesData = [
       { id: 1, name: "Henri Becquerel", theme: "La Radioactivité", icon: "☢️", members: ["Henri", "Anne-Victoria", "Florence", "Camille", "Karol", "Charlotte"], bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-800", iconCol: "text-emerald-600" },
       { id: 2, name: "Nicolas-Joseph Cugnot", theme: "L'Automobile à vapeur", icon: "⚙️", members: ["Élisabeth C", "Joseph BC", "Sixtine", "Aymeric DS", "Domitille", "Pierre"], bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-800", iconCol: "text-blue-600" },
@@ -3242,37 +3248,33 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                     <AlertTriangle className="text-amber-600" size={18}/> 🛠️ Guide Admin : Modifications Manuelles
                   </h3>
                   <p className="text-amber-800 text-sm mb-3">
-                    Pour forcer un échange, une absence ou une annulation sans casser le calcul d'équité global, vous devez modifier directement le code source du fichier.
+                    Pour forcer une absence ou un échange sans casser le calcul d'équité global, vous devez modifier directement le code source (vers la ligne 105).
                   </p>
-                  <ol className="list-decimal list-inside space-y-2 text-amber-800 text-sm font-medium">
-                    <li>Ouvrez le fichier contenant le code (ex: <code>ModulePlannings.jsx</code>).</li>
-                    <li>Cherchez le texte : <strong>🚨 ZONE DE MODIFICATION MANUELLE 🚨</strong> (vers la ligne 110).</li>
-                    <li>Ajoutez votre modification dans le tableau <code>remplacementsManuels</code> en suivant ce modèle :</li>
-                  </ol>
-                  <pre className="bg-amber-100/50 p-3 rounded-lg text-xs font-mono text-amber-900 mt-3 border border-amber-200 overflow-x-auto">
-                    {`{ date: "2026-11-13", type: "cantine", initial: "LE LÉZEC", remplacant: "DE PONTE" },\n{ date: "2027-06-26", type: "menage", initial: "DE MALAUSSENE", remplacant: "ANNULÉ" }`}
-                  </pre>
-                  <p className="text-amber-800 text-xs mt-3 italic">
-                    Note : Si vous utilisez "ANNULÉ" ou un nom non répertorié pour remplacer, le point de service sera tout de même proprement remboursé à la famille initiale.
-                  </p>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="font-bold text-amber-900 text-sm mb-1">1. Faire un remplacement simple ou une annulation :</h4>
+                      <pre className="bg-amber-100/50 p-3 rounded-lg text-xs font-mono text-amber-900 border border-amber-200 overflow-x-auto">
+                        {`{ date: "2026-11-20", type: "cantine", initial: "BOCCA", remplacant: "MME BEN GELOUNE" }\n{ date: "2026-12-19", type: "menage", initial: "BEZIAT-MENUT", remplacant: "ANNULÉ" }`}
+                      </pre>
+                    </div>
+
+                    <div>
+                      <h4 className="font-bold text-amber-900 text-sm mb-1">2. Faire un échange croisé (ex: Ménage contre Cantine) :</h4>
+                      <p className="text-amber-800 text-xs mb-2">Un échange est simplement composé de 2 remplacements. Les statistiques se croiseront parfaitement.</p>
+                      <pre className="bg-amber-100/50 p-3 rounded-lg text-xs font-mono text-amber-900 border border-amber-200 overflow-x-auto">
+                        {`// BEZIAT-MENUT donne son ménage à BOCCA\n{ date: "2026-12-19", type: "menage",  initial: "BEZIAT-MENUT", remplacant: "BOCCA" },\n// BOCCA donne sa cantine à BEZIAT-MENUT en retour\n{ date: "2026-09-25", type: "cantine", initial: "BOCCA",        remplacant: "BEZIAT-MENUT" }`}
+                      </pre>
+                    </div>
+                  </div>
                 </div>
               )}
 
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                  <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><Utensils className="text-slate-400" size={18}/> Jours de Cantine</h3>
+                  <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><Utensils className="text-slate-400" size={18}/> Structure de l'Année</h3>
                   <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
-                      <li><strong>Lundi :</strong> Repas par classe (2 parents)</li>
-                      <li><strong>Mardi :</strong> Alternance. Semaine Impaire (dès le 10 Nov) : Mme Gerard + Mme Sublet (0 parent). Semaine Paire (dès le 17 Nov) : Mme Qarioh + 1 parent.</li>
-                      <li><strong>Jeudi :</strong> Filles/Garçons (2 parents)</li>
-                      <li><strong>Vendredi :</strong> Par cordée. Alternance. Semaine Impaire : 2 parents. Semaine Paire (dès le 20 Nov) : Mme Sublet + Mme Ben Geloune.</li>
-                  </ul>
-              </div>
-              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                  <h3 className="font-bold text-lg text-slate-800 mb-3 border-b pb-2 flex items-center gap-2"><Users className="text-slate-400" size={18}/> Période d'intégration & Lissage</h3>
-                  <ul className="list-disc list-inside space-y-2 text-slate-600 text-sm">
-                      <li><strong>Lissage Mensuel Anti-Surcharge :</strong> La priorité d'affectation prend en compte le nombre de cantines effectuées *sur le mois en cours*, puis *sur la période*, puis *sur l'année*. Cela garantit une répartition parfaitement lissée et empêche l'accumulation de gardes sur quelques semaines.</li>
-                      <li><strong>Nouvelles Familles SP (Toussaint) :</strong> Intégration lissée et différée (aucune présence la première semaine de rentrée de Novembre). Jamais 2 familles "Nouveau SP" en duo à la cantine durant les deux premières semaines de novembre (ensuite c'est autorisé).</li>
-                      <li><strong>Historique préservé :</strong> L'algorithme a injecté en dur les données de vos tableaux de Septembre à Octobre pour s'y tenir strictement.</li>
+                      <li>Le code n'utilise plus de calcul mathématique de probabilité. Il affiche <strong>strictement et intégralement</strong> les 133 cantines et 33 ménages issus de votre fichier CSV validé (incluant les vendredis modifiés avec Mme Ben Geloune).</li>
+                      <li>Le tableau des statistiques continue cependant de s'additionner et de se corriger automatiquement si vous appliquez des remplacements d'urgence dans la zone manuelle de l'en-tête.</li>
                   </ul>
               </div>
             </div>
