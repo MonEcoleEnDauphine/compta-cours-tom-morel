@@ -2060,8 +2060,8 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     const remplacementsManuels = [
       // 1. EXEMPLES DE REMPLACEMENTS SIMPLES (Dépannage, Annulation)
       { date: "2026-11-13", type: "cantine", initial: "LE LÉZEC", remplacant: "LE LÉZEC" },
-      { date: "2027-05-30", type: "cantine", initial: "LE LÉZEC", remplacant: "BOCCA" },
-      { date: "2027-05-30", type: "cantine", initial: "LE LÉZEC", remplacant: "BEZIAT-MENUT" },
+      { date: "2027-04-30", type: "cantine", initial: "LE LÉZEC", remplacant: "BOCCA" },
+      { date: "2027-04-30", type: "cantine", initial: "LE LÉZEC", remplacant: "BEZIAT-MENUT" },
        { date: "2026-10-30", type: "cantine", initial: "DE LA CHARRIE", remplacant: "PILON" },
       { date: "2026-12-15", type: "cantine", initial: "DE LA CHARRIE", remplacant: "SHAW" },
       { date: "2027-04-05", type: "cantine", initial: "DE LA CHARRIE", remplacant: "DE MALAUSSENE" },
