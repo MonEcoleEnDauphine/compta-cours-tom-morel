@@ -2006,6 +2006,9 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
   const [showHistory, setShowHistory] = useState(false);
   const [monCompteId, setMonCompteId] = useState(null);
 
+  // Nouvel état pour le tri du tableau des statistiques
+  const [sortConfig, setSortConfig] = useState({ key: 'total', direction: 'desc' });
+
   const peutVoirAdmin = 
     utilisateurConnecte?.role === 'admin' || 
     utilisateurConnecte?.role === 'Administrateur Global' || 
@@ -2058,10 +2061,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     // 🚨 ZONE DE MODIFICATION MANUELLE (REMPLACEMENTS A POSTERIORI) 🚨
     // ============================================================================
     const remplacementsManuels = [
-      // 1. EXEMPLES DE REMPLACEMENTS SIMPLES (Dépannage, Annulation)
-      // { date: "2026-11-13", type: "cantine", initial: "LE LÉZEC", remplacant: "LE LÉZEC" },
-      // { date: "2027-06-26", type: "menage", initial: "DE MALAUSSENE", remplacant: "ANNULÉ" },
-      
       { date: "2027-04-30", type: "cantine", initial: "LE LÉZEC", remplacant: "BOCCA" },
       { date: "2027-04-30", type: "cantine", initial: "LE LÉZEC", remplacant: "BEZIAT-MENUT" },
       { date: "2026-10-30", type: "cantine", initial: "DE LA CHARRIE", remplacant: "PILON" },
@@ -2077,13 +2076,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { date: "2026-12-12", type: "menage", initial: "DE MALAUSSENE", remplacant: "PILON" },
       { date: "2026-12-19", type: "menage", initial: "BEZIAT-MENUT", remplacant: "DE MALAUSSENE" },
       { date: "2027-06-26", type: "menage", initial: "DE MALAUSSENE", remplacant: "LE LÉZEC" }
-      
-
-      // 2. EXEMPLES D'ÉCHANGES CROISÉS (Ménage contre Cantine, etc.)
-      // Pour échanger, il suffit de faire 2 lignes ! Les statistiques se croiseront parfaitement.
-      // Exemple : BEZIAT-MENUT donne son ménage (19/12) à BOCCA, qui lui donne sa cantine (25/09).
-      // { date: "2026-12-19", type: "menage",  initial: "BEZIAT-MENUT", remplacant: "BOCCA" },
-      // { date: "2026-09-25", type: "cantine", initial: "BOCCA",        remplacant: "BEZIAT-MENUT" }
     ];
     // ============================================================================
 
@@ -2111,11 +2103,11 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     ];
 
     const perData = [
-      { id: 1, name: "H. Becquerel ☢️", desc: "Radioactivité (Rentrée - Toussaint)", start: "2026-09-03", end: "2026-11-01" },
-      { id: 2, name: "N-J. Cugnot ⚙️", desc: "L'Auto à vapeur (Toussaint - Noël)", start: "2026-11-02", end: "2027-01-03" },
-      { id: 3, name: "H. Giffard 🎈", desc: "L'Aérostat (Noël - Fév)", start: "2027-01-04", end: "2027-02-28" },
-      { id: 4, name: "M. Curie 🩻", desc: "Petites Curies (Fév - Pâques)", start: "2027-03-01", end: "2027-04-25" },
-      { id: 5, name: "D. Papin 🍲", desc: "Machine à vapeur (Pâques - Été)", start: "2027-04-26", end: "2027-08-31" }
+      { id: 1, name: "H. Becquerel", desc: "Radioactivité (Rentrée - Toussaint)", start: "2026-09-03", end: "2026-11-01" },
+      { id: 2, name: "N-J. Cugnot", desc: "L'Auto à vapeur (Toussaint - Noël)", start: "2026-11-02", end: "2027-01-03" },
+      { id: 3, name: "H. Giffard", desc: "L'Aérostat (Noël - Fév)", start: "2027-01-04", end: "2027-02-28" },
+      { id: 4, name: "M. Curie", desc: "Petites Curies (Fév - Pâques)", start: "2027-03-01", end: "2027-04-25" },
+      { id: 5, name: "D. Papin", desc: "Machine à vapeur (Pâques - Été)", start: "2027-04-26", end: "2027-08-31" }
     ];
 
     const holiData = ["2026-11-11", "2027-03-26", "2027-03-29", "2027-05-06", "2027-05-07", "2027-05-17"];
@@ -2128,16 +2120,16 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     ];
 
     const cordeesData = [
-      { id: 1, name: "Henri Becquerel", theme: "La Radioactivité", icon: "☢️", members: ["Henri", "Anne-Victoria", "Florence", "Camille", "Karol", "Charlotte"], bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-800", iconCol: "text-emerald-600" },
-      { id: 2, name: "Nicolas-Joseph Cugnot", theme: "L'Automobile à vapeur", icon: "⚙️", members: ["Élisabeth C", "Joseph BC", "Sixtine", "Aymeric DS", "Domitille", "Pierre"], bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-800", iconCol: "text-blue-600" },
-      { id: 3, name: "Henri Giffard", theme: "L'Aérostat", icon: "🎈", members: ["Jacques DP", "Alice", "Pénélope", "Priscille", "Thalia", "François"], bg: "bg-rose-50", border: "border-rose-200", text: "text-rose-800", iconCol: "text-rose-600" },
-      { id: 4, name: "Marie Curie", theme: "Les Petites Curies", icon: "🩻", members: ["Léon", "Élie", "Armel", "Liz", "Honorine"], bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-800", iconCol: "text-amber-600" },
-      { id: 5, name: "Denis Papin", theme: "La Machine à vapeur", icon: "🍲", members: ["Laëtitia", "Séraphin", "Sophie", "Madeleine", "Jacques BC"], bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-800", iconCol: "text-orange-600" },
-      { id: 6, name: "André-Marie Ampère", theme: "Le Télégraphe", icon: "⚡", members: ["Aymeric BM", "Élisabeth R", "Thaïs", "Éléna", "Lou", "Joseph C"], bg: "bg-purple-50", border: "border-purple-200", text: "text-purple-800", iconCol: "text-purple-600" }
+      { id: 1, name: "Henri Becquerel", theme: "La Radioactivité", imgUrl: "/becquerel.jpg", members: ["Henri", "Anne-Victoria", "Florence", "Camille", "Karol", "Charlotte"], bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-800", iconCol: "text-emerald-600" },
+      { id: 2, name: "Nicolas-Joseph Cugnot", theme: "L'Automobile à vapeur", imgUrl: "/cugnot.jpg", members: ["Élisabeth C", "Joseph BC", "Sixtine", "Aymeric DS", "Domitille", "Pierre"], bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-800", iconCol: "text-blue-600" },
+      { id: 3, name: "Henri Giffard", theme: "L'Aérostat", imgUrl: "/giffard.jpg", members: ["Jacques DP", "Alice", "Pénélope", "Priscille", "Thalia", "François"], bg: "bg-rose-50", border: "border-rose-200", text: "text-rose-800", iconCol: "text-rose-600" },
+      { id: 4, name: "Marie Curie", theme: "Les Petites Curies", imgUrl: "/curie.jpg", members: ["Léon", "Élie", "Armel", "Liz", "Honorine"], bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-800", iconCol: "text-amber-600" },
+      { id: 5, name: "Denis Papin", theme: "La Machine à vapeur", imgUrl: "/papin.jpg", members: ["Laëtitia", "Séraphin", "Sophie", "Madeleine", "Jacques BC"], bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-800", iconCol: "text-orange-600" },
+      { id: 6, name: "André-Marie Ampère", theme: "Le Télégraphe", imgUrl: "/ampere.jpg", members: ["Aymeric BM", "Élisabeth R", "Thaïs", "Éléna", "Lou", "Joseph C"], bg: "bg-purple-50", border: "border-purple-200", text: "text-purple-800", iconCol: "text-purple-600" }
     ];
 
     // ============================================================================
-    // EXTRACTION DIRECTE ET ABSOLUE DES FICHIERS CSV (PLANNING DE TOUTE L'ANNÉE)
+    // EXTRACTION DIRECTE DES FICHIERS CSV 
     // ============================================================================
     const historicalCantine = [
       { date: '2026-09-03', p1: 'BOCCA', p2: 'TAISSIDRE-CARVALHO', repasType: 'Filles / Garçons' },
@@ -2347,31 +2339,42 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
 
     // --- APPLICATION DES REMPLACEMENTS MANUELS A POSTERIORI ---
     remplacementsManuels.forEach(remp => {
-        if (remp.initial === remp.remplacant) return; 
+        if (!remp.initial || remp.initial === remp.remplacant) return; 
+        
+        let typeStr = (remp.type || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        let isCancel = (remp.remplacant.toUpperCase() === "ANNULÉ" || remp.remplacant === "" || remp.remplacant.toUpperCase() === "VIDE");
 
-        if (remp.type === 'cantine') {
-            let event = scheduleArr.find(s => s.date === remp.date);
+        if (typeStr === 'cantine') {
+            let event = scheduleArr.find(s => s.date === remp.date && (s.p1 === remp.initial || s.p2 === remp.initial));
             if (event) {
                 let replaced = false;
-                if (event.p1 === remp.initial) { event.p1 = remp.remplacant; replaced = true; }
-                else if (event.p2 === remp.initial) { event.p2 = remp.remplacant; replaced = true; }
+                let newValue = isCancel ? null : remp.remplacant;
+
+                if (event.p1 === remp.initial) { event.p1 = newValue; replaced = true; }
+                else if (event.p2 === remp.initial) { event.p2 = newValue; replaced = true; }
                 
-                if (replaced && statsObj[remp.initial]) {
-                    statsObj[remp.initial].cantine--;
-                    statsObj[remp.initial].total--;
-                    if (statsObj[remp.remplacant]) {
+                if (replaced) {
+                    if (statsObj[remp.initial]) {
+                        statsObj[remp.initial].cantine--;
+                        statsObj[remp.initial].total--;
+                    }
+                    if (!isCancel && statsObj[remp.remplacant]) {
                         statsObj[remp.remplacant].cantine++;
                         statsObj[remp.remplacant].total++;
                     }
                 }
             }
-        } else if (remp.type === 'menage') {
-            let event = menageArr.find(m => m.date === remp.date && m.familyId === remp.initial);
-            if (event) {
-                event.familyId = remp.remplacant;
+        } else if (typeStr === 'menage') {
+            let eventIndex = menageArr.findIndex(m => m.date === remp.date && m.familyId === remp.initial);
+            if (eventIndex !== -1) {
                 if (statsObj[remp.initial]) {
                     statsObj[remp.initial].menage--;
                     statsObj[remp.initial].total--;
+                }
+                if (isCancel) {
+                    menageArr.splice(eventIndex, 1);
+                } else {
+                    menageArr[eventIndex].familyId = remp.remplacant;
                     if (statsObj[remp.remplacant]) {
                         statsObj[remp.remplacant].menage++;
                         statsObj[remp.remplacant].total++;
@@ -2381,7 +2384,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         }
     });
 
-    // --- FONCTION DE CALCUL DU JOUR PRÉFÉRENTIEL ---
     const dayNamesMap = { 1: 'Lundi', 2: 'Mardi', 3: 'Mercredi', 4: 'Jeudi', 5: 'Vendredi' };
     const calcJourPref = (famId) => {
         let counts = { 1: 0, 2: 0, 4: 0, 5: 0 };
@@ -2421,17 +2423,42 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     fStats.push({ id: "MME QARIOH", name: "MME QARIOH", isTeacher: true, cantine: teaCantine("MME QARIOH"), menage: 0, total: teaCantine("MME QARIOH"), jourPref: calcJourPref("MME QARIOH") });
     fStats.push({ id: "MME BEN GELOUNE", name: "MME BEN GELOUNE", isTeacher: true, cantine: teaCantine("MME BEN GELOUNE"), menage: 0, total: teaCantine("MME BEN GELOUNE"), jourPref: calcJourPref("MME BEN GELOUNE") });
 
-    fStats.sort((a, b) => {
-      if (a.isTeacher && !b.isTeacher) return 1;
-      if (!a.isTeacher && b.isTeacher) return -1;
-      if (b.total !== a.total) return b.total - a.total;
-      return String(a.id).localeCompare(String(b.id));
-    });
-
     return { familiesList: famsData, periodsInfo: perData, schedule: scheduleArr, menagesSchedule: menageArr, familyStats: fStats, holidays: holiData, cordeesData };
   }, []);
 
   const { familiesList, periodsInfo, schedule, menagesSchedule, familyStats, holidays, cordeesData } = data;
+
+  // LOGIQUE DE TRI DU TABLEAU STATISTIQUES
+  const sortedStats = useMemo(() => {
+    let sortableItems = [...familyStats];
+    if (sortConfig.key !== null) {
+      sortableItems.sort((a, b) => {
+        let aVal = a[sortConfig.key];
+        let bVal = b[sortConfig.key];
+
+        // Pour les enseignants, on les force en bas si on trie par autre chose que le nom
+        if (sortConfig.key !== 'id') {
+          if (a.isTeacher && !b.isTeacher) return 1;
+          if (!a.isTeacher && b.isTeacher) return -1;
+        }
+
+        if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+        
+        // Tie-breaker sur le nom
+        return String(a.id).localeCompare(String(b.id));
+      });
+    }
+    return sortableItems;
+  }, [familyStats, sortConfig]);
+
+  const requestSort = (key) => {
+    let direction = 'desc';
+    if (sortConfig.key === key && sortConfig.direction === 'desc') {
+      direction = 'asc';
+    }
+    setSortConfig({ key, direction });
+  };
 
   const getLocalDateString = (d) => {
     let year = d.getFullYear(); let month = String(d.getMonth() + 1).padStart(2, '0'); let day = String(d.getDate()).padStart(2, '0');
@@ -2618,7 +2645,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     "SHAW": "bg-fuchsia-200 text-fuchsia-900 border-fuchsia-400"
   };
 
-  const FamilyPill = ({ id, isOut = false, fullWidth = false }) => {
+  const FamilyPill = ({ id, isOut = false, fullWidth = false, onClick }) => {
     if (!id || typeof id !== 'string') return <span className={`text-red-500 text-xs italic bg-red-50 px-2 py-0.5 rounded border border-red-300 ${fullWidth ? 'w-full text-center block' : ''}`}>-</span>;
     
     let isTeacher = id.startsWith("MME");
@@ -2633,11 +2660,18 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
 
     return (
       <button 
-        onClick={() => {
-          if (clickable) setQuickFilterFamily(id);
+        onClick={(e) => {
+          if (onClick) {
+            e.stopPropagation();
+            onClick();
+          } else if (clickable) {
+            e.stopPropagation();
+            if (quickFilterFamily === id) setQuickFilterFamily(null); // Défiltre si déjà actif
+            else setQuickFilterFamily(id);
+          }
         }}
-        className={`inline-flex items-center gap-1 rounded-md border font-extrabold shadow-sm transition-all hover:opacity-80 active:scale-95 ${clickable ? 'cursor-pointer' : 'cursor-default'} ${styleClass} ${errBorder} ${widthClass} ${textClass}`}
-        title={isOut ? `⚠️ Jour non souhaité par ${id}` : (clickable ? `Filtrer sur ${id}` : undefined)}
+        className={`inline-flex items-center gap-1 rounded-md border font-extrabold shadow-sm transition-all hover:opacity-80 active:scale-95 ${clickable || onClick ? 'cursor-pointer' : 'cursor-default'} ${styleClass} ${errBorder} ${widthClass} ${textClass}`}
+        title={isOut ? `⚠️ Jour non souhaité par ${id}` : ((clickable || onClick) ? `Filtrer sur ${id}` : undefined)}
       >
         {isTeacher && <Users size={10} className="shrink-0" />} 
         {isOut && <AlertTriangle size={10} className="text-red-600 shrink-0" />} 
@@ -2681,7 +2715,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       });
     } else if (activeTab === 'stats') {
       headers.push('Famille / Intervenant', 'Tours de Cantine', 'Jour(s) Préférentiel(s)', 'Tours de Ménage', 'Total Services');
-      familyStats.forEach(s => exportData.push([s.name, s.cantine, s.jourPref, s.menage, s.total]));
+      sortedStats.forEach(s => exportData.push([s.name, s.cantine, s.jourPref, s.menage, s.total]));
     } else if (activeTab === 'famille') {
       if (!selectedFamilyFilter) return alert("Sélectionnez un nom.");
       headers.push('Type', 'Période', 'Date', 'Détails');
@@ -2843,7 +2877,13 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
             )}
 
             {menageEvent && (
-              <div className={`mt-auto flex-1 w-full flex flex-col items-center justify-center relative z-10 rounded-md shadow-sm border p-1 ${familyStyles[menageEvent.familyId] || 'bg-slate-100 text-slate-800 border-slate-300'}`}>
+              <div 
+                className={`mt-auto flex-1 w-full flex flex-col items-center justify-center relative z-10 rounded-md shadow-sm border p-1 cursor-pointer transition-transform hover:scale-95 ${familyStyles[menageEvent.familyId] || 'bg-slate-100 text-slate-800 border-slate-300'}`}
+                onClick={() => {
+                  if (quickFilterFamily === menageEvent.familyId) setQuickFilterFamily(null); // Défiltre si déjà actif
+                  else setQuickFilterFamily(menageEvent.familyId);
+                }}
+              >
                 <div className="text-[16px] leading-none mb-1">🧹🧽🧪</div>
                 <div className="text-[8px] font-black uppercase tracking-wider opacity-80 mb-0.5">Opération Ménage</div>
                 <div className="text-[9.5px] font-extrabold text-center leading-tight break-words w-full">{menageEvent.familyId}</div>
@@ -3107,9 +3147,16 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                 {cordeesData.map((cordee, idx) => (
                   <div key={idx} className={`rounded-2xl p-6 border ${cordee.border} ${cordee.bg} shadow-sm flex flex-col h-full hover:shadow-md transition-shadow`}>
                     <div className="flex items-center gap-4 mb-4">
-                      <div className={`w-14 h-14 rounded-full bg-white flex items-center justify-center text-3xl shadow-sm border ${cordee.border}`}>
-                        {cordee.icon}
+                      
+                      <div className={`w-16 h-16 rounded-full bg-white flex items-center justify-center overflow-hidden shadow-sm border-2 ${cordee.border} shrink-0`}>
+                        <img 
+                          src={cordee.imgUrl} 
+                          alt={cordee.theme} 
+                          className="w-full h-full object-cover"
+                          onError={(e) => { e.target.style.display = 'none'; }}
+                        />
                       </div>
+                      
                       <div>
                         <h3 className={`text-lg font-bold ${cordee.text}`}>{cordee.name}</h3>
                         <span className={`text-xs font-bold uppercase tracking-wider ${cordee.iconCol}`}>{cordee.theme}</span>
@@ -3273,7 +3320,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
             </div>
           )}
 
-          {/* TAB STATS */}
+          {/* TAB STATS AVEC TRI */}
           {activeTab === 'stats' && (
             <div className="animate-in fade-in duration-300 max-w-4xl mx-auto pb-12">
               <div className="text-center mb-8 print:text-left">
@@ -3283,15 +3330,40 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
                 <table className="w-full text-left text-sm">
                   <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
                     <tr>
-                      <th className="p-4 font-bold">Famille</th>
-                      <th className="p-4 font-bold text-center">Cantine</th>
-                      <th className="p-4 font-bold text-center">Jour(s) Préférentiel(s)</th>
-                      <th className="p-4 font-bold text-center">Ménage</th>
-                      <th className="p-4 font-bold text-center">Total Services</th>
+                      <th 
+                        className="p-4 font-bold cursor-pointer hover:bg-slate-100 transition-colors select-none group"
+                        onClick={() => requestSort('id')}
+                      >
+                        Famille {sortConfig.key === 'id' && <span className="ml-1 opacity-70 inline-block">{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>}
+                      </th>
+                      <th 
+                        className="p-4 font-bold text-center cursor-pointer hover:bg-slate-100 transition-colors select-none group"
+                        onClick={() => requestSort('cantine')}
+                      >
+                        Cantine {sortConfig.key === 'cantine' && <span className="ml-1 opacity-70 inline-block">{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>}
+                      </th>
+                      <th 
+                        className="p-4 font-bold text-center cursor-pointer hover:bg-slate-100 transition-colors select-none group"
+                        onClick={() => requestSort('jourPref')}
+                      >
+                        Jour(s) Préférentiel(s) {sortConfig.key === 'jourPref' && <span className="ml-1 opacity-70 inline-block">{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>}
+                      </th>
+                      <th 
+                        className="p-4 font-bold text-center cursor-pointer hover:bg-slate-100 transition-colors select-none group"
+                        onClick={() => requestSort('menage')}
+                      >
+                        Ménage {sortConfig.key === 'menage' && <span className="ml-1 opacity-70 inline-block">{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>}
+                      </th>
+                      <th 
+                        className="p-4 font-bold text-center cursor-pointer hover:bg-slate-100 transition-colors select-none group"
+                        onClick={() => requestSort('total')}
+                      >
+                        Total Services {sortConfig.key === 'total' && <span className="ml-1 opacity-70 inline-block text-amber-500">{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>}
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {familyStats.map((stat, i) => (
+                    {sortedStats.map((stat, i) => (
                       <tr key={i} className="hover:bg-slate-50 transition">
                         <td className="p-4 font-semibold text-slate-800"><FamilyPill id={stat.id} /></td>
                         <td className="p-4 text-center text-blue-600 font-bold">{stat.cantine}</td>
