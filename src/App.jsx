@@ -2075,7 +2075,8 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       
       { date: "2026-12-12", type: "menage", initial: "DE MALAUSSENE", remplacant: "PILON" },
       { date: "2026-12-19", type: "menage", initial: "BEZIAT-MENUT", remplacant: "DE MALAUSSENE" },
-      { date: "2027-06-26", type: "menage", initial: "DE MALAUSSENE", remplacant: "LE LÉZEC" }
+      { date: "2027-04-10", type: "menage", initial: "BEZIAT-MENUT", remplacant: "LE LÉZEC" },
+      { date: "2027-06-26", type: "menage", initial: "DE MALAUSSENE", remplacant: "ANNULÉ" }
     ];
     // ============================================================================
 
