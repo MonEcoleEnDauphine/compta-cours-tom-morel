@@ -2004,9 +2004,9 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
   const [selectedFamilyFilter, setSelectedFamilyFilter] = useState('');
   const [quickFilterFamily, setQuickFilterFamily] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [showPastMonths, setShowPastMonths] = useState(false); // Nouvel état pour le calendrier annuel
   const [monCompteId, setMonCompteId] = useState(null);
 
-  // Nouvel état pour le tri du tableau des statistiques
   const [sortConfig, setSortConfig] = useState({ key: 'total', direction: 'desc' });
 
   const peutVoirAdmin = 
@@ -2073,6 +2073,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { date: "2027-05-13", type: "cantine", initial: "DE PONTE", remplacant: "DE LASTIC ST JAL" },
       { date: "2026-11-20", type: "cantine", initial: "BOCCA", remplacant: "MME BEN GELOUNE" },
       
+            
       { date: "2026-12-12", type: "menage", initial: "DE MALAUSSENE", remplacant: "PILON" },
       { date: "2026-12-19", type: "menage", initial: "BEZIAT-MENUT", remplacant: "DE MALAUSSENE" },
       { date: "2027-04-10", type: "menage", initial: "BEZIAT-MENUT", remplacant: "LE LÉZEC" },
@@ -2429,7 +2430,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
 
   const { familiesList, periodsInfo, schedule, menagesSchedule, familyStats, holidays, cordeesData } = data;
 
-  // LOGIQUE DE TRI DU TABLEAU STATISTIQUES
   const sortedStats = useMemo(() => {
     let sortableItems = [...familyStats];
     if (sortConfig.key !== null) {
@@ -2437,7 +2437,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         let aVal = a[sortConfig.key];
         let bVal = b[sortConfig.key];
 
-        // Pour les enseignants, on les force en bas si on trie par autre chose que le nom
         if (sortConfig.key !== 'id') {
           if (a.isTeacher && !b.isTeacher) return 1;
           if (!a.isTeacher && b.isTeacher) return -1;
@@ -2446,7 +2445,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
         if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
         
-        // Tie-breaker sur le nom
         return String(a.id).localeCompare(String(b.id));
       });
     }
@@ -2667,7 +2665,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
             onClick();
           } else if (clickable) {
             e.stopPropagation();
-            if (quickFilterFamily === id) setQuickFilterFamily(null); // Défiltre si déjà actif
+            if (quickFilterFamily === id) setQuickFilterFamily(null); 
             else setQuickFilterFamily(id);
           }
         }}
@@ -2742,12 +2740,21 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
   };
 
   const renderCalendarGrid = () => {
-    const months = [
+    const allMonths = [
       { y: 2026, m: 8, name: 'Septembre' }, { y: 2026, m: 9, name: 'Octobre' }, { y: 2026, m: 10, name: 'Novembre' },
       { y: 2026, m: 11, name: 'Décembre' }, { y: 2027, m: 0, name: 'Janvier' }, { y: 2027, m: 1, name: 'Février' },
       { y: 2027, m: 2, name: 'Mars' }, { y: 2027, m: 3, name: 'Avril' }, { y: 2027, m: 4, name: 'Mai' },
       { y: 2027, m: 5, name: 'Juin' }
     ];
+
+    const currentY = new Date().getFullYear();
+    const currentM = new Date().getMonth();
+
+    const displayedMonths = allMonths.filter(mo => {
+      if (showPastMonths) return true;
+      return (mo.y > currentY) || (mo.y === currentY && mo.m >= currentM);
+    });
+
     const dayNames = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
     const cells = [];
     
@@ -2761,7 +2768,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
 
     cells.push(<div key="tl" className="bg-slate-100 border-r border-b-2 border-slate-300 sticky top-0 z-20" style={{ gridColumn: 1, gridRow: 1 }}></div>);
 
-    months.forEach((mo, idx) => {
+    displayedMonths.forEach((mo, idx) => {
       cells.push(
         <div key={`header-${idx}`} className="bg-slate-100 font-bold text-center p-2 border-r border-b-2 border-slate-300 sticky top-0 z-10 print:text-[10px] print:p-1" style={{ gridColumn: idx + 2, gridRow: 1 }}>
           {mo.name}
@@ -2777,7 +2784,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       );
     }
 
-    months.forEach((mo, moIdx) => {
+    displayedMonths.forEach((mo, moIdx) => {
       const daysInMonth = new Date(mo.y, mo.m + 1, 0).getDate();
       
       for (let day = 1; day <= 31; day++) {
@@ -2881,7 +2888,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
               <div 
                 className={`mt-auto flex-1 w-full flex flex-col items-center justify-center relative z-10 rounded-md shadow-sm border p-1 cursor-pointer transition-transform hover:scale-95 ${familyStyles[menageEvent.familyId] || 'bg-slate-100 text-slate-800 border-slate-300'}`}
                 onClick={() => {
-                  if (quickFilterFamily === menageEvent.familyId) setQuickFilterFamily(null); // Défiltre si déjà actif
+                  if (quickFilterFamily === menageEvent.familyId) setQuickFilterFamily(null); 
                   else setQuickFilterFamily(menageEvent.familyId);
                 }}
               >
@@ -2897,7 +2904,14 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
 
     return (
       <div className="overflow-x-auto pb-10 calendar-container print:overflow-visible print:pb-0 print:w-full print:max-w-none relative" id="capture-zone">
-        <div className="grid border-t border-l border-slate-200 min-w-[1100px] calendar-grid print:min-w-0 print:w-full print:h-[95vh] blueprint-bg relative z-10" style={{ gridTemplateColumns: "25px repeat(10, minmax(0, 1fr))", gridTemplateRows: "auto repeat(31, minmax(45px, auto))" }}>
+        <div 
+          className="grid border-t border-l border-slate-200 calendar-grid print:min-w-0 print:w-full print:h-[95vh] blueprint-bg relative z-10" 
+          style={{ 
+            minWidth: `${Math.max(800, displayedMonths.length * 110)}px`,
+            gridTemplateColumns: `25px repeat(${displayedMonths.length}, minmax(0, 1fr))`, 
+            gridTemplateRows: "auto repeat(31, minmax(45px, auto))" 
+          }}
+        >
           {cells}
         </div>
       </div>
@@ -3314,8 +3328,14 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
           {/* TAB CALENDRIER */}
           {activeTab === 'calendrier' && (
             <div className="animate-in fade-in duration-300">
-              <div className="text-center mb-6 print:text-left">
+              <div className="flex flex-col sm:flex-row justify-between items-center mb-6 print:mb-6 gap-4 text-center print:text-left">
                 <h2 className="text-2xl font-bold text-slate-800 flex items-center justify-center md:justify-start gap-2"><Microscope className="text-amber-500" /> Calendrier Annuel Global</h2>
+                <button 
+                  onClick={() => setShowPastMonths(!showPastMonths)} 
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 shadow-sm print:hidden"
+                >
+                  <Clock size={16} /> {showPastMonths ? "Masquer les mois passés" : "Afficher l'année complète"}
+                </button>
               </div>
               {renderCalendarGrid()}
             </div>
