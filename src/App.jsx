@@ -2062,6 +2062,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { date: "2026-11-13", type: "cantine", initial: "LE LÉZEC", remplacant: "LE LÉZEC" },
       { date: "2026-11-13", type: "cantine", initial: "LE LÉZEC", remplacant: "LE LÉZEC" },
       { date: "2026-12-12", type: "menage", initial: "DE MALAUSSENE", remplacant: "PILON" },
+      { date: "2027-06-26", type: "menage", initial: "BEZIAT-MENUT", remplacant: "ANNULÉ" },
       { date: "2026-12-19", type: "menage", initial: "BEZIAT-MENUT", remplacant: "DE MALAUSSENE" },
       { date: "2027-06-26", type: "menage", initial: "DE MALAUSSENE", remplacant: "BEZIAT-MENUT" },
       { date: "2027-04-30", type: "cantine", initial: "LE LÉZEC", remplacant: "BOCCA" },
