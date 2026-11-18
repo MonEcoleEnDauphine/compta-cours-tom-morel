@@ -2060,6 +2060,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     const remplacementsManuels = [
       // 1. EXEMPLES DE REMPLACEMENTS SIMPLES (Dépannage, Annulation)
       { date: "2026-11-13", type: "cantine", initial: "LE LÉZEC", remplacant: "LE LÉZEC" },
+      { date: "2026-11-13", type: "cantine", initial: "LE LÉZEC", remplacant: "LE LÉZEC" },
       { date: "2026-12-12", type: "menage", initial: "DE MALAUSSENE", remplacant: "PILON" },
       { date: "2026-12-19", type: "menage", initial: "BEZIAT-MENUT", remplacant: "DE MALAUSSENE" },
       { date: "2027-06-26", type: "menage", initial: "DE MALAUSSENE", remplacant: "BEZIAT-MENUT" },
@@ -2072,8 +2073,9 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { date: "2027-02-01", type: "cantine", initial: "FAUVAIN", remplacant: "DE LA CHARRIE" },
       { date: "2027-02-08", type: "cantine", initial: "DE MALAUSSENE", remplacant: "DE LA CHARRIE" },
       { date: "2027-01-14", type: "cantine", initial: "DE PONTE", remplacant: "DE LASTIC ST JAL" },
-      { date: "2027-05-13", type: "cantine", initial: "DE PONTE", remplacant: "DE LASTIC ST JAL" }
-      
+      { date: "2027-05-13", type: "cantine", initial: "DE PONTE", remplacant: "DE LASTIC ST JAL" }/ { date: "2026-11-20", type: "cantine", initial: "BOCCA", remplacant: "MME BEN GELOUNE" },
+      // { date: "2027-06-26", type: "menage", initial: "DE MALAUSSENE", remplacant: "ANNULÉ" },
+
       // 2. EXEMPLES D'ÉCHANGES CROISÉS (Ménage contre Cantine, etc.)
       // Pour échanger, il suffit de faire 2 lignes ! Les statistiques se croiseront parfaitement.
       // Exemple : BEZIAT-MENUT donne son ménage (19/12) à BOCCA, qui lui donne sa cantine (25/09).
@@ -2491,7 +2493,6 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       document.body.removeChild(link);
   };
 
-  // --- NOUVELLE FONCTION : TOUT AJOUTER À L'AGENDA EN UN CLIC ---
   const handleAddAllToCalendar = (events, familyName) => {
     if (!events || events.length === 0) return;
     
@@ -3034,7 +3035,8 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
         }
       `}</style>
 
-      <div className="max-w-7xl mx-auto">
+      {/* MODIFICATION DE LA LARGEUR DYNAMIQUE DU CONTENEUR SELON L'ONGLET ACTIF */}
+      <div className={`mx-auto transition-all duration-500 ease-in-out ${activeTab === 'calendrier' ? 'max-w-[98%] px-2' : 'max-w-7xl'}`}>
         <header className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 print:hidden">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-amber-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-amber-200">
