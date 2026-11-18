@@ -2060,6 +2060,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
     const remplacementsManuels = [
       // 1. EXEMPLES DE REMPLACEMENTS SIMPLES (Dépannage, Annulation)
       { date: "2026-11-13", type: "cantine", initial: "LE LÉZEC", remplacant: "LE LÉZEC" },
+      { date: "2026-12-12", type: "menage", initial: "DE MALAUSSENE", remplacant: "PILON" },
       { date: "2027-04-30", type: "cantine", initial: "LE LÉZEC", remplacant: "BOCCA" },
       { date: "2027-04-30", type: "cantine", initial: "LE LÉZEC", remplacant: "BEZIAT-MENUT" },
        { date: "2026-10-30", type: "cantine", initial: "DE LA CHARRIE", remplacant: "PILON" },
@@ -2070,6 +2071,7 @@ export const ModulePlannings = ({ defaultTab = 'cantine', utilisateurConnecte })
       { date: "2027-02-08", type: "cantine", initial: "DE MALAUSSENE", remplacant: "DE LA CHARRIE" },
       { date: "2027-01-14", type: "cantine", initial: "DE PONTE", remplacant: "DE LASTIC ST JAL" },
       { date: "2027-05-13", type: "cantine", initial: "DE PONTE", remplacant: "DE LASTIC ST JAL" }
+      
       // 2. EXEMPLES D'ÉCHANGES CROISÉS (Ménage contre Cantine, etc.)
       // Pour échanger, il suffit de faire 2 lignes ! Les statistiques se croiseront parfaitement.
       // Exemple : BEZIAT-MENUT donne son ménage (19/12) à BOCCA, qui lui donne sa cantine (25/09).
