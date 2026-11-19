@@ -227,18 +227,18 @@ const PlaceholderPage = ({ title }) => (
 // --- MODULE : ACCUEIL FAMILLE (Tableau de Bord Dynamique) ---
 
 const handleShareWhatsApp = (type, contenu) => {
-    // ⚠️ REMPLACEZ CETTE URL PAR LA VRAIE URL DE VOTRE SITE VERCEL
-    const lienSite = "https://cours-tom-morel.vercel.app"; 
+    // Récupère automatiquement l'URL exacte de votre site (plus d'erreur possible !)
+    const lienSite = window.location.origin; 
     
     let texte = "";
     if (type === 'rappel') {
-      texte = `🔔 *Nouveau Rappel (Cours Tom Morel)*\n\n👉 ${contenu}\n\n📍 Connectez-vous sur l'Espace Famille pour plus de détails :\n${lienSite}`;
+      texte = `📣 *Flash Info - Cours Tom Morel*\n\n📌 *Rappel important :*\n${contenu}\n\n🔗 *Accédez à votre Espace Famille ici :*\n${lienSite}`;
     } else if (type === 'evenement') {
-      texte = `📅 *Nouvel Événement* : ${contenu}\n\n📍 Consultez le calendrier sur l'Espace Famille :\n${lienSite}`;
+      texte = `📅 *À vos agendas !*\n\nNouvel événement programmé : *${contenu}*\n\n🔗 *Tous les détails sur votre Espace Famille :*\n${lienSite}`;
     }
 
-    // Ouvre WhatsApp avec le texte pré-rempli
-    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(texte)}`;
+    // Ouvre WhatsApp avec une méthode plus robuste pour éviter les bugs de caractères ()
+    const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(texte)}`;
     window.open(whatsappUrl, '_blank');
   };
 
