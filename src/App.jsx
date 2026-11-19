@@ -9,7 +9,7 @@ import {
   Megaphone, Bell, Newspaper, Camera, MessageCircle,
   Utensils, BarChart3, AlertCircle, Printer, CalendarDays,
   ChevronLeft, UploadCloud, Baby, LogOut, Eye, EyeOff, FlaskConical, Microscope, Beaker, Cog,
-  Compass, FileCheck, Key, Wrench
+  Compass, FileCheck, Key, Wrench, Coffee, Car, Gift, Lightbulb, HeartHandshake, MessageSquare
 } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
@@ -8892,6 +8892,217 @@ const ModuleGestionPlanningCantinesMenages = () => {
   );
 };
 
+// --- MODULE : LE CAFÉ DES INVENTEURS (Entraide Familles) ---
+const EntraideFamilles = ({ utilisateurConnecte }) => {
+  const isAdmin = utilisateurConnecte?.role === 'admin' || utilisateurConnecte?.role === 'Administrateur Global';
+  const monNom = utilisateurConnecte?.identifiant || "Inconnu";
+
+  const [annonces, setAnnonces] = useState([]);
+  const [modal, setModal] = useState(false);
+  const [formValue, setFormValue] = useState({
+    type: 'Dons & Échanges',
+    titre: '',
+    description: '',
+    telephone: ''
+  });
+
+  // Lien vers votre groupe WhatsApp global
+  const LIEN_GROUPE_WHATSAPP = "https://chat.whatsapp.com/VOTRE_LIEN_DE_GROUPE_ICI"; 
+
+  useEffect(() => {
+    const q = collection(db, 'artifacts', appId, 'public', 'data', 'petites_annonces');
+    const unsub = onSnapshot(q, (snapshot) => {
+      const liste = [];
+      snapshot.forEach(doc => liste.push({ id: doc.id, ...doc.data() }));
+      // Tri par date de création, du plus récent au plus ancien
+      liste.sort((a, b) => new Date(b.date_creation) - new Date(a.date_creation));
+      setAnnonces(liste);
+    });
+    return () => unsub();
+  }, []);
+
+  // Formater le numéro pour l'API WhatsApp (transforme "06 12..." en "33612...")
+  const formatPhoneForWhatsApp = (phone) => {
+    let cleaned = String(phone).replace(/\D/g, '');
+    if (cleaned.startsWith('0')) {
+      cleaned = '33' + cleaned.substring(1);
+    }
+    return cleaned;
+  };
+
+  const handleContactWhatsApp = (annonce) => {
+    const num = formatPhoneForWhatsApp(annonce.telephone);
+    const text = `Bonjour ${annonce.auteur}, je te contacte suite à ton annonce "${annonce.titre}" sur le portail de l'école Tom Morel.`;
+    window.open(`https://api.whatsapp.com/send?phone=${num}&text=${encodeURIComponent(text)}`, '_blank');
+  };
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    try {
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'petites_annonces'), {
+        ...formValue,
+        auteur: monNom,
+        date_creation: new Date().toISOString()
+      });
+      setModal(false);
+      setFormValue({ type: 'Dons & Échanges', titre: '', description: '', telephone: '' });
+    } catch (err) {
+      alert("Erreur lors de la publication de l'annonce.");
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm("Retirer cette annonce du tableau ?")) {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'petites_annonces', id));
+    }
+  };
+
+  const getStyleParType = (type) => {
+    switch(type) {
+      case 'Covoiturage': return { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-800', icon: <Car size={18} className="text-blue-500" /> };
+      case 'Dons & Échanges': return { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-800', icon: <Gift size={18} className="text-emerald-500" /> };
+      case 'Bons Plans': return { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-800', icon: <Lightbulb size={18} className="text-amber-500" /> };
+      case 'Entraide & Garde': return { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-800', icon: <HeartHandshake size={18} className="text-purple-500" /> };
+      default: return { bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-800', icon: <MessageSquare size={18} className="text-slate-500" /> };
+    }
+  };
+
+  return (
+    <div className="space-y-6 max-w-7xl mx-auto pb-10 font-sans animate-fade-in relative">
+      
+      {/* MODALE D'AJOUT D'ANNONCE */}
+      {modal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl border-4 border-slate-700 w-full max-w-md overflow-hidden">
+            <div className="bg-slate-800 p-6 text-white flex justify-between items-center border-b-4 border-amber-500">
+              <h3 className="font-black text-lg flex items-center gap-2">
+                <PlusCircle className="text-amber-500" size={20}/> Épingler une annonce
+              </h3>
+              <button onClick={() => setModal(false)} className="text-slate-400 hover:text-white transition-colors"><XCircle size={20} /></button>
+            </div>
+            <form onSubmit={handleSave} className="p-6 space-y-4 bg-slate-50">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Catégorie</label>
+                <select value={formValue.type} onChange={e => setFormValue({...formValue, type: e.target.value})} className="w-full border-2 border-slate-300 rounded-xl p-3 text-sm bg-white outline-none focus:border-amber-500 font-bold cursor-pointer">
+                  <option value="Dons & Échanges">🎁 Dons & Échanges (Vêtements, livres...)</option>
+                  <option value="Covoiturage">🚗 Covoiturage</option>
+                  <option value="Entraide & Garde">🤝 Entraide & Garde d'enfants</option>
+                  <option value="Bons Plans">💡 Bons Plans & Sorties</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Sujet de l'annonce *</label>
+                <input type="text" required value={formValue.titre} onChange={e => setFormValue({...formValue, titre: e.target.value})} className="w-full border-2 border-slate-300 rounded-xl p-3 text-sm bg-white outline-none focus:border-amber-500 font-bold" placeholder="Ex: Cherche covoiturage jeudi matin" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Détails *</label>
+                <textarea required value={formValue.description} onChange={e => setFormValue({...formValue, description: e.target.value})} rows="3" className="w-full border-2 border-slate-300 rounded-xl p-3 text-sm bg-white outline-none focus:border-amber-500" placeholder="Ex: J'ai besoin d'un aller pour St-Chef..." />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Numéro WhatsApp *</label>
+                <input type="tel" required value={formValue.telephone} onChange={e => setFormValue({...formValue, telephone: e.target.value})} className="w-full border-2 border-slate-300 rounded-xl p-3 text-sm bg-white outline-none focus:border-amber-500 font-mono" placeholder="06 12 34 56 78" />
+                <p className="text-[10px] text-slate-500 mt-1 font-medium">Les parents utiliseront ce numéro pour vous répondre directement.</p>
+              </div>
+              <div className="pt-4 flex justify-end gap-3 mt-6">
+                <button type="button" onClick={() => setModal(false)} className="px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-200">Annuler</button>
+                <button type="submit" className="px-5 py-2.5 rounded-xl text-sm font-black text-slate-900 bg-amber-400 hover:bg-amber-500 shadow-md flex items-center gap-2 active:scale-95 transition-transform">
+                  <CheckCircle2 size={16}/> Publier
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* BANNIÈRE HERO */}
+      <div className="bg-slate-900 rounded-3xl shadow-xl overflow-hidden relative border-4 border-slate-800 p-8 md:p-10 flex flex-col md:flex-row justify-between items-center gap-6">
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/blueprint.png')] opacity-20 pointer-events-none"></div>
+        <div className="relative z-10">
+          <div className="flex items-center gap-3 mb-3">
+            <span className="bg-slate-800 text-amber-400 border border-slate-700 px-3 py-1 rounded-lg text-xs font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+              <Coffee size={14} /> La Salle de Pause
+            </span>
+          </div>
+          <h2 className="text-3xl md:text-4xl font-black text-white mb-2 tracking-tight">Le Café des Inventeurs ☕</h2>
+          <p className="text-slate-300 text-sm max-w-xl leading-relaxed">
+            Le tableau d'affichage des familles. Postez une annonce, organisez un covoiturage ou répondez directement sur WhatsApp.
+          </p>
+        </div>
+        
+        {/* BOUTON GROUPE GLOBAL */}
+        <a href={LIEN_GROUPE_WHATSAPP} target="_blank" rel="noreferrer" className="relative z-10 shrink-0 bg-emerald-500 hover:bg-emerald-400 text-slate-900 px-6 py-4 rounded-2xl font-black text-sm transition-all shadow-lg shadow-emerald-500/20 active:scale-95 flex flex-col items-center gap-1 border border-emerald-400">
+          <MessageCircle size={24} />
+          <span>Discussion Générale</span>
+        </a>
+      </div>
+
+      <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+        <p className="text-sm font-bold text-slate-600 ml-2">
+          {annonces.length} annonce(s) en cours
+        </p>
+        <button onClick={() => setModal(true)} className="bg-amber-400 text-slate-900 px-5 py-2.5 rounded-xl text-sm font-black hover:bg-amber-500 shadow-md flex items-center gap-2 transition-transform active:scale-95">
+          <PlusCircle size={18}/> Épingler une annonce
+        </button>
+      </div>
+
+      {/* GRILLE DES ANNONCES */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {annonces.map(annonce => {
+          const style = getStyleParType(annonce.type);
+          const estMonAnnonce = annonce.auteur === monNom;
+          const peutSupprimer = isAdmin || estMonAnnonce;
+
+          return (
+            <div key={annonce.id} className={`rounded-2xl border-2 p-5 flex flex-col relative group transition-all duration-300 ${style.bg} ${style.border} hover:shadow-md`}>
+              
+              {peutSupprimer && (
+                <button onClick={() => handleDelete(annonce.id)} className="absolute top-4 right-4 text-slate-400 hover:text-rose-500 bg-white p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shadow-sm border border-slate-200">
+                  <Trash2 size={16}/>
+                </button>
+              )}
+
+              <div className="flex items-center gap-2 mb-3">
+                <span className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase flex items-center gap-1.5 border bg-white ${style.text} ${style.border} shadow-sm`}>
+                  {style.icon} {annonce.type}
+                </span>
+              </div>
+
+              <h3 className="font-black text-lg text-slate-800 mb-2 leading-tight pr-8">{annonce.titre}</h3>
+              <p className="text-sm text-slate-600 mb-6 flex-1 whitespace-pre-line leading-relaxed">{annonce.description}</p>
+
+              <div className="mt-auto border-t border-slate-200/60 pt-4 flex flex-col gap-3">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
+                  <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 uppercase">
+                    {annonce.auteur.charAt(0)}
+                  </div>
+                  Posté par {annonce.auteur}
+                </div>
+                
+                {!estMonAnnonce ? (
+                  <button onClick={() => handleContactWhatsApp(annonce)} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2.5 rounded-xl font-black text-sm transition-all shadow-md active:scale-95 flex items-center justify-center gap-2">
+                    <MessageCircle size={18} /> Répondre (WhatsApp)
+                  </button>
+                ) : (
+                  <div className="w-full bg-slate-100 text-slate-400 px-4 py-2.5 rounded-xl font-bold text-sm text-center border border-slate-200 border-dashed">
+                    C'est votre annonce
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+
+        {annonces.length === 0 && (
+          <div className="col-span-full py-16 flex flex-col items-center justify-center text-center bg-white rounded-3xl border-2 border-dashed border-slate-300">
+            <Coffee size={40} className="text-slate-300 mb-3" />
+            <h3 className="font-bold text-slate-600 text-lg">Le tableau est vide</h3>
+            <p className="text-sm text-slate-400 mt-1 max-w-md">Soyez le premier à épingler une petite annonce pour les familles de l'école.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 export default function App() {
   
@@ -8971,6 +9182,7 @@ export default function App() {
       case 'uniformes_stock': return <PlaceholderPage title="Uniformes & Stock" />;
       case 'gestion_acces': return <ModuleGestionAcces/>;
       case 'parametres_familles': return <ModuleGestionPlanningCantinesMenages />;
+      case 'entraide': return <EntraideFamilles utilisateurConnecte={utilisateurConnecte} />;
       default: return <PlaceholderPage title="Module en construction" />;
     }
   };
@@ -9021,6 +9233,7 @@ export default function App() {
                 {hasAnyFamilyAccess && (
                   <div className="mb-6">
                     <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Espace Famille</h3>
+                    {hasAccess('accueil_famille') && <a href="#entraide" onClick={() => handleNavigation('entraide')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'entraide' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><Coffee size={18} /> Le Café (Entraide)</a>}
                     {hasAccess('accueil_famille') && <a href="#accueil_famille" onClick={() => handleNavigation('accueil_famille')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'accueil_famille' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'} w-full`}><LayoutDashboard size={18} /> Accueil</a>}
                     {hasAccess('vie_ecole') && <a href="#vie_ecole" onClick={() => handleNavigation('vie_ecole')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'vie_ecole' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><Newspaper size={18} /> Vie de l'école</a>}
                     {hasAccess('scolarite') && <a href="#scolarite" onClick={() => handleNavigation('scolarite')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'scolarite' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><GraduationCap size={18} /> Scolarité</a>}
