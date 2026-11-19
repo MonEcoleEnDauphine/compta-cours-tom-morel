@@ -40,10 +40,18 @@ const appId = "cours-tom-morel-erp";
 
 // --- MODULE : ÉCRAN DE CONNEXION (SAS DE SÉCURITÉ) ---
 const EcranConnexion = ({ onLogin }) => {
+  // États classiques de connexion
   const [id, setId] = useState('');
   const [mdp, setMdp] = useState('');
+  const [seSouvenir, setSeSouvenir] = useState(false);
   const [erreur, setErreur] = useState('');
   const [chargement, setChargement] = useState(false);
+
+  // États pour la gestion de la première connexion
+  const [etape, setEtape] = useState('login'); // 'login' | 'prompt' | 'change'
+  const [compteTemp, setCompteTemp] = useState(null);
+  const [nouveauMdp, setNouveauMdp] = useState('');
+  const [confirmMdp, setConfirmMdp] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -52,10 +60,9 @@ const EcranConnexion = ({ onLogin }) => {
 
     // --- PORTE DÉROBÉE ADMIN ---
     if (id.toUpperCase() === 'ADMIN' && mdp === '1234') {
-      onLogin({ id: 'superadmin', identifiant: 'ADMIN', role: 'admin' });
+      onLogin({ id: 'superadmin', identifiant: 'ADMIN', role: 'admin' }, seSouvenir);
       return;
     }
-    // ---------------------------
 
     try {
       const q = collection(db, 'artifacts', appId, 'public', 'data', 'utilisateurs');
@@ -67,86 +74,141 @@ const EcranConnexion = ({ onLogin }) => {
         .find(u => u.identifiant?.toUpperCase().trim() === saisieId && u.mdp === mdp);
 
       if (compte) {
-        onLogin(compte);
+        // Détection de la première connexion (si aChangeMdp n'est pas true)
+        if (compte.role !== 'admin' && compte.role !== 'Administrateur Global' && !compte.aChangeMdp) {
+          setCompteTemp(compte);
+          setEtape('prompt');
+          setChargement(false);
+        } else {
+          onLogin(compte, seSouvenir);
+        }
       } else {
         setErreur('Identifiant ou mot de passe incorrect.');
+        setChargement(false);
       }
     } catch (err) {
       setErreur('Erreur de connexion au serveur.');
-    } finally {
+      setChargement(false);
+    }
+  };
+
+  const handleSkipPasswordChange = async () => {
+    setChargement(true);
+    try {
+      // On marque qu'on lui a proposé, pour ne plus l'embêter
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'utilisateurs', compteTemp.id), {
+        aChangeMdp: true
+      });
+      onLogin({ ...compteTemp, aChangeMdp: true }, seSouvenir);
+    } catch(e) {
+      setErreur("Erreur lors de la mise à jour.");
+      setChargement(false);
+    }
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setErreur('');
+    if (nouveauMdp.length < 6) return setErreur("Le mot de passe doit faire au moins 6 caractères.");
+    if (nouveauMdp !== confirmMdp) return setErreur("Les mots de passe ne correspondent pas.");
+    
+    setChargement(true);
+    try {
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'utilisateurs', compteTemp.id), {
+        mdp: nouveauMdp,
+        aChangeMdp: true
+      });
+      onLogin({ ...compteTemp, mdp: nouveauMdp, aChangeMdp: true }, seSouvenir);
+    } catch(e) {
+      setErreur("Erreur lors de la modification.");
       setChargement(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-xl border border-slate-200/80 p-8 w-full max-w-sm text-center">
+      <div className="bg-white rounded-3xl shadow-xl border border-slate-200/80 p-8 w-full max-w-sm text-center transition-all">
         
-        {/* LOGO DE L'ÉCOLE */}
         <div className="w-20 h-20 mx-auto mb-4 flex items-center justify-center">
-          <img 
-            src={LOGO_URL} 
-            alt="Logo Cours Tom Morel" 
-            className="w-full h-full object-contain"
-          />
+          <img src={LOGO_URL} alt="Logo Cours Tom Morel" className="w-full h-full object-contain" />
         </div>
-
         <h1 className="text-2xl font-black text-slate-800 tracking-tight">Cours Tom Morel</h1>
-        <p className="text-xs text-slate-400 font-medium mt-1 mb-6">Accès à l'espace privé</p>
-
+        
         {erreur && (
-          <div className="mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-600 rounded-xl text-xs font-semibold">
+          <div className="mt-4 p-3 bg-rose-50 border border-rose-200 text-rose-600 rounded-xl text-xs font-semibold animate-fade-in">
             {erreur}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4 text-left">
-          <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-              Identifiant
-            </label>
-            <div className="relative flex items-center">
-              <Users size={16} className="absolute left-3.5 text-slate-400" />
-              <input 
-                type="text" 
-                required 
-                value={id} 
-                onChange={e => setId(e.target.value)} 
-                placeholder="EX: BEZIAT-MENUT" 
-                className="w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold uppercase outline-none focus:ring-2 focus:ring-indigo-600 focus:bg-white transition-all"
-              />
+        {/* ÉTAPE 1 : CONNEXION CLASSIQUE */}
+        {etape === 'login' && (
+          <div className="animate-fade-in">
+            <p className="text-xs text-slate-400 font-medium mt-1 mb-6">Accès à l'espace privé</p>
+            <form onSubmit={handleSubmit} className="space-y-4 text-left">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Identifiant</label>
+                <div className="relative flex items-center">
+                  <Users size={16} className="absolute left-3.5 text-slate-400" />
+                  <input type="text" required value={id} onChange={e => setId(e.target.value)} placeholder="EX: BEZIAT-MENUT" className="w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold uppercase outline-none focus:ring-2 focus:ring-indigo-600 focus:bg-white transition-all" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Mot de passe</label>
+                <div className="relative flex items-center">
+                  <Lock size={16} className="absolute left-3.5 text-slate-400" />
+                  <input type="password" required value={mdp} onChange={e => setMdp(e.target.value)} placeholder="••••••••" className="w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-600 focus:bg-white transition-all" />
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer mt-2 w-fit">
+                <input type="checkbox" checked={seSouvenir} onChange={e => setSeSouvenir(e.target.checked)} className="w-4 h-4 text-indigo-600 rounded border-slate-300" />
+                <span className="text-xs font-bold text-slate-600">Se souvenir de moi</span>
+              </label>
+
+              <button type="submit" disabled={chargement} className="w-full mt-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition-all disabled:opacity-50">
+                {chargement ? 'Connexion…' : <>Se connecter <ChevronRight size={16} /></>}
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* ÉTAPE 2 : PROPOSITION DE CHANGEMENT */}
+        {etape === 'prompt' && (
+          <div className="animate-fade-in text-left mt-6">
+            <h3 className="font-black text-indigo-900 text-lg mb-2">👋 Première connexion !</h3>
+            <p className="text-sm text-slate-600 mb-6 leading-relaxed">
+              Souhaitez-vous personnaliser votre mot de passe pour sécuriser l'accès à votre espace famille ?
+            </p>
+            <div className="flex flex-col gap-3">
+              <button onClick={() => setEtape('change')} className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-md transition-all">
+                Oui, créer mon mot de passe
+              </button>
+              <button onClick={handleSkipPasswordChange} disabled={chargement} className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm rounded-xl transition-all">
+                {chargement ? 'Redirection...' : 'Non, conserver l\'actuel'}
+              </button>
             </div>
           </div>
+        )}
 
-          <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-              Mot de passe
-            </label>
-            <div className="relative flex items-center">
-              <Lock size={16} className="absolute left-3.5 text-slate-400" />
-              <input 
-                type="password" 
-                required 
-                value={mdp} 
-                onChange={e => setMdp(e.target.value)} 
-                placeholder="••••••••" 
-                className="w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-600 focus:bg-white transition-all"
-              />
-            </div>
+        {/* ÉTAPE 3 : FORMULAIRE NOUVEAU MOT DE PASSE */}
+        {etape === 'change' && (
+          <div className="animate-fade-in text-left mt-6">
+            <p className="text-xs text-slate-500 font-bold mb-4 uppercase">Nouveau mot de passe</p>
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div>
+                <input type="password" required value={nouveauMdp} onChange={e => setNouveauMdp(e.target.value)} placeholder="Nouveau mot de passe" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-600" />
+              </div>
+              <div>
+                <input type="password" required value={confirmMdp} onChange={e => setConfirmMdp(e.target.value)} placeholder="Confirmer le mot de passe" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-600" />
+              </div>
+              <button type="submit" disabled={chargement} className="w-full mt-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-md flex items-center justify-center gap-2 transition-all">
+                {chargement ? 'Enregistrement...' : <><CheckCircle2 size={16} /> Enregistrer et continuer</>}
+              </button>
+            </form>
           </div>
+        )}
 
-          <button 
-            type="submit" 
-            disabled={chargement}
-            className="w-full mt-2 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-          >
-            {chargement ? 'Connexion…' : (
-              <>
-                Se connecter <ChevronRight size={16} />
-              </>
-            )}
-          </button>
-        </form>
       </div>
     </div>
   );
@@ -8797,8 +8859,20 @@ const ModuleGestionPlanningCantinesMenages = () => {
 
 
 export default function App() {
+  
   // 1. VARIABLES (Doivent être tout en haut)
-  const [utilisateurConnecte, setUtilisateurConnecte] = useState(null);
+  const [utilisateurConnecte, setUtilisateurConnecte] = useState(() => {
+    // Vérifie si une session "Se souvenir de moi" existe au chargement
+    const savedSession = localStorage.getItem('erp_tom_morel_session');
+    return savedSession ? JSON.parse(savedSession) : null;
+  });
+
+  const handleLogin = (user, rememberMe) => {
+    setUtilisateurConnecte(user);
+    if (rememberMe) {
+      localStorage.setItem('erp_tom_morel_session', JSON.stringify(user));
+    }
+  };
   const [transactionsGlobales, setTransactionsGlobales] = useState([]); // <-- Ajouté ici !
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
@@ -8866,9 +8940,9 @@ export default function App() {
     }
   };
 
-  // 4. BOUCLIER DE SÉCURITÉ (Placé au bon endroit, juste avant l'affichage)
+  // 4. BOUCLIER DE SÉCURITÉ
   if (!utilisateurConnecte) {
-    return <EcranConnexion onLogin={setUtilisateurConnecte} />;
+    return <EcranConnexion onLogin={handleLogin} />;
   }
 
   return (
@@ -8960,7 +9034,7 @@ export default function App() {
         
         {/* BOUTON DÉCONNEXION */}
         <div className="p-4 border-t border-slate-800">
-          <button onClick={() => setUtilisateurConnecte(null)} className="w-full flex items-center justify-center gap-2 text-slate-400 hover:text-rose-400 transition-colors text-sm font-bold">
+          <button onClick={() => { setUtilisateurConnecte(null); localStorage.removeItem('erp_tom_morel_session'); }} className="w-full flex items-center justify-center gap-2 text-slate-400 hover:text-rose-400 transition-colors text-sm font-bold">
             <LogOut size={18} /> Déconnexion
           </button>
         </div>
