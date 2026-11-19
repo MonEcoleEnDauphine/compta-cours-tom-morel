@@ -9173,6 +9173,7 @@ export default function App() {
       case 'factures_parents': return <PlaceholderPage title="Mes Factures (Parents)" />;
       case 'plannings': return <ModulePlannings defaultTab="cantine" utilisateurConnecte={utilisateurConnecte} />;
       case 'fiche_travaux': return <FicheTravaux utilisateurConnecte={utilisateurConnecte} />;
+      case 'entraide': return <EntraideFamilles utilisateurConnecte={utilisateurConnecte} />;
       case 'budget': return <BudgetPrevisionnel transactionsGlobales={transactionsGlobales} />;
       case 'notes_frais': return <NotesFrais transactionsGlobales={transactionsGlobales} />;
       case 'dons_recus': return <DonsRecus transactionsGlobales={transactionsGlobales} />;
@@ -9182,7 +9183,7 @@ export default function App() {
       case 'uniformes_stock': return <PlaceholderPage title="Uniformes & Stock" />;
       case 'gestion_acces': return <ModuleGestionAcces/>;
       case 'parametres_familles': return <ModuleGestionPlanningCantinesMenages />;
-      case 'entraide': return <EntraideFamilles utilisateurConnecte={utilisateurConnecte} />;
+      
       default: return <PlaceholderPage title="Module en construction" />;
     }
   };
@@ -9233,12 +9234,13 @@ export default function App() {
                 {hasAnyFamilyAccess && (
                   <div className="mb-6">
                     <h3 className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider pl-3">Espace Famille</h3>
-                    {hasAccess('accueil_famille') && <a href="#entraide" onClick={() => handleNavigation('entraide')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'entraide' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><Coffee size={18} /> Le Café (Entraide)</a>}
+                    
                     {hasAccess('accueil_famille') && <a href="#accueil_famille" onClick={() => handleNavigation('accueil_famille')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'accueil_famille' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'} w-full`}><LayoutDashboard size={18} /> Accueil</a>}
                     {hasAccess('vie_ecole') && <a href="#vie_ecole" onClick={() => handleNavigation('vie_ecole')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'vie_ecole' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><Newspaper size={18} /> Vie de l'école</a>}
                     {hasAccess('scolarite') && <a href="#scolarite" onClick={() => handleNavigation('scolarite')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'scolarite' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><GraduationCap size={18} /> Scolarité</a>}
                     {hasAccess('factures_parents') && <a href="#factures_parents" onClick={() => handleNavigation('factures_parents')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'factures_parents' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><Receipt size={18} /> Mes Factures</a>}
                     {hasAccess('plannings') && <a href="#plannings" onClick={() => handleNavigation('plannings')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'plannings' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><Calendar size={18} /> Plannings & Ménage</a>}
+                    {hasAccess('accueil_famille') && <a href="#entraide" onClick={() => handleNavigation('entraide')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'entraide' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><Coffee size={18} /> Le Café (Entraide)</a>}
                     {hasAccess('fiche_travaux') && <a href="#fiche_travaux" onClick={() => handleNavigation('fiche_travaux')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'fiche_travaux' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><Hammer size={18} /> Fiche Travaux</a>}
                     {hasAccess('inscriptions') && <a href="#inscriptions" onClick={() => handleNavigation('inscriptions')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'inscriptions' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><FileSignature size={18} /> Inscriptions</a>}
                     {hasAccess('contact') && <a href="#contact" onClick={() => handleNavigation('contact')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === 'contact' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'}`}><Info size={18} /> Infos & Contact</a>}
