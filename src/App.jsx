@@ -8906,8 +8906,8 @@ const EntraideFamilles = ({ utilisateurConnecte }) => {
     telephone: ''
   });
 
-  // Lien vers votre groupe WhatsApp global
-  const LIEN_GROUPE_WHATSAPP = "https://chat.whatsapp.com/VOTRE_LIEN_DE_GROUPE_ICI"; 
+ // Lien vers votre groupe WhatsApp global
+  const LIEN_GROUPE_WHATSAPP = "https://chat.whatsapp.com/CjaE3OllgOzCd0WWsb1WUI";
 
   useEffect(() => {
     const q = collection(db, 'artifacts', appId, 'public', 'data', 'petites_annonces');
