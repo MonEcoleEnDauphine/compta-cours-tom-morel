@@ -225,6 +225,23 @@ const PlaceholderPage = ({ title }) => (
 );
 
 // --- MODULE : ACCUEIL FAMILLE (Tableau de Bord Dynamique) ---
+
+const handleShareWhatsApp = (type, contenu) => {
+    // ⚠️ REMPLACEZ CETTE URL PAR LA VRAIE URL DE VOTRE SITE VERCEL
+    const lienSite = "https://cours-tom-morel.vercel.app"; 
+    
+    let texte = "";
+    if (type === 'rappel') {
+      texte = `🔔 *Nouveau Rappel (Cours Tom Morel)*\n\n👉 ${contenu}\n\n📍 Connectez-vous sur l'Espace Famille pour plus de détails :\n${lienSite}`;
+    } else if (type === 'evenement') {
+      texte = `📅 *Nouvel Événement* : ${contenu}\n\n📍 Consultez le calendrier sur l'Espace Famille :\n${lienSite}`;
+    }
+
+    // Ouvre WhatsApp avec le texte pré-rempli
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(texte)}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
 const AccueilFamille = ({ utilisateurConnecte }) => {
   const isAdmin = utilisateurConnecte?.role === 'admin' || utilisateurConnecte?.role === 'Administrateur Global';
 
@@ -531,12 +548,27 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
             </div>
             <ul className="space-y-3">
               {rappels.map(rappel => (
-                <li key={rappel.id} className="flex items-start justify-between gap-2 text-sm text-slate-600 bg-white p-3 rounded-xl border border-rose-100 shadow-sm group">
+               <li key={rappel.id} className="flex items-start justify-between gap-2 text-sm text-slate-600 bg-white p-3 rounded-xl border border-rose-100 shadow-sm group">
                   <div className="flex items-start gap-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-rose-500 mt-1.5 shrink-0"></div>
                     <span>{rappel.texte}</span>
                   </div>
-                  {isAdmin && <button onClick={() => handleDelete('rappels', rappel.id)} className="text-rose-400 opacity-0 group-hover:opacity-100"><Trash2 size={14}/></button>}
+                  {isAdmin && (
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {/* NOUVEAU BOUTON WHATSAPP */}
+                      <button 
+                        onClick={() => handleShareWhatsApp('rappel', rappel.texte)} 
+                        className="text-emerald-500 hover:bg-emerald-50 p-1.5 rounded-lg transition-colors" 
+                        title="Partager sur le groupe WhatsApp"
+                      >
+                        <MessageCircle size={14} />
+                      </button>
+
+                      <button onClick={() => handleDelete('rappels', rappel.id)} className="text-rose-400 hover:bg-rose-50 p-1.5 rounded-lg transition-colors" title="Supprimer">
+                        <Trash2 size={14}/>
+                      </button>
+                    </div>
+                  )}
                 </li>
               ))}
               {rappels.length === 0 && <li className="text-xs text-slate-400">Aucun rappel actif.</li>}
@@ -569,6 +601,9 @@ const AccueilFamille = ({ utilisateurConnecte }) => {
                     </div>
                     {isAdmin && (
                       <div className="flex items-center gap-1 opacity-0 group-hover/event:opacity-100 transition-opacity shrink-0">
+                        {/* BOUTON WHATSAPP ÉVÉNEMENT */}
+                        <button onClick={() => handleShareWhatsApp('evenement', evt.titre)} className="text-emerald-500 hover:text-emerald-600 p-1.5 hover:bg-emerald-50 rounded-lg transition-colors"><MessageCircle size={14}/></button>
+                        
                         <button onClick={() => openEditModal('evenement', evt)} className="text-slate-400 hover:text-indigo-600 p-1.5 hover:bg-indigo-50 rounded-lg transition-colors"><Edit2 size={14}/></button>
                         <button onClick={() => handleDelete('evenements', evt.id)} className="text-slate-400 hover:text-rose-600 p-1.5 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 size={14}/></button>
                       </div>
