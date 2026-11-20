@@ -8068,7 +8068,6 @@ const GestionEvenements = ({ transactionsGlobales }) => {
   );
 };
 
-
 // --- MODULE : GESTION DES ACCÈS ---
 const ModuleGestionAcces = () => {
   const [utilisateurs, setUtilisateurs] = useState([]);
@@ -8080,29 +8079,36 @@ const ModuleGestionAcces = () => {
 
   const permissionsParRole = {
     'Administrateur Global': {
-      accueil_famille: true, vie_ecole: true, scolarite: true, factures_parents: true, plannings: true, fiche_travaux: true, inscriptions: true, contact: true,
+      accueil_famille: true, vie_ecole: true, scolarite: true, factures_parents: true, plannings: true, fiche_travaux: true, entraide: true, inscriptions: true, contact: true,
       tableau_bord: true, etat_financier: true,
       grand_livre: true, plan_comptable: true, budget: true, notes_frais: true, dons_recus: true, evenements: true,
       gestion_acces: true, parametres_familles: true, dossiers_facturation: true, equipe_contrats: true, uniformes_stock: true
     },
     'Direction': {
-      accueil_famille: true, vie_ecole: false, scolarite: false, factures_parents: false, plannings: true, fiche_travaux: true, inscriptions: true, contact: true,
+      accueil_famille: true, vie_ecole: false, scolarite: false, factures_parents: false, plannings: true, fiche_travaux: true, entraide: true, inscriptions: true, contact: true,
       tableau_bord: false, etat_financier: false,
       grand_livre: false, plan_comptable: false, budget: false, notes_frais: true, dons_recus: false, evenements: false,
       gestion_acces: false, parametres_familles: false, dossiers_facturation: true, equipe_contrats: false, uniformes_stock: false
     },
     'Famille': {
-      accueil_famille: true, vie_ecole: true, scolarite: true, factures_parents: true, plannings: true, fiche_travaux: true, inscriptions: true, contact: true,
+      accueil_famille: true, vie_ecole: true, scolarite: true, factures_parents: true, plannings: true, fiche_travaux: true, entraide: true, inscriptions: true, contact: true,
       tableau_bord: false, etat_financier: false,
       grand_livre: false, plan_comptable: false, budget: false, notes_frais: true, dons_recus: false, evenements: false,
       gestion_acces: false, parametres_familles: false, dossiers_facturation: false, equipe_contrats: false, uniformes_stock: false
     },
     'Famille Asso': {
-      accueil_famille: true, vie_ecole: true, scolarite: true, factures_parents: true, plannings: true, fiche_travaux: true, inscriptions: true, contact: true,
+      accueil_famille: true, vie_ecole: true, scolarite: true, factures_parents: true, plannings: true, fiche_travaux: true, entraide: true, inscriptions: true, contact: true,
       tableau_bord: true, etat_financier: true,
       grand_livre: false, plan_comptable: false, budget: true, notes_frais: true, dons_recus: true, evenements: true,
       gestion_acces: false, parametres_familles: true, dossiers_facturation: true, equipe_contrats: true, uniformes_stock: true
     }
+  };
+
+  const CATEGORIES = {
+    "Espace Famille": ['accueil_famille', 'vie_ecole', 'scolarite', 'factures_parents', 'plannings', 'fiche_travaux', 'entraide', 'inscriptions', 'contact'],
+    "Pilotage": ['tableau_bord', 'etat_financier'],
+    "Compta & Finances": ['grand_livre', 'plan_comptable', 'budget', 'notes_frais', 'dons_recus', 'evenements'],
+    "Administration": ['gestion_acces', 'parametres_familles', 'dossiers_facturation', 'equipe_contrats', 'uniformes_stock']
   };
 
   const handleRoleChange = (e) => {
@@ -8116,13 +8122,6 @@ const ModuleGestionAcces = () => {
       role: nouveauRole,
       modules: nouvellesPermissions
     }));
-  };
-
-  const CATEGORIES = {
-    "Espace Famille": ['accueil_famille', 'vie_ecole', 'scolarite', 'factures_parents', 'plannings', 'fiche_travaux', 'inscriptions', 'contact'],
-    "Pilotage": ['tableau_bord', 'etat_financier'],
-    "Compta & Finances": ['grand_livre', 'plan_comptable', 'budget', 'notes_frais', 'dons_recus', 'evenements'],
-    "Administration": ['gestion_acces', 'parametres_familles', 'dossiers_facturation', 'equipe_contrats', 'uniformes_stock']
   };
 
   useEffect(() => {
@@ -8218,6 +8217,16 @@ const ModuleGestionAcces = () => {
     } catch (err) {
       setModalConfig({ isOpen: true, type: 'error', message: "Une erreur est survenue lors de l'enregistrement." });
     }
+  };
+
+  const handleShareWhatsAppAcces = (user) => {
+    const lienSite = window.location.origin;
+    const prenom = user.identifiant ? user.identifiant.split('-')[0].charAt(0).toUpperCase() + user.identifiant.split('-')[0].slice(1).toLowerCase() : "Famille";
+    
+    const texte = `🎓 *Bienvenue au Cours Tom Morel !*\n\nBonjour ${prenom} 👋,\nTon accès à l'Espace Famille (ERP) vient d'être activé.\n\nVoici tes identifiants confidentiels :\n👤 *Identifiant :* ${user.identifiant}\n🔑 *Mot de passe :* ${user.mdp}\n\n👉 Connecte-toi dès maintenant en cliquant ici :\n${lienSite}\n\n*(Astuce : À ta première connexion, tu pourras personnaliser ton mot de passe)* 😉\n\nÀ très vite !`;
+
+    const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(texte)}`;
+    window.open(whatsappUrl, '_blank');
   };
 
   return (
@@ -8324,11 +8333,19 @@ const ModuleGestionAcces = () => {
                   </button>
                 </div>
 
-                <div className="pr-16 mb-3">
+                <div className="pr-16 mb-3 flex items-center gap-2 flex-wrap">
                   <span className="font-black text-slate-800 text-lg">{u.identifiant}</span>
-                  <span className={`text-[10px] font-bold uppercase ml-2 px-2 py-0.5 rounded border ${u.role === 'admin' || u.role === 'Administrateur Global' ? 'bg-rose-50 text-rose-700 border-rose-100' : 'bg-indigo-50 text-indigo-700 border-indigo-100'}`}>
+                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${u.role === 'admin' || u.role === 'Administrateur Global' ? 'bg-rose-50 text-rose-700 border-rose-100' : 'bg-indigo-50 text-indigo-700 border-indigo-100'}`}>
                     {u.role}
                   </span>
+                  {/* NOUVEAU BOUTON WHATSAPP */}
+                  <button 
+                    onClick={() => handleShareWhatsAppAcces(u)} 
+                    className="ml-auto text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border border-emerald-200 px-2 py-1 rounded transition-colors flex items-center gap-1 shadow-sm"
+                    title="Envoyer les identifiants sur WhatsApp"
+                  >
+                    <MessageCircle size={12} /> Inviter
+                  </button>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 mb-3 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
@@ -8370,6 +8387,7 @@ const ModuleGestionAcces = () => {
 
 
 // --- MODULE : GESTION DU PLANNING CANTINES & MENAGES PAR FAMILLE---
+
 const ModuleGestionPlanningCantinesMenages = () => {
   const [familles, setFamilles] = useState([]);
   const [parametres, setParametres] = useState({ 
